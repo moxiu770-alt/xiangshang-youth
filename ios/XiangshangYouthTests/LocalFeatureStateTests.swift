@@ -138,6 +138,29 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertEqual(restored.localFeatures.selectedChildID, "s02")
     }
 
+    func testSessionRestoreFailureReturnsToLoginWithRetryableError() async throws {
+        let suite = "xiangshang.youth.restore-failure-tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let store = LocalFeatureStore(defaults: defaults)
+        store.update { value in
+            value.sessionProfile = UserProfile(id: "u1", name: "王女士", phone: "13800138000", role: .parent, schoolName: "向上实验小学", avatarInitials: "王")
+            value.sessionRole = .principal
+        }
+
+        let state = AppState(repository: FailingRepository(), featureStore: store)
+        for _ in 0..<40 {
+            if state.error != nil || state.profile == nil { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        XCTAssertNil(state.profile)
+        XCTAssertNil(state.selectedRole)
+        XCTAssertNil(state.data)
+        XCTAssertNotNil(state.error)
+        XCTAssertNil(LocalFeatureStore(defaults: defaults).state.sessionProfile)
+    }
+
     func testMessageReadStatePersistsAndUpdatesUnreadCount() async {
         let suite = "xiangshang.youth.message-tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
@@ -150,4 +173,9 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertEqual(state.unreadMessageCount, 0)
         XCTAssertTrue(LocalFeatureStore(defaults: defaults).state.readMessageIDs.contains("m1"))
     }
+}
+
+private struct FailingRepository: YouthRepository {
+    func loadDashboard() async throws -> DashboardData { throw ApiError.network }
+    func report(for student: Student) -> DiagnosisReport { MockRepository.shared.report(for: student) }
 }

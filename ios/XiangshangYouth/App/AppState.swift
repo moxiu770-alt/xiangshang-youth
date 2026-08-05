@@ -29,7 +29,25 @@ import SwiftUI
                 do {
                     self.data = try await repository.loadDashboard()
                     self.selectedChild = self.data?.students.first(where: { $0.id == self.localFeatures.selectedChildID && self.localFeatures.boundChildIDs.contains($0.id) })
-                } catch { self.handleDashboardError(error) }
+            } catch {
+                if case ApiError.unauthorized = error {
+                    self.handleDashboardError(error)
+                } else {
+                    // A persisted session is only useful when its dashboard can be
+                    // refreshed.  Do not send the user into role selection with a
+                    // nil dashboard (which would leave every workbench loading
+                    // forever); return to login with an actionable error instead.
+                    self.mutateLocal { values in
+                        values.sessionProfile = nil
+                        values.sessionRole = nil
+                    }
+                    self.profile = nil
+                    self.selectedRole = nil
+                    self.selectedChild = nil
+                    self.data = nil
+                    self.error = error.localizedDescription
+                }
+            }
             }
         }
         // Local visual-regression entry point.  It is inert unless Xcode/simctl passes

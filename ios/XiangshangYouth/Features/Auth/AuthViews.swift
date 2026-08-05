@@ -248,6 +248,7 @@ struct RegisterView: View {
     @State private var confirmed = false
     @State private var error: String?
     @State private var submitted = false
+    @State private var codeSent = false
     @State private var codeCountdown = 0
     @State private var countdownTask: Task<Void, Never>?
 
@@ -270,8 +271,9 @@ struct RegisterView: View {
                         TextField("手机号", text: $phone).keyboardType(.phonePad)
                         HStack(spacing: 8) {
                             TextField("短信验证码", text: $code).keyboardType(.numberPad)
-                            Button(codeCountdown > 0 ? "\(codeCountdown)s" : code.isEmpty ? "获取验证码" : "重新获取") {
+                            Button(codeCountdown > 0 ? "\(codeCountdown)s" : codeSent ? "重新获取" : "获取验证码") {
                                 guard phone.filter(\.isNumber).count == 11 else { error = "请先填写 11 位手机号。"; return }
+                                codeSent = true
                                 code = "1234"
                                 codeCountdown = 60
                                 countdownTask?.cancel()

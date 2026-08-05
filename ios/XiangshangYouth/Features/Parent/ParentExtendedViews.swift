@@ -297,7 +297,19 @@ struct AccountDashboard: View {
 struct AppSettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var state: AppState
-    var body: some View { NavigationStack { Form { Section("通知与显示") { Toggle("接收测评与班级通知", isOn: Binding(get: { state.localFeatures.settings.notificationsEnabled }, set: { state.updateSettings(notificationsEnabled: $0) })); Toggle("减少动态效果", isOn: Binding(get: { state.localFeatures.settings.reduceMotion }, set: { state.updateSettings(reduceMotion: $0) })); Text("设置已自动保存，并将在下次启动后保留。").font(.footnote).foregroundStyle(.secondary) } }.navigationTitle("设置").toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } } } }
+    @State private var permissionMessage: String?
+    var body: some View { NavigationStack { Form { Section("通知与显示") { Toggle("接收测评与班级通知", isOn: Binding(get: { state.localFeatures.settings.notificationsEnabled }, set: { enabled in
+                        if enabled {
+                            Task { @MainActor in
+                                let granted = await NotificationPermission.request()
+                                state.updateSettings(notificationsEnabled: granted)
+                                permissionMessage = granted ? nil : "系统通知权限未开启，可在系统设置中允许通知。"
+                            }
+                        } else {
+                            state.updateSettings(notificationsEnabled: false)
+                            permissionMessage = nil
+                        }
+                    })); Toggle("减少动态效果", isOn: Binding(get: { state.localFeatures.settings.reduceMotion }, set: { state.updateSettings(reduceMotion: $0) })); if let permissionMessage { Text(permissionMessage).font(.footnote).foregroundStyle(.orange) }; Text("设置已自动保存，并将在下次启动后保留。").font(.footnote).foregroundStyle(.secondary) } }.navigationTitle("设置").toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } } } }
 }
 
 struct AccountInfoSheet: View {

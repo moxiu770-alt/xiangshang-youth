@@ -1,7 +1,9 @@
 package com.xiangshang.youth.feature.parent
 
+import android.Manifest
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -16,6 +18,8 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -354,7 +358,33 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
     accountInfo?.let { title -> AccountInfoDialog(title, sendSupport) { accountInfo = null } }
 }
 
-@Composable fun SettingsDialog(notifications: Boolean, reduceMotion: Boolean, update: (Boolean?, Boolean?) -> Unit, dismiss: () -> Unit) { var notify by remember { mutableStateOf(notifications) }; var reduce by remember { mutableStateOf(reduceMotion) }; AlertDialog(onDismissRequest = dismiss, title = { Text("设置") }, text = { Column { Row(verticalAlignment = Alignment.CenterVertically) { Text("接收测评与班级通知", modifier = Modifier.weight(1f)); Switch(checked = notify, onCheckedChange = { notify = it }) }; Row(verticalAlignment = Alignment.CenterVertically) { Text("减少动态效果", modifier = Modifier.weight(1f)); Switch(checked = reduce, onCheckedChange = { reduce = it }) }; Text("设置会自动保存并在下次启动后保留。", color = Color.Gray, fontSize = 10.sp, modifier = Modifier.padding(top = 9.dp)) } }, confirmButton = { TextButton(onClick = { update(notify, reduce); dismiss() }) { Text("保存") } }, dismissButton = { TextButton(onClick = dismiss) { Text("取消") } }) }
+@Composable fun SettingsDialog(notifications: Boolean, reduceMotion: Boolean, update: (Boolean?, Boolean?) -> Unit, dismiss: () -> Unit) {
+    var notify by remember { mutableStateOf(notifications) }
+    var reduce by remember { mutableStateOf(reduceMotion) }
+    var permissionMessage by remember { mutableStateOf<String?>(null) }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        notify = granted
+        permissionMessage = if (granted) null else "系统通知权限未开启，可在系统设置中允许通知。"
+    }
+    AlertDialog(
+        onDismissRequest = dismiss,
+        title = { Text("设置") },
+        text = { Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("接收测评与班级通知", modifier = Modifier.weight(1f))
+                Switch(checked = notify, onCheckedChange = { enabled ->
+                    if (enabled && Build.VERSION.SDK_INT >= 33) permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    else { notify = enabled; permissionMessage = null }
+                })
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) { Text("减少动态效果", modifier = Modifier.weight(1f)); Switch(checked = reduce, onCheckedChange = { reduce = it }) }
+            permissionMessage?.let { Text(it, color = Color(0xFFFF8B1F), fontSize = 10.sp, modifier = Modifier.padding(top = 7.dp)) }
+            Text("设置会自动保存并在下次启动后保留。", color = Color.Gray, fontSize = 10.sp, modifier = Modifier.padding(top = 9.dp))
+        } },
+        confirmButton = { TextButton(onClick = { update(notify, reduce); dismiss() }) { Text("保存") } },
+        dismissButton = { TextButton(onClick = dismiss) { Text("取消") } }
+    )
+}
 
 @Composable
 private fun AccountInfoDialog(title: String, sendSupport: (String) -> Unit, dismiss: () -> Unit) {

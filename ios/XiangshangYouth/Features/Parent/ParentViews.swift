@@ -67,6 +67,7 @@ struct ParentLandingView: View {
     @EnvironmentObject private var state: AppState; @EnvironmentObject private var router: AppRouter
     @State private var activityDetail: String?
     @State private var expertDetail: String?
+    @State private var healthChannelDetail: String?
     var body: some View { ScrollView { VStack(spacing: 9) {
         ReferenceHeader(name: state.selectedChild?.name ?? "王小明", school: "\(state.selectedChild?.className ?? "三年级2班") · 点击切换孩子", initial: String((state.selectedChild?.name ?? "王").prefix(1)), avatarAsset: "ChildAvatar", identityAction: { router.push(.children) })
         Button { activityDetail = "向上少年健康成长季" } label: { ParentCampaignCard() }.buttonStyle(.plain).padding(.horizontal, 9)
@@ -94,7 +95,7 @@ struct ParentLandingView: View {
             ParentCourseTeaser(image: "ActivityFootball", title: "运动表现课")
             ParentCourseTeaser(image: "ActivityBalance", title: "心理舒展课")
         }.padding(.horizontal, 12)
-        ReferenceSectionTitle(title: "健康科普", trailing: "关注公众号").padding(.horizontal, 12)
+        ReferenceSectionTitle(title: "健康科普", trailing: "关注公众号", action: { healthChannelDetail = "向上少年健康成长公众号" }).padding(.horizontal, 12)
         VStack(spacing: 7) {
             ParentArticleRow(title: "儿童科学长高的 5 个关键习惯", detail: "成长专栏 · 3分钟前")
             ParentArticleRow(title: "居家体态训练 10 分钟", detail: "健康专栏 · 今日推荐")
@@ -109,6 +110,7 @@ struct ParentLandingView: View {
         }
         .sheet(item: Binding(get: { activityDetail.map(CourseSheetItem.init) }, set: { activityDetail = $0?.name })) { item in ActivityDetailSheet(title: item.name) }
         .sheet(item: Binding(get: { expertDetail.map(CourseSheetItem.init) }, set: { expertDetail = $0?.name })) { item in ExpertDetailSheet(name: item.name) }
+        .sheet(item: Binding(get: { healthChannelDetail.map(CourseSheetItem.init) }, set: { healthChannelDetail = $0?.name })) { item in HealthArticleSheet(title: item.name) }
     }
     private func metric(_ icon: String, _ title: String, _ subtitle: String, _ color: Color) -> some View {
         Button { if let child = state.selectedChild { router.push(.report(child)) } } label: {

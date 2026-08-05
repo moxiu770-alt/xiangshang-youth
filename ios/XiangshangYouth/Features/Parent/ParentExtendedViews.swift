@@ -86,6 +86,7 @@ struct ParentCoursesDashboard: View {
 
 struct ParentClassCircleDashboard: View {
     @EnvironmentObject private var state: AppState
+    @EnvironmentObject private var router: AppRouter
     @State private var isComposerShown = false
     @State private var selectedMoment: String?
     @State private var editingPost: ClassPostDraft?
@@ -129,22 +130,22 @@ struct ParentClassCircleDashboard: View {
                 }
                 ReferenceCard {
                     VStack(alignment: .leading, spacing: 8) {
-                        ReferenceSectionTitle(title: "班级之星", trailing: "查看全部")
+                        ReferenceSectionTitle(title: "班级之星", trailing: "查看全部", action: { selectedMoment = "班级之星榜单" })
                         HStack { star("勤劳之星", "陈乐乐", ReferenceColor.yellow); star("运动之星", state.selectedChild?.name ?? "王小明", ReferenceColor.blue); star("阅读之星", "李安然", ReferenceColor.purple) }
                     }
                 }.padding(.horizontal, 12)
                 ReferenceCard {
                     VStack(alignment: .leading, spacing: 7) {
-                        ReferenceSectionTitle(title: "本月打卡", trailing: "查看记录")
+                        ReferenceSectionTitle(title: "本月打卡", trailing: "查看记录", action: { selectedMoment = "本月运动打卡记录" })
                         Text("✓  ✓  ✓  ✓  ·  ✓  ✓  ·  ✓  ✓  ✓  ✓  ✓  ·  ✓").font(.system(size: 15)).foregroundStyle(ReferenceColor.green)
                         Text("小明本月完成 15 次运动打卡，继续加油！").font(.system(size: 9)).foregroundStyle(.secondary)
                     }
                 }.padding(.horizontal, 12)
-                ReferenceSectionTitle(title: "延时课堂精彩瞬间", trailing: "查看全部").padding(.horizontal, 12)
+                ReferenceSectionTitle(title: "延时课堂精彩瞬间", trailing: "查看全部", action: { router.push(.parentCourses) }).padding(.horizontal, 12)
                 HStack(spacing: 8) { moment("ActivityFootball", "足球启蒙"); moment("ActivityClassroom", "健康课堂"); moment("ActivityBalance", "亲子平衡") }.padding(.horizontal, 12)
-                ReferenceSectionTitle(title: "推荐课程", trailing: "查看详情").padding(.horizontal, 12)
+                ReferenceSectionTitle(title: "推荐课程", trailing: "查看详情", action: { router.push(.parentCourses) }).padding(.horizontal, 12)
                 CourseSuggestionBanner().padding(.horizontal, 12)
-                ReferenceSectionTitle(title: "我的课程", trailing: "全部课程").padding(.horizontal, 12)
+                ReferenceSectionTitle(title: "我的课程", trailing: "全部课程", action: { router.push(.parentCourses) }).padding(.horizontal, 12)
                 UpcomingTrainingCard().padding(.horizontal, 12)
             }.padding(.bottom, 10)
         }.background(ReferenceColor.canvas)
@@ -154,7 +155,13 @@ struct ParentClassCircleDashboard: View {
         }
         .sheet(isPresented: $isComposerShown) { PublishClassPostSheet(author: "王女士") }
         .sheet(item: $editingPost) { post in PublishClassPostSheet(author: post.author, editingPost: post) }
-        .sheet(item: Binding(get: { selectedMoment.map(CourseSheetItem.init) }, set: { selectedMoment = $0?.name })) { item in CourseDetailSheet(title: item.name) }
+        .sheet(item: Binding(get: { selectedMoment.map(CourseSheetItem.init) }, set: { selectedMoment = $0?.name })) { item in
+            if item.name.contains("榜单") || item.name.contains("打卡记录") {
+                CircleInfoSheet(title: item.name)
+            } else {
+                CourseDetailSheet(title: item.name)
+            }
+        }
         .sheet(item: Binding(get: { commentPostID.map(CommentSheetItem.init) }, set: { commentPostID = $0?.id })) { item in
             NavigationStack { VStack(spacing: 14) { if commentSubmitted { Image(systemName: "checkmark.circle.fill").font(.system(size: 44)).foregroundStyle(ReferenceColor.green); Text("评论已发布").font(.headline); Text("班级成员可以看到你的留言。").font(.footnote).foregroundStyle(.secondary); Button("完成") { commentPostID = nil }.buttonStyle(.borderedProminent) } else { Text("给这条动态留言").font(.headline); TextField("说点鼓励的话…", text: $commentDraft, axis: .vertical).textFieldStyle(.roundedBorder); Button("发布评论") { if let postID = commentPostID { state.addClassPostComment(postID: postID, text: commentDraft) }; commentSubmitted = true }.buttonStyle(.borderedProminent).disabled(commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }; Spacer() }.padding(20).navigationTitle("评论").toolbar { ToolbarItem(placement: .topBarTrailing) { Button("取消") { commentPostID = nil } } } }
         }
@@ -165,6 +172,33 @@ struct ParentClassCircleDashboard: View {
 }
 
 private struct CommentSheetItem: Identifiable { let id: UUID }
+
+private struct CircleInfoSheet: View {
+    let title: String
+    @Environment(\.dismiss) private var dismiss
+    var body: some View {
+        NavigationStack {
+            List {
+                if title.contains("榜单") {
+                    Section("本月班级之星") {
+                        LabeledContent("勤劳之星", value: "陈乐乐")
+                        LabeledContent("运动之星", value: "王小明")
+                        LabeledContent("阅读之星", value: "李安然")
+                    }
+                } else {
+                    Section("王小明的运动打卡") {
+                        LabeledContent("本月完成", value: "15 次")
+                        LabeledContent("连续打卡", value: "5 天")
+                        Text("打卡数据会在学校活动和家庭运动记录同步后自动更新。")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .navigationTitle(title)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
+        }
+    }
+}
 
 struct AccountDashboard: View {
     @EnvironmentObject private var state: AppState

@@ -12,6 +12,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -88,5 +91,24 @@ import com.xiangshang.youth.core.model.*
 @Composable fun EmptyState(text: String = "暂无数据") { Box(Modifier.fillMaxWidth().padding(32.dp).semantics { contentDescription = text }, contentAlignment = Alignment.Center) { Text(text, color = Color.Gray) } }
 @Composable fun LoadingState() { Box(Modifier.fillMaxWidth().padding(32.dp).semantics { contentDescription = "正在加载" }, contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
 @Composable fun ErrorState(text: String, retry: () -> Unit = {}) { Column(Modifier.fillMaxWidth().padding(24.dp).semantics { contentDescription = "加载失败：$text" }, horizontalAlignment = Alignment.CenterHorizontally) { Text(text, color = Color.Red); TextButton(onClick = retry) { Text("重试") } } }
-@Composable fun FilterBar() { Text("本轮综合测评  ·  2026秋季", color = Blue, fontSize = 12.sp, modifier = Modifier.background(Sky, RoundedCornerShape(14.dp)).padding(8.dp)) }
-@Composable fun GradeClassSelector() { Text("三年级  ·  三年级2班", color = Navy, fontSize = 12.sp, modifier = Modifier.background(Color.White, RoundedCornerShape(10.dp)).padding(10.dp)) }
+@Composable fun FilterBar(options: List<String> = listOf("本轮综合测评", "2026秋季"), selected: String = options.firstOrNull().orEmpty(), onSelected: (String) -> Unit = {}) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        options.forEach { option ->
+            FilterChip(selected = option == selected, onClick = { onSelected(option) }, label = { Text(option, fontSize = 10.sp) }, modifier = Modifier.semantics { contentDescription = "筛选：$option" })
+        }
+    }
+}
+@Composable fun GradeClassSelector(grades: List<String> = listOf("三年级"), classes: List<String> = listOf("三年级2班"), selectedGrade: String = grades.firstOrNull().orEmpty(), selectedClass: String = classes.firstOrNull().orEmpty(), onGradeSelected: (String) -> Unit = {}, onClassSelected: (String) -> Unit = {}) {
+    Row(Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(10.dp)).padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        DropdownSelector(selectedGrade, grades, onGradeSelected, "选择年级")
+        Divider(Modifier.height(22.dp).padding(horizontal = 4.dp))
+        DropdownSelector(selectedClass, classes, onClassSelected, "选择班级")
+    }
+}
+@Composable private fun DropdownSelector(selected: String, options: List<String>, onSelected: (String) -> Unit, description: String) {
+    var expanded by androidx.compose.runtime.remember { mutableStateOf(false) }
+    Box {
+        TextButton(onClick = { expanded = true }, modifier = Modifier.semantics { contentDescription = description }) { Text(selected, color = Navy, fontSize = 11.sp) }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) { options.forEach { option -> DropdownMenuItem(text = { Text(option) }, onClick = { onSelected(option); expanded = false }) } }
+    }
+}

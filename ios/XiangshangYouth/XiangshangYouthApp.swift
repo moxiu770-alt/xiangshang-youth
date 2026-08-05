@@ -37,8 +37,8 @@ struct RootView: View {
             router.receiveDeepLink(url)
             router.activatePendingDeepLink(using: state)
         }
-        .onChange(of: state.selectedRole) { _ in router.activatePendingDeepLink(using: state) }
-        .onChange(of: state.data?.students.count ?? 0) { _ in router.activatePendingDeepLink(using: state) }
+        .onChange(of: state.selectedRole) { _, _ in router.activatePendingDeepLink(using: state) }
+        .onChange(of: state.data?.students.count ?? 0) { _, _ in router.activatePendingDeepLink(using: state) }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active, state.profile != nil, state.data != nil else { return }
             Task { await state.refreshDashboard() }

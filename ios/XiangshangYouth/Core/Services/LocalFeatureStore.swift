@@ -10,6 +10,8 @@ struct LocalFeatureState: Codable, Equatable {
     var courseProgress: [String: Double] = [:]
     var supportMessages: [SupportChatMessage] = []
     var classPosts: [ClassPostDraft] = []
+    var likedClassPostIDs: Set<UUID> = []
+    var classPostComments: [ClassPostComment] = []
     var uploadedTaskIDs: Set<String> = []
     var checkInDates: Set<String> = []
     var drafts: [String: String] = [:]
@@ -78,6 +80,14 @@ struct ClassPostDraft: Codable, Identifiable, Equatable {
     let createdAt: Date
 }
 
+struct ClassPostComment: Codable, Identifiable, Equatable {
+    let id: UUID
+    let postID: UUID
+    let author: String
+    let text: String
+    let createdAt: Date
+}
+
 @MainActor
 final class LocalFeatureStore: ObservableObject {
     @Published private(set) var state: LocalFeatureState
@@ -110,6 +120,8 @@ final class LocalFeatureStore: ObservableObject {
         if legacy["selectedChildID"] == nil { legacy["selectedChildID"] = NSNull() }
         if legacy["boundChildIDs"] == nil { legacy["boundChildIDs"] = [String]() }
         if legacy["readMessageIDs"] == nil { legacy["readMessageIDs"] = [String]() }
+        if legacy["likedClassPostIDs"] == nil { legacy["likedClassPostIDs"] = [String]() }
+        if legacy["classPostComments"] == nil { legacy["classPostComments"] = [[String: Any]]() }
         guard let migrated = try? JSONSerialization.data(withJSONObject: legacy) else { return nil }
         return try? decoder.decode(LocalFeatureState.self, from: migrated)
     }

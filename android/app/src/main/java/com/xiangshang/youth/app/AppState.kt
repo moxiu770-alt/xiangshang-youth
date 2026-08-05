@@ -94,6 +94,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun sendSupport(text: String) { if (text.isBlank()) return; mutate { it.copy(supportMessages = it.supportMessages + SupportMessage(text, true) + SupportMessage("已收到您的咨询，客服老师会在工作时间内为您回复。", false)) } }
     fun publishPost(author: String, content: String) { if (content.isBlank()) return; mutate { it.copy(classPosts = listOf(ClassPost(author = author, content = content)) + it.classPosts) } }
     fun updatePost(id: String, content: String) { if (content.isBlank()) return; mutate { local -> local.copy(classPosts = local.classPosts.map { if (it.id == id) it.copy(content = content) else it }) } }
+    fun togglePostLike(postId: String) = mutate { local -> local.copy(likedPostIds = if (postId in local.likedPostIds) local.likedPostIds - postId else local.likedPostIds + postId) }
+    fun addPostComment(postId: String, content: String) { val trimmed = content.trim(); if (trimmed.isBlank()) return; mutate { local -> local.copy(postComments = local.postComments + (postId to (local.postComments[postId].orEmpty() + trimmed))) } }
     fun saveDraft(key: String, content: String) = mutate { it.copy(drafts = it.drafts + (key to content)) }
     fun clearDraft(key: String) = mutate { it.copy(drafts = it.drafts - key) }
     fun bookExpert(name: String, date: String, note: String) { if (date.isBlank() || note.isBlank()) return; mutate { it.copy(expertAppointments = listOf(ExpertAppointment(expertName = name, preferredDate = date, note = note)) + it.expertAppointments) } }

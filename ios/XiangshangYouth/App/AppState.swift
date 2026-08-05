@@ -132,6 +132,19 @@ import SwiftUI
             values.classPosts[index].content = text
         }
     }
+    func toggleClassPostLike(_ id: UUID) {
+        mutateLocal { values in
+            if values.likedClassPostIDs.contains(id) { values.likedClassPostIDs.remove(id) }
+            else { values.likedClassPostIDs.insert(id) }
+        }
+    }
+    func addClassPostComment(postID: UUID, text: String, author: String = "王女士") {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        mutateLocal { values in
+            values.classPostComments.append(ClassPostComment(id: UUID(), postID: postID, author: author, text: trimmed, createdAt: .now))
+        }
+    }
     func saveDraft(_ text: String, key: String) { mutateLocal { $0.drafts[key] = text } }
     func clearDraft(_ key: String) { mutateLocal { $0.drafts.removeValue(forKey: key) } }
     func clearDrafts(prefix: String) { mutateLocal { values in let keys = values.drafts.keys.filter { $0.hasPrefix(prefix) }; keys.forEach { values.drafts.removeValue(forKey: $0) } } }

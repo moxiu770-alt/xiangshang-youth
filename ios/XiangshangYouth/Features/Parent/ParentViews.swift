@@ -224,7 +224,7 @@ struct ParentPageNavigation: View {
             Text(title).font(.system(size: 15, weight: .bold))
             HStack {
                 Spacer()
-                Button { router.push(.notifications) } label: {
+                Button { router.push(state.selectedRole == .teacher ? .teacherMessages : .notifications) } label: {
                     Image(systemName: "bell").font(.system(size: 14, weight: .medium))
                         .overlay(alignment: .topTrailing) {
                             if state.unreadMessageCount > 0 {

@@ -15,6 +15,8 @@ data class LocalFeatureState(
     val courseProgress: Map<String, Float> = emptyMap(),
     val supportMessages: List<SupportMessage> = emptyList(),
     val classPosts: List<ClassPost> = emptyList(),
+    val likedPostIds: Set<String> = emptySet(),
+    val postComments: Map<String, List<String>> = emptyMap(),
     val uploadedTaskIds: Set<String> = emptySet(),
     val checkedInToday: Boolean = false,
     val checkedInDate: String? = null,
@@ -49,6 +51,8 @@ class LocalFeatureStore(context: Context) {
         courseProgress = decodeProgress(prefs.getString("course_progress", null)),
         supportMessages = decodeMessages(prefs.getString("support_messages", null)),
         classPosts = decodePosts(prefs.getString("class_posts", null)),
+        likedPostIds = prefs.getStringSet("liked_post_ids", emptySet()) ?: emptySet(),
+        postComments = decodeComments(prefs.getString("post_comments", null)),
         uploadedTaskIds = prefs.getStringSet("uploaded_task_ids", emptySet()) ?: emptySet(),
         checkedInToday = prefs.getString("checked_in_date", null) == today(),
         checkedInDate = prefs.getString("checked_in_date", null),
@@ -74,6 +78,8 @@ class LocalFeatureStore(context: Context) {
         .putString("course_progress", JSONObject(value.courseProgress).toString())
         .putString("support_messages", JSONArray().apply { value.supportMessages.forEach { put(JSONObject().put("text", it.text).put("mine", it.mine)) } }.toString())
         .putString("class_posts", JSONArray().apply { value.classPosts.forEach { put(JSONObject().put("id", it.id).put("author", it.author).put("content", it.content)) } }.toString())
+        .putStringSet("liked_post_ids", value.likedPostIds)
+        .putString("post_comments", JSONObject().apply { value.postComments.forEach { (postId, comments) -> put(postId, JSONArray(comments)) } }.toString())
         .putStringSet("uploaded_task_ids", value.uploadedTaskIds)
         .putBoolean("checked_in_today", value.checkedInToday)
         .putString("checked_in_date", normalizedCheckInDate)
@@ -97,6 +103,7 @@ class LocalFeatureStore(context: Context) {
     private fun decodeMessages(raw: String?): List<SupportMessage> = runCatching { val a = JSONArray(raw ?: "[]"); List(a.length()) { SupportMessage(a.getJSONObject(it).optString("text"), a.getJSONObject(it).optBoolean("mine")) } }.getOrDefault(emptyList())
     private fun decodeActivityRegistrations(raw: String?): List<ActivityRegistration> = runCatching { val a = JSONArray(raw ?: "[]"); List(a.length()) { val o = a.getJSONObject(it); ActivityRegistration(o.optString("id"), o.optString("activityId"), o.optString("contactName"), o.optString("phone"), o.optString("status").let { runCatching { LocalSubmissionStatus.valueOf(it) }.getOrDefault(LocalSubmissionStatus.Submitted) }) } }.getOrDefault(emptyList())
     private fun decodePosts(raw: String?): List<ClassPost> = runCatching { val a = JSONArray(raw ?: "[]"); List(a.length()) { ClassPost(a.getJSONObject(it).optString("id", java.util.UUID.randomUUID().toString()), a.getJSONObject(it).optString("author"), a.getJSONObject(it).optString("content")) } }.getOrDefault(emptyList())
+    private fun decodeComments(raw: String?): Map<String, List<String>> = runCatching { val value = JSONObject(raw ?: "{}"); value.keys().asSequence().associateWith { key -> val array = value.optJSONArray(key) ?: JSONArray(); List(array.length()) { index -> array.optString(index) } } }.getOrDefault(emptyMap())
     private fun decodeAppointments(raw: String?): List<ExpertAppointment> = runCatching { val a = JSONArray(raw ?: "[]"); List(a.length()) { val o=a.getJSONObject(it); ExpertAppointment(o.optString("id"), o.optString("expertName"), o.optString("preferredDate"), o.optString("note"), o.optString("status").let { runCatching { LocalSubmissionStatus.valueOf(it) }.getOrDefault(LocalSubmissionStatus.Submitted) }) } }.getOrDefault(emptyList())
     private fun decodeUploads(raw: String?): List<CourseUploadRecord> = runCatching { val a = JSONArray(raw ?: "[]"); List(a.length()) { val o=a.getJSONObject(it); CourseUploadRecord(o.optString("id"), o.optString("taskId"), o.optInt("attendanceCount"), o.optString("notes"), o.optString("attachmentName"), o.optString("status").let { runCatching { LocalSubmissionStatus.valueOf(it) }.getOrDefault(LocalSubmissionStatus.Draft) }) } }.getOrDefault(emptyList())
     private fun decodeTaskStatuses(raw: String?): Map<String, TaskStatus> = runCatching { val value = JSONObject(raw ?: "{}"); value.keys().asSequence().mapNotNull { key -> runCatching { key to TaskStatus.valueOf(value.getString(key)) }.getOrNull() }.toMap() }.getOrDefault(emptyMap())

@@ -173,15 +173,16 @@ fun RoleSelectScreen(onRole: (UserRole) -> Unit, onLogout: () -> Unit = {}) {
     val landscapeScale by transition.animateFloat(1f, if (reduceMotion) 1f else 1.035f, infiniteRepeatable(tween(5400, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "role-landscape-scale")
     LaunchedEffect(Unit) { appeared = true }
     Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.White, Sky)))) {
-        Column(Modifier.fillMaxSize().padding(horizontal = 19.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.fillMaxSize().padding(horizontal = 19.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(Modifier.padding(top = 45.dp), verticalAlignment = Alignment.CenterVertically) { Text("请选择进入方式", color = Blue, fontSize = 18.sp, fontWeight = FontWeight.Bold); Spacer(Modifier.width(8.dp)); Icon(Icons.Filled.WbSunny, null, tint = Color(0xFFFFBD2E)) }
             Spacer(Modifier.height(20.dp))
             RoleCard(R.drawable.family_entrance, "家庭端", "家长查看孩子测评与成长建议", Blue, Color.White, appeared) { onRole(UserRole.Parent) }
             Spacer(Modifier.height(18.dp))
             RoleCard(R.drawable.school_entrance, "学校端", "教师与校长管理班级健康数据", Color.White, Blue, appeared) { onRole(UserRole.Teacher) }
-            TextButton(onClick = { onRole(UserRole.Principal) }) { Text("以校长身份进入学校看板", color = Blue, fontSize = 11.sp) }
+            Spacer(Modifier.height(12.dp))
+            RoleCard(R.drawable.school_entrance, "校长端", "查看学校总览、年级对比与风险学生", Navy, Color.White, appeared) { onRole(UserRole.Principal) }
             TextButton(onClick = onLogout) { Text("退出当前账号", color = Color.Gray, fontSize = 11.sp) }
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.height(16.dp))
             Image(painterResource(R.drawable.campus_footer), null, Modifier.fillMaxWidth().height(132.dp).scale(landscapeScale), contentScale = ContentScale.Fit)
             Spacer(Modifier.height(4.dp))
         }

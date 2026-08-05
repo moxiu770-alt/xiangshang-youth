@@ -131,7 +131,7 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
         composable(Destinations.ParentEvaluations) { ParentEvaluationsScreen(state, nav, state.selectedChild?.let(viewModel::report)) }
         composable("${Destinations.Assessment}/{category}") { entry -> AssessmentFlowScreen(state, nav, entry.arguments?.getString("category") ?: "fitness", viewModel::completeAssessment, viewModel::saveDraft, viewModel::clearDraft) }
         composable(Destinations.Courses) { ParentCoursesScreen(state, nav, viewModel::updateCourseProgress, viewModel::sendSupport, viewModel::saveDraft, viewModel::clearDraft) }
-        composable(Destinations.Circle) { ParentClassCircleScreen(state, nav, viewModel::publishPost, viewModel::saveDraft, viewModel::clearDraft) }
+        composable(Destinations.Circle) { ParentClassCircleScreen(state, nav, viewModel::publishPost, viewModel::saveDraft, viewModel::clearDraft, viewModel::togglePostLike, viewModel::addPostComment) }
         composable(Destinations.Account) { if (state.role?.name == "Teacher") TeacherAccountScreen(state, nav, viewModel::chooseRole, viewModel::logout, viewModel::updateSettings) else AccountScreen(state, nav, viewModel::chooseRole, viewModel::logout, viewModel::updateSettings, viewModel::sendSupport) }
         composable(Destinations.Messages) { ParentMessagesScreen(state, nav, viewModel::markMessageRead) }
         composable(Destinations.Notifications) { NotificationsScreen(state, nav, viewModel::markMessageRead) }

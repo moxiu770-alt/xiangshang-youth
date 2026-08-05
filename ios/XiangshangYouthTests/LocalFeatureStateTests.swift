@@ -56,6 +56,9 @@ final class LocalFeatureStateTests: XCTestCase {
             value.studentTaskStatuses["s01"] = .review
             value.reviewNotes["s01"] = "核验视频后建议周五补测。"
             value.settings.reduceMotion = true
+            let postID = UUID()
+            value.likedClassPostIDs.insert(postID)
+            value.classPostComments.append(ClassPostComment(id: UUID(), postID: postID, author: "王女士", text: "继续加油", createdAt: .now))
         }
 
         let restored = LocalFeatureStore(defaults: defaults).state
@@ -67,6 +70,8 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertEqual(restored.studentTaskStatuses["s01"], .review)
         XCTAssertEqual(restored.reviewNotes["s01"], "核验视频后建议周五补测。")
         XCTAssertTrue(restored.settings.reduceMotion)
+        XCTAssertEqual(restored.classPostComments.first?.text, "继续加油")
+        XCTAssertEqual(restored.likedClassPostIDs.count, 1)
     }
 
     func testRemoteRepositoryKeepsReportRouteRenderableDuringEndpointRollout() async throws {

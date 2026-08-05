@@ -314,9 +314,8 @@ struct RoleSelectView: View {
                     .offset(x: visible ? 0 : -28).opacity(visible ? 1 : 0)
                 roleEntry(icon: "building.2.fill", title: "学校端", detail: "教师与校长管理班级健康数据", color: .white, role: .teacher)
                     .offset(x: visible ? 0 : 28).opacity(visible ? 1 : 0)
-                Button { state.selectRole(.principal); router.start(.principal) } label: {
-                    Text("以校长身份进入学校看板").font(.system(size: 11, weight: .medium)).foregroundStyle(ReferenceColor.blue)
-                }
+                roleEntry(icon: "chart.bar.xaxis", title: "校长端", detail: "查看学校总览、年级对比与风险学生", color: ReferenceColor.navy, role: .principal)
+                    .offset(y: visible ? 0 : 20).opacity(visible ? 1 : 0)
                 Button {
                     state.switchAccount()
                     router.path = NavigationPath()

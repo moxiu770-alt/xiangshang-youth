@@ -63,7 +63,6 @@ fun TeacherHomeScreen(state: AppUiState, nav: NavHostController, refreshDashboar
             modifier = Modifier.fillMaxSize().padding(inset),
             contentPadding = PaddingValues(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (state.error != null) item { ErrorState(state.error, retry = refreshDashboard) }
             item { TeacherIdentity(sportsTeacher, nav, state.unreadMessageCount, state.loading, refreshDashboard) { sportsTeacher = !sportsTeacher } }
             item { TeacherRoleSwitch(sportsTeacher) { sportsTeacher = it } }
             item {

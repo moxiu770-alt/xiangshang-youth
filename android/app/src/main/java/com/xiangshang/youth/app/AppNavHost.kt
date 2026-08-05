@@ -37,7 +37,7 @@ import com.xiangshang.youth.core.util.DeepLinkResolver
 import com.xiangshang.youth.core.util.DeepLinkTarget
 import com.xiangshang.youth.shared.component.ErrorState
 
-object Destinations { const val Splash="splash"; const val Login="login"; const val Register="register"; const val PasswordReset="passwordReset"; const val Role="role"; const val Parent="parent"; const val Children="children"; const val ParentEvaluations="parentEvaluations"; const val Assessment="assessment"; const val Courses="courses"; const val Circle="circle"; const val Account="account"; const val Messages="messages"; const val Notifications="notifications"; const val Health="health"; const val Report="report"; const val Teacher="teacher"; const val TeacherMessages="teacherMessages"; const val Classes="classes"; const val TeacherCircle="teacherCircle"; const val TeacherBoard="teacherBoard"; const val Students="students"; const val StudentsRoute="students?className={className}"; const val Tasks="tasks"; const val TaskDetail="taskDetail"; const val TaskDetailRoute="taskDetail/{taskId}"; const val Review="review"; const val Principal="principal"; const val Grades="grades"; const val ClassStats="classStats"; const val ClassStatsRoute="classStats?grade={grade}"; const val Risk="risk"; const val RiskRoute="risk?className={className}" }
+object Destinations { const val Splash="splash"; const val Login="login"; const val Register="register"; const val PasswordReset="passwordReset"; const val Role="role"; const val Parent="parent"; const val Children="children"; const val ParentEvaluations="parentEvaluations"; const val Assessment="assessment"; const val Courses="courses"; const val CoursesRoute="courses?openSupport={openSupport}"; const val Circle="circle"; const val Account="account"; const val Messages="messages"; const val Notifications="notifications"; const val Health="health"; const val Report="report"; const val Teacher="teacher"; const val TeacherMessages="teacherMessages"; const val Classes="classes"; const val TeacherCircle="teacherCircle"; const val TeacherBoard="teacherBoard"; const val Students="students"; const val StudentsRoute="students?className={className}"; const val Tasks="tasks"; const val TaskDetail="taskDetail"; const val TaskDetailRoute="taskDetail/{taskId}"; const val Review="review"; const val Principal="principal"; const val Grades="grades"; const val ClassStats="classStats"; const val ClassStatsRoute="classStats?grade={grade}"; const val Risk="risk"; const val RiskRoute="risk?className={className}" }
 @Composable fun AppNavHost(viewModel: AppViewModel, incomingDeepLink: Uri? = null, nav: NavHostController = rememberNavController()) {
     val state by viewModel.state.collectAsState()
     val view = LocalView.current
@@ -141,6 +141,13 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
         composable(Destinations.ParentEvaluations) { ParentEvaluationsScreen(state, nav, state.selectedChild?.let(viewModel::report)) }
         composable("${Destinations.Assessment}/{category}") { entry -> AssessmentFlowScreen(state, nav, entry.arguments?.getString("category") ?: "fitness", viewModel::completeAssessment, viewModel::saveDraft, viewModel::clearDraft) }
         composable(Destinations.Courses) { ParentCoursesScreen(state, nav, viewModel::updateCourseProgress, viewModel::sendSupport, viewModel::saveDraft, viewModel::clearDraft) }
+        composable(Destinations.CoursesRoute) { entry ->
+            ParentCoursesScreen(
+                state, nav, viewModel::updateCourseProgress, viewModel::sendSupport,
+                viewModel::saveDraft, viewModel::clearDraft,
+                openSupport = entry.arguments?.getString("openSupport") == "true"
+            )
+        }
         composable(Destinations.Circle) { ParentClassCircleScreen(state, nav, viewModel::publishPost, viewModel::saveDraft, viewModel::clearDraft, viewModel::togglePostLike, viewModel::addPostComment) }
         composable(Destinations.Account) { if (state.role?.name == "Teacher") TeacherAccountScreen(state, nav, viewModel::chooseRole, viewModel::logout, viewModel::updateSettings) else AccountScreen(state, nav, viewModel::chooseRole, viewModel::logout, viewModel::updateSettings, viewModel::sendSupport) }
         composable(Destinations.Messages) { ParentMessagesScreen(state, nav, viewModel::markMessageRead) }
@@ -173,7 +180,7 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
         composable(Destinations.Tasks) { TeacherTasksScreen(state, nav, viewModel::saveCourseUpload) }
         composable(Destinations.TaskDetailRoute) { entry -> TeacherTaskDetailScreen(state, nav, viewModel::updateStudentTaskStatus, entry.arguments?.getString("taskId")) }
         composable(Destinations.Review) { ReviewListScreen(state, nav, viewModel::submitReviewDecision) }
-        composable(Destinations.Principal) { PrincipalHomeScreen(state, nav, viewModel::clearRoleSelection, viewModel::refreshDashboard, viewModel::logout) }
+        composable(Destinations.Principal) { PrincipalHomeScreen(state, nav, viewModel::clearRoleSelection, viewModel::refreshDashboard) }
         composable(Destinations.Grades) { GradeStatsScreen(state, nav) }
         composable(Destinations.ClassStats) { ClassStatsScreen(state, nav, null) }
         composable(Destinations.ClassStatsRoute) { entry -> ClassStatsScreen(state, nav, entry.arguments?.getString("grade")) }

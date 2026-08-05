@@ -72,7 +72,6 @@ fun ParentHomeScreen(state: AppUiState, nav: NavHostController, registerActivity
         return@Scaffold
     }
     Column(Modifier.fillMaxSize().padding(contentPadding).background(Canvas).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-        if (state.error != null) ErrorState(state.error, retry = refreshDashboard)
         ParentHeader(state.selectedChild?.name ?: "王小明", { nav.navigate(Destinations.Children) }, { nav.navigate(Destinations.Notifications) }, state.unreadMessageCount, refreshDashboard, state.loading)
         Surface(Modifier.padding(horizontal = 10.dp).fillMaxWidth().semantics { role = Role.Button; contentDescription = "打开健康成长季活动报名" }.clickable { state.local.drafts[activityDraftKey]?.split("|", limit = 2)?.takeIf { it.size == 2 }?.let { (name, phone) -> activityName = name; activityPhone = phone }; activityDetail = true }, color = Color.White, shape = RoundedCornerShape(12.dp), shadowElevation = 1.dp) {
             Box(Modifier.height(108.dp)) {
@@ -286,8 +285,8 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
 }
 @Composable private fun RowScope.ParentNavItem(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean, onClick: () -> Unit) = NavigationBarItem(selected = selected, onClick = onClick, icon = { Icon(icon, null) }, label = { Text(label, fontSize = 9.sp) })
 
-@Composable fun ParentCoursesScreen(state: AppUiState, nav: NavHostController, updateCourseProgress: (String, Float) -> Unit, sendSupport: (String) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit) {
-    var paid by remember { mutableStateOf(false) }; var detail by remember { mutableStateOf<String?>(null) }
+@Composable fun ParentCoursesScreen(state: AppUiState, nav: NavHostController, updateCourseProgress: (String, Float) -> Unit, sendSupport: (String) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit, openSupport: Boolean = false) {
+    var paid by remember { mutableStateOf(false) }; var detail by rememberSaveable(openSupport) { mutableStateOf<String?>(if (openSupport) "客服咨询" else null) }
     ParentTabScaffold(nav, Destinations.Courses) {
         if (state.loading || state.data == null) { LoadingState(); return@ParentTabScaffold }
         if (state.selectedChild == null) { EmptyState("暂无孩子档案，请先完成孩子绑定。"); Button(onClick = { nav.navigate(Destinations.Children) }) { Text("去绑定孩子") }; return@ParentTabScaffold }
@@ -347,7 +346,8 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
         Text("账户与设置", color = Navy, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)); listOf("我的健康档案" to Icons.Filled.Favorite, "我的课程" to Icons.Filled.PlayCircle, "客服咨询" to Icons.Filled.Message, "设置" to Icons.Filled.Settings, "消息" to Icons.Filled.Notifications).forEach { (title, icon) -> AccountRow(title, icon, Blue) {
             when (title) {
                 "我的健康档案" -> nav.navigate(Destinations.Health)
-                "我的课程", "客服咨询" -> nav.navigate(Destinations.Courses)
+                "我的课程" -> nav.navigate(Destinations.Courses)
+                "客服咨询" -> nav.navigate("${Destinations.Courses}?openSupport=true")
                 "消息" -> nav.navigate(Destinations.Messages)
                 "设置" -> settingsOpen = true
             }

@@ -12,12 +12,40 @@ struct SplashView: View {
                 .ignoresSafeArea()
         }
         .statusBarHidden(true)
+        // Keep the launch artwork edge-to-edge for the full splash duration.
+        // This hides the transient Home indicator while the native poster is
+        // visible; the login/dashboard screens restore the system overlay.
+        .persistentSystemOverlays(.hidden)
+        .background(HomeIndicatorAutoHideView())
         .task {
             try? await Task.sleep(for: .seconds(2.0))
             withAnimation(.easeOut(duration: 0.28)) {
                 state.dismissSplash()
             }
         }
+    }
+}
+
+/// UIKit bridge used only by the launch artwork. SwiftUI's
+/// `persistentSystemOverlays` does not reliably propagate the Home-indicator
+/// preference through the app's hosting controller on every iOS simulator.
+private struct HomeIndicatorAutoHideView: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> HomeIndicatorViewController {
+        HomeIndicatorViewController()
+    }
+
+    func updateUIViewController(_ viewController: HomeIndicatorViewController, context: Context) {
+        viewController.setNeedsUpdateOfHomeIndicatorAutoHidden()
+    }
+}
+
+private final class HomeIndicatorViewController: UIViewController {
+    override var prefersHomeIndicatorAutoHidden: Bool { true }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        parent?.setNeedsUpdateOfHomeIndicatorAutoHidden()
+        view.window?.rootViewController?.setNeedsUpdateOfHomeIndicatorAutoHidden()
     }
 }
 

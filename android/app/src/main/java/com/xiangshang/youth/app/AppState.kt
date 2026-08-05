@@ -126,7 +126,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             if (error is ApiError.Unauthorized) {
                 featureStore.clear()
                 _state.value = AppUiState(error = error.message, restoringSession = false)
-            } else _state.value = _state.value.copy(loading = false, restoringSession = false, error = error.message)
+            } else {
+                // A persisted session whose dashboard cannot be refreshed is not
+                // a usable authenticated state. Clear it before returning to the
+                // login screen so the next launch cannot loop through RoleSelect
+                // with a nil dashboard or keep retrying stale credentials.
+                featureStore.clear()
+                _state.value = AppUiState(error = error.message, restoringSession = false)
+            }
         }
     }
     private fun handleDashboardFailure(error: Throwable) {

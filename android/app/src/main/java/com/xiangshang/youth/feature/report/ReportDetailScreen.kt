@@ -17,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -51,10 +53,10 @@ fun ReportDetailScreen(report: DiagnosisReport, isRefreshing: Boolean, onRefresh
             }
         }
         ReportSection("风险提示", Icons.Filled.WarningAmber) {
-            report.riskAlerts.forEach { alert -> Row(Modifier.fillMaxWidth().clickable { selectedDetail = "风险提示\n$alert" }, verticalAlignment = Alignment.Top) { Icon(Icons.Filled.Circle, null, tint = if (alert == "暂无高风险提示") Green else Color.Red, modifier = Modifier.size(8.dp).padding(top = 4.dp)); Spacer(Modifier.width(7.dp)); Text(alert, color = if (alert == "暂无高风险提示") Green else Color.Red, fontSize = 12.sp) } }
+            report.riskAlerts.forEach { alert -> Row(Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "查看风险提示：$alert" }.clickable { selectedDetail = "风险提示\n$alert" }, verticalAlignment = Alignment.Top) { Icon(Icons.Filled.Circle, null, tint = if (alert == "暂无高风险提示") Green else Color.Red, modifier = Modifier.size(8.dp).padding(top = 4.dp)); Spacer(Modifier.width(7.dp)); Text(alert, color = if (alert == "暂无高风险提示") Green else Color.Red, fontSize = 12.sp) } }
         }
         ReportSection("训练建议", Icons.Filled.DirectionsRun) {
-            report.trainingAdvice.forEach { advice -> Text("• $advice", color = Navy, fontSize = 12.sp, modifier = Modifier.fillMaxWidth().clickable { selectedDetail = "训练建议\n$advice" }.padding(vertical = 3.dp)) }
+            report.trainingAdvice.forEach { advice -> Text("• $advice", color = Navy, fontSize = 12.sp, modifier = Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "查看训练建议：$advice" }.clickable { selectedDetail = "训练建议\n$advice" }.padding(vertical = 3.dp)) }
         }
         ReportSection("课程建议", Icons.Filled.PlayCircleFilled) {
             report.courseSuggestions.forEach { course -> CourseSuggestionRow(course) { selectedDetail = "课程建议\n${course.title}\n${course.focus} · ${course.duration}" } }
@@ -103,6 +105,6 @@ private fun ReportSection(title: String, icon: androidx.compose.ui.graphics.vect
 }
 
 @Composable
-private fun CourseSuggestionRow(course: CourseSuggestion, onClick: () -> Unit) = Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+private fun CourseSuggestionRow(course: CourseSuggestion, onClick: () -> Unit) = Row(Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "打开课程建议：${course.title}" }.clickable(onClick = onClick).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
     Icon(Icons.Filled.PlayCircleFilled, null, tint = Color(0xFF10B7A5), modifier = Modifier.size(27.dp)); Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Text(course.title, color = Navy, fontWeight = FontWeight.SemiBold, fontSize = 12.sp); Text("${course.focus} · ${course.duration}", color = Color.Gray, fontSize = 9.sp) }; Text(if (course.isPublicBenefit) "公益" else "推荐", color = Blue, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.background(Sky, RoundedCornerShape(10.dp)).padding(horizontal = 7.dp, vertical = 4.dp))
 }

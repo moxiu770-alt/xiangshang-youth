@@ -27,6 +27,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xiangshang.youth.R
@@ -113,7 +117,7 @@ fun LoginScreen(
                         TextButton(onClick = { error = "请联系学校管理员重置密码，或使用短信验证码登录。" }, contentPadding = PaddingValues(0.dp)) { Text("忘记密码？", color = Color.Gray, fontSize = 11.sp) }
                     }
                     Column(Modifier.fillMaxWidth().padding(top = 5.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { LoginCheck("专业身心测评与科学健康干预", "体质评估 · 科学干预"); LoginCheck("提供专属解决方案", "成长规划 · 定制方案"); LoginCheck("全程跟踪辅导", "专家护航 · 全程陪伴") }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { agreement = !agreement }) { Checkbox(checked = agreement, onCheckedChange = { agreement = it }); Text("我已阅读并同意《用户协议》《隐私政策》《儿童隐私政策》", color = if (agreement) Green else Color.Gray, fontSize = 8.sp) }
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.semantics { role = Role.Checkbox; contentDescription = if (agreement) "已同意用户协议、隐私政策和儿童隐私政策" else "同意用户协议、隐私政策和儿童隐私政策" }.clickable { agreement = !agreement }) { Checkbox(checked = agreement, onCheckedChange = { agreement = it }); Text("我已阅读并同意《用户协议》《隐私政策》《儿童隐私政策》", color = if (agreement) Green else Color.Gray, fontSize = 8.sp) }
                 }
             }
             Spacer(Modifier.height(18.dp))
@@ -145,7 +149,7 @@ fun RegisterScreen(onBack: () -> Unit, onRegistered: () -> Unit) {
         OutlinedTextField(value = phone, onValueChange = { phone = it; error = null }, label = { Text("手机号") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 9.dp))
         OutlinedTextField(value = code, onValueChange = { code = it; error = null }, label = { Text("短信验证码") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 9.dp))
         OutlinedTextField(value = password, onValueChange = { password = it; error = null }, label = { Text("设置密码（至少 6 位）") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 9.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp).clickable { agreement = !agreement }) { Checkbox(checked = agreement, onCheckedChange = { agreement = it }); Text("我已阅读并同意用户协议、隐私政策和儿童隐私政策", color = Navy, fontSize = 10.sp) }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp).semantics { role = Role.Checkbox; contentDescription = if (agreement) "已同意用户协议、隐私政策和儿童隐私政策" else "同意用户协议、隐私政策和儿童隐私政策" }.clickable { agreement = !agreement }) { Checkbox(checked = agreement, onCheckedChange = { agreement = it }); Text("我已阅读并同意用户协议、隐私政策和儿童隐私政策", color = Navy, fontSize = 10.sp) }
         error?.let { Text(it, color = Color.Red, fontSize = 10.sp) }
         Button(onClick = {
             when {
@@ -161,7 +165,7 @@ fun RegisterScreen(onBack: () -> Unit, onRegistered: () -> Unit) {
 }
 
 @Composable private fun LoginButton(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, background: Color, foreground: Color, onClick: () -> Unit, outlined: Boolean = false) = Surface(
-    onClick = onClick, modifier = Modifier.fillMaxWidth().height(39.dp), color = background, shape = CircleShape, border = if (outlined) BorderStroke(1.dp, foreground) else null
+    onClick = onClick, modifier = Modifier.fillMaxWidth().height(39.dp).semantics { role = Role.Button; contentDescription = title }, color = background, shape = CircleShape, border = if (outlined) BorderStroke(1.dp, foreground) else null
 ) { Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = foreground, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(7.dp)); Text(title, color = foreground, fontSize = 13.sp, fontWeight = FontWeight.Bold) } }
 @Composable private fun LoginCheck(title: String, note: String) = Row(verticalAlignment = Alignment.CenterVertically) { Surface(Modifier.size(18.dp), color = Green, shape = CircleShape) { Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.padding(4.dp)) }; Spacer(Modifier.width(8.dp)); Column { Text(title, color = Navy, fontSize = 10.sp, fontWeight = FontWeight.Bold); Text(note, color = Color.Gray, fontSize = 8.sp) } }
 

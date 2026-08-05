@@ -46,7 +46,7 @@ import com.xiangshang.youth.shared.component.*
 
 /** Mirrors the two teacher workbenches in the supplied mobile reference screens. */
 @Composable
-fun TeacherHomeScreen(state: AppUiState, nav: NavHostController) {
+fun TeacherHomeScreen(state: AppUiState, nav: NavHostController, refreshDashboard: () -> Unit = {}) {
     if (state.loading || state.data == null) {
         LoadingState()
         return
@@ -63,7 +63,8 @@ fun TeacherHomeScreen(state: AppUiState, nav: NavHostController) {
             modifier = Modifier.fillMaxSize().padding(inset),
             contentPadding = PaddingValues(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            item { TeacherIdentity(sportsTeacher, nav, state.unreadMessageCount) { sportsTeacher = !sportsTeacher } }
+            if (state.error != null) item { ErrorState(state.error, retry = refreshDashboard) }
+            item { TeacherIdentity(sportsTeacher, nav, state.unreadMessageCount, state.loading, refreshDashboard) { sportsTeacher = !sportsTeacher } }
             item { TeacherRoleSwitch(sportsTeacher) { sportsTeacher = it } }
             item {
                 AnimatedContent(targetState = sportsTeacher, label = "teacher-role-content") { isSports ->
@@ -75,7 +76,7 @@ fun TeacherHomeScreen(state: AppUiState, nav: NavHostController) {
 }
 
 @Composable
-private fun TeacherIdentity(sportsTeacher: Boolean, nav: NavHostController, unreadCount: Int, onSwitchRole: () -> Unit) = Row(
+private fun TeacherIdentity(sportsTeacher: Boolean, nav: NavHostController, unreadCount: Int, isRefreshing: Boolean, onRefresh: () -> Unit, onSwitchRole: () -> Unit) = Row(
     Modifier.fillMaxWidth().background(Color.White).padding(horizontal = 13.dp, vertical = 8.dp),
     verticalAlignment = Alignment.CenterVertically
 ) {
@@ -88,6 +89,7 @@ private fun TeacherIdentity(sportsTeacher: Boolean, nav: NavHostController, unre
     }
     AssistChip(onClick = onSwitchRole, label = { Text("⇄  切换角色", fontSize = 9.sp) }, modifier = Modifier.height(29.dp))
     Spacer(Modifier.width(7.dp))
+    IconButton(onClick = onRefresh, enabled = !isRefreshing) { if (isRefreshing) CircularProgressIndicator(Modifier.size(17.dp), color = Blue, strokeWidth = 2.dp) else Icon(Icons.Filled.Refresh, contentDescription = "刷新数据", tint = Navy, modifier = Modifier.size(19.dp)) }
     IconButton(onClick = { nav.navigate(Destinations.TeacherMessages) }) { BadgedBox(badge = { if (unreadCount > 0) Badge(containerColor = Color.Red, modifier = Modifier.size(6.dp)) {} }) { Icon(Icons.Filled.NotificationsNone, contentDescription = "消息通知", tint = Navy, modifier = Modifier.size(20.dp)) } }
 }
 

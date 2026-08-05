@@ -46,7 +46,7 @@ import com.xiangshang.youth.core.model.UserRole
 import com.xiangshang.youth.shared.component.*
 
 @Composable
-fun ParentHomeScreen(state: AppUiState, nav: NavHostController, registerActivity: (String, String) -> Unit, checkInToday: () -> Unit, bookExpert: (String, String, String) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit) {
+fun ParentHomeScreen(state: AppUiState, nav: NavHostController, registerActivity: (String, String) -> Unit, checkInToday: () -> Unit, bookExpert: (String, String, String) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit, refreshDashboard: () -> Unit = {}) {
     val context = LocalContext.current
     val reduceMotion = LocalReduceMotion.current
     val transition = rememberInfiniteTransition(label = "parent-campaign")
@@ -71,7 +71,8 @@ fun ParentHomeScreen(state: AppUiState, nav: NavHostController, registerActivity
         return@Scaffold
     }
     Column(Modifier.fillMaxSize().padding(contentPadding).background(Canvas).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-        ParentHeader(state.selectedChild?.name ?: "王小明", { nav.navigate(Destinations.Children) }, { nav.navigate(Destinations.Notifications) }, state.unreadMessageCount)
+        if (state.error != null) ErrorState(state.error, retry = refreshDashboard)
+        ParentHeader(state.selectedChild?.name ?: "王小明", { nav.navigate(Destinations.Children) }, { nav.navigate(Destinations.Notifications) }, state.unreadMessageCount, refreshDashboard, state.loading)
         Surface(Modifier.padding(horizontal = 10.dp).fillMaxWidth().semantics { role = Role.Button; contentDescription = "打开健康成长季活动报名" }.clickable { state.local.drafts[activityDraftKey]?.split("|", limit = 2)?.takeIf { it.size == 2 }?.let { (name, phone) -> activityName = name; activityPhone = phone }; activityDetail = true }, color = Color.White, shape = RoundedCornerShape(12.dp), shadowElevation = 1.dp) {
             Box(Modifier.height(108.dp)) {
                 Image(painterResource(R.drawable.parent_campaign), null, Modifier.fillMaxSize().scale(campaignScale), contentScale = ContentScale.Crop)
@@ -103,7 +104,7 @@ fun ParentHomeScreen(state: AppUiState, nav: NavHostController, registerActivity
     article?.let { title -> AlertDialog(onDismissRequest = { article = null }, title = { Text(title) }, text = { Text("完整内容由“向上少年健康成长”微信公众号提供。请在微信中搜索公众号查看。") }, confirmButton = { TextButton(onClick = { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("weixin://"))) }; article = null }) { Text("打开微信") } }, dismissButton = { TextButton(onClick = { article = null }) { Text("取消") } }) }
 }
 
-@Composable private fun ParentHeader(name: String, onClick: () -> Unit, onMessages: (() -> Unit)? = null, unreadCount: Int = 0) = Row(Modifier.fillMaxWidth().background(Color.White).padding(horizontal = 14.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) { Surface(Modifier.size(40.dp), color = Color(0xFF16AFA5), shape = CircleShape) { Text(name.take(1), color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 9.dp)) }; Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Text(name, color = Navy, fontWeight = FontWeight.Bold, fontSize = 14.sp); Text("三年级2班 · 点击切换孩子", color = Color.Gray, fontSize = 9.sp) }; IconButton(onClick = onClick) { Icon(Icons.Filled.ChevronRight, "切换孩子", tint = Blue) }; onMessages?.let { action -> IconButton(onClick = action) { BadgedBox(badge = { if (unreadCount > 0) Badge(containerColor = Color.Red, modifier = Modifier.size(6.dp)) {} }) { Icon(Icons.Filled.NotificationsNone, contentDescription = "消息通知", tint = Navy, modifier = Modifier.size(20.dp)) } } } }
+@Composable private fun ParentHeader(name: String, onClick: () -> Unit, onMessages: (() -> Unit)? = null, unreadCount: Int = 0, onRefresh: (() -> Unit)? = null, isRefreshing: Boolean = false) = Row(Modifier.fillMaxWidth().background(Color.White).padding(horizontal = 14.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) { Surface(Modifier.size(40.dp), color = Color(0xFF16AFA5), shape = CircleShape) { Text(name.take(1), color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 9.dp)) }; Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Text(name, color = Navy, fontWeight = FontWeight.Bold, fontSize = 14.sp); Text("三年级2班 · 点击切换孩子", color = Color.Gray, fontSize = 9.sp) }; IconButton(onClick = onClick) { Icon(Icons.Filled.ChevronRight, "切换孩子", tint = Blue) }; onRefresh?.let { action -> IconButton(onClick = action, enabled = !isRefreshing) { if (isRefreshing) CircularProgressIndicator(Modifier.size(17.dp), color = Blue, strokeWidth = 2.dp) else Icon(Icons.Filled.Refresh, "刷新数据", tint = Navy, modifier = Modifier.size(19.dp)) } }; onMessages?.let { action -> IconButton(onClick = action) { BadgedBox(badge = { if (unreadCount > 0) Badge(containerColor = Color.Red, modifier = Modifier.size(6.dp)) {} }) { Icon(Icons.Filled.NotificationsNone, contentDescription = "消息通知", tint = Navy, modifier = Modifier.size(20.dp)) } } } }
 
 @Composable fun NotificationsScreen(state: AppUiState, nav: NavHostController, markMessageRead: (String) -> Unit) = AppScaffold("消息通知", onBack = { nav.popBackStack() }) {
     if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }

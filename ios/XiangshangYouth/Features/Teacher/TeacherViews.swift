@@ -129,6 +129,7 @@ struct TeacherDashboard: View {
             .padding(.bottom, 8)
         }
         .background(ReferenceColor.canvas)
+        .refreshable { await state.refreshDashboard() }
         .overlay {
             if state.loading || state.data == nil {
                 LoadingStateView()

@@ -143,6 +143,7 @@ struct PrincipalDashboard: View {
             }.padding(.bottom, 14)
         }
         .background(ReferenceColor.canvas)
+        .refreshable { await state.refreshDashboard() }
         .task { withAnimation(.spring(response: 0.65, dampingFraction: 0.78)) { dashboardAppeared = true } }
         .sheet(isPresented: $isRegionDetailShown) {
             NavigationStack {

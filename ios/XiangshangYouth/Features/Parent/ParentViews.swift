@@ -101,6 +101,7 @@ struct ParentLandingView: View {
             ParentArticleRow(title: "居家体态训练 10 分钟", detail: "健康专栏 · 今日推荐")
         }.padding(.horizontal, 12)
     }.padding(.bottom, 8) }.background(ReferenceColor.canvas)
+        .refreshable { await state.refreshDashboard() }
         .overlay {
             if state.loading || state.data == nil {
                 ZStack { ReferenceColor.canvas.ignoresSafeArea(); LoadingStateView() }
@@ -260,7 +261,9 @@ struct ParentEvaluationDashboard: View {
         ReferenceCard { VStack(alignment: .leading, spacing: 8) { Text("身高成长趋势").font(.system(size: 11, weight: .bold)); HStack(alignment: .bottom, spacing: 13) { ForEach([108, 114, 120, 126, 132], id: \.self) { value in VStack(spacing: 3) { RoundedRectangle(cornerRadius: 4).fill(ReferenceColor.blue.opacity(value == 132 ? 1 : 0.35)).frame(width: 22, height: CGFloat(value - 96)); Text("\(value)").font(.system(size: 7)).foregroundStyle(.secondary) } }; Spacer() }; Text("遗传身高区间：165–173 cm · 运动表现持续向好").font(.system(size: 8)).foregroundStyle(.secondary) } }.padding(.horizontal, 12)
         ReferenceSectionTitle(title: "详细报告", trailing: "四维健康评估").padding(.horizontal, 12)
         VStack(spacing: 7) { ParentHealthDimension(title: "体质", detail: "脊柱姿态 · 遗传身高 · 运动表现", color: ReferenceColor.blue); ParentHealthDimension(title: "视力", detail: "屈光筛查 · 用眼习惯", color: ReferenceColor.green); ParentHealthDimension(title: "口腔", detail: "龋齿风险 · 牙列发育", color: ReferenceColor.purple); ParentHealthDimension(title: "心理", detail: "情绪状态 · 同伴适应", color: ReferenceColor.pink) }.padding(.horizontal, 12)
-    } }.background(ReferenceColor.canvas).task { withAnimation(.easeOut(duration: 1.0)) { ringProgress = reportProgress } }
+    } }.background(ReferenceColor.canvas)
+        .refreshable { await state.refreshDashboard() }
+        .task { withAnimation(.easeOut(duration: 1.0)) { ringProgress = reportProgress } }
         .overlay {
             if state.loading || state.data == nil {
                 ZStack { ReferenceColor.canvas.ignoresSafeArea(); LoadingStateView() }

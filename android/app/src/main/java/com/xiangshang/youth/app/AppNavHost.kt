@@ -128,7 +128,7 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
             val destination = if (role.name == "Parent") Destinations.Parent else if (role.name == "Teacher") Destinations.Teacher else Destinations.Principal
             nav.navigate(destination) { popUpTo(Destinations.Role) { inclusive = true }; launchSingleTop = true }
         }, onLogout = { viewModel.logout(); nav.navigate(Destinations.Login) { popUpTo(Destinations.Role) { inclusive = true }; launchSingleTop = true } }) }
-        composable(Destinations.Parent) { ParentHomeScreen(state, nav, viewModel::registerActivity, viewModel::checkInToday, viewModel::bookExpert, viewModel::saveDraft, viewModel::clearDraft) }
+        composable(Destinations.Parent) { ParentHomeScreen(state, nav, viewModel::registerActivity, viewModel::checkInToday, viewModel::bookExpert, viewModel::saveDraft, viewModel::clearDraft, viewModel::refreshDashboard) }
         composable(Destinations.Children) { ChildrenScreen(state, nav, viewModel::bindChild) { viewModel.chooseChild(it); nav.popBackStack() } }
         composable(Destinations.ParentEvaluations) { ParentEvaluationsScreen(state, nav, state.selectedChild?.let(viewModel::report)) }
         composable("${Destinations.Assessment}/{category}") { entry -> AssessmentFlowScreen(state, nav, entry.arguments?.getString("category") ?: "fitness", viewModel::completeAssessment, viewModel::saveDraft, viewModel::clearDraft) }
@@ -146,7 +146,7 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
                 else -> ReportDetailScreen(viewModel.report(child), state.loading, viewModel::refreshDashboard, nav)
             }
         }
-        composable(Destinations.Teacher) { TeacherHomeScreen(state, nav) }
+        composable(Destinations.Teacher) { TeacherHomeScreen(state, nav, viewModel::refreshDashboard) }
         composable(Destinations.TeacherMessages) { TeacherMessagesScreen(state, nav, viewModel::markMessageRead) }
         composable(Destinations.Classes) { TeacherClassesScreen(state, nav) }
         composable(Destinations.TeacherCircle) {
@@ -165,7 +165,7 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
         composable(Destinations.Tasks) { TeacherTasksScreen(state, nav, viewModel::saveCourseUpload) }
         composable(Destinations.TaskDetailRoute) { entry -> TeacherTaskDetailScreen(state, nav, viewModel::updateStudentTaskStatus, entry.arguments?.getString("taskId")) }
         composable(Destinations.Review) { ReviewListScreen(state, nav, viewModel::submitReviewDecision) }
-        composable(Destinations.Principal) { PrincipalHomeScreen(state, nav, viewModel::clearRoleSelection) }
+        composable(Destinations.Principal) { PrincipalHomeScreen(state, nav, viewModel::clearRoleSelection, viewModel::refreshDashboard) }
         composable(Destinations.Grades) { GradeStatsScreen(state, nav) }
         composable(Destinations.ClassStats) { ClassStatsScreen(state, nav, null) }
         composable(Destinations.ClassStatsRoute) { entry -> ClassStatsScreen(state, nav, entry.arguments?.getString("grade")) }

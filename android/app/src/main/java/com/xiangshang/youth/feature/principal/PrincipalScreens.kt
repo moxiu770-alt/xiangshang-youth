@@ -24,7 +24,7 @@ import com.xiangshang.youth.app.*
 import com.xiangshang.youth.shared.component.*
 import java.util.Locale
 
-@Composable fun PrincipalHomeScreen(state: AppUiState, nav: NavHostController, switchRole: () -> Unit) = AppScaffold("学校运动健康总览", onNotifications = { nav.navigate(Destinations.Notifications) }, notificationCount = state.unreadMessageCount, onSwitchRole = { switchRole(); nav.navigate(Destinations.Role) { popUpTo(Destinations.Principal) { inclusive = true } } }) {
+@Composable fun PrincipalHomeScreen(state: AppUiState, nav: NavHostController, switchRole: () -> Unit, refreshDashboard: () -> Unit = {}) = AppScaffold("学校运动健康总览", onNotifications = { nav.navigate(Destinations.Notifications) }, notificationCount = state.unreadMessageCount, onRefresh = refreshDashboard, isRefreshing = state.loading, errorMessage = state.error?.takeIf { state.data != null }, onRetry = refreshDashboard, onSwitchRole = { switchRole(); nav.navigate(Destinations.Role) { popUpTo(Destinations.Principal) { inclusive = true } } }) {
     if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }
     if (state.data.students.isEmpty()) { EmptyState("暂无学校测评数据，场地端上传后会显示在这里。"); return@AppScaffold }
     Surface(Modifier.fillMaxWidth().padding(bottom = 8.dp), color = Color.White, shape = RoundedCornerShape(12.dp), shadowElevation = 1.dp) {

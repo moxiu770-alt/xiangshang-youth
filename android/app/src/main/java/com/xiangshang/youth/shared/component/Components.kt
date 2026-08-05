@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.NotificationsNone
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,7 +25,7 @@ import com.xiangshang.youth.app.*
 import com.xiangshang.youth.core.model.*
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable fun AppScaffold(title: String, onBack: (() -> Unit)? = null, onSwitchRole: (() -> Unit)? = null, onNotifications: (() -> Unit)? = null, notificationCount: Int = 0, content: @Composable ColumnScope.() -> Unit) {
+@Composable fun AppScaffold(title: String, onBack: (() -> Unit)? = null, onSwitchRole: (() -> Unit)? = null, onNotifications: (() -> Unit)? = null, notificationCount: Int = 0, onRefresh: (() -> Unit)? = null, isRefreshing: Boolean = false, errorMessage: String? = null, onRetry: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
     Scaffold(containerColor = Canvas, topBar = {
         CenterAlignedTopAppBar(
             title = { Text(title, color = Navy, fontSize = 16.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) },
@@ -41,13 +42,24 @@ import com.xiangshang.youth.core.model.*
                         }
                     }
                 }
+                onRefresh?.let { action ->
+                    IconButton(onClick = action, enabled = !isRefreshing) {
+                        if (isRefreshing) CircularProgressIndicator(Modifier.size(17.dp), color = Blue, strokeWidth = 2.dp)
+                        else Icon(Icons.Filled.Refresh, contentDescription = "刷新数据", tint = Navy, modifier = Modifier.size(19.dp))
+                    }
+                }
                 onSwitchRole?.let { action ->
                     TextButton(onClick = action) { Text("切换身份", color = Blue, fontSize = 11.sp) }
                 }
             }
         )
     }) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize().padding(horizontal = 12.dp).verticalScroll(rememberScrollState()), content = content)
+        Column(Modifier.padding(padding).fillMaxSize().padding(horizontal = 12.dp).verticalScroll(rememberScrollState())) {
+            if (errorMessage != null) {
+                ErrorState(errorMessage, retry = onRetry ?: {})
+            }
+            content()
+        }
     }
 }
 @Composable fun RoleBadge(role: UserRole) { Text(role.label, color = Blue, fontSize = 12.sp, modifier = Modifier.background(Sky, RoundedCornerShape(14.dp)).padding(horizontal = 9.dp, vertical = 4.dp)) }

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="23094" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" initialViewController="launch-controller">
+    <scenes>
+        <scene sceneID="launch-scene">
+            <objects>
+                <viewController id="launch-controller" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="launch-view">
+                        <rect key="frame" x="0.0" y="0.0" width="390" height="844"/>
+                        <color key="backgroundColor" red="0.353" green="0.235" blue="0.604" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <subviews>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFill" image="LaunchPoster" translatesAutoresizingMaskIntoConstraints="NO" id="launch-poster"/>
+                        </subviews>
+                        <viewLayoutGuide key="safeArea" id="safe"/>
+                        <constraints>
+                            <constraint firstItem="launch-poster" firstAttribute="leading" secondItem="launch-view" secondAttribute="leading" id="poster-leading"/>
+                            <constraint firstItem="launch-poster" firstAttribute="trailing" secondItem="launch-view" secondAttribute="trailing" id="poster-trailing"/>
+                            <constraint firstItem="launch-poster" firstAttribute="top" secondItem="launch-view" secondAttribute="top" id="poster-top"/>
+                            <constraint firstItem="launch-poster" firstAttribute="bottom" secondItem="launch-view" secondAttribute="bottom" id="poster-bottom"/>
+                        </constraints>
+                    </view>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="first-responder" userLabel="First Responder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="50" y="50"/>
+        </scene>
+    </scenes>
+    <resources>
+        <image name="LaunchPoster" width="426" height="922"/>
+    </resources>
+</document>

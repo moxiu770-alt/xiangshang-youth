@@ -1,0 +1,37 @@
+# macOS
+.DS_Store
+._*
+
+# Local scratch files
+tmp/
+
+# Xcode / iOS
+DerivedData/
+build/
+*.xcuserstate
+*.xcscmblueprint
+ios/**/xcuserdata/
+ios/**/project.xcworkspace/xcuserdata/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Android / Gradle
+.gradle/
+**/build/
+android/local.properties
+*.apk
+*.aab
+
+# IDE
+.idea/
+*.iml
+
+# Logs
+*.log
+
+# Secrets / environment
+.env
+.env.*
+!.env.example

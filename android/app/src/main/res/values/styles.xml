@@ -1,0 +1,10 @@
+<resources>
+    <style name="Theme.XiangshangYouth" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowBackground">@drawable/launch_window_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">#7AB7EF</item>
+        <item name="android:navigationBarColor">#FFFFFF</item>
+        <item name="android:colorAccent">#347CF1</item>
+    </style>
+</resources>

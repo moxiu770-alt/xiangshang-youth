@@ -92,6 +92,26 @@ class LocalFeatureStateTest {
     }
 
     @Test
+    fun mockStudentStatusesMatchReferenceTaskBoardSequence() = runBlocking {
+        val statuses = MockRepository().dashboard().students.take(10).map { it.taskStatus }
+        assertEquals(
+            listOf(
+                TaskStatus.Completed,
+                TaskStatus.Completed,
+                TaskStatus.Review,
+                TaskStatus.Retest,
+                TaskStatus.Waiting,
+                TaskStatus.NotCheckedIn,
+                TaskStatus.Completed,
+                TaskStatus.Testing,
+                TaskStatus.Absent,
+                TaskStatus.CheckedIn
+            ),
+            statuses
+        )
+    }
+
+    @Test
     fun childBindingRequiresMatchingNameAndSchoolCode() = runBlocking {
         val students = MockRepository().dashboard().students
         assertEquals(null, ChildBindingValidator.findMatch(students, "王小明", "wrong-code"))

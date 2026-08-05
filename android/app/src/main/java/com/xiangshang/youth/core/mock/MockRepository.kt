@@ -14,7 +14,12 @@ class MockRepository : YouthRepository {
     )
     private val students = listOf("王小明","王小雨","陈子涵","刘一诺","张梓轩","李思远","周语桐","黄俊杰","吴欣怡","郑浩然","孙可心","何雨泽","杨子墨","朱思妍","马晨曦","胡宇航","林佳宁","郭子轩","高诗涵","罗锦程").mapIndexed { i, name ->
         val pairs = listOf("三年级" to "三年级1班","三年级" to "三年级2班","四年级" to "四年级1班","四年级" to "四年级2班","五年级" to "五年级1班","五年级" to "五年级2班")
-        Student("s" + (i + 1).toString().padStart(2, '0'), name, pairs[i % 6].first, pairs[i % 6].second, school.region, i % 3 == 0, TaskStatus.entries[i % TaskStatus.entries.size], if (i % 5 == 2) 19.5 else 24.0 + i % 11)
+        // Keep the deterministic demo sequence aligned with the iOS MockRepository.
+        // The order is intentionally not TaskStatus.entries order: it mirrors the
+        // reference task board, which needs completed, review, retest and absent
+        // rows visible on the first screen.
+        val statuses = listOf(TaskStatus.Completed, TaskStatus.Completed, TaskStatus.Review, TaskStatus.Retest, TaskStatus.Waiting, TaskStatus.NotCheckedIn, TaskStatus.Completed, TaskStatus.Testing, TaskStatus.Absent, TaskStatus.CheckedIn)
+        Student("s" + (i + 1).toString().padStart(2, '0'), name, pairs[i % 6].first, pairs[i % 6].second, school.region, i % 3 == 0, statuses[i % statuses.size], if (i % 5 == 2) 19.5 else 24.0 + i % 11)
     }
     private val tasks = listOf(
         TestTask("t1","2026年秋季综合运动能力测评","2026-09-12 09:00","南湖校区体育馆","三年级","三年级1班、2班",15,20,TaskStatus.Testing,"小学三年级运动能力标准 v1.0"),

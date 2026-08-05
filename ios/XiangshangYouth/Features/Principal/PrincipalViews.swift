@@ -50,7 +50,26 @@ struct PrincipalDashboard: View {
     private var students: [Student] { state.data?.students ?? [] }
     private var classes: [ClassInfo] { state.data?.classes ?? [] }
     private var activeTask: TestTask? { state.data?.tasks.first }
-    private var completionRate: Double { guard let activeTask, activeTask.totalCount > 0 else { return 0 }; return Double(activeTask.completedCount) / Double(activeTask.totalCount) }
+    private var activeTaskStudents: [Student] {
+        guard let activeTask else { return [] }
+        return students.filter { student in
+            student.grade == activeTask.gradeName && activeTask.className.split(separator: "、").map(String.init).contains(student.className)
+        }
+    }
+    private var activeCompletedCount: Int {
+        activeTaskStudents.isEmpty ? (activeTask?.completedCount ?? 0) : activeTaskStudents.filter { state.taskStatus(for: $0) == .completed }.count
+    }
+    private var activeTotalCount: Int { activeTaskStudents.isEmpty ? (activeTask?.totalCount ?? 0) : activeTaskStudents.count }
+    private var completionRate: Double { guard activeTotalCount > 0 else { return 0 }; return Double(activeCompletedCount) / Double(activeTotalCount) }
+    private func completionRate(for grade: Grade) -> Double {
+        let gradeStudents = students.filter { $0.grade == grade.name }
+        if !gradeStudents.isEmpty {
+            return Double(gradeStudents.filter { state.taskStatus(for: $0) == .completed }.count) / Double(gradeStudents.count)
+        }
+        let gradeClasses = classes.filter { $0.gradeId == grade.id }
+        guard !gradeClasses.isEmpty else { return 0 }
+        return Double(gradeClasses.map(\.completionRate).reduce(0, +)) / Double(gradeClasses.count) / 100
+    }
     private var riskStudents: [Student] { students.filter { ($0.totalScore ?? 35) < 25 || state.taskStatus(for: $0) == .review || state.taskStatus(for: $0) == .retest } }
     private var averageScore: Double { let scores = students.compactMap(\.totalScore); return scores.isEmpty ? 0 : scores.reduce(0, +) / Double(scores.count) }
 
@@ -160,7 +179,7 @@ struct PrincipalDashboard: View {
                     }
                     Spacer()
                     VStack(alignment: .trailing, spacing: 3) {
-                        Text("\(activeTask?.completedCount ?? 0) / \(activeTask?.totalCount ?? 0) 人").font(.system(size: 14, weight: .bold)).foregroundStyle(ReferenceColor.navy)
+                        Text("\(activeCompletedCount) / \(activeTotalCount) 人").font(.system(size: 14, weight: .bold)).foregroundStyle(ReferenceColor.navy)
                         Text("已完成 · 规则 v1.0").font(.system(size: 9)).foregroundStyle(.secondary)
                     }
                 }
@@ -184,8 +203,7 @@ struct PrincipalDashboard: View {
                     ReferenceSectionTitle(title: "年级完成率对比", trailing: "全部年级")
                 }.buttonStyle(.plain)
                 ForEach(Array((state.data?.grades ?? []).enumerated()), id: \.element.id) { index, grade in
-                    let gradeClasses = classes.filter { $0.gradeId == grade.id }
-                    let progress = gradeClasses.isEmpty ? 0 : Double(gradeClasses.map(\.completionRate).reduce(0, +)) / Double(gradeClasses.count) / 100
+                    let progress = completionRate(for: grade)
                     Button { router.pendingGradeFilter = grade.name; router.push(.classStats) } label: {
                         HStack(spacing: 8) {
                             Text(grade.name).font(.system(size: 11, weight: .semibold)).frame(width: 42, alignment: .leading)
@@ -230,12 +248,17 @@ struct GradeStatsView: View {
     let showsBack: Bool
     @State private var selectedMetric = "完成率"
     init(showsBack: Bool = false) { self.showsBack = showsBack }
-    private var completionRates: [Int] {
-        (state.data?.grades ?? []).map { grade in
-            let gradeClasses = (state.data?.classes ?? []).filter { $0.gradeId == grade.id }
-            guard !gradeClasses.isEmpty else { return 0 }
-            return Int((Double(gradeClasses.map(\.completionRate).reduce(0, +)) / Double(gradeClasses.count)).rounded())
+    private func completionRate(for grade: Grade) -> Int {
+        let gradeStudents = (state.data?.students ?? []).filter { $0.grade == grade.name }
+        if !gradeStudents.isEmpty {
+            return Int((Double(gradeStudents.filter { state.taskStatus(for: $0) == .completed }.count) / Double(gradeStudents.count) * 100).rounded())
         }
+        let gradeClasses = (state.data?.classes ?? []).filter { $0.gradeId == grade.id }
+        guard !gradeClasses.isEmpty else { return 0 }
+        return Int((Double(gradeClasses.map(\.completionRate).reduce(0, +)) / Double(gradeClasses.count)).rounded())
+    }
+    private var completionRates: [Int] {
+        (state.data?.grades ?? []).map { completionRate(for: $0) }
     }
 
     var body: some View {
@@ -256,9 +279,9 @@ struct GradeStatsView: View {
                 ForEach(Array((state.data?.grades ?? []).enumerated()), id: \.element.id) { index, grade in
                     let rate = completionRates[index]
                     let gradeClasses = (state.data?.classes ?? []).filter { $0.gradeId == grade.id }
-                    let totalStudents = gradeClasses.reduce(0) { $0 + $1.studentCount }
-                    let completedStudents = Int((Double(totalStudents) * Double(rate) / 100).rounded())
                     let gradeStudents = (state.data?.students ?? []).filter { $0.grade == grade.name }
+                    let totalStudents = gradeStudents.isEmpty ? gradeClasses.reduce(0) { $0 + $1.studentCount } : gradeStudents.count
+                    let completedStudents = gradeStudents.isEmpty ? Int((Double(totalStudents) * Double(rate) / 100).rounded()) : gradeStudents.filter { state.taskStatus(for: $0) == .completed }.count
                     let gradeRisk = gradeStudents.filter { ($0.totalScore ?? 35) < 25 || [.review, .retest].contains(state.taskStatus(for: $0)) }.count
                     let metric = selectedMetric == "完成率" ? "\(rate)%" : selectedMetric == "平均总分" ? String(format: "%.1f", 24.8 + Double(index)) : "\(gradeRisk)人"
                     Button { router.pendingGradeFilter = grade.name; router.push(.classStats) } label: {
@@ -321,6 +344,11 @@ struct ClassStatsView: View {
             state.data?.grades.first { grade in grade.id == item.gradeId }?.name == selectedGrade
         }
     }
+    private func completionRate(for item: ClassInfo) -> Int {
+        let classStudents = (state.data?.students ?? []).filter { $0.className == item.name }
+        guard !classStudents.isEmpty else { return item.completionRate }
+        return Int((Double(classStudents.filter { state.taskStatus(for: $0) == .completed }.count) / Double(classStudents.count) * 100).rounded())
+    }
 
     var body: some View {
         ScrollView {
@@ -331,6 +359,7 @@ struct ClassStatsView: View {
                 Text("\(classes.count)个班级 · 点击班级查看需重点跟进的学生")
                     .font(.system(size: 10)).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 14)
                 ForEach(classes) { item in
+                    let rate = completionRate(for: item)
                     Button { router.pendingClassFilter = item.name; router.push(.riskStudents) } label: {
                         ReferenceCard {
                             VStack(spacing: 8) {
@@ -340,12 +369,12 @@ struct ClassStatsView: View {
                                         Text("\(item.teacherName) · \(item.studentCount)人").font(.system(size: 9)).foregroundStyle(.secondary)
                                     }
                                     Spacer()
-                                    Text("\(item.completionRate)%").font(.system(size: 18, weight: .bold)).foregroundStyle(item.completionRate < 80 ? .red : ReferenceColor.green)
+                                    Text("\(rate)%").font(.system(size: 18, weight: .bold)).foregroundStyle(rate < 80 ? .red : ReferenceColor.green)
                                     Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold)).foregroundStyle(.secondary)
                                 }
-                                AnimatedProgressLine(value: Double(item.completionRate) / 100, colors: [item.completionRate < 80 ? .orange : ReferenceColor.green, ReferenceColor.blue], height: 6)
-                                HStack { Text("待完成 \(max(0, item.studentCount - Int((Double(item.studentCount) * Double(item.completionRate) / 100).rounded()))) 人"); Spacer(); Text(item.completionRate < 80 ? "建议班主任跟进" : "进度正常") }
-                                    .font(.system(size: 8)).foregroundStyle(item.completionRate < 80 ? .orange : .secondary)
+                                AnimatedProgressLine(value: Double(rate) / 100, colors: [rate < 80 ? .orange : ReferenceColor.green, ReferenceColor.blue], height: 6)
+                                HStack { Text("待完成 \(max(0, item.studentCount - Int((Double(item.studentCount) * Double(rate) / 100).rounded()))) 人"); Spacer(); Text(rate < 80 ? "建议班主任跟进" : "进度正常") }
+                                    .font(.system(size: 8)).foregroundStyle(rate < 80 ? .orange : .secondary)
                             }
                         }
                     }.buttonStyle(.plain)

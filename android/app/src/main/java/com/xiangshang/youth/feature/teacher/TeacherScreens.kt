@@ -136,8 +136,8 @@ private fun ClassTeacherPanel(state: AppUiState, nav: NavHostController, pulse: 
     Surface(Modifier.padding(horizontal = 12.dp).fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(10.dp), shadowElevation = 1.dp) {
         Column(Modifier.padding(vertical = 9.dp)) {
             SectionHeader("今日任务", "查看全部") { nav.navigate(Destinations.Tasks) }
-            SportsTask("16:30", "16:30 · 17:10", "三年级2班综合测评", Green)
-            SportsTask("17:20", "17:20 · 18:00", "体能提升课", Blue)
+            SportsTask("16:30", "16:30 · 17:10", "三年级2班综合测评", Green) { nav.navigate(Destinations.Tasks) }
+            SportsTask("17:20", "17:20 · 18:00", "体能提升课", Blue) { nav.navigate(Destinations.Tasks) }
         }
     }
 }
@@ -176,8 +176,15 @@ private fun TeacherActionGrid(nav: NavHostController) {
 @Composable
 private fun SportsTeacherPanel(state: AppUiState, nav: NavHostController, pulse: Float) = Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
     val tasks = state.data?.tasks.orEmpty()
-    val completed = tasks.sumOf { it.completedCount }
-    val total = tasks.sumOf { it.totalCount }.coerceAtLeast(1)
+    val taskCounts = tasks.map { task ->
+        val taskStudents = state.data?.students.orEmpty().filter { student ->
+            student.grade == task.gradeName && task.className.split("、").contains(student.className)
+        }
+        if (taskStudents.isEmpty()) task.completedCount to task.totalCount
+        else taskStudents.count { (state.local.studentTaskStatuses[it.id] ?: it.taskStatus) == com.xiangshang.youth.core.model.TaskStatus.Completed } to taskStudents.size
+    }
+    val completed = taskCounts.sumOf { it.first }
+    val total = taskCounts.sumOf { it.second }.coerceAtLeast(1)
     Surface(Modifier.padding(horizontal = 12.dp).fillMaxWidth().scale(pulse), color = Color.White, shape = RoundedCornerShape(10.dp), shadowElevation = 1.dp) {
         Column(Modifier.padding(vertical = 10.dp)) {
             SectionHeader("近日测评提醒", "查看全部") { nav.navigate(Destinations.Tasks) }
@@ -186,12 +193,12 @@ private fun SportsTeacherPanel(state: AppUiState, nav: NavHostController, pulse:
         }
     }
     Row(Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) { SportsShortcut("学生管理", Icons.Filled.Groups, Green, Modifier.weight(1f)) { nav.navigate(Destinations.Students) }; SportsShortcut("班级排课", Icons.Filled.CalendarMonth, Blue, Modifier.weight(1f)) { nav.navigate(Destinations.Tasks) } }
-    Surface(Modifier.padding(horizontal = 12.dp).fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(10.dp)) { Column(Modifier.padding(vertical = 10.dp)) { SectionHeader("今日任务", "查看全部") { nav.navigate(Destinations.Tasks) }; SportsTask("16:30", "16:30 · 17:10", "一（6）班 测评任务", Green); SportsTask("17:20", "17:20 · 18:00", "体能提升班", Blue) } }
+    Surface(Modifier.padding(horizontal = 12.dp).fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(10.dp)) { Column(Modifier.padding(vertical = 10.dp)) { SectionHeader("今日任务", "查看全部") { nav.navigate(Destinations.Tasks) }; SportsTask("16:30", "16:30 · 17:10", "一（6）班 测评任务", Green) { nav.navigate(Destinations.Tasks) }; SportsTask("17:20", "17:20 · 18:00", "体能提升班", Blue) { nav.navigate(Destinations.Tasks) } } }
     Surface(Modifier.padding(horizontal = 12.dp).fillMaxWidth().semantics { role = Role.Button; contentDescription = "上传课后测评结果和照片" }.clickable { nav.navigate(Destinations.Tasks) }, color = Color(0xFFFFAA25), shape = RoundedCornerShape(9.dp)) { Row(Modifier.padding(vertical = 10.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.CameraAlt, null, tint = Color.White, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(7.dp)); Text("课后上传测评结果记录与照片", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp) } }
 }
 
 @Composable private fun SportsShortcut(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier, onClick: () -> Unit) = Surface(modifier.height(66.dp).semantics { role = Role.Button; contentDescription = "查看$label" }.clickable(onClick = onClick), color = color.copy(alpha = .065f), shape = RoundedCornerShape(10.dp)) { Row(Modifier.fillMaxSize().padding(10.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = color, modifier = Modifier.size(27.dp)); Spacer(Modifier.width(9.dp)); Column { Text(label, color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text("查看详情 ›", color = color, fontSize = 9.sp) } } }
-@Composable private fun SportsTask(time: String, duration: String, title: String, color: Color) = Row(Modifier.padding(horizontal = 13.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) { Surface(color = color.copy(alpha = .13f), shape = CircleShape, modifier = Modifier.size(28.dp)) { Icon(Icons.Filled.DirectionsRun, null, tint = color, modifier = Modifier.padding(6.dp)) }; Spacer(Modifier.width(8.dp)); Column(Modifier.weight(1f)) { Text(duration, color = Color(0xFF778497), fontSize = 8.sp); Text(title, color = Navy, fontWeight = FontWeight.SemiBold, fontSize = 11.sp) }; Text(time, color = color, fontWeight = FontWeight.Bold, fontSize = 10.sp) }
+@Composable private fun SportsTask(time: String, duration: String, title: String, color: Color, onClick: (() -> Unit)? = null) = Row(Modifier.padding(horizontal = 13.dp, vertical = 6.dp).then(if (onClick == null) Modifier else Modifier.clickable(onClick = onClick).semantics { role = Role.Button; contentDescription = "查看任务：$title，$duration" }), verticalAlignment = Alignment.CenterVertically) { Surface(color = color.copy(alpha = .13f), shape = CircleShape, modifier = Modifier.size(28.dp)) { Icon(Icons.Filled.DirectionsRun, null, tint = color, modifier = Modifier.padding(6.dp)) }; Spacer(Modifier.width(8.dp)); Column(Modifier.weight(1f)) { Text(duration, color = Color(0xFF778497), fontSize = 8.sp); Text(title, color = Navy, fontWeight = FontWeight.SemiBold, fontSize = 11.sp) }; Text(time, color = color, fontWeight = FontWeight.Bold, fontSize = 10.sp); if (onClick != null) { Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray, modifier = Modifier.size(15.dp)) } }
 @Composable private fun SectionHeader(title: String, action: String, onClick: () -> Unit) = Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) { Text(title, color = Blue, fontWeight = FontWeight.Bold, fontSize = 13.sp); Spacer(Modifier.weight(1f)); Text(action + "  ›", color = Blue, fontSize = 9.sp, modifier = Modifier.semantics { role = Role.Button; contentDescription = "$title：$action" }.clickable(onClick = onClick)) }
 
 @Composable

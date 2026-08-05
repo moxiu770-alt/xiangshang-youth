@@ -41,7 +41,16 @@ import java.util.Locale
         }
     }
     val activeTask = state.data.tasks.firstOrNull()
-    val completion = if (activeTask == null || activeTask.totalCount == 0) 0f else activeTask.completedCount.toFloat() / activeTask.totalCount
+    val activeTaskStudents = activeTask?.let { task ->
+        state.data.students.filter { student ->
+            student.grade == task.gradeName && task.className.split("、").contains(student.className)
+        }
+    }.orEmpty()
+    val activeCompleted = if (activeTaskStudents.isEmpty()) activeTask?.completedCount ?: 0 else activeTaskStudents.count { student ->
+        (state.local.studentTaskStatuses[student.id] ?: student.taskStatus) == com.xiangshang.youth.core.model.TaskStatus.Completed
+    }
+    val activeTotal = if (activeTaskStudents.isEmpty()) activeTask?.totalCount ?: 0 else activeTaskStudents.size
+    val completion = if (activeTotal == 0) 0f else activeCompleted.toFloat() / activeTotal
     var regionDetailShown by rememberSaveable { mutableStateOf(false) }
     val risk = state.data?.students?.count { student ->
         val status = state.local.studentTaskStatuses[student.id] ?: student.taskStatus
@@ -49,7 +58,7 @@ import java.util.Locale
     } ?: 6
     val averageScore = state.data.students.mapNotNull { it.totalScore }.average().takeIf { it.isFinite() } ?: 0.0
     val povertyCount = state.data.students.count { it.isPovertyArea }
-    Surface(onClick = { nav.navigate(Destinations.Grades) }, modifier = Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(12.dp), shadowElevation = 1.dp) { Column(Modifier.padding(14.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.TrendingUp, null, tint = Blue); Spacer(Modifier.width(7.dp)); Text(activeTask?.title ?: "综合运动能力测评", color = Navy, fontWeight = FontWeight.Bold, fontSize = 13.sp); Spacer(Modifier.weight(1f)); Text(activeTask?.status?.label ?: "待开始", color = Blue, fontSize = 9.sp) }; Spacer(Modifier.height(10.dp)); Row(verticalAlignment = Alignment.Bottom) { Column(Modifier.weight(1f)) { Text("${(completion * 100).toInt()}%", color = Blue, fontWeight = FontWeight.Bold, fontSize = 30.sp); Text("全校测评完成率", color = Color.Gray, fontSize = 10.sp) }; Column(horizontalAlignment = Alignment.End) { Text("${activeTask?.completedCount ?: 0} / ${activeTask?.totalCount ?: 0} 人", color = Navy, fontWeight = FontWeight.Bold, fontSize = 14.sp); Text("已完成 · ${activeTask?.ruleVersion ?: "规则 v1.0"}", color = Color.Gray, fontSize = 8.sp) } }; Spacer(Modifier.height(8.dp)); LinearProgressIndicator({ completion }, Modifier.fillMaxWidth().height(8.dp), color = Green, trackColor = Sky) } }
+    Surface(onClick = { nav.navigate(Destinations.Grades) }, modifier = Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(12.dp), shadowElevation = 1.dp) { Column(Modifier.padding(14.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.TrendingUp, null, tint = Blue); Spacer(Modifier.width(7.dp)); Text(activeTask?.title ?: "综合运动能力测评", color = Navy, fontWeight = FontWeight.Bold, fontSize = 13.sp); Spacer(Modifier.weight(1f)); Text(activeTask?.status?.label ?: "待开始", color = Blue, fontSize = 9.sp) }; Spacer(Modifier.height(10.dp)); Row(verticalAlignment = Alignment.Bottom) { Column(Modifier.weight(1f)) { Text("${(completion * 100).toInt()}%", color = Blue, fontWeight = FontWeight.Bold, fontSize = 30.sp); Text("全校测评完成率", color = Color.Gray, fontSize = 10.sp) }; Column(horizontalAlignment = Alignment.End) { Text("$activeCompleted / $activeTotal 人", color = Navy, fontWeight = FontWeight.Bold, fontSize = 14.sp); Text("已完成 · ${activeTask?.ruleVersion ?: "规则 v1.0"}", color = Color.Gray, fontSize = 8.sp) } }; Spacer(Modifier.height(8.dp)); LinearProgressIndicator({ completion }, Modifier.fillMaxWidth().height(8.dp), color = Green, trackColor = Sky) } }
     Spacer(Modifier.height(9.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) { PrincipalMetric("平均总分", String.format(Locale.US, "%.1f", averageScore), "35分制", Icons.Filled.SportsScore, Blue, Modifier.weight(1f)) { nav.navigate(Destinations.Grades) }; PrincipalMetric("风险学生", "$risk", "待及时跟进", Icons.Filled.WarningAmber, Color.Red, Modifier.weight(1f)) { nav.navigate(Destinations.Risk) }; PrincipalMetric("公益支持", "$povertyCount", "贫困地区", Icons.Filled.Favorite, Color(0xFFFF638E), Modifier.weight(1f)) { regionDetailShown = true } }
     Spacer(Modifier.height(10.dp)); Surface(Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(12.dp)) { Column(Modifier.padding(12.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Text("年级完成率对比", color = Navy, fontWeight = FontWeight.Bold, fontSize = 14.sp); Spacer(Modifier.weight(1f)); TextButton(onClick = { nav.navigate(Destinations.Grades) }) { Text("全部年级 ›", fontSize = 9.sp) } }; state.data.grades.forEach { grade -> val gradeClasses = state.data.classes.filter { it.gradeId == grade.id }; val value = if (gradeClasses.isEmpty()) 0f else gradeClasses.map { it.completionRate }.average().toFloat() / 100f; Row(Modifier.fillMaxWidth().padding(vertical = 5.dp).semantics { role = Role.Button; contentDescription = "查看${grade.name}班级统计" }.clickable { nav.navigate("${Destinations.ClassStats}?grade=${android.net.Uri.encode(grade.name)}") }, verticalAlignment = Alignment.CenterVertically) { Text(grade.name, color = Navy, fontSize = 10.sp, modifier = Modifier.width(55.dp)); LinearProgressIndicator({ value }, Modifier.weight(1f).height(6.dp), color = if (value < .8f) Color(0xFFFF9D25) else Green, trackColor = Sky); Spacer(Modifier.width(7.dp)); Text("${(value * 100).toInt()}%", color = if (value < .8f) Color(0xFFFF9D25) else Green, fontWeight = FontWeight.Bold, fontSize = 10.sp) }; Text("7项平均分：跳跃 3.9 · 滑步 3.8 · 平衡 3.6", color = Color.Gray, fontSize = 8.sp) } } }
     Spacer(Modifier.height(9.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { PrincipalEntry("班级完成率", "6个班级实时进度", Icons.Filled.Groups, Color(0xFF8A5AF5), Modifier.weight(1f)) { nav.navigate(Destinations.ClassStats) }; PrincipalEntry("重点风险学生", "$risk 人需要跟进", Icons.Filled.PersonSearch, Color.Red, Modifier.weight(1f)) { nav.navigate(Destinations.Risk) } }
@@ -78,11 +87,13 @@ fun GradeStatsScreen(state: AppUiState, nav: NavHostController) = AppScaffold("�
     Text("按小学综合运动能力标准 v1.0 汇总，点击年级查看班级进度。", color = Color.Gray, fontSize = 9.sp)
     state.data.grades.forEachIndexed { index, grade ->
         val gradeClasses = state.data.classes.filter { it.gradeId == grade.id }
-        val rate = if (gradeClasses.isEmpty()) 0 else gradeClasses.map { it.completionRate }.average().toInt()
-        val totalStudents = gradeClasses.sumOf { it.studentCount }
-        val completedStudents = totalStudents * rate / 100
         val gradeName = grade.name
         val gradeStudents = state.data.students.filter { it.grade == gradeName }
+        val rate = if (gradeStudents.isNotEmpty()) {
+            gradeStudents.count { (state.local.studentTaskStatuses[it.id] ?: it.taskStatus) == com.xiangshang.youth.core.model.TaskStatus.Completed } * 100 / gradeStudents.size
+        } else if (gradeClasses.isEmpty()) 0 else gradeClasses.map { it.completionRate }.average().toInt()
+        val totalStudents = if (gradeStudents.isEmpty()) gradeClasses.sumOf { it.studentCount } else gradeStudents.size
+        val completedStudents = if (gradeStudents.isEmpty()) totalStudents * rate / 100 else gradeStudents.count { (state.local.studentTaskStatuses[it.id] ?: it.taskStatus) == com.xiangshang.youth.core.model.TaskStatus.Completed }
         val gradeAverage = gradeStudents.mapNotNull { it.totalScore }.average().takeIf { it.isFinite() } ?: 0.0
         val gradeRisk = gradeStudents.count { student ->
             val status = state.local.studentTaskStatuses[student.id] ?: student.taskStatus
@@ -117,11 +128,13 @@ fun ClassStatsScreen(state: AppUiState, nav: NavHostController, initialGrade: St
     }
     Text("${classes.size}个班级 · 点击班级查看需要重点跟进的学生", color = Color.Gray, fontSize = 9.sp, modifier = Modifier.padding(bottom = 4.dp))
     classes.forEach { item ->
-        Surface(Modifier.fillMaxWidth().padding(vertical = 5.dp).semantics { role = Role.Button; contentDescription = "查看${item.name}风险学生，完成率${item.completionRate}%" }.clickable { nav.navigate("${Destinations.Risk}?className=${android.net.Uri.encode(item.name)}") }, color = Color.White, shape = RoundedCornerShape(11.dp), shadowElevation = 1.dp) {
+        val classStudents = state.data.students.filter { it.className == item.name }
+        val completionRate = if (classStudents.isEmpty()) item.completionRate else classStudents.count { (state.local.studentTaskStatuses[it.id] ?: it.taskStatus) == com.xiangshang.youth.core.model.TaskStatus.Completed } * 100 / classStudents.size
+        Surface(Modifier.fillMaxWidth().padding(vertical = 5.dp).semantics { role = Role.Button; contentDescription = "查看${item.name}风险学生，完成率${completionRate}%" }.clickable { nav.navigate("${Destinations.Risk}?className=${android.net.Uri.encode(item.name)}") }, color = Color.White, shape = RoundedCornerShape(11.dp), shadowElevation = 1.dp) {
             Column(Modifier.padding(12.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(item.name, color = Navy, fontWeight = FontWeight.Bold); Text("${item.teacherName} · ${item.studentCount}人", color = Color.Gray, fontSize = 9.sp) }; Text("${item.completionRate}%", color = if (item.completionRate < 80) Color.Red else Green, fontWeight = FontWeight.Bold, fontSize = 18.sp); Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray, modifier = Modifier.padding(start = 5.dp)) }
-                LinearProgressIndicator({ item.completionRate / 100f }, Modifier.fillMaxWidth().padding(top = 9.dp).height(6.dp), color = if (item.completionRate < 80) Color(0xFFFF9D25) else Green, trackColor = Sky)
-                Text(if (item.completionRate < 80) "建议班主任跟进" else "进度正常", color = if (item.completionRate < 80) Color(0xFFFF8B1F) else Color.Gray, fontSize = 8.sp, modifier = Modifier.padding(top = 5.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(item.name, color = Navy, fontWeight = FontWeight.Bold); Text("${item.teacherName} · ${item.studentCount}人", color = Color.Gray, fontSize = 9.sp) }; Text("${completionRate}%", color = if (completionRate < 80) Color.Red else Green, fontWeight = FontWeight.Bold, fontSize = 18.sp); Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray, modifier = Modifier.padding(start = 5.dp)) }
+                LinearProgressIndicator({ completionRate / 100f }, Modifier.fillMaxWidth().padding(top = 9.dp).height(6.dp), color = if (completionRate < 80) Color(0xFFFF9D25) else Green, trackColor = Sky)
+                Text(if (completionRate < 80) "建议班主任跟进" else "进度正常", color = if (completionRate < 80) Color(0xFFFF8B1F) else Color.Gray, fontSize = 8.sp, modifier = Modifier.padding(top = 5.dp))
             }
         }
     }

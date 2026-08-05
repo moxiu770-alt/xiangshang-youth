@@ -5,9 +5,8 @@ import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,6 +35,7 @@ import com.xiangshang.youth.feature.teacher.*
 import com.xiangshang.youth.core.model.UserRole
 import com.xiangshang.youth.core.util.DeepLinkResolver
 import com.xiangshang.youth.core.util.DeepLinkTarget
+import com.xiangshang.youth.shared.component.ErrorState
 
 object Destinations { const val Splash="splash"; const val Login="login"; const val Register="register"; const val PasswordReset="passwordReset"; const val Role="role"; const val Parent="parent"; const val Children="children"; const val ParentEvaluations="parentEvaluations"; const val Assessment="assessment"; const val Courses="courses"; const val Circle="circle"; const val Account="account"; const val Messages="messages"; const val Notifications="notifications"; const val Health="health"; const val Report="report"; const val Teacher="teacher"; const val TeacherMessages="teacherMessages"; const val Classes="classes"; const val TeacherCircle="teacherCircle"; const val TeacherBoard="teacherBoard"; const val Students="students"; const val StudentsRoute="students?className={className}"; const val Tasks="tasks"; const val TaskDetail="taskDetail"; const val TaskDetailRoute="taskDetail/{taskId}"; const val Review="review"; const val Principal="principal"; const val Grades="grades"; const val ClassStats="classStats"; const val ClassStatsRoute="classStats?grade={grade}"; const val Risk="risk"; const val RiskRoute="risk?className={className}" }
 @Composable fun AppNavHost(viewModel: AppViewModel, incomingDeepLink: Uri? = null, nav: NavHostController = rememberNavController()) {
@@ -176,6 +176,25 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
             RiskStudentsScreen(state, nav, entry.arguments?.getString("className")) { student ->
                 viewModel.chooseChild(student)
                 nav.navigate(Destinations.Report)
+        }
+    }
+    }
+    // Keep refresh failures actionable on every authenticated route, including
+    // secondary pages that intentionally keep their last successful content.
+    // Login remains inline so the small loading/error window never covers the
+    // authentication form.
+    if (state.error != null && state.profile != null && state.data != null && !state.restoringSession) {
+        androidx.compose.foundation.layout.Box(
+            Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                Modifier.fillMaxWidth().padding(horizontal = 28.dp),
+                color = Color.White,
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+                shadowElevation = 8.dp
+            ) {
+                ErrorState(state.error ?: "数据加载失败", retry = { viewModel.refreshDashboard() })
             }
         }
     }
@@ -183,7 +202,6 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
     // is reserved for authenticated dashboard refreshes, so no modal spinner window
     // flashes over the login page.
     if (state.loading && !state.restoringSession && state.profile != null) Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = .72f)), contentAlignment = Alignment.Center) { com.xiangshang.youth.shared.component.LoadingState() }
-    if (state.profile != null) state.error?.let { message -> AlertDialog(onDismissRequest = viewModel::clearError, title = { Text("加载失败") }, text = { Text(message.ifBlank { "请检查网络后重试。" }) }, confirmButton = { TextButton(onClick = viewModel::refreshDashboard) { Text("重试") } }, dismissButton = { TextButton(onClick = viewModel::clearError) { Text("关闭") } }) }
     }
     }
 }

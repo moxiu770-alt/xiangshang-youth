@@ -111,6 +111,7 @@ fun LoginScreen(
                             !agreement -> error = "请先阅读并同意用户协议和儿童隐私政策。"
                             method == 0 -> onLogin()
                             method == 1 && phone.filter(Char::isDigit).length != 11 -> error = "请输入有效的 11 位手机号。"
+                            method == 1 && !codeSent -> error = "请先获取短信验证码。"
                             method == 1 && code.length < 4 -> error = "请输入短信验证码。"
                             method == 2 && account.isBlank() -> error = "请输入账号或手机号。"
                             method == 2 && password.length < 6 -> error = "密码至少需要 6 位。"
@@ -184,6 +185,7 @@ fun RegisterScreen(onBack: () -> Unit, onRegistered: () -> Unit) {
             when {
                 name.isBlank() -> error = "请输入姓名。"
                 phone.filter(Char::isDigit).length != 11 -> error = "请输入有效的 11 位手机号。"
+                !codeSent -> error = "请先获取短信验证码。"
                 code.length < 4 -> error = "请输入短信验证码。"
                 password.length < 6 -> error = "密码至少需要 6 位。"
                 !agreement -> error = "请先同意相关协议。"
@@ -273,6 +275,7 @@ fun PasswordResetScreen(onBack: () -> Unit) {
             onClick = {
                 when {
                     phone.filter(Char::isDigit).length != 11 -> error = "请输入有效的 11 位手机号。"
+                    !codeSent -> error = "请先获取短信验证码。"
                     code.length < 4 -> error = "请输入短信验证码。"
                     password.length < 6 -> error = "新密码至少需要 6 位。"
                     password != confirmation -> error = "两次输入的密码不一致。"

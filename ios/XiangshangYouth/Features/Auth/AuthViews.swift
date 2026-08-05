@@ -204,6 +204,7 @@ struct LoginView: View {
         }
         if method == .phone {
             guard phone.filter(\.isNumber).count == 11 else { validationMessage = "请输入有效的 11 位手机号。"; return }
+            guard codeSent else { validationMessage = "请先获取短信验证码。"; return }
             guard verificationCode.count >= 4 else { validationMessage = "请输入短信验证码。"; return }
         } else {
             guard !account.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { validationMessage = "请输入账号或手机号。"; return }
@@ -347,6 +348,7 @@ struct RegisterView: View {
     private func register() {
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { error = "请输入姓名。"; return }
         guard phone.filter(\.isNumber).count == 11 else { error = "请输入有效的 11 位手机号。"; return }
+        guard codeSent else { error = "请先获取短信验证码。"; return }
         guard code.count >= 4 else { error = "请输入短信验证码。"; return }
         guard password.count >= 6 else { error = "密码至少需要 6 位。"; return }
         submitted = true
@@ -411,7 +413,7 @@ struct ResetPasswordView: View {
                     Section {
                         Button("确认重置密码") { reset() }
                             .frame(maxWidth: .infinity)
-                            .disabled(phone.filter(\.isNumber).count != 11 || code.count < 4 || password.count < 6 || confirmation.isEmpty)
+                            .disabled(phone.filter(\.isNumber).count != 11 || !codeSent || code.count < 4 || password.count < 6 || confirmation.isEmpty)
                     }
                 }
             }
@@ -446,6 +448,7 @@ struct ResetPasswordView: View {
 
     private func reset() {
         guard phone.filter(\.isNumber).count == 11 else { error = "请输入有效的 11 位手机号。"; return }
+        guard codeSent else { error = "请先获取短信验证码。"; return }
         guard code.count >= 4 else { error = "请输入短信验证码。"; return }
         guard password.count >= 6 else { error = "新密码至少需要 6 位。"; return }
         guard password == confirmation else { error = "两次输入的密码不一致。"; return }

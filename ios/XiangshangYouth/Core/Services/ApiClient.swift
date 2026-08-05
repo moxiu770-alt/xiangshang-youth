@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 enum ApiError: LocalizedError {
     case notConfigured
@@ -19,8 +20,12 @@ enum ApiError: LocalizedError {
 }
 
 final class ApiClient {
-    static let shared = ApiClient(); private init() {}
-    var token: String?
+    static let shared = ApiClient()
+    private let tokenStore = SecureTokenStore()
+    var token: String? {
+        didSet { tokenStore.write(token) }
+    }
+    private init() { token = tokenStore.read() }
     func request<T: Decodable>(_ request: URLRequest, type: T.Type) async throws -> T {
         var request = request; if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         do {
@@ -45,6 +50,46 @@ final class ApiClient {
             throw ApiError.invalidResponse
         } catch {
             throw ApiError.network
+        }
+    }
+}
+
+/// Keychain-backed token storage. UserDefaults continues to hold only local UI
+/// drafts and mock interaction state; credentials never rely on that store.
+private struct SecureTokenStore {
+    private let service = Bundle.main.bundleIdentifier ?? "com.xiangshang.youth"
+    private let account = "api-token"
+
+    func read() -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    func write(_ token: String?) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+        guard let token, !token.isEmpty else {
+            SecItemDelete(query as CFDictionary)
+            return
+        }
+        let data = Data(token.utf8)
+        let attributes: [String: Any] = [kSecValueData as String: data, kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]
+        if SecItemUpdate(query as CFDictionary, attributes as CFDictionary) != errSecSuccess {
+            var add = query
+            add.merge(attributes) { _, new in new }
+            SecItemAdd(add as CFDictionary, nil)
         }
     }
 }

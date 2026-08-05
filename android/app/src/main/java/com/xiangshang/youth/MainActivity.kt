@@ -14,12 +14,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xiangshang.youth.app.AppViewModel
 import com.xiangshang.youth.app.XiangshangYouthTheme
 import com.xiangshang.youth.app.AppNavHost
+import com.xiangshang.youth.core.service.ApiClient
 
 class MainActivity : ComponentActivity() {
     private var incomingDeepLink: Uri? by mutableStateOf(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ApiClient.initialize(this)
         // The visual spec uses full-bleed artwork on the launch/login surfaces.
         // Draw behind system bars so Android does not add a black status-bar band.
         WindowCompat.setDecorFitsSystemWindows(window, false)

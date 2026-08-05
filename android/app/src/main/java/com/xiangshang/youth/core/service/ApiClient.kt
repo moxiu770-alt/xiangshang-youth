@@ -1,5 +1,6 @@
 package com.xiangshang.youth.core.service
 
+import android.content.Context
 import java.io.IOException
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
@@ -17,6 +18,7 @@ sealed class ApiError(message: String) : IOException(message) {
 object ApiClient {
     private const val BaseUrl = "https://api.example.com/"
     @Volatile private var token: String? = null
+    @Volatile private var secureTokenStore: SecureTokenStore? = null
 
     private val authInterceptor = Interceptor { chain ->
         val request = chain.request().newBuilder().apply {
@@ -47,7 +49,19 @@ object ApiClient {
         .addConverterFactory(MoshiConverterFactory.create())
         .build()
 
-    fun updateToken(value: String?) { token = value?.trim()?.takeIf { it.isNotEmpty() } }
-    fun clearToken() { token = null }
+    fun initialize(context: Context) {
+        secureTokenStore = SecureTokenStore(context.applicationContext)
+        token = secureTokenStore?.read()
+    }
+
+    fun updateToken(value: String?) {
+        token = value?.trim()?.takeIf { it.isNotEmpty() }
+        secureTokenStore?.write(token)
+    }
+
+    fun clearToken() {
+        token = null
+        secureTokenStore?.write(null)
+    }
     fun hasToken(): Boolean = token != null
 }

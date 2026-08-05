@@ -73,6 +73,7 @@ fun LoginScreen(
     var codeSent by rememberSaveable { mutableStateOf(false) }
     var codeCountdown by rememberSaveable { mutableIntStateOf(0) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
+    var legalDocument by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(codeCountdown > 0) {
         while (codeSent && codeCountdown > 0) {
             delay(1000)
@@ -125,13 +126,22 @@ fun LoginScreen(
                         TextButton(onClick = onForgotPassword, contentPadding = PaddingValues(0.dp)) { Text("忘记密码？", color = Color.Gray, fontSize = 11.sp) }
                     }
                     Column(Modifier.fillMaxWidth().padding(top = 5.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { LoginCheck("专业身心测评与科学健康干预", "体质评估 · 科学干预"); LoginCheck("提供专属解决方案", "成长规划 · 定制方案"); LoginCheck("全程跟踪辅导", "专家护航 · 全程陪伴") }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.semantics { role = Role.Checkbox; contentDescription = if (agreement) "已同意用户协议、隐私政策和儿童隐私政策" else "同意用户协议、隐私政策和儿童隐私政策" }.clickable { agreement = !agreement }) { Checkbox(checked = agreement, onCheckedChange = { agreement = it }); Text("我已阅读并同意《用户协议》《隐私政策》《儿童隐私政策》", color = if (agreement) Green else Color.Gray, fontSize = 8.sp) }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.weight(1f).semantics { role = Role.Checkbox; contentDescription = if (agreement) "已同意用户协议、隐私政策和儿童隐私政策" else "同意用户协议、隐私政策和儿童隐私政策" }.clickable { agreement = !agreement }) {
+                            Checkbox(checked = agreement, onCheckedChange = { agreement = it })
+                            Text(if (agreement) "已阅读并同意相关协议" else "请阅读并同意相关协议", color = if (agreement) Green else Color.Gray, fontSize = 8.sp)
+                        }
+                        TextButton(onClick = { legalDocument = "用户协议" }, contentPadding = PaddingValues(0.dp)) { Text("查看协议", color = Blue, fontSize = 9.sp) }
+                    }
                 }
             }
             Spacer(Modifier.height(18.dp))
             Image(painterResource(R.drawable.campus_footer), null, Modifier.fillMaxWidth().height(112.dp).scale(landscapeScale), contentScale = ContentScale.Fit)
             Spacer(Modifier.height(3.dp))
         }
+    }
+    legalDocument?.let { document ->
+        AlertDialog(onDismissRequest = { legalDocument = null }, title = { Text(document) }, text = { Text("本页面为一期内测版展示。正式上线前将替换为经审核的完整文本，并说明账号、儿童健康数据、通知和第三方登录的处理规则。当前 Mock 数据不会上传到服务器。") }, confirmButton = { TextButton(onClick = { legalDocument = null }) { Text("完成") } })
     }
 }
 

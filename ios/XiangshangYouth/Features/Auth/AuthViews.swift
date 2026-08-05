@@ -42,6 +42,7 @@ struct LoginView: View {
     @State private var validationMessage: String?
     @State private var registerPresented = false
     @State private var resetPasswordPresented = false
+    @State private var legalDocument: LegalDocument?
     @State private var landscapeDrifts = false
 
     var body: some View {
@@ -80,6 +81,7 @@ struct LoginView: View {
         .onDisappear { countdownTask?.cancel() }
         .sheet(isPresented: $registerPresented) { RegisterView() }
         .sheet(isPresented: $resetPasswordPresented) { ResetPasswordView() }
+        .sheet(item: $legalDocument) { document in LegalDocumentView(document: document) }
     }
 
     private var loginPanel: some View {
@@ -165,14 +167,15 @@ struct LoginView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, 8)
-            Button {
-                agreementAccepted.toggle()
-            } label: {
-                Label(agreementAccepted ? "已阅读并同意《用户协议》《隐私政策》《儿童隐私政策》" : "请阅读并同意《用户协议》《隐私政策》《儿童隐私政策》", systemImage: agreementAccepted ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 9)).foregroundStyle(agreementAccepted ? ReferenceColor.green : .secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 8) {
+                Button { agreementAccepted.toggle() } label: {
+                    Label(agreementAccepted ? "已阅读并同意相关协议" : "请阅读并同意相关协议", systemImage: agreementAccepted ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 9)).foregroundStyle(agreementAccepted ? ReferenceColor.green : .secondary)
+                }.buttonStyle(.plain)
+                Spacer()
+                Button("查看协议") { legalDocument = .userAgreement }
+                    .font(.system(size: 9, weight: .semibold)).foregroundStyle(ReferenceColor.blue).buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .padding(20)
         .background(.white, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
@@ -232,6 +235,28 @@ struct LoginView: View {
                 Text(title).font(.system(size: 10, weight: .bold))
                 Text(subtitle).font(.system(size: 8)).foregroundStyle(.secondary)
             }
+        }
+    }
+}
+
+private enum LegalDocument: String, Identifiable {
+    case userAgreement = "用户协议"
+    case privacy = "隐私政策"
+    case childPrivacy = "儿童隐私政策"
+    var id: String { rawValue }
+}
+
+private struct LegalDocumentView: View {
+    let document: LegalDocument
+    @Environment(\.dismiss) private var dismiss
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                Text("《\(document.rawValue)》\n\n本页面为一期内测版展示。正式上线前将替换为经审核的完整文本，并说明账号、儿童健康数据、通知和第三方登录的处理规则。当前 Mock 数据不会上传到服务器。\n\n如需帮助，请联系学校管理员或平台客服。")
+                    .font(.body).foregroundStyle(ReferenceColor.navy).frame(maxWidth: .infinity, alignment: .leading).padding(20)
+            }
+            .navigationTitle(document.rawValue)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
         }
     }
 }

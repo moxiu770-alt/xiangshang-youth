@@ -72,7 +72,7 @@ fun LoginScreen(
     var codeSent by rememberSaveable { mutableStateOf(false) }
     var codeCountdown by rememberSaveable { mutableIntStateOf(0) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
-    LaunchedEffect(codeSent) {
+    LaunchedEffect(codeCountdown > 0) {
         while (codeSent && codeCountdown > 0) {
             delay(1000)
             codeCountdown -= 1

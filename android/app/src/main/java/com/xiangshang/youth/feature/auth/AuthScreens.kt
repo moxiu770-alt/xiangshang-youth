@@ -41,15 +41,12 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun SplashScreen(onFinished: () -> Unit, canFinish: () -> Boolean = { true }) {
-    val reduceMotion = LocalReduceMotion.current
-    val transition = rememberInfiniteTransition(label = "splash-breathe")
-    val scale by transition.animateFloat(1f, if (reduceMotion) 1f else 1.025f, infiniteRepeatable(tween(1500, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "splash-scale")
     LaunchedEffect(Unit) {
         delay(2000)
         while (!canFinish()) delay(120)
         onFinished()
     }
-    Image(painter = painterResource(R.drawable.launch_poster), contentDescription = "向上少年启动页", modifier = Modifier.fillMaxSize().scale(scale), contentScale = ContentScale.Crop)
+    Image(painter = painterResource(R.drawable.launch_poster), contentDescription = "向上少年启动页", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
 }
 
 @Composable

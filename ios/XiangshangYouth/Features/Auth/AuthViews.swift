@@ -2,7 +2,6 @@ import SwiftUI
 
 struct SplashView: View {
     @EnvironmentObject private var state: AppState
-    @State private var breathes = false
 
     var body: some View {
         ZStack {
@@ -10,14 +9,10 @@ struct SplashView: View {
             Image("LaunchPoster")
                 .resizable()
                 .scaledToFill()
-                .scaleEffect(breathes ? 1.025 : 1)
                 .ignoresSafeArea()
         }
         .statusBarHidden(true)
         .task {
-            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                breathes = true
-            }
             try? await Task.sleep(for: .seconds(2.0))
             withAnimation(.easeOut(duration: 0.28)) {
                 state.dismissSplash()

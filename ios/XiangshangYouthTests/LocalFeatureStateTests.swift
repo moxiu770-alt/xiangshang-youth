@@ -173,6 +173,22 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertEqual(state.unreadMessageCount, 0)
         XCTAssertTrue(LocalFeatureStore(defaults: defaults).state.readMessageIDs.contains("m1"))
     }
+
+    func testFamilyBindingRequiresMatchingNameAndSchoolCode() async {
+        let suite = "xiangshang.youth.binding-tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let state = AppState(featureStore: LocalFeatureStore(defaults: defaults))
+        await state.login(phone: "13800138000")
+
+        XCTAssertFalse(state.bindChild(name: "王小明", code: "wrong-code"))
+        XCTAssertFalse(state.bindChild(name: "其他学生", code: "XS-S01"))
+        XCTAssertTrue(state.bindChild(name: "王小明", code: "XS-S01"))
+        XCTAssertEqual(state.selectedChild?.id, "s01")
+        XCTAssertEqual(state.boundChildren.map(\.id), ["s01"])
+        XCTAssertTrue(state.bindChild(name: "王小雨", code: "s02"))
+        XCTAssertEqual(Set(state.boundChildren.map(\.id)), ["s01", "s02"])
+    }
 }
 
 private struct FailingRepository: YouthRepository {

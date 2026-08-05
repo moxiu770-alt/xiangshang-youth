@@ -351,7 +351,7 @@ struct TeacherClassBoardView: View {
                         Text("向上实验小学 · 三年级2班 · 共\(classStudents.count)人").font(.system(size: 8)).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button { router.push(.notifications) } label: {
+                    Button { router.push(.teacherMessages) } label: {
                         Image(systemName: "bell").overlay(alignment: .topTrailing) {
                             if state.unreadMessageCount > 0 { Circle().fill(.red).frame(width: 5, height: 5) }
                         }
@@ -436,7 +436,7 @@ struct TeacherClassBoardView: View {
                 }
 
                 HStack(spacing: 7) {
-                    actionButton("推送班级通知", "bell.fill", ReferenceColor.blue) { router.push(.notifications) }
+                    actionButton("推送班级通知", "bell.fill", ReferenceColor.blue) { router.push(.teacherMessages) }
                     actionButton("导出班级数据报告", "doc.text.fill", ReferenceColor.purple) { actionMessage = "班级数据报告已生成，可在消息通知中查看。" }
                     actionButton("批量发出预警", "exclamationmark.shield.fill", .red) { actionMessage = "已向待处理学生发送预警通知。" }
                 }

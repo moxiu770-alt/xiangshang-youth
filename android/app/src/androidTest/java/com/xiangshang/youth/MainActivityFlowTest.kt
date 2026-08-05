@@ -14,6 +14,11 @@ class MainActivityFlowTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<MainActivity>()
 
+    // A cold AVD can spend several seconds creating the Compose runtime after
+    // the native launch window. Keep the UI assertion honest without making it
+    // flaky on slower CI/emulator hosts.
+    private val coldStartTimeout = 15_000L
+
     @Test
     fun launchShowsBrandedSplashContent() {
         // The launch image is intentionally exposed for TalkBack and test discovery.
@@ -22,20 +27,24 @@ class MainActivityFlowTest {
 
     @Test
     fun loginFlowsToRoleChoiceAndParentHome() {
-        composeRule.waitUntil(timeoutMillis = 5_000) {
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("微信登录").fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithText("微信登录").performClick()
-        composeRule.waitUntil(timeoutMillis = 5_000) {
+        composeRule.onNodeWithText("请阅读并同意相关协议").performClick()
+        composeRule.onNodeWithText("微信授权登录").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("请选择进入方式").fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithText("家庭端").assertIsDisplayed()
         composeRule.onNodeWithText("学校端").assertIsDisplayed()
         composeRule.onNodeWithText("校长端").assertIsDisplayed()
         composeRule.onNodeWithText("家庭端").performClick()
-        composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodesWithText("综合测评").fetchSemanticsNodes().isNotEmpty()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            // A new family session must bind a child before child-specific
+            // reports and assessments are exposed.
+            composeRule.onAllNodesWithText("去绑定孩子").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithText("综合测评").assertIsDisplayed()
+        composeRule.onNodeWithText("去绑定孩子").assertIsDisplayed()
     }
 }

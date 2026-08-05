@@ -50,7 +50,10 @@ object ApiClient {
         .build()
 
     fun initialize(context: Context) {
-        secureTokenStore = SecureTokenStore(context.applicationContext)
+        // Keystore can be temporarily unavailable on a fresh/locked device. The
+        // app must still boot in Mock mode instead of crashing before Compose is
+        // rendered; a later remote login can retry persistence.
+        secureTokenStore = runCatching { SecureTokenStore(context.applicationContext) }.getOrNull()
         token = secureTokenStore?.read()
     }
 

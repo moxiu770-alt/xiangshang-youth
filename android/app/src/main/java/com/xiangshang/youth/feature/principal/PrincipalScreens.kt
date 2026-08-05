@@ -24,7 +24,7 @@ import com.xiangshang.youth.app.*
 import com.xiangshang.youth.shared.component.*
 import java.util.Locale
 
-@Composable fun PrincipalHomeScreen(state: AppUiState, nav: NavHostController, switchRole: () -> Unit, refreshDashboard: () -> Unit = {}) = AppScaffold("学校运动健康总览", onNotifications = { nav.navigate(Destinations.Notifications) }, notificationCount = state.unreadMessageCount, onRefresh = refreshDashboard, isRefreshing = state.loading, errorMessage = state.error?.takeIf { state.data != null }, onRetry = refreshDashboard, onSwitchRole = { switchRole(); nav.navigate(Destinations.Role) { popUpTo(Destinations.Principal) { inclusive = true } } }) {
+@Composable fun PrincipalHomeScreen(state: AppUiState, nav: NavHostController, switchRole: () -> Unit, refreshDashboard: () -> Unit = {}, logout: () -> Unit = {}) = AppScaffold("学校运动健康总览", onNotifications = { nav.navigate(Destinations.Notifications) }, notificationCount = state.unreadMessageCount, onRefresh = refreshDashboard, isRefreshing = state.loading, errorMessage = state.error?.takeIf { state.data != null }, onRetry = refreshDashboard, onSwitchRole = { switchRole(); nav.navigate(Destinations.Role) { popUpTo(Destinations.Principal) { inclusive = true } } }) {
     if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }
     if (state.data.students.isEmpty()) { EmptyState("暂无学校测评数据，场地端上传后会显示在这里。"); return@AppScaffold }
     Surface(Modifier.fillMaxWidth().padding(bottom = 8.dp), color = Color.White, shape = RoundedCornerShape(12.dp), shadowElevation = 1.dp) {
@@ -37,6 +37,14 @@ import java.util.Locale
                 Text("周校长", color = Navy, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 Text("向上实验小学 · 南湖校区", color = Color.Gray, fontSize = 10.sp)
             }
+            TextButton(
+                onClick = {
+                    logout()
+                    nav.navigate(Destinations.Login) { popUpTo(nav.graph.id) { inclusive = true }; launchSingleTop = true }
+                },
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                modifier = Modifier.semantics { contentDescription = "退出校长端" }
+            ) { Text("退出校长端", color = Blue, fontSize = 10.sp) }
             Text("本轮测评", color = Blue, fontSize = 9.sp, modifier = Modifier.background(Sky, RoundedCornerShape(12.dp)).padding(horizontal = 9.dp, vertical = 5.dp))
         }
     }
@@ -52,13 +60,13 @@ import java.util.Locale
     val activeTotal = if (activeTaskStudents.isEmpty()) activeTask?.totalCount ?: 0 else activeTaskStudents.size
     val completion = if (activeTotal == 0) 0f else activeCompleted.toFloat() / activeTotal
     var regionDetailShown by rememberSaveable { mutableStateOf(false) }
-    val risk = state.data?.students?.count { student ->
+    val risk = state.data.students.count { student ->
         val status = state.local.studentTaskStatuses[student.id] ?: student.taskStatus
         (student.totalScore ?: 35.0) < 25 || status.name == "Review" || status.name == "Retest"
-    } ?: 6
+    }
     val averageScore = state.data.students.mapNotNull { it.totalScore }.average().takeIf { it.isFinite() } ?: 0.0
     val povertyCount = state.data.students.count { it.isPovertyArea }
-    Surface(onClick = { nav.navigate(Destinations.Grades) }, modifier = Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(12.dp), shadowElevation = 1.dp) { Column(Modifier.padding(14.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.TrendingUp, null, tint = Blue); Spacer(Modifier.width(7.dp)); Text(activeTask?.title ?: "综合运动能力测评", color = Navy, fontWeight = FontWeight.Bold, fontSize = 13.sp); Spacer(Modifier.weight(1f)); Text(activeTask?.status?.label ?: "待开始", color = Blue, fontSize = 9.sp) }; Spacer(Modifier.height(10.dp)); Row(verticalAlignment = Alignment.Bottom) { Column(Modifier.weight(1f)) { Text("${(completion * 100).toInt()}%", color = Blue, fontWeight = FontWeight.Bold, fontSize = 30.sp); Text("全校测评完成率", color = Color.Gray, fontSize = 10.sp) }; Column(horizontalAlignment = Alignment.End) { Text("$activeCompleted / $activeTotal 人", color = Navy, fontWeight = FontWeight.Bold, fontSize = 14.sp); Text("已完成 · ${activeTask?.ruleVersion ?: "规则 v1.0"}", color = Color.Gray, fontSize = 8.sp) } }; Spacer(Modifier.height(8.dp)); LinearProgressIndicator({ completion }, Modifier.fillMaxWidth().height(8.dp), color = Green, trackColor = Sky) } }
+    Surface(onClick = { nav.navigate(Destinations.Grades) }, modifier = Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(12.dp), shadowElevation = 1.dp) { Column(Modifier.padding(14.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.Assessment, null, tint = Blue); Spacer(Modifier.width(7.dp)); Text(activeTask?.title ?: "综合运动能力测评", color = Navy, fontWeight = FontWeight.Bold, fontSize = 13.sp); Spacer(Modifier.weight(1f)); Text(activeTask?.status?.label ?: "待开始", color = Blue, fontSize = 9.sp) }; Spacer(Modifier.height(10.dp)); Row(verticalAlignment = Alignment.Bottom) { Column(Modifier.weight(1f)) { Text("${(completion * 100).toInt()}%", color = Blue, fontWeight = FontWeight.Bold, fontSize = 30.sp); Text("全校测评完成率", color = Color.Gray, fontSize = 10.sp) }; Column(horizontalAlignment = Alignment.End) { Text("$activeCompleted / $activeTotal 人", color = Navy, fontWeight = FontWeight.Bold, fontSize = 14.sp); Text("已完成 · ${activeTask?.ruleVersion ?: "规则 v1.0"}", color = Color.Gray, fontSize = 8.sp) } }; Spacer(Modifier.height(8.dp)); LinearProgressIndicator({ completion }, Modifier.fillMaxWidth().height(8.dp), color = Green, trackColor = Sky) } }
     Spacer(Modifier.height(9.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) { PrincipalMetric("平均总分", String.format(Locale.US, "%.1f", averageScore), "35分制", Icons.Filled.SportsScore, Blue, Modifier.weight(1f)) { nav.navigate(Destinations.Grades) }; PrincipalMetric("风险学生", "$risk", "待及时跟进", Icons.Filled.WarningAmber, Color.Red, Modifier.weight(1f)) { nav.navigate(Destinations.Risk) }; PrincipalMetric("公益支持", "$povertyCount", "贫困地区", Icons.Filled.Favorite, Color(0xFFFF638E), Modifier.weight(1f)) { regionDetailShown = true } }
     Spacer(Modifier.height(10.dp)); Surface(Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(12.dp)) { Column(Modifier.padding(12.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Text("年级完成率对比", color = Navy, fontWeight = FontWeight.Bold, fontSize = 14.sp); Spacer(Modifier.weight(1f)); TextButton(onClick = { nav.navigate(Destinations.Grades) }) { Text("全部年级 ›", fontSize = 9.sp) } }; state.data.grades.forEach { grade -> val gradeClasses = state.data.classes.filter { it.gradeId == grade.id }; val gradeStudents = state.data.students.filter { it.grade == grade.name }; val value = if (gradeStudents.isNotEmpty()) gradeStudents.count { (state.local.studentTaskStatuses[it.id] ?: it.taskStatus) == com.xiangshang.youth.core.model.TaskStatus.Completed }.toFloat() / gradeStudents.size else if (gradeClasses.isEmpty()) 0f else gradeClasses.map { it.completionRate }.average().toFloat() / 100f; Row(Modifier.fillMaxWidth().padding(vertical = 5.dp).semantics { role = Role.Button; contentDescription = "查看${grade.name}班级统计" }.clickable { nav.navigate("${Destinations.ClassStats}?grade=${android.net.Uri.encode(grade.name)}") }, verticalAlignment = Alignment.CenterVertically) { Text(grade.name, color = Navy, fontSize = 10.sp, modifier = Modifier.width(55.dp)); LinearProgressIndicator({ value }, Modifier.weight(1f).height(6.dp), color = if (value < .8f) Color(0xFFFF9D25) else Green, trackColor = Sky); Spacer(Modifier.width(7.dp)); Text("${(value * 100).toInt()}%", color = if (value < .8f) Color(0xFFFF9D25) else Green, fontWeight = FontWeight.Bold, fontSize = 10.sp) }; Text("7项平均分：跳跃 3.9 · 滑步 3.8 · 平衡 3.6", color = Color.Gray, fontSize = 8.sp) } } }
     Spacer(Modifier.height(9.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { PrincipalEntry("班级完成率", "6个班级实时进度", Icons.Filled.Groups, Color(0xFF8A5AF5), Modifier.weight(1f)) { nav.navigate(Destinations.ClassStats) }; PrincipalEntry("重点风险学生", "$risk 人需要跟进", Icons.Filled.PersonSearch, Color.Red, Modifier.weight(1f)) { nav.navigate(Destinations.Risk) } }
@@ -66,7 +74,7 @@ import java.util.Locale
     if (regionDetailShown) AlertDialog(
         onDismissRequest = { regionDetailShown = false },
         title = { Text("地区关怀明细") },
-        text = { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { Text("南湖校区", color = Navy, fontWeight = FontWeight.Bold); Text("覆盖3个年级 · 6个班级 · ${state.data?.students?.size ?: 0}名学生", color = Color.Gray, fontSize = 11.sp); HorizontalDivider(); Text("粤北山区", color = Navy, fontWeight = FontWeight.Bold); Text("${state.data?.students?.count { it.isPovertyArea } ?: 0}名贫困地区学生已纳入公益运动课程支持", color = Color.Gray, fontSize = 11.sp); Text("地区标签和公益资格由学校管理端维护，场地端上传成绩后会自动刷新。", color = Color.Gray, fontSize = 10.sp) } },
+        text = { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { Text("南湖校区", color = Navy, fontWeight = FontWeight.Bold); Text("覆盖3个年级 · 6个班级 · ${state.data.students.size}名学生", color = Color.Gray, fontSize = 11.sp); HorizontalDivider(); Text("粤北山区", color = Navy, fontWeight = FontWeight.Bold); Text("${state.data.students.count { it.isPovertyArea }}名贫困地区学生已纳入公益运动课程支持", color = Color.Gray, fontSize = 11.sp); Text("地区标签和公益资格由学校管理端维护，场地端上传成绩后会自动刷新。", color = Color.Gray, fontSize = 10.sp) } },
         confirmButton = { TextButton(onClick = { regionDetailShown = false }) { Text("关闭") } }
     )
 }
@@ -145,7 +153,7 @@ fun ClassStatsScreen(state: AppUiState, nav: NavHostController, initialGrade: St
 fun RiskStudentsScreen(state: AppUiState, nav: NavHostController, className: String?, onOpenReport: (com.xiangshang.youth.core.model.Student) -> Unit) = AppScaffold("重点风险学生", onBack = { nav.popBackStack() }) {
     if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }
     var riskFilter by rememberSaveable { mutableStateOf("全部") }
-    val students = state.data?.students.orEmpty().filter { student ->
+    val students = state.data.students.filter { student ->
         val status = state.local.studentTaskStatuses[student.id] ?: student.taskStatus
         (className == null || student.className == className) && when (riskFilter) {
             "待复核" -> status.name == "Review"

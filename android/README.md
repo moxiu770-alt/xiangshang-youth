@@ -11,7 +11,7 @@ cd android
 
 生成的 APK 位于 `app/build/outputs/apk/debug/app-debug.apk`。使用 Android Studio 打开 `android` 目录即可运行模拟器或真机。
 
-`run-android-checks.sh` 会自动使用 Android Studio 内置 JDK，并设置本机 Android SDK；它会同时执行 Debug APK 构建和 `testDebugUnitTest`。如果只需要构建：
+`run-android-checks.sh` 会自动使用 Android Studio 内置 JDK，并设置本机 Android SDK；它会同时执行 Debug APK 构建、`testDebugUnitTest` 和 `lintDebug`。如果只需要构建：
 
 ```bash
 cd android
@@ -23,3 +23,5 @@ export ANDROID_HOME="/Users/luyanpeng/Library/Android/sdk"
 本机已配置 `XiangshangYouth_QA_API34` 和 `ChangXiang_A34` 两个模拟器，项目 SDK 路径写在 `local.properties` 中。
 
 默认测试登录页使用预填账号，登录后可以选择家长、教师或校长角色。
+
+发布校验：`./gradlew :app:assembleRelease` 已可构建，产物为 `app/build/outputs/apk/release/app-release-unsigned.apk`；真实上架前需要配置发行签名与 Play/App Store 审核材料。

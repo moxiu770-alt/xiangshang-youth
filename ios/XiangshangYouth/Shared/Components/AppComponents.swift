@@ -19,18 +19,34 @@ struct AppScaffold<Content: View>: View {
 struct RoleBadge: View { let role: UserRole; var body: some View { Label(role.rawValue, systemImage: role.icon).font(.caption.weight(.semibold)).foregroundStyle(AppTheme.primary).padding(.horizontal, 10).padding(.vertical, 6).background(AppTheme.primary.opacity(0.1), in: Capsule()).accessibilityLabel("当前角色：\(role.rawValue)") } }
 struct StudentCard: View {
     let student: Student; let action: (() -> Void)?
-    var body: some View { Button(action: { action?() }) { HStack(spacing: 12) {
+    @ViewBuilder private var cardContent: some View { HStack(spacing: 12) {
         Text(String(student.name.prefix(1))).font(.title2.bold()).foregroundStyle(.white).frame(width: 46, height: 46).background(AppTheme.teal, in: Circle())
         VStack(alignment: .leading, spacing: 4) { Text(student.name).font(.headline).foregroundStyle(AppTheme.ink); Text("\(student.grade) · \(student.className) · \(student.gender)").font(.caption).foregroundStyle(AppTheme.muted); Label(student.isPovertyArea ? "贫困地区学生" : student.region, systemImage: student.isPovertyArea ? "heart.text.square" : "mappin.and.ellipse").font(.caption2).foregroundStyle(student.isPovertyArea ? AppTheme.danger : AppTheme.muted) }
         Spacer(); if let score = student.totalScore { VStack { Text("\(score, specifier: "%.1f")").font(.headline).foregroundStyle(AppTheme.primary); Text("/ 35分").font(.caption2).foregroundStyle(AppTheme.muted) } }; Image(systemName: "chevron.right").foregroundStyle(.tertiary)
-    }.padding(14).background(.white, in: RoundedRectangle(cornerRadius: 16)) }.buttonStyle(.plain).accessibilityLabel("学生 \(student.name)，\(student.grade)，\(student.className)") }
+    }.padding(14).background(.white, in: RoundedRectangle(cornerRadius: 16)) }
+    var body: some View {
+        Group {
+            if let action { Button(action: action) { cardContent }.buttonStyle(.plain) }
+            else { cardContent }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("学生 \(student.name)，\(student.grade)，\(student.className)")
+    }
 }
 struct TestTaskCard: View {
     let task: TestTask; let action: (() -> Void)?
-    var body: some View { Button(action: { action?() }) { VStack(alignment: .leading, spacing: 10) {
+    @ViewBuilder private var cardContent: some View { VStack(alignment: .leading, spacing: 10) {
         HStack { Text(task.title).font(.headline).foregroundStyle(AppTheme.ink); Spacer(); Text(task.status.rawValue).font(.caption.weight(.semibold)).foregroundStyle(statusColor(task.status)).padding(.horizontal, 8).padding(.vertical, 4).background(statusColor(task.status).opacity(0.12), in: Capsule()) }
         Label(task.date, systemImage: "calendar").font(.subheadline).foregroundStyle(AppTheme.muted); Label(task.location, systemImage: "mappin.and.ellipse").font(.subheadline).foregroundStyle(AppTheme.muted); ProgressView(value: Double(task.completedCount), total: Double(task.totalCount)).tint(AppTheme.teal); Text("已完成 \(task.completedCount) / \(task.totalCount) 人 · \(task.ruleVersion)").font(.caption).foregroundStyle(AppTheme.muted)
-    }.padding(14).background(.white, in: RoundedRectangle(cornerRadius: 16)) }.buttonStyle(.plain).accessibilityLabel("体测任务 \(task.title)，状态 \(task.status.rawValue)，已完成 \(task.completedCount) 人") }
+    }.padding(14).background(.white, in: RoundedRectangle(cornerRadius: 16)) }
+    var body: some View {
+        Group {
+            if let action { Button(action: action) { cardContent }.buttonStyle(.plain) }
+            else { cardContent }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("体测任务 \(task.title)，状态 \(task.status.rawValue)，已完成 \(task.completedCount) 人")
+    }
     private func statusColor(_ status: TaskStatus) -> Color { status == .completed ? AppTheme.teal : status == .review || status == .retest || status == .absent ? AppTheme.danger : AppTheme.primary }
 }
 struct ScoreSummaryCard: View { let title: String; let value: String; let caption: String; var body: some View { VStack(alignment: .leading, spacing: 8) { Text(title).font(.caption).foregroundStyle(AppTheme.muted); Text(value).font(.title2.bold()).foregroundStyle(AppTheme.ink); Text(caption).font(.caption2).foregroundStyle(AppTheme.teal) }.frame(maxWidth: .infinity, alignment: .leading).padding(14).background(.white, in: RoundedRectangle(cornerRadius: 16)).accessibilityElement(children: .ignore).accessibilityLabel("\(title)，\(value)，\(caption)") } }

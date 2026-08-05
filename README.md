@@ -26,13 +26,15 @@ cd android
 ./run-android-checks.sh
 ```
 
-脚本会构建 Debug APK 并运行 JVM 单元测试。APK 输出在 `android/app/build/outputs/apk/debug/app-debug.apk`；Compose 仪器测试需要连接真机或可用模拟器：
+脚本会构建 Debug APK、运行 JVM 单元测试并执行 `lintDebug`。APK 输出在 `android/app/build/outputs/apk/debug/app-debug.apk`；Compose 仪器测试需要连接真机或可用模拟器：
 
 ```bash
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 export ANDROID_HOME="/Users/luyanpeng/Library/Android/sdk"
 ./gradlew :app:assembleAndroidTest
 ```
+
+发布构建可用 `./gradlew :app:assembleRelease` 验证；当前输出为 `app-release-unsigned.apk`，需接入学校/发行方签名证书后才能上架。
 
 ## 运行入口
 
@@ -44,6 +46,7 @@ export ANDROID_HOME="/Users/luyanpeng/Library/Android/sdk"
 - 本地草稿、绑定关系、测评状态、班级动态和课程进度会保存，登录失败、恢复失败、空数据和重试状态均由页面处理；双端根工作台支持主动刷新，Android 提供刷新按钮与全局错误重试，iOS 支持系统下拉刷新；登录页可打开协议/隐私说明。
 - 深链格式：`xiangshang-youth://open?target=report&studentId=s01`，支持报告、复核、任务和风险入口。
 - Android 页面和关键卡片已补充 TalkBack 语义；iOS 使用 VoiceOver accessibility label。
+- 启动海报已统一为用户提供的 `379.PNG` 清晰源图：iOS 1x/2x/3x 与 Android `drawable-nodpi` 使用同一画面比例；iOS 包含 `PrivacyInfo.xcprivacy`，Android 禁止明文流量和自动备份。
 
 ## 前端落地差距（不含后端）
 
@@ -68,14 +71,14 @@ export ANDROID_HOME="/Users/luyanpeng/Library/Android/sdk"
 ### P2：规模化运行前
 
 - **质量工程**：补齐 iOS XCTest/SwiftUI UI Test、Android JVM/Compose UI Test、关键路径覆盖率、lint/format、依赖和资源检查、视觉快照回归。
-- **发布配置**：生产 Bundle/Application ID、隐私清单、通知权限说明、文件/相机权限文案、深链/Universal Link、签名、Release 构建和崩溃兜底页；通知权限的代码路径已完成，仍需在发布包中补齐审核文案与真实渠道配置。
+- **发布配置**：生产 Bundle/Application ID、通知权限说明、文件/相机权限文案、Universal Link、签名、Release 构建和崩溃兜底页；隐私清单、通知权限代码、应用 Scheme 和 Android 明文流量/备份策略已落地，真实渠道与签名仍需在联调发布阶段替换。
 - **性能与资源**：图片缓存/失败兜底、列表分页或窗口化、骨架屏、动画减弱模式、启动耗时和大数据量看板性能基线。
 - **可观测性**：前端错误日志、页面/按钮埋点、关键流程漏斗、版本和环境开关；不记录手机号、学生健康数据等敏感明文。
 - **产品化细节**：统一日期/数字/状态颜色规范、隐私与用户协议版本、账号注销入口、数据导出/删除提示、客服与反馈闭环、必要的中英文/无障碍文案。
 
 ### 当前结论
 
-在不计后端的前提下，当前可视为“可演示的一期前端骨架 + Mock 闭环”，约 **70%–75%**；完成 P0 后可进入学校试点验收，约 **80%–85%**；完成 P1/P2 的设备、无障碍、视觉回归、发布和监控后，才接近真正商业化前端。Android 仪器测试代码已可编译，但当前机器的模拟器 System UI ANR，尚未形成有效真机运行证据。
+在不计后端的前提下，当前可视为“可演示的一期前端 + Mock 闭环”：视觉/交互内测约 **75%–80%**，一期业务闭环前端约 **65%–70%**，学校试点交付约 **55%–65%**，规模化商业前端约 **40%–50%**。剩余差距主要集中在真实第三方登录/权限渠道、设备矩阵和视觉快照回归、Release 签名与商店审核材料、真实崩溃/埋点服务，以及 Android 真机仪器测试；这些不应被 Mock 或单元测试结果替代。
 
 ## Git
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Assessment flow preserves the production route boundary and keeps unfinished entries
 /// recoverable before the external systems are connected.
@@ -367,7 +368,27 @@ struct PublishClassPostSheet: View {
     private var draftKey: String { "class-post-\(editingPost?.id.uuidString ?? author)" }
     var body: some View { NavigationStack { VStack(alignment: .leading, spacing: 14) { if submitted { VStack(spacing: 12) { Image(systemName: "checkmark.circle.fill").font(.system(size: 48)).foregroundStyle(ReferenceColor.green); Text(editingPost == nil ? "动态已发布" : "修改已保存").font(.title3.bold()); Text("内容已保存到本班家校圈，可在班级圈继续查看。").font(.system(size: 12)).foregroundStyle(.secondary).multilineTextAlignment(.center); Spacer(); Button("完成") { dismiss() }.font(.system(size: 14, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 12).foregroundStyle(.white).background(ReferenceColor.blue, in: RoundedRectangle(cornerRadius: 11)) } } else { Text(editingPost == nil ? "发布班级动态" : "编辑班级动态").font(.title3.bold()); Text("内容将同步显示在本班家校圈。请勿发布学生隐私信息。").font(.system(size: 12)).foregroundStyle(.secondary); TextEditor(text: $content).frame(minHeight: 160).padding(8).overlay(RoundedRectangle(cornerRadius: 10).stroke(validationMessage == nil ? ReferenceColor.navy.opacity(0.15) : .red, lineWidth: 1)).onChange(of: content) { _, value in state.saveDraft(value, key: draftKey) }; if let validationMessage { Text(validationMessage).font(.system(size: 10)).foregroundStyle(.red) }; Spacer(); Button { let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines); guard !trimmed.isEmpty else { validationMessage = "动态内容不能为空。"; return }; if let editingPost { state.updateClassPost(id: editingPost.id, text: trimmed) } else { state.publishClassPost(trimmed, author: author) }; state.clearDraft(draftKey); submitted = true } label: { Text(editingPost == nil ? "发布动态" : "保存修改").font(.system(size: 14, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 12).foregroundStyle(.white).background(ReferenceColor.blue, in: RoundedRectangle(cornerRadius: 11)) }.disabled(content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) } }.padding(18).navigationBarTitleDisplayMode(.inline) }.task { content = editingPost?.content ?? state.localFeatures.drafts[draftKey] ?? "" } }
 }
-struct HealthArticleSheet: View { let title: String; @Environment(\.dismiss) private var dismiss; @Environment(\.openURL) private var openURL; var body: some View { NavigationStack { VStack(spacing: 15) { Image(systemName: "book.closed.fill").font(.system(size: 44)).foregroundStyle(ReferenceColor.green); Text(title).font(.title3.bold()).multilineTextAlignment(.center); Text("完整健康专栏将由“向上少年健康成长”微信公众号提供。") .font(.system(size: 13)).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal, 28); Button { openURL(URL(string: "weixin://")!) } label: { Label("打开微信公众号", systemImage: "arrow.up.forward.app") }.buttonStyle(.borderedProminent); Text("若未安装微信，可搜索公众号：向上少年健康成长").font(.system(size: 10)).foregroundStyle(.secondary) }.frame(maxWidth: .infinity, maxHeight: .infinity).navigationTitle("健康科普").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } } } } }
+struct HealthArticleSheet: View {
+    let title: String
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
+    @State private var openFailed = false
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 15) {
+                Image(systemName: "book.closed.fill").font(.system(size: 44)).foregroundStyle(ReferenceColor.green)
+                Text(title).font(.title3.bold()).multilineTextAlignment(.center)
+                Text("完整健康专栏将由“向上少年健康成长”微信公众号提供。") .font(.system(size: 13)).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal, 28)
+                if openFailed { Text("当前设备未安装微信，请直接搜索公众号：向上少年健康成长。").font(.system(size: 11)).foregroundStyle(.red).multilineTextAlignment(.center).padding(.horizontal, 24) }
+                Button {
+                    let url = URL(string: "weixin://")!
+                    if UIApplication.shared.canOpenURL(url) { openURL(url); dismiss() } else { openFailed = true }
+                } label: { Label(openFailed ? "重试打开微信" : "打开微信公众号", systemImage: "arrow.up.forward.app") }.buttonStyle(.borderedProminent)
+                Text("若未安装微信，可搜索公众号：向上少年健康成长").font(.system(size: 10)).foregroundStyle(.secondary)
+            }.frame(maxWidth: .infinity, maxHeight: .infinity).navigationTitle("健康科普").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }
+        }
+    }
+}
 struct ActivityDetailSheet: View {
     let title: String
     @Environment(\.dismiss) private var dismiss

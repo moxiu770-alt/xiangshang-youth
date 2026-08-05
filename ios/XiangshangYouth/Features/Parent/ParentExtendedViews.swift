@@ -46,6 +46,7 @@ struct ParentCoursesDashboard: View {
     @EnvironmentObject private var state: AppState
     @State private var selectedKind = 0
     @State private var selectedCourse: String?
+    @State private var catalogShown = false
     private let categories = [("figure.run", "体质", ReferenceColor.blue), ("eye.fill", "视力", ReferenceColor.green), ("mouth.fill", "口腔", ReferenceColor.purple), ("brain.head.profile", "心理", ReferenceColor.pink)]
 
     var body: some View {
@@ -55,7 +56,7 @@ struct ParentCoursesDashboard: View {
                 ReferenceHeader(name: state.selectedChild?.name ?? "王小明", school: "\(state.selectedChild?.className ?? "三年级2班") · 成长课程", initial: String((state.selectedChild?.name ?? "王").prefix(1)), avatarAsset: "ChildAvatar")
                 Picker("课程类型", selection: $selectedKind) { Text("公益课程").tag(0); Text("学校课程").tag(1) }
                     .pickerStyle(.segmented).padding(.horizontal, 12)
-                ReferenceSectionTitle(title: selectedKind == 0 ? "公益课堂" : "精选学校课程", trailing: "全部课程").padding(.horizontal, 12)
+                ReferenceSectionTitle(title: selectedKind == 0 ? "公益课堂" : "精选学校课程", trailing: "全部课程", action: { catalogShown = true }).padding(.horizontal, 12)
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                     ForEach(categories, id: \.1) { icon, title, color in
                         Button { selectedCourse = "\(title)健康成长课程" } label: {
@@ -80,6 +81,36 @@ struct ParentCoursesDashboard: View {
         }
         .sheet(item: Binding(get: { selectedCourse.map(CourseSheetItem.init) }, set: { selectedCourse = $0?.name })) { item in
             CourseDetailSheet(title: item.name)
+        }
+        .sheet(isPresented: $catalogShown) {
+            CourseCatalogSheet(kind: selectedKind == 0 ? "公益课堂" : "精选学校课程")
+        }
+    }
+}
+
+private struct CourseCatalogSheet: View {
+    let kind: String
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedCourse: String?
+    private let courses = ["体质成长课", "视力守护课", "口腔健康课", "心理舒展课"]
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section(kind) {
+                    ForEach(courses, id: \.self) { course in
+                        Button { selectedCourse = course } label: {
+                            Label(course, systemImage: "play.circle.fill")
+                                .foregroundStyle(ReferenceColor.navy)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("课程目录")
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
+            .sheet(item: Binding(get: { selectedCourse.map(CourseSheetItem.init) }, set: { selectedCourse = $0?.name })) { item in
+                CourseDetailSheet(title: item.name)
+            }
         }
     }
 }

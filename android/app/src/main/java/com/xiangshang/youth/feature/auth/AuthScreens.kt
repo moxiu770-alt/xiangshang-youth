@@ -70,7 +70,14 @@ fun LoginScreen(
     var password by rememberSaveable { mutableStateOf("") }
     var agreement by rememberSaveable { mutableStateOf(false) }
     var codeSent by rememberSaveable { mutableStateOf(false) }
+    var codeCountdown by rememberSaveable { mutableIntStateOf(0) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(codeSent) {
+        while (codeSent && codeCountdown > 0) {
+            delay(1000)
+            codeCountdown -= 1
+        }
+    }
     Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF76B8F7), Color(0xFFEFF8FF))))) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             Column(Modifier.padding(top = 34.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -91,7 +98,7 @@ fun LoginScreen(
                         OutlinedTextField(value = phone, onValueChange = { phone = it; error = null; onClearError() }, label = { Text("手机号") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), singleLine = true, modifier = Modifier.fillMaxWidth())
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             OutlinedTextField(value = code, onValueChange = { code = it; error = null; onClearError() }, label = { Text("短信验证码") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.weight(1f))
-                            TextButton(onClick = { if (phone.filter(Char::isDigit).length != 11) error = "请先填写 11 位手机号。" else { codeSent = true; code = "1234" } }, enabled = !codeSent) { Text(if (codeSent) "已发送" else "获取验证码", fontSize = 11.sp) }
+                            TextButton(onClick = { if (phone.filter(Char::isDigit).length != 11) error = "请先填写 11 位手机号。" else { codeSent = true; codeCountdown = 60; code = "1234" } }, enabled = codeCountdown == 0) { Text(if (codeCountdown > 0) "${codeCountdown}s 后重试" else if (codeSent) "重新获取" else "获取验证码", fontSize = 11.sp) }
                         }
                     } else if (method == 2) {
                         OutlinedTextField(value = account, onValueChange = { account = it; error = null; onClearError() }, label = { Text("账号 / 手机号") }, singleLine = true, modifier = Modifier.fillMaxWidth())

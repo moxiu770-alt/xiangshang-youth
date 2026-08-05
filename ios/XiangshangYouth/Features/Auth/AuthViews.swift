@@ -37,6 +37,8 @@ struct LoginView: View {
     @State private var method: LoginMethod = .wechat
     @State private var agreementAccepted = false
     @State private var codeSent = false
+    @State private var codeCountdown = 0
+    @State private var countdownTask: Task<Void, Never>?
     @State private var validationMessage: String?
     @State private var registerPresented = false
     @State private var landscapeDrifts = false
@@ -74,6 +76,7 @@ struct LoginView: View {
         .task {
             withAnimation(.easeInOut(duration: 5.5).repeatForever(autoreverses: true)) { landscapeDrifts = true }
         }
+        .onDisappear { countdownTask?.cancel() }
         .sheet(isPresented: $registerPresented) { RegisterView() }
     }
 
@@ -101,14 +104,23 @@ struct LoginView: View {
                     TextField("短信验证码", text: $verificationCode)
                         .keyboardType(.numberPad)
                         .textFieldStyle(.roundedBorder)
-                    Button(codeSent ? "已发送" : "获取验证码") {
+                    Button(codeCountdown > 0 ? "\(codeCountdown)s 后重试" : codeSent ? "重新获取" : "获取验证码") {
                         guard phone.filter(\.isNumber).count == 11 else { validationMessage = "请先填写 11 位手机号。"; return }
                         codeSent = true
                         verificationCode = "1234"
+                        codeCountdown = 60
+                        countdownTask?.cancel()
+                        countdownTask = Task { @MainActor in
+                            while codeCountdown > 0 {
+                                try? await Task.sleep(for: .seconds(1))
+                                guard !Task.isCancelled else { return }
+                                codeCountdown -= 1
+                            }
+                        }
                     }
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(ReferenceColor.blue)
-                    .disabled(codeSent)
+                    .disabled(codeCountdown > 0)
                 }
             } else if method == .account {
                 TextField("账号 / 手机号", text: $account)

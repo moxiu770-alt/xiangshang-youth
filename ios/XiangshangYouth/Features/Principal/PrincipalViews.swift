@@ -258,7 +258,9 @@ struct GradeStatsView: View {
                     let gradeClasses = (state.data?.classes ?? []).filter { $0.gradeId == grade.id }
                     let totalStudents = gradeClasses.reduce(0) { $0 + $1.studentCount }
                     let completedStudents = Int((Double(totalStudents) * Double(rate) / 100).rounded())
-                    let metric = selectedMetric == "完成率" ? "\(rate)%" : selectedMetric == "平均总分" ? String(format: "%.1f", 24.8 + Double(index)) : "\(max(1, 4 - index))人"
+                    let gradeStudents = (state.data?.students ?? []).filter { $0.grade == grade.name }
+                    let gradeRisk = gradeStudents.filter { ($0.totalScore ?? 35) < 25 || [.review, .retest].contains(state.taskStatus(for: $0)) }.count
+                    let metric = selectedMetric == "完成率" ? "\(rate)%" : selectedMetric == "平均总分" ? String(format: "%.1f", 24.8 + Double(index)) : "\(gradeRisk)人"
                     Button { router.pendingGradeFilter = grade.name; router.push(.classStats) } label: {
                         ReferenceCard {
                             VStack(spacing: 8) {

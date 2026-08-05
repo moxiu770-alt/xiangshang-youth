@@ -84,7 +84,10 @@ fun GradeStatsScreen(state: AppUiState, nav: NavHostController) = AppScaffold("�
         val gradeName = grade.name
         val gradeStudents = state.data.students.filter { it.grade == gradeName }
         val gradeAverage = gradeStudents.mapNotNull { it.totalScore }.average().takeIf { it.isFinite() } ?: 0.0
-        val gradeRisk = gradeStudents.count { (it.totalScore ?: 35.0) < 25 || it.taskStatus == com.xiangshang.youth.core.model.TaskStatus.Review || it.taskStatus == com.xiangshang.youth.core.model.TaskStatus.Retest }
+        val gradeRisk = gradeStudents.count { student ->
+            val status = state.local.studentTaskStatuses[student.id] ?: student.taskStatus
+            (student.totalScore ?: 35.0) < 25 || status == com.xiangshang.youth.core.model.TaskStatus.Review || status == com.xiangshang.youth.core.model.TaskStatus.Retest
+        }
         val value = when (metric) { "平均总分" -> String.format(Locale.US, "%.1f", gradeAverage); "风险人数" -> "${gradeRisk}人"; else -> "$rate%" }
         Surface(
             Modifier.fillMaxWidth().padding(vertical = 5.dp).semantics { role = Role.Button; contentDescription = "查看${grade.name}班级统计，${value}${metric}" }.clickable { nav.navigate("${Destinations.ClassStats}?grade=${android.net.Uri.encode(grade.name)}") },

@@ -116,7 +116,7 @@ struct ParentLandingView: View {
     private func metric(_ icon: String, _ title: String, _ subtitle: String, _ color: Color) -> some View {
         Button { if let child = state.selectedChild { router.push(.report(child)) } } label: {
             ReferenceMetric(icon: icon, title: title, value: subtitle, color: color)
-        }.buttonStyle(.plain).accessibilityLabel("查看(title)报告")
+        }.buttonStyle(.plain).accessibilityLabel("查看\(title)报告")
     }
     private func assessmentMetric(_ category: AssessmentCategory) -> some View { Button { router.push(.assessment(category)) } label: { ReferenceMetric(icon: category.icon, title: category.rawValue, value: category == .fitness ? "继续测评" : "开始测评", color: category.color) }.buttonStyle(.plain) }
 }

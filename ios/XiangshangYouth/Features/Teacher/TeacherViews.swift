@@ -754,9 +754,10 @@ struct TeacherTaskDetailView: View {
     let task: TestTask
     @State private var selectedStudent: Student?
     var body: some View {
+        let currentTask = state.data?.tasks.first(where: { $0.id == task.id }) ?? task
         AppScaffold(title: "任务详情") {
             VStack(spacing: 10) {
-                TestTaskCard(task: task, action: nil)
+                TestTaskCard(task: currentTask, action: nil)
                 Text("点击学生更新签到、测试、复核或补测状态；状态将保存在本机，等待场地端同步。")
                     .font(.system(size: 9)).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
                 if state.loading || state.data == nil {
@@ -764,7 +765,12 @@ struct TeacherTaskDetailView: View {
                 } else if let data = state.data, data.students.isEmpty {
                     EmptyStateView(title: "暂无任务学生", detail: "学生名单同步后可更新测评状态。")
                 } else if let data = state.data {
-                    ForEach(Array(data.students.prefix(10))) { student in
+                    let classNames = Set(currentTask.className.split(separator: "、").map(String.init))
+                    let taskStudents = data.students.filter { $0.grade == currentTask.gradeName && classNames.contains($0.className) }
+                    if taskStudents.isEmpty {
+                        EmptyStateView(title: "暂无任务学生", detail: "该任务对应的年级或班级名单尚未同步。")
+                    }
+                    ForEach(taskStudents) { student in
                         TeacherStudentStatusRow(student: student, status: state.taskStatus(for: student)) { selectedStudent = student }
                     }
                 }

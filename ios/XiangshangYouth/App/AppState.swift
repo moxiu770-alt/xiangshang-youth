@@ -87,7 +87,7 @@ import SwiftUI
         } catch { self.handleDashboardError(error) }
     }
     func refreshDashboard() async {
-        guard profile != nil else { return }
+        guard profile != nil, !loading else { return }
         loading = true; error = nil; defer { loading = false }
         do {
             data = try await repository.loadDashboard()

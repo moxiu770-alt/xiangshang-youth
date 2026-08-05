@@ -5,7 +5,11 @@ struct ReportDetailView: View {
     let student: Student
     @State private var selectedDetail: String?
     var body: some View {
-        let report = state.report(for: student)
+        // Routes carry the student that was selected at navigation time, but a
+        // refresh can replace the dashboard objects. Resolve the latest record
+        // by stable id so the report reflects newly synced scores and status.
+        let currentStudent = state.data?.students.first(where: { $0.id == student.id }) ?? student
+        let report = state.report(for: currentStudent)
         return AppScaffold(title: "体测报告") {
             VStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 9) {

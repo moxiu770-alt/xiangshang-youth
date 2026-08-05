@@ -47,7 +47,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }.onFailure { handleDashboardFailure(it) }
     }
     fun refreshDashboard(onSuccess: () -> Unit = {}) = viewModelScope.launch {
-        if (_state.value.profile == null) return@launch
+        if (_state.value.profile == null || _state.value.loading) return@launch
         _state.value = _state.value.copy(loading = true, error = null)
         runCatching { repository.dashboard() }.onSuccess { data ->
             val selected = _state.value.selectedChild?.id?.let { id -> data.students.firstOrNull { it.id == id && id in _state.value.local.boundChildIds } }

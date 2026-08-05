@@ -121,7 +121,15 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
                 onForgotPassword = { nav.navigate(Destinations.PasswordReset) }
             )
         }
-        composable(Destinations.Register) { RegisterScreen(onBack = { nav.popBackStack() }, onRegistered = { viewModel.login { nav.navigate(Destinations.Role) { popUpTo(Destinations.Register) { inclusive = true }; launchSingleTop = true } } }) }
+        composable(Destinations.Register) {
+            RegisterScreen(
+                onBack = { nav.popBackStack() },
+                onRegistered = { viewModel.login { nav.navigate(Destinations.Role) { popUpTo(Destinations.Register) { inclusive = true }; launchSingleTop = true } } },
+                loading = state.loading,
+                serverError = state.error,
+                onClearError = viewModel::clearError
+            )
+        }
         composable(Destinations.PasswordReset) { PasswordResetScreen(onBack = { nav.popBackStack() }) }
         composable(Destinations.Role) { RoleSelectScreen(onRole = { role ->
             viewModel.chooseRole(role)

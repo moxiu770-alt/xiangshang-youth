@@ -147,7 +147,13 @@ fun LoginScreen(
 }
 
 @Composable
-fun RegisterScreen(onBack: () -> Unit, onRegistered: () -> Unit) {
+fun RegisterScreen(
+    onBack: () -> Unit,
+    onRegistered: () -> Unit,
+    loading: Boolean = false,
+    serverError: String? = null,
+    onClearError: () -> Unit = {}
+) {
     var name by rememberSaveable { mutableStateOf("") }
     var phone by rememberSaveable { mutableStateOf("") }
     var code by rememberSaveable { mutableStateOf("") }
@@ -163,10 +169,16 @@ fun RegisterScreen(onBack: () -> Unit, onRegistered: () -> Unit) {
             codeCountdown -= 1
         }
     }
+    LaunchedEffect(serverError) {
+        if (serverError != null) {
+            success = false
+            error = serverError
+        }
+    }
     AppScaffold(title = "注册账号", onBack = onBack) {
         if (success) {
             Column(Modifier.fillMaxWidth().padding(top = 80.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Filled.CheckCircle, null, tint = Green, modifier = Modifier.size(54.dp)); Text("注册成功", color = Navy, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp)); Text("账号已创建，正在进入角色选择。", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp)); Button(onClick = onRegistered, modifier = Modifier.padding(top = 20.dp)) { Text("开始使用") }
+                Icon(Icons.Filled.CheckCircle, null, tint = Green, modifier = Modifier.size(54.dp)); Text("注册成功", color = Navy, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp)); Text("账号已创建，请登录后选择使用角色。", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp)); Button(onClick = { onClearError(); onRegistered() }, enabled = !loading, modifier = Modifier.padding(top = 20.dp)) { if (loading) CircularProgressIndicator(Modifier.size(17.dp), color = Color.White, strokeWidth = 2.dp) else Text("开始使用") }
             }
             return@AppScaffold
         }

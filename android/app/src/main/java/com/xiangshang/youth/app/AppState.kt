@@ -16,6 +16,7 @@ import com.xiangshang.youth.core.service.CourseUploadRecord
 import com.xiangshang.youth.core.service.LocalSubmissionStatus
 import com.xiangshang.youth.core.service.ApiClient
 import com.xiangshang.youth.core.service.ApiError
+import com.xiangshang.youth.core.util.ChildBindingValidator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -70,12 +71,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun markMessageRead(messageId: String) = mutate { it.copy(readMessageIds = it.readMessageIds + messageId) }
     fun bindChild(name: String, code: String): Boolean {
-        val normalizedName = name.trim()
-        val normalizedCode = code.trim().uppercase()
-        val child = _state.value.data?.students?.firstOrNull { student ->
-            val validCode = normalizedCode == student.id.uppercase() || normalizedCode == "XS-${student.id.uppercase()}"
-            validCode && student.name == normalizedName
-        } ?: return false
+        val child = ChildBindingValidator.findMatch(_state.value.data?.students.orEmpty(), name, code) ?: return false
         mutate { it.copy(boundChildIds = it.boundChildIds + child.id) }
         if (_state.value.selectedChild == null) chooseChild(child)
         return true

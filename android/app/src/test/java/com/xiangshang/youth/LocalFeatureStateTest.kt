@@ -11,6 +11,7 @@ import com.xiangshang.youth.core.model.TaskStatus
 import com.xiangshang.youth.core.model.ScoreReviewStatus
 import com.xiangshang.youth.core.mock.MockRepository
 import com.xiangshang.youth.core.repository.RemoteRepository
+import com.xiangshang.youth.core.util.ChildBindingValidator
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -81,5 +82,14 @@ class LocalFeatureStateTest {
         assertEquals(7, report.scores.size)
         assertTrue(report.scores.any { it.confidence < 0.8 && it.reviewStatus == ScoreReviewStatus.PendingReview })
         assertTrue(report.scores.filter { it.confidence >= 0.8 }.all { it.reviewStatus == ScoreReviewStatus.Passed })
+    }
+
+    @Test
+    fun childBindingRequiresMatchingNameAndSchoolCode() = runBlocking {
+        val students = MockRepository().dashboard().students
+        assertEquals(null, ChildBindingValidator.findMatch(students, "王小明", "wrong-code"))
+        assertEquals(null, ChildBindingValidator.findMatch(students, "其他学生", "XS-S01"))
+        assertEquals("s01", ChildBindingValidator.findMatch(students, "王小明", "xs-s01")?.id)
+        assertEquals("s02", ChildBindingValidator.findMatch(students, "王小雨", "s02")?.id)
     }
 }

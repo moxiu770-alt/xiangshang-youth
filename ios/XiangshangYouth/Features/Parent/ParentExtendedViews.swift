@@ -299,6 +299,7 @@ struct AppSettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var state: AppState
     @State private var permissionMessage: String?
+    @State private var showingClearDataConfirmation = false
     var body: some View { NavigationStack { Form { Section("通知与显示") { Toggle("接收测评与班级通知", isOn: Binding(get: { state.localFeatures.settings.notificationsEnabled }, set: { enabled in
                         if enabled {
                             Task { @MainActor in
@@ -310,7 +311,7 @@ struct AppSettingsSheet: View {
                             state.updateSettings(notificationsEnabled: false)
                             permissionMessage = nil
                         }
-                    })); Toggle("减少动态效果", isOn: Binding(get: { state.localFeatures.settings.reduceMotion }, set: { state.updateSettings(reduceMotion: $0) })); if let permissionMessage { Text(permissionMessage).font(.footnote).foregroundStyle(.orange) }; Text("设置已自动保存，并将在下次启动后保留。").font(.footnote).foregroundStyle(.secondary) } }.navigationTitle("设置").toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } } } }
+                    })); Toggle("减少动态效果", isOn: Binding(get: { state.localFeatures.settings.reduceMotion }, set: { state.updateSettings(reduceMotion: $0) })); if let permissionMessage { Text(permissionMessage).font(.footnote).foregroundStyle(.orange) }; Text("设置已自动保存，并将在下次启动后保留。").font(.footnote).foregroundStyle(.secondary) }; Section("账号安全") { Text("退出登录会清除本机保存的绑定孩子、草稿和通知状态；不会删除学校侧的测评记录。").font(.footnote).foregroundStyle(.secondary); Button("清除本机数据并退出登录", role: .destructive) { showingClearDataConfirmation = true } } }.navigationTitle("设置").toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }.confirmationDialog("清除本机数据？", isPresented: $showingClearDataConfirmation, titleVisibility: .visible) { Button("清除并退出", role: .destructive) { state.switchAccount(); dismiss() }; Button("取消", role: .cancel) {} } message: { Text("此操作会移除本设备上的登录态、孩子绑定和本地草稿，后续可重新登录。") } } }
 }
 
 struct AccountInfoSheet: View {

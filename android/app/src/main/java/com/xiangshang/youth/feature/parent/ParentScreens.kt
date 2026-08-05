@@ -356,14 +356,15 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
         Spacer(Modifier.height(8.dp)); Text("切换使用角色", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) { listOf(UserRole.Parent, UserRole.Teacher, UserRole.Principal).forEach { role -> OutlinedButton(onClick = { chooseRole(role); val destination = if (role == UserRole.Parent) Destinations.Parent else if (role == UserRole.Teacher) Destinations.Teacher else Destinations.Principal; nav.navigate(destination) { popUpTo(Destinations.Account) { inclusive = true }; launchSingleTop = true } }, modifier = Modifier.weight(1f)) { Text(role.label, fontSize = 9.sp) } } }
         OutlinedButton(onClick = { logout(); nav.navigate(Destinations.Login) { popUpTo(nav.graph.id) { inclusive = true } } }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red)) { Text("切换账号") }
     }
-    if (settingsOpen) SettingsDialog(state.local.settings.notificationsEnabled, state.local.settings.reduceMotion, updateSettings) { settingsOpen = false }
+    if (settingsOpen) SettingsDialog(state.local.settings.notificationsEnabled, state.local.settings.reduceMotion, updateSettings, clearLocalData = { logout(); nav.navigate(Destinations.Login) { popUpTo(nav.graph.id) { inclusive = true } } }) { settingsOpen = false }
     accountInfo?.let { title -> AccountInfoDialog(title, sendSupport) { accountInfo = null } }
 }
 
-@Composable fun SettingsDialog(notifications: Boolean, reduceMotion: Boolean, update: (Boolean?, Boolean?) -> Unit, dismiss: () -> Unit) {
+@Composable fun SettingsDialog(notifications: Boolean, reduceMotion: Boolean, update: (Boolean?, Boolean?) -> Unit, clearLocalData: () -> Unit = {}, dismiss: () -> Unit) {
     var notify by remember { mutableStateOf(notifications) }
     var reduce by remember { mutableStateOf(reduceMotion) }
     var permissionMessage by remember { mutableStateOf<String?>(null) }
+    var clearConfirmation by remember { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         notify = granted
         permissionMessage = if (granted) null else "系统通知权限未开启，可在系统设置中允许通知。"
@@ -382,9 +383,19 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
             Row(verticalAlignment = Alignment.CenterVertically) { Text("减少动态效果", modifier = Modifier.weight(1f)); Switch(checked = reduce, onCheckedChange = { reduce = it }) }
             permissionMessage?.let { Text(it, color = Color(0xFFFF8B1F), fontSize = 10.sp, modifier = Modifier.padding(top = 7.dp)) }
             Text("设置会自动保存并在下次启动后保留。", color = Color.Gray, fontSize = 10.sp, modifier = Modifier.padding(top = 9.dp))
+            Spacer(Modifier.height(8.dp))
+            Text("退出登录会清除本机保存的绑定孩子、草稿和通知状态；不会删除学校侧的测评记录。", color = Color.Gray, fontSize = 10.sp)
+            TextButton(onClick = { clearConfirmation = true }, colors = ButtonDefaults.textButtonColors(contentColor = Color.Red), modifier = Modifier.align(Alignment.Start)) { Text("清除本机数据并退出登录") }
         } },
         confirmButton = { TextButton(onClick = { update(notify, reduce); dismiss() }) { Text("保存") } },
         dismissButton = { TextButton(onClick = dismiss) { Text("取消") } }
+    )
+    if (clearConfirmation) AlertDialog(
+        onDismissRequest = { clearConfirmation = false },
+        title = { Text("清除本机数据？") },
+        text = { Text("此操作会移除本设备上的登录态、孩子绑定和本地草稿，后续可重新登录。") },
+        confirmButton = { TextButton(onClick = { clearConfirmation = false; clearLocalData() }, colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)) { Text("清除并退出") } },
+        dismissButton = { TextButton(onClick = { clearConfirmation = false }) { Text("取消") } }
     )
 }
 

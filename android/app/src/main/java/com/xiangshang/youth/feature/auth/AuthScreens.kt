@@ -89,7 +89,7 @@ fun LoginScreen(
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) { Text("登录开启成长之旅", color = Navy, fontSize = 14.sp, fontWeight = FontWeight.Bold); Spacer(Modifier.width(7.dp)); Icon(Icons.Filled.WbSunny, null, tint = Color(0xFFFFBD2E), modifier = Modifier.size(20.dp)) }
                     Column(verticalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth()) {
-                        LoginButton("微信登录", Icons.Filled.Chat, Blue, Color.White, { method = 0; error = null; onClearError() })
+                        LoginButton("微信登录", Icons.Filled.ChatBubble, Blue, Color.White, { method = 0; error = null; onClearError() })
                         LoginButton("手机号登录", Icons.Filled.PhoneIphone, Blue, Color.White, { method = 1; error = null; onClearError() }, outlined = method != 1)
                         LoginButton("账号密码登录", Icons.Filled.Person, Color(0xFFFFB92E), Color(0xFF765522), { method = 2; error = null; onClearError() }, outlined = method != 2)
                     }
@@ -115,7 +115,7 @@ fun LoginScreen(
                             else -> onLogin()
                         }
                     }, enabled = !loading, modifier = Modifier.fillMaxWidth().height(44.dp), shape = CircleShape) {
-                        if (loading) CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(18.dp)) else Icon(if (method == 0) Icons.Filled.VerifiedUser else Icons.Filled.Login, null)
+                        if (loading) CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(18.dp)) else Icon(if (method == 0) Icons.Filled.VerifiedUser else Icons.Filled.ArrowForward, null)
                         Spacer(Modifier.width(7.dp)); Text(if (loading) "正在登录…" else if (method == 0) "微信授权登录" else "登录", fontWeight = FontWeight.Bold)
                     }
                     (error ?: serverError)?.let { Text(it, color = Color.Red, fontSize = 10.sp) }

@@ -301,11 +301,12 @@ struct HealthDashboard: View {
 }
 
 struct RecentFamilyActivities: View {
+    @EnvironmentObject private var router: AppRouter
     @State private var slides = false
     @State private var selectedActivity: String?
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
-            ReferenceSectionTitle(title: "最近家庭运动", trailing: "查看全部")
+            ReferenceSectionTitle(title: "最近家庭运动", trailing: "查看全部", action: { router.push(.parentCourses) })
             HStack(spacing: 7) {
                 activityTile("ActivityClassroom", "课间活力操", "本周完成 2 次", ReferenceColor.green, offset: -3)
                 activityTile("ActivityFootball", "足球启蒙", "亲子运动日", ReferenceColor.blue, offset: 0)

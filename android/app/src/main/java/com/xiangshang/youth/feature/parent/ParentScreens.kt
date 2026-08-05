@@ -27,6 +27,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
@@ -112,8 +116,8 @@ fun ParentHomeScreen(state: AppUiState, nav: NavHostController, registerActivity
         if (detail) AlertDialog(onDismissRequest = { detail = false }, title = { Text(item.title) }, text = { Column { Text(item.content); Text("${item.category} · ${item.time}", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.padding(top = 10.dp)) } }, confirmButton = { TextButton(onClick = { detail = false }) { Text("关闭") } })
     }
 }
-@Composable private fun ParentMetric(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier, onClick: () -> Unit) = Surface(modifier.clickable(onClick = onClick), color = color.copy(.08f), shape = RoundedCornerShape(9.dp)) { Row(Modifier.padding(9.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = color, modifier = Modifier.size(21.dp)); Spacer(Modifier.width(8.dp)); Column { Text(label, color = Navy, fontWeight = FontWeight.Bold, fontSize = 10.sp); Text(if (label == "体质") "继续测评" else "开始测评", color = Color.Gray, fontSize = 8.sp) } } }
-@Composable private fun ParentAction(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier, onClick: () -> Unit) = Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) { FilledIconButton(onClick = onClick, modifier = Modifier.size(39.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = color)) { Icon(icon, null, modifier = Modifier.size(20.dp)) }; Text(label, color = Navy, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, maxLines = 1) }
+@Composable private fun ParentMetric(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier, onClick: () -> Unit) = Surface(modifier.semantics { role = Role.Button; contentDescription = "打开${label}测评" }.clickable(onClick = onClick), color = color.copy(.08f), shape = RoundedCornerShape(9.dp)) { Row(Modifier.padding(9.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = color, modifier = Modifier.size(21.dp)); Spacer(Modifier.width(8.dp)); Column { Text(label, color = Navy, fontWeight = FontWeight.Bold, fontSize = 10.sp); Text(if (label == "体质") "继续测评" else "开始测评", color = Color.Gray, fontSize = 8.sp) } } }
+@Composable private fun ParentAction(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier, onClick: () -> Unit) = Column(modifier.semantics { role = Role.Button; contentDescription = label }, horizontalAlignment = Alignment.CenterHorizontally) { FilledIconButton(onClick = onClick, modifier = Modifier.size(39.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = color)) { Icon(icon, contentDescription = label, modifier = Modifier.size(20.dp)) }; Text(label, color = Navy, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, maxLines = 1) }
 @Composable
 private fun ParentSection(title: String, action: String, onAction: (() -> Unit)? = null) =
     Row(Modifier.padding(horizontal = 12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

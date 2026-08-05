@@ -29,6 +29,9 @@ class MainActivityFlowTest {
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithText("请选择进入方式").fetchSemanticsNodes().isNotEmpty()
         }
+        composeRule.onNodeWithText("家庭端").assertIsDisplayed()
+        composeRule.onNodeWithText("学校端").assertIsDisplayed()
+        composeRule.onNodeWithText("校长端").assertIsDisplayed()
         composeRule.onNodeWithText("家庭端").performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithText("综合测评").fetchSemanticsNodes().isNotEmpty()

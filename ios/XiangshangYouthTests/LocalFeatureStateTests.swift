@@ -39,6 +39,11 @@ final class LocalFeatureStateTests: XCTestCase {
         } else {
             XCTFail("Mock dashboard should include students")
         }
+        state.selectRole(.principal)
+        XCTAssertEqual(state.selectedRole, .principal)
+        XCTAssertEqual(state.profile?.name, "周校长")
+        state.chooseAnotherRole()
+        XCTAssertNil(state.selectedRole)
     }
 
     func testFeatureStorePersistsCommercialWorkflowRecords() {

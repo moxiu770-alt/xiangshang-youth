@@ -13,6 +13,7 @@ import com.xiangshang.youth.core.model.UserProfile
 import com.xiangshang.youth.core.model.UserRole
 import com.xiangshang.youth.core.mock.MockRepository
 import com.xiangshang.youth.core.repository.RemoteRepository
+import com.xiangshang.youth.app.AppUiState
 import com.xiangshang.youth.core.util.ChildBindingValidator
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -121,6 +122,15 @@ class LocalFeatureStateTest {
         assertEquals(28.5, report.totalScore, 0.001)
         assertEquals("男", student.gender)
         assertEquals("王", UserProfile("u1", "王女士", "13800138000", UserRole.Parent, "向上实验小学").avatarInitials)
+    }
+
+    @Test
+    fun messageReadStateClearsTheSharedTeacherAndParentBadge() = runBlocking {
+        val data = MockRepository().dashboard()
+        val initial = AppUiState(data = data)
+        assertEquals(1, initial.unreadMessageCount)
+        val afterOpeningWarning = initial.copy(local = LocalFeatureState(readMessageIds = setOf("m1")))
+        assertEquals(0, afterOpeningWarning.unreadMessageCount)
     }
 
     @Test

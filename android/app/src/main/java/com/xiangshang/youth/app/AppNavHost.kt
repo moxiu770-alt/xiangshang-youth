@@ -145,7 +145,7 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
             }
         }
         composable(Destinations.Teacher) { TeacherHomeScreen(state, nav) }
-        composable(Destinations.TeacherMessages) { TeacherMessagesScreen(nav) }
+        composable(Destinations.TeacherMessages) { TeacherMessagesScreen(state, nav, viewModel::markMessageRead) }
         composable(Destinations.Classes) { TeacherClassesScreen(state, nav) }
         composable(Destinations.TeacherCircle) {
             TeacherClassCircleScreen(

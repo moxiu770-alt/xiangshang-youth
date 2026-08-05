@@ -23,6 +23,19 @@ import java.util.Locale
 @Composable fun PrincipalHomeScreen(state: AppUiState, nav: NavHostController, switchRole: () -> Unit) = AppScaffold("学校运动健康总览", onNotifications = { nav.navigate(Destinations.Notifications) }, notificationCount = state.unreadMessageCount, onSwitchRole = { switchRole(); nav.navigate(Destinations.Role) { popUpTo(Destinations.Principal) { inclusive = true } } }) {
     if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }
     if (state.data.students.isEmpty()) { EmptyState("暂无学校测评数据，场地端上传后会显示在这里。"); return@AppScaffold }
+    Surface(Modifier.fillMaxWidth().padding(bottom = 8.dp), color = Color.White, shape = RoundedCornerShape(12.dp), shadowElevation = 1.dp) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Surface(Modifier.size(44.dp), color = Color(0xFF6EA7FF), shape = androidx.compose.foundation.shape.CircleShape) {
+                Text("周", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(top = 9.dp))
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text("周校长", color = Navy, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text("向上实验小学 · 南湖校区", color = Color.Gray, fontSize = 10.sp)
+            }
+            Text("本轮测评", color = Blue, fontSize = 9.sp, modifier = Modifier.background(Sky, RoundedCornerShape(12.dp)).padding(horizontal = 9.dp, vertical = 5.dp))
+        }
+    }
     val activeTask = state.data.tasks.firstOrNull()
     val completion = if (activeTask == null || activeTask.totalCount == 0) 0f else activeTask.completedCount.toFloat() / activeTask.totalCount
     var regionDetailShown by rememberSaveable { mutableStateOf(false) }

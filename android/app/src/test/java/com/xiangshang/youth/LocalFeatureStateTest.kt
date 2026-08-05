@@ -85,6 +85,13 @@ class LocalFeatureStateTest {
     }
 
     @Test
+    fun mockReportRiskRulesMatchStudentScores() = runBlocking {
+        val students = MockRepository().dashboard().students
+        assertEquals(listOf("暂无高风险提示"), MockRepository().report(students.first()).riskAlerts)
+        assertEquals(listOf("倒退平衡项目偏弱，建议4周后复测"), MockRepository().report(students[1]).riskAlerts)
+    }
+
+    @Test
     fun childBindingRequiresMatchingNameAndSchoolCode() = runBlocking {
         val students = MockRepository().dashboard().students
         assertEquals(null, ChildBindingValidator.findMatch(students, "王小明", "wrong-code"))

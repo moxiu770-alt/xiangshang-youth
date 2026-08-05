@@ -22,8 +22,13 @@ class MockRepository : YouthRepository {
         TestTask("t3","五年级秋季综合运动能力测评","2026-09-18 09:00","南湖校区体育馆","五年级","五年级1班、2班",0,20,TaskStatus.NotCheckedIn,"小学五年级运动能力标准 v1.0")
     )
     override suspend fun dashboard() = DashboardData(school, grades, classes, students, tasks, listOf(ParentChild("pc1","p1",students[0],"母子"), ParentChild("pc2","p1",students[1],"母女")), listOf(MessageItem("m1","测评报告已生成","王小明的秋季综合运动能力测评报告已生成。","今天 10:30","报告",false), MessageItem("m2","补测提醒","请关注班级补测安排，携带运动鞋按时到场。","昨天 16:00","任务",true)))
-    override fun report(student: Student) = DiagnosisReport("r-" + student.id, student, "2026-09-12", TestItem.entries.mapIndexed { i, item ->
-        val confidence = if (i == 2) 0.72 else 0.94 + (i % 3) * 0.02
-        ScoreResult(item, listOf(4.5,4.0,3.5,4.5,4.0,3.5,4.5)[i], "表现良好", confidence, if (confidence < 0.8) ScoreReviewStatus.PendingReview else ScoreReviewStatus.Passed)
-    }, listOf("协调性良好","敏捷性优秀","平衡能力待提升"), listOf("暂无高风险提示"), listOf("每周进行3次平衡与核心训练，每次15分钟","练习脚步变向时注意控制重心"), listOf(CourseSuggestion("course-1", "儿童协调性提升课", "12分钟/节", "平衡与敏捷", true), CourseSuggestion("course-2", "球类基础控球练习", "15分钟/节", "手脚协调", true)), student.grade + "运动能力标准 v1.0")
+    override fun report(student: Student): DiagnosisReport {
+        val scoreValues = if (student.id == "s01") listOf(4.5, 4.0, 3.5, 4.5, 4.0, 3.5, 4.5) else listOf(3.5, 3.0, 2.5, 3.5, 3.0, 3.5, 3.0)
+        val scores = TestItem.entries.mapIndexed { i, item ->
+            val confidence = if (i == 2) 0.72 else 0.94 + (i % 3) * 0.02
+            ScoreResult(item, scoreValues[i], if (scoreValues[i] < 3.5) "建议重点练习" else "表现良好", confidence, if (confidence < 0.8) ScoreReviewStatus.PendingReview else ScoreReviewStatus.Passed)
+        }
+        val risks = if (scoreValues.any { it < 3 }) listOf("倒退平衡项目偏弱，建议4周后复测") else listOf("暂无高风险提示")
+        return DiagnosisReport("r-" + student.id, student, "2026-09-12", scores, listOf("协调性良好","敏捷性优秀","平衡能力待提升"), risks, listOf("每周进行3次平衡与核心训练，每次15分钟","练习脚步变向时注意控制重心"), listOf(CourseSuggestion("course-1", "儿童协调性提升课", "12分钟/节", "平衡与敏捷", true), CourseSuggestion("course-2", "球类基础控球练习", "15分钟/节", "手脚协调", true)), student.grade + "运动能力标准 v1.0")
+    }
 }

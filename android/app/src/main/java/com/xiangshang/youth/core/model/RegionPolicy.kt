@@ -1,2 +1,8 @@
 package com.xiangshang.youth.core.model
-data class RegionPolicy(val region: String, val isPovertyArea: Boolean, val policyName: String)
+data class RegionPolicy(
+    val id: String,
+    val region: String,
+    val povertyAreaLabel: String? = null,
+    val standardVersion: String = "",
+    val effectiveDate: String = ""
+)

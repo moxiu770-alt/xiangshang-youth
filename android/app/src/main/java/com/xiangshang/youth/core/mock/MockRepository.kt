@@ -19,7 +19,7 @@ class MockRepository : YouthRepository {
         // reference task board, which needs completed, review, retest and absent
         // rows visible on the first screen.
         val statuses = listOf(TaskStatus.Completed, TaskStatus.Completed, TaskStatus.Review, TaskStatus.Retest, TaskStatus.Waiting, TaskStatus.NotCheckedIn, TaskStatus.Completed, TaskStatus.Testing, TaskStatus.Absent, TaskStatus.CheckedIn)
-        Student("s" + (i + 1).toString().padStart(2, '0'), name, pairs[i % 6].first, pairs[i % 6].second, school.region, i % 3 == 0, statuses[i % statuses.size], if (i % 5 == 2) 19.5 else 24.0 + i % 11)
+        Student("s" + (i + 1).toString().padStart(2, '0'), name, pairs[i % 6].first, pairs[i % 6].second, school.region, i % 3 == 0, statuses[i % statuses.size], if (i % 5 == 2) 19.5 else 24.0 + i % 11, if (i % 2 == 0) "男" else "女")
     }
     private val tasks = listOf(
         TestTask("t1","2026年秋季综合运动能力测评","2026-09-12 09:00","南湖校区体育馆","三年级","三年级1班、2班",15,20,TaskStatus.Testing,"小学三年级运动能力标准 v1.0"),

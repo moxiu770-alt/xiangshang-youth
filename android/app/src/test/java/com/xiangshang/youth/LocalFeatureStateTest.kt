@@ -9,6 +9,8 @@ import com.xiangshang.youth.core.service.LocalFeatureState
 import com.xiangshang.youth.core.service.SupportMessage
 import com.xiangshang.youth.core.model.TaskStatus
 import com.xiangshang.youth.core.model.ScoreReviewStatus
+import com.xiangshang.youth.core.model.UserProfile
+import com.xiangshang.youth.core.model.UserRole
 import com.xiangshang.youth.core.mock.MockRepository
 import com.xiangshang.youth.core.repository.RemoteRepository
 import com.xiangshang.youth.core.util.ChildBindingValidator
@@ -109,6 +111,16 @@ class LocalFeatureStateTest {
             ),
             statuses
         )
+    }
+
+    @Test
+    fun mockReportExposesSevenItemTotalScore() = runBlocking {
+        val student = MockRepository().dashboard().students.first()
+        val report = MockRepository().report(student)
+        assertEquals(7, report.scores.size)
+        assertEquals(28.5, report.totalScore, 0.001)
+        assertEquals("男", student.gender)
+        assertEquals("王", UserProfile("u1", "王女士", "13800138000", UserRole.Parent, "向上实验小学").avatarInitials)
     }
 
     @Test

@@ -245,7 +245,7 @@ struct AccountDashboard: View {
                     VStack(alignment: .leading, spacing: 3) { Text(state.profile?.name ?? "王女士").font(.system(size: 16, weight: .bold)); Text(state.profile?.schoolName ?? "向上实验小学").font(.system(size: 10)).foregroundStyle(.secondary); RoleBadge(role: state.selectedRole ?? .parent) }
                     Spacer()
                     Image(systemName: "chevron.right").foregroundStyle(.secondary)
-                }.padding(14).background(.white, in: RoundedRectangle(cornerRadius: 12)).padding(.horizontal, 12).onTapGesture { dialog = "个人资料" }
+                }.padding(14).background(.white, in: RoundedRectangle(cornerRadius: 12)).padding(.horizontal, 12).contentShape(RoundedRectangle(cornerRadius: 12)).onTapGesture { dialog = "个人资料" }.accessibilityElement(children: .combine).accessibilityLabel("查看个人资料").accessibilityAddTraits(.isButton)
                 if state.selectedRole == .parent {
                     HStack(spacing: 8) {
                         accountMetric(title: "已绑定孩子", value: "\(state.boundChildren.count)", action: { router.push(.children) })

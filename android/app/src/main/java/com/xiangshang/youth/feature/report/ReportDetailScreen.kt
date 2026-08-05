@@ -78,7 +78,7 @@ private fun ReportHero(report: DiagnosisReport, isRefreshing: Boolean, onRefresh
                 Text("${report.student.grade} · ${report.student.className}", color = Color.White.copy(alpha = .88f), fontSize = 11.sp)
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text(String.format(Locale.US, "%.1f / 35", report.scores.sumOf { it.score }), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 21.sp)
+                Text(String.format(Locale.US, "%.1f / 35", report.totalScore), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 21.sp)
                 TextButton(onClick = onRefresh, enabled = !isRefreshing, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) {
                     if (isRefreshing) CircularProgressIndicator(Modifier.size(11.dp), color = Color.White, strokeWidth = 1.5.dp)
                     else Icon(Icons.Filled.Refresh, null, tint = Color.White, modifier = Modifier.size(12.dp))

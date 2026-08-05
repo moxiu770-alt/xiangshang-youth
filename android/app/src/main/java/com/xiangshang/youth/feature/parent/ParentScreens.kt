@@ -206,7 +206,7 @@ fun ParentEvaluationsScreen(state: AppUiState, nav: NavHostController, report: D
     Spacer(Modifier.height(10.dp))
     Text("详细报告", color = Navy, fontWeight = FontWeight.Bold)
     listOf("体质" to "脊柱姿态 · 遗传身高 · 运动表现", "视力" to "屈光筛查 · 用眼习惯", "口腔" to "龋齿风险 · 牙列发育", "心理" to "情绪状态 · 同伴适应").forEach { (name, detail) ->
-        Surface(Modifier.fillMaxWidth().padding(top = 6.dp).clickable { nav.navigate(Destinations.Report) }, color = Color.White, shape = RoundedCornerShape(9.dp)) {
+        Surface(Modifier.fillMaxWidth().padding(top = 6.dp).semantics { role = Role.Button; contentDescription = "查看${name}健康报告" }.clickable { nav.navigate(Destinations.Report) }, color = Color.White, shape = RoundedCornerShape(9.dp)) {
             Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(if (name == "体质") Icons.Filled.DirectionsRun else if (name == "视力") Icons.Filled.RemoveRedEye else if (name == "口腔") Icons.Filled.MedicalServices else Icons.Filled.Favorite, null, tint = Blue)
                 Spacer(Modifier.width(9.dp))
@@ -232,7 +232,7 @@ fun ParentEvaluationsScreen(state: AppUiState, nav: NavHostController, report: D
     when {
         state.loading || data == null -> LoadingState()
         data.messages.isEmpty() || visibleMessages.isEmpty() -> EmptyState(if (selectedTab == 0) "暂无消息提醒" else "暂无系统通知")
-        else -> visibleMessages.forEachIndexed { index, item -> Surface(Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { markMessageRead(item.id); selectedTitle = item.title; selectedContent = item.content; selectedTime = item.time }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(11.dp)) { Icon(if (index % 2 == 0) Icons.Filled.Warning else Icons.Filled.Notifications, null, tint = if (index % 2 == 0) Color.Red else Blue); Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Row(verticalAlignment = Alignment.CenterVertically) { Text(item.title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); if (!item.isRead && item.id !in state.local.readMessageIds) Box(Modifier.size(5.dp).background(Color.Red, CircleShape).padding(start = 4.dp)) }; Text(item.content, color = Color.Gray, fontSize = 9.sp, maxLines = 1); Text(item.category, color = Blue, fontSize = 8.sp) }; Text(item.time, color = Color.Gray, fontSize = 8.sp) } } }
+        else -> visibleMessages.forEachIndexed { index, item -> Surface(Modifier.fillMaxWidth().padding(vertical = 4.dp).semantics { role = Role.Button; contentDescription = "查看消息：${item.title}" }.clickable { markMessageRead(item.id); selectedTitle = item.title; selectedContent = item.content; selectedTime = item.time }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(11.dp)) { Icon(if (index % 2 == 0) Icons.Filled.Warning else Icons.Filled.Notifications, null, tint = if (index % 2 == 0) Color.Red else Blue); Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Row(verticalAlignment = Alignment.CenterVertically) { Text(item.title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); if (!item.isRead && item.id !in state.local.readMessageIds) Box(Modifier.size(5.dp).background(Color.Red, CircleShape).padding(start = 4.dp)) }; Text(item.content, color = Color.Gray, fontSize = 9.sp, maxLines = 1); Text(item.category, color = Blue, fontSize = 8.sp) }; Text(item.time, color = Color.Gray, fontSize = 8.sp) } } }
     }
 }
     selectedTitle?.let { title -> AlertDialog(onDismissRequest = { selectedTitle = null }, title = { Text(title) }, text = { Column { Text(selectedContent); Text(selectedTime, color = Color.Gray, fontSize = 11.sp, modifier = Modifier.padding(top = 10.dp)) } }, confirmButton = { TextButton(onClick = { selectedTitle = null }) { Text("关闭") } }) }
@@ -259,7 +259,7 @@ fun HealthProfileScreen(state: AppUiState, nav: NavHostController) = ParentTabSc
 private fun ParentActivities(nav: NavHostController) = Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
     ParentSection("最近家庭运动", "查看全部") { nav.navigate(Destinations.Courses) }
     Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth()) { MiniActivity(R.drawable.activity_classroom, "课间活力操", Modifier.weight(1f)) { nav.navigate(Destinations.Courses) }; MiniActivity(R.drawable.activity_football, "足球启蒙", Modifier.weight(1f)) { nav.navigate(Destinations.Courses) }; MiniActivity(R.drawable.activity_balance, "平衡挑战", Modifier.weight(1f)) { nav.navigate(Destinations.Courses) } }
-    Surface(Modifier.fillMaxWidth().clickable { nav.navigate(Destinations.Courses) }, color = Color.White, shape = RoundedCornerShape(11.dp)) {
+    Surface(Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "查看推荐课程：青少年体姿改善课程" }.clickable { nav.navigate(Destinations.Courses) }, color = Color.White, shape = RoundedCornerShape(11.dp)) {
         Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Image(painterResource(R.drawable.activity_balance), null, Modifier.size(58.dp).clip(RoundedCornerShape(9.dp)), contentScale = ContentScale.Crop)
             Spacer(Modifier.width(9.dp))

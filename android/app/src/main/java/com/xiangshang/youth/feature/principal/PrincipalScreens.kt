@@ -87,7 +87,7 @@ fun GradeStatsScreen(state: AppUiState, nav: NavHostController) = AppScaffold("�
         val gradeRisk = gradeStudents.count { (it.totalScore ?: 35.0) < 25 || it.taskStatus == com.xiangshang.youth.core.model.TaskStatus.Review || it.taskStatus == com.xiangshang.youth.core.model.TaskStatus.Retest }
         val value = when (metric) { "平均总分" -> String.format(Locale.US, "%.1f", gradeAverage); "风险人数" -> "${gradeRisk}人"; else -> "$rate%" }
         Surface(
-            Modifier.fillMaxWidth().padding(vertical = 5.dp).clickable { nav.navigate("${Destinations.ClassStats}?grade=${android.net.Uri.encode(grade.name)}") },
+            Modifier.fillMaxWidth().padding(vertical = 5.dp).semantics { role = Role.Button; contentDescription = "查看${grade.name}班级统计，${value}${metric}" }.clickable { nav.navigate("${Destinations.ClassStats}?grade=${android.net.Uri.encode(grade.name)}") },
             color = Color.White, shape = RoundedCornerShape(11.dp), shadowElevation = 1.dp
         ) {
             Column(Modifier.padding(12.dp)) {
@@ -114,7 +114,7 @@ fun ClassStatsScreen(state: AppUiState, nav: NavHostController, initialGrade: St
     }
     Text("${classes.size}个班级 · 点击班级查看需要重点跟进的学生", color = Color.Gray, fontSize = 9.sp, modifier = Modifier.padding(bottom = 4.dp))
     classes.forEach { item ->
-        Surface(Modifier.fillMaxWidth().padding(vertical = 5.dp).clickable { nav.navigate("${Destinations.Risk}?className=${android.net.Uri.encode(item.name)}") }, color = Color.White, shape = RoundedCornerShape(11.dp), shadowElevation = 1.dp) {
+        Surface(Modifier.fillMaxWidth().padding(vertical = 5.dp).semantics { role = Role.Button; contentDescription = "查看${item.name}风险学生，完成率${item.completionRate}%" }.clickable { nav.navigate("${Destinations.Risk}?className=${android.net.Uri.encode(item.name)}") }, color = Color.White, shape = RoundedCornerShape(11.dp), shadowElevation = 1.dp) {
             Column(Modifier.padding(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(item.name, color = Navy, fontWeight = FontWeight.Bold); Text("${item.teacherName} · ${item.studentCount}人", color = Color.Gray, fontSize = 9.sp) }; Text("${item.completionRate}%", color = if (item.completionRate < 80) Color.Red else Green, fontWeight = FontWeight.Bold, fontSize = 18.sp); Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray, modifier = Modifier.padding(start = 5.dp)) }
                 LinearProgressIndicator({ item.completionRate / 100f }, Modifier.fillMaxWidth().padding(top = 9.dp).height(6.dp), color = if (item.completionRate < 80) Color(0xFFFF9D25) else Green, trackColor = Sky)

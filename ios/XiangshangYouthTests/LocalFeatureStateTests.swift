@@ -16,6 +16,17 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertTrue(data.students.contains(where: \.isPovertyArea))
     }
 
+    func testMockStudentStatusesAndReportTotalMatchReferenceBoard() async throws {
+        let data = try await MockRepository.shared.loadDashboard()
+        XCTAssertEqual(
+            Array(data.students.prefix(10).map(\.taskStatus)),
+            [.completed, .completed, .review, .retest, .waiting, .notCheckedIn, .completed, .testing, .absent, .checkedIn]
+        )
+        let report = MockRepository.shared.report(for: data.students[0])
+        XCTAssertEqual(report.scores.count, 7)
+        XCTAssertEqual(report.totalScore, 28.5, accuracy: 0.001)
+    }
+
     func testLoginRoleSwitchAndTaskStatusAreKeptInAppState() async {
         let suite = "xiangshang.youth.login-tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!

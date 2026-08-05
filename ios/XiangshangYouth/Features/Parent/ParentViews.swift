@@ -398,13 +398,13 @@ struct ParentMessagesDashboard: View {
     @EnvironmentObject private var state: AppState
     @State private var selectedTab = 0
     @State private var selectedMessage: ParentMessageDetail?
-    private let messages: [(String, String, String, String, String, Color)] = [
-        ("exclamationmark.circle.fill", "体质提醒", "体质指标偏低，建议关注饮食与运动习惯", "健康提醒", "08:30", .red),
-        ("eye.fill", "视力提醒", "用眼时长超过建议时长，建议合理用眼", "健康提醒", "昨天 21:00", ReferenceColor.green),
-        ("mouth.fill", "口腔提醒", "建议定期进行口腔健康检查", "成长关注", "昨天 20:00", ReferenceColor.purple),
-        ("brain.head.profile", "心理提醒", "情绪状态良好，继续保持", "成长关注", "昨天 18:30", ReferenceColor.pink),
-        ("bell.fill", "成长提醒", "本月完成2次运动打卡", "成长提醒", "07-15 16:20", ReferenceColor.blue),
-        ("star.fill", "打卡提醒", "今日运动打卡未完成，快去打卡吧！", "待完成", "07-15 08:00", .orange)
+    private let messages: [(String, String, String, String, String, String, Color)] = [
+        ("m1", "exclamationmark.circle.fill", "体质提醒", "体质指标偏低，建议关注饮食与运动习惯", "健康提醒", "08:30", .red),
+        ("m2", "eye.fill", "视力提醒", "用眼时长超过建议时长，建议合理用眼", "健康提醒", "昨天 21:00", ReferenceColor.green),
+        ("health-oral", "mouth.fill", "口腔提醒", "建议定期进行口腔健康检查", "成长关注", "昨天 20:00", ReferenceColor.purple),
+        ("health-mental", "brain.head.profile", "心理提醒", "情绪状态良好，继续保持", "成长关注", "昨天 18:30", ReferenceColor.pink),
+        ("health-growth", "bell.fill", "成长提醒", "本月完成2次运动打卡", "成长提醒", "07-15 16:20", ReferenceColor.blue),
+        ("health-checkin", "star.fill", "打卡提醒", "今日运动打卡未完成，快去打卡吧！", "待完成", "07-15 08:00", .orange)
     ]
 
     var body: some View {
@@ -421,9 +421,11 @@ struct ParentMessagesDashboard: View {
                 ForEach(visibleMessages.indices, id: \.self) { index in
                     let item = visibleMessages[index]
                     Button {
-                        selectedMessage = ParentMessageDetail(title: item.1, detail: item.2, tag: item.3, time: item.4)
+                        state.markMessageRead(item.0)
+                        selectedMessage = ParentMessageDetail(title: item.2, detail: item.3, tag: item.4, time: item.5)
                     } label: {
-                        messageRow(icon: item.0, title: item.1, detail: item.2, tag: item.3, time: item.4, color: item.5, unread: index < 2)
+                        let isUnread = index < 2 && !state.localFeatures.readMessageIDs.contains(item.0)
+                        messageRow(icon: item.1, title: item.2, detail: item.3, tag: item.4, time: item.5, color: item.6, unread: isUnread)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("\(item.1)，\(item.2)，\(item.4)，查看详情")

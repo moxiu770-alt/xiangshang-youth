@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 /// Persists the front-end workflow state while the remote APIs are unavailable.
 /// Keeping it behind this small store lets the UI move to remote sync later without
@@ -93,11 +94,21 @@ final class LocalFeatureStore: ObservableObject {
     @Published private(set) var state: LocalFeatureState
     private let key = "xiangshang.local-feature-state.v1"
     private let defaults: UserDefaults
+    private let secureStore: KeychainStateStore?
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        if let data = defaults.data(forKey: key), let decoded = Self.decodePersistedState(data) {
+        // Test suites and migration fixtures intentionally stay isolated in their
+        // supplied UserDefaults. The production standard store uses Keychain so
+        // drafts, child bindings and health workflow state are not plain text.
+        self.secureStore = defaults === UserDefaults.standard ? KeychainStateStore() : nil
+        let persisted = secureStore?.read() ?? defaults.data(forKey: key)
+        if let data = persisted, let decoded = Self.decodePersistedState(data) {
             state = decoded
+            if secureStore != nil, defaults.data(forKey: key) != nil {
+                secureStore?.write(data)
+                defaults.removeObject(forKey: key)
+            }
         } else {
             state = LocalFeatureState()
         }
@@ -105,10 +116,13 @@ final class LocalFeatureStore: ObservableObject {
 
     func update(_ body: (inout LocalFeatureState) -> Void) {
         body(&state)
-        if let data = try? JSONEncoder().encode(state) { defaults.set(data, forKey: key) }
+        if let data = try? JSONEncoder().encode(state) {
+            if let secureStore { secureStore.write(data) }
+            else { defaults.set(data, forKey: key) }
+        }
     }
 
-    func reset() { state = LocalFeatureState(); defaults.removeObject(forKey: key) }
+    func reset() { state = LocalFeatureState(); secureStore?.remove(); defaults.removeObject(forKey: key) }
 
     /// Adds defaults introduced after v1 without discarding existing drafts or
     /// submissions when users update the app.
@@ -124,5 +138,52 @@ final class LocalFeatureStore: ObservableObject {
         if legacy["classPostComments"] == nil { legacy["classPostComments"] = [[String: Any]]() }
         guard let migrated = try? JSONSerialization.data(withJSONObject: legacy) else { return nil }
         return try? decoder.decode(LocalFeatureState.self, from: migrated)
+    }
+}
+
+/// Keychain-backed local workflow state. The payload is small and contains only
+/// client-side drafts/statuses; it is not a replacement for server-side health
+/// record storage once the remote repository is enabled.
+private struct KeychainStateStore {
+    private let service = Bundle.main.bundleIdentifier ?? "com.xiangshang.youth"
+    private let account = "local-feature-state"
+
+    func read() -> Data? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess else { return nil }
+        return result as? Data
+    }
+
+    func write(_ data: Data) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+        let attributes: [String: Any] = [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        ]
+        if SecItemUpdate(query as CFDictionary, attributes as CFDictionary) != errSecSuccess {
+            var add = query
+            add.merge(attributes) { _, new in new }
+            SecItemAdd(add as CFDictionary, nil)
+        }
+    }
+
+    func remove() {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+        SecItemDelete(query as CFDictionary)
     }
 }

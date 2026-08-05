@@ -43,7 +43,7 @@ data class LocalAppSettings(val notificationsEnabled: Boolean = true, val reduce
 
 /** Front-end persistence used until the remote workflow APIs are connected. */
 class LocalFeatureStore(context: Context) {
-    private val prefs = context.getSharedPreferences("xiangshang_local_features", Context.MODE_PRIVATE)
+    private val prefs = SecurePreferences(context, "xiangshang_local_features")
     fun load(): LocalFeatureState = LocalFeatureState(
         activityRegistered = prefs.getBoolean("activity_registered", false),
         activityRegistrations = decodeActivityRegistrations(prefs.getString("activity_registrations", null)),

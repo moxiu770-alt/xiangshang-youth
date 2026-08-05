@@ -155,6 +155,7 @@ struct ChildrenView: View {
     @State private var childName = ""
     @State private var bindingCode = ""
     @State private var bindingError: String?
+    @State private var bindingHelpPresented = false
     var body: some View {
         AppScaffold(title: "孩子管理") {
             VStack(spacing: 8) {
@@ -186,9 +187,19 @@ struct ChildrenView: View {
                     Section("孩子信息") {
                         TextField("孩子姓名", text: $childName)
                         TextField("绑定码（示例 XS-S03）", text: $bindingCode)
-                        Text("绑定码由学校或班主任提供，用于确认家庭与孩子关系。")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "info.circle.fill").foregroundStyle(ReferenceColor.blue)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("绑定码由学校或班主任提供，用于确认家庭与孩子关系。")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Button("绑定码在哪找？") { bindingHelpPresented = true }
+                                    .font(.caption.weight(.semibold))
+                                    .buttonStyle(.plain)
+                                    .foregroundStyle(ReferenceColor.blue)
+                                    .accessibilityLabel("查看绑定码获取说明")
+                            }
+                        }
                         if let bindingError { Text(bindingError).font(.caption).foregroundStyle(.red) }
                     }
                     Section { Button("确认绑定") {
@@ -199,6 +210,11 @@ struct ChildrenView: View {
                 .navigationTitle("绑定孩子")
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("取消") { bindingPresented = false } } }
             }
+        }
+        .alert("绑定码获取说明", isPresented: $bindingHelpPresented) {
+            Button("知道了", role: .cancel) { }
+        } message: {
+            Text("绑定码由学校后台生成。请联系班主任或学校管理员，在“家长绑定管理/学生档案”中获取孩子专属绑定码。示例格式：XS-S03。若学校尚未发放，请先向班主任申请，平台不会自动猜测或生成绑定码。")
         }
     }
 }

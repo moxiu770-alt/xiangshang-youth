@@ -46,5 +46,12 @@ class MainActivityFlowTest {
             composeRule.onAllNodesWithText("去绑定孩子").fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithText("去绑定孩子").assertIsDisplayed()
+        composeRule.onNodeWithText("去绑定孩子").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("绑定孩子").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("绑定孩子").performClick()
+        composeRule.onNodeWithText("绑定码在哪找？").performClick()
+        composeRule.onNodeWithText("绑定码获取说明").assertIsDisplayed()
     }
 }

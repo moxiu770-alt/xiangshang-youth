@@ -56,6 +56,7 @@ fun SplashScreen(onFinished: () -> Unit, canFinish: () -> Boolean = { true }) {
 fun LoginScreen(
     onLogin: () -> Unit,
     onRegister: () -> Unit,
+    onForgotPassword: () -> Unit = {},
     loading: Boolean = false,
     serverError: String? = null,
     onClearError: () -> Unit = {}
@@ -121,7 +122,7 @@ fun LoginScreen(
                     (error ?: serverError)?.let { Text(it, color = Color.Red, fontSize = 10.sp) }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         TextButton(onClick = onRegister, contentPadding = PaddingValues(0.dp)) { Text("注册新账号", color = Blue, fontSize = 11.sp) }
-                        TextButton(onClick = { error = "请联系学校管理员重置密码，或使用短信验证码登录。" }, contentPadding = PaddingValues(0.dp)) { Text("忘记密码？", color = Color.Gray, fontSize = 11.sp) }
+                        TextButton(onClick = onForgotPassword, contentPadding = PaddingValues(0.dp)) { Text("忘记密码？", color = Color.Gray, fontSize = 11.sp) }
                     }
                     Column(Modifier.fillMaxWidth().padding(top = 5.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { LoginCheck("专业身心测评与科学健康干预", "体质评估 · 科学干预"); LoginCheck("提供专属解决方案", "成长规划 · 定制方案"); LoginCheck("全程跟踪辅导", "专家护航 · 全程陪伴") }
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.semantics { role = Role.Checkbox; contentDescription = if (agreement) "已同意用户协议、隐私政策和儿童隐私政策" else "同意用户协议、隐私政策和儿童隐私政策" }.clickable { agreement = !agreement }) { Checkbox(checked = agreement, onCheckedChange = { agreement = it }); Text("我已阅读并同意《用户协议》《隐私政策》《儿童隐私政策》", color = if (agreement) Green else Color.Gray, fontSize = 8.sp) }
@@ -179,6 +180,98 @@ fun RegisterScreen(onBack: () -> Unit, onRegistered: () -> Unit) {
                 else -> success = true
             }
         }, enabled = agreement, modifier = Modifier.fillMaxWidth().padding(top = 12.dp).height(44.dp), shape = CircleShape) { Text("注册并登录", fontWeight = FontWeight.Bold) }
+    }
+}
+
+@Composable
+fun PasswordResetScreen(onBack: () -> Unit) {
+    var phone by rememberSaveable { mutableStateOf("") }
+    var code by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
+    var confirmation by rememberSaveable { mutableStateOf("") }
+    var codeSent by rememberSaveable { mutableStateOf(false) }
+    var codeCountdown by rememberSaveable { mutableIntStateOf(0) }
+    var error by rememberSaveable { mutableStateOf<String?>(null) }
+    var submitted by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(codeCountdown > 0) {
+        while (codeCountdown > 0) {
+            delay(1000)
+            codeCountdown -= 1
+        }
+    }
+
+    AppScaffold(title = "忘记密码", onBack = onBack) {
+        if (submitted) {
+            Column(
+                Modifier.fillMaxWidth().padding(top = 80.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(Icons.Filled.CheckCircle, null, tint = Green, modifier = Modifier.size(56.dp))
+                Text("密码已重置", color = Navy, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
+                Text("请使用新密码重新登录。", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                Button(onClick = onBack, modifier = Modifier.padding(top = 20.dp), shape = CircleShape) { Text("返回登录") }
+            }
+            return@AppScaffold
+        }
+
+        Text("找回向上少年账号", color = Navy, fontSize = 21.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp))
+        Text("验证手机号后设置新密码，验证码为 Mock 1234。", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.padding(top = 5.dp, bottom = 14.dp))
+        OutlinedTextField(
+            value = phone,
+            onValueChange = { phone = it; error = null },
+            label = { Text("手机号") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Row(Modifier.fillMaxWidth().padding(top = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = code,
+                onValueChange = { code = it; error = null },
+                label = { Text("短信验证码") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(
+                onClick = {
+                    if (phone.filter(Char::isDigit).length != 11) error = "请输入有效的 11 位手机号。"
+                    else { codeSent = true; code = "1234"; codeCountdown = 60; error = null }
+                },
+                enabled = codeCountdown == 0
+            ) { Text(if (codeCountdown > 0) "${codeCountdown}s" else if (codeSent) "重新获取" else "获取验证码", fontSize = 11.sp) }
+        }
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it; error = null },
+            label = { Text("新密码（至少 6 位）") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(top = 9.dp)
+        )
+        OutlinedTextField(
+            value = confirmation,
+            onValueChange = { confirmation = it; error = null },
+            label = { Text("再次输入新密码") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(top = 9.dp)
+        )
+        error?.let { Text(it, color = Color.Red, fontSize = 10.sp, modifier = Modifier.padding(top = 8.dp)) }
+        Button(
+            onClick = {
+                when {
+                    phone.filter(Char::isDigit).length != 11 -> error = "请输入有效的 11 位手机号。"
+                    code.length < 4 -> error = "请输入短信验证码。"
+                    password.length < 6 -> error = "新密码至少需要 6 位。"
+                    password != confirmation -> error = "两次输入的密码不一致。"
+                    else -> { error = null; submitted = true }
+                }
+            },
+            modifier = Modifier.fillMaxWidth().padding(top = 14.dp).height(44.dp),
+            shape = CircleShape
+        ) { Text("确认重置密码", fontWeight = FontWeight.Bold) }
     }
 }
 

@@ -41,6 +41,7 @@ struct LoginView: View {
     @State private var countdownTask: Task<Void, Never>?
     @State private var validationMessage: String?
     @State private var registerPresented = false
+    @State private var resetPasswordPresented = false
     @State private var landscapeDrifts = false
 
     var body: some View {
@@ -78,6 +79,7 @@ struct LoginView: View {
         }
         .onDisappear { countdownTask?.cancel() }
         .sheet(isPresented: $registerPresented) { RegisterView() }
+        .sheet(isPresented: $resetPasswordPresented) { ResetPasswordView() }
     }
 
     private var loginPanel: some View {
@@ -153,7 +155,7 @@ struct LoginView: View {
             HStack {
                 Button { registerPresented = true } label: { Text("注册新账号").foregroundStyle(ReferenceColor.blue) }
                 Spacer()
-                Button { validationMessage = "请联系学校管理员重置密码，或使用短信验证码登录。" } label: { Text("忘记密码？").foregroundStyle(.secondary) }
+                Button { resetPasswordPresented = true } label: { Text("忘记密码？").foregroundStyle(.secondary) }
             }
             .font(.system(size: 11, weight: .semibold))
             VStack(alignment: .leading, spacing: 9) {
@@ -324,6 +326,106 @@ struct RegisterView: View {
         guard password.count >= 6 else { error = "密码至少需要 6 位。"; return }
         submitted = true
         Task { await state.login(phone: phone) }
+    }
+}
+
+struct ResetPasswordView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var phone = ""
+    @State private var code = ""
+    @State private var password = ""
+    @State private var confirmation = ""
+    @State private var codeSent = false
+    @State private var codeCountdown = 0
+    @State private var error: String?
+    @State private var submitted = false
+    @State private var countdownTask: Task<Void, Never>?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                if submitted {
+                    Section {
+                        VStack(spacing: 12) {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.system(size: 48))
+                                .foregroundStyle(ReferenceColor.green)
+                            Text("密码已重置").font(.title3.bold())
+                            Text("请使用新密码重新登录。")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                            Button("返回登录") { dismiss() }
+                                .buttonStyle(.borderedProminent)
+                                .tint(ReferenceColor.blue)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 30)
+                    }
+                } else {
+                    Section("验证身份") {
+                        TextField("手机号", text: $phone)
+                            .keyboardType(.phonePad)
+                            .textContentType(.telephoneNumber)
+                        HStack(spacing: 8) {
+                            TextField("短信验证码", text: $code)
+                                .keyboardType(.numberPad)
+                            Button(codeCountdown > 0 ? "\(codeCountdown)s" : codeSent ? "重新获取" : "获取验证码") {
+                                sendCode()
+                            }
+                            .font(.caption.weight(.semibold))
+                            .disabled(codeCountdown > 0)
+                        }
+                    }
+                    Section("设置新密码") {
+                        SecureField("新密码（至少 6 位）", text: $password)
+                        SecureField("再次输入新密码", text: $confirmation)
+                    }
+                    if let error {
+                        Section { Text(error).font(.caption).foregroundStyle(.red) }
+                    }
+                    Section {
+                        Button("确认重置密码") { reset() }
+                            .frame(maxWidth: .infinity)
+                            .disabled(phone.filter(\.isNumber).count != 11 || code.count < 4 || password.count < 6 || confirmation.isEmpty)
+                    }
+                }
+            }
+            .navigationTitle("忘记密码")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(submitted ? "完成" : "取消") { dismiss() }
+                }
+            }
+        }
+        .onDisappear { countdownTask?.cancel() }
+    }
+
+    private func sendCode() {
+        guard phone.filter(\.isNumber).count == 11 else {
+            error = "请输入有效的 11 位手机号。"
+            return
+        }
+        error = nil
+        codeSent = true
+        code = "1234"
+        codeCountdown = 60
+        countdownTask?.cancel()
+        countdownTask = Task { @MainActor in
+            while codeCountdown > 0 {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { return }
+                codeCountdown -= 1
+            }
+        }
+    }
+
+    private func reset() {
+        guard phone.filter(\.isNumber).count == 11 else { error = "请输入有效的 11 位手机号。"; return }
+        guard code.count >= 4 else { error = "请输入短信验证码。"; return }
+        guard password.count >= 6 else { error = "新密码至少需要 6 位。"; return }
+        guard password == confirmation else { error = "两次输入的密码不一致。"; return }
+        error = nil
+        submitted = true
     }
 }
 

@@ -143,6 +143,13 @@ fun RegisterScreen(onBack: () -> Unit, onRegistered: () -> Unit) {
     var agreement by rememberSaveable { mutableStateOf(false) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     var success by rememberSaveable { mutableStateOf(false) }
+    var codeCountdown by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(codeCountdown > 0) {
+        while (codeCountdown > 0) {
+            delay(1000)
+            codeCountdown -= 1
+        }
+    }
     AppScaffold(title = "注册账号", onBack = onBack) {
         if (success) {
             Column(Modifier.fillMaxWidth().padding(top = 80.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -154,7 +161,10 @@ fun RegisterScreen(onBack: () -> Unit, onRegistered: () -> Unit) {
         Text("注册后可绑定家庭、接收学校通知并保存成长档案。", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.padding(top = 5.dp, bottom = 14.dp))
         OutlinedTextField(value = name, onValueChange = { name = it; error = null }, label = { Text("姓名") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(value = phone, onValueChange = { phone = it; error = null }, label = { Text("手机号") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 9.dp))
-        OutlinedTextField(value = code, onValueChange = { code = it; error = null }, label = { Text("短信验证码") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 9.dp))
+        Row(Modifier.fillMaxWidth().padding(top = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(value = code, onValueChange = { code = it; error = null }, label = { Text("短信验证码") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.weight(1f))
+            TextButton(onClick = { if (phone.filter(Char::isDigit).length != 11) error = "请先填写 11 位手机号。" else { code = "1234"; codeCountdown = 60 } }, enabled = codeCountdown == 0) { Text(if (codeCountdown > 0) "${codeCountdown}s" else if (code.isBlank()) "获取验证码" else "重新获取", fontSize = 11.sp) }
+        }
         OutlinedTextField(value = password, onValueChange = { password = it; error = null }, label = { Text("设置密码（至少 6 位）") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 9.dp))
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp).semantics { role = Role.Checkbox; contentDescription = if (agreement) "已同意用户协议、隐私政策和儿童隐私政策" else "同意用户协议、隐私政策和儿童隐私政策" }.clickable { agreement = !agreement }) { Checkbox(checked = agreement, onCheckedChange = { agreement = it }); Text("我已阅读并同意用户协议、隐私政策和儿童隐私政策", color = Navy, fontSize = 10.sp) }
         error?.let { Text(it, color = Color.Red, fontSize = 10.sp) }

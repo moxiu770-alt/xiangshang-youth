@@ -248,6 +248,8 @@ struct RegisterView: View {
     @State private var confirmed = false
     @State private var error: String?
     @State private var submitted = false
+    @State private var codeCountdown = 0
+    @State private var countdownTask: Task<Void, Never>?
 
     var body: some View {
         NavigationStack {
@@ -266,7 +268,24 @@ struct RegisterView: View {
                     Section("账号信息") {
                         TextField("姓名", text: $name)
                         TextField("手机号", text: $phone).keyboardType(.phonePad)
-                        TextField("短信验证码", text: $code).keyboardType(.numberPad)
+                        HStack(spacing: 8) {
+                            TextField("短信验证码", text: $code).keyboardType(.numberPad)
+                            Button(codeCountdown > 0 ? "\(codeCountdown)s" : code.isEmpty ? "获取验证码" : "重新获取") {
+                                guard phone.filter(\.isNumber).count == 11 else { error = "请先填写 11 位手机号。"; return }
+                                code = "1234"
+                                codeCountdown = 60
+                                countdownTask?.cancel()
+                                countdownTask = Task { @MainActor in
+                                    while codeCountdown > 0 {
+                                        try? await Task.sleep(for: .seconds(1))
+                                        guard !Task.isCancelled else { return }
+                                        codeCountdown -= 1
+                                    }
+                                }
+                            }
+                            .font(.caption.weight(.semibold))
+                            .disabled(codeCountdown > 0)
+                        }
                         SecureField("设置密码（至少 6 位）", text: $password)
                     }
                     Section {
@@ -287,6 +306,7 @@ struct RegisterView: View {
         .onChange(of: state.profile?.id) { _, profileID in
             if submitted, profileID != nil { dismiss() }
         }
+        .onDisappear { countdownTask?.cancel() }
         .onChange(of: state.error) { _, message in
             if submitted, let message {
                 submitted = false

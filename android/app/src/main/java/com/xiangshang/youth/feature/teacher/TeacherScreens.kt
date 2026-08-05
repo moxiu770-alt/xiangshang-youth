@@ -345,7 +345,11 @@ fun TeacherClassBoardScreen(state: AppUiState, nav: NavHostController, onOpenRep
     when {
         state.loading || data == null -> LoadingState()
         data.classes.isEmpty() -> EmptyState("暂无管理班级，学校分班后会自动同步。")
-        else -> data.classes.take(2).forEach { item -> Surface(Modifier.fillMaxWidth().padding(vertical = 5.dp).semantics { role = Role.Button; contentDescription = "查看${item.name}学生列表" }.clickable { nav.navigate("${Destinations.Students}?className=${android.net.Uri.encode(item.name)}") }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(13.dp), verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(item.name, color = Navy, fontWeight = FontWeight.Bold); Text(item.studentCount.toString() + "人 · " + item.teacherName, fontSize = 10.sp, color = Color.Gray) }; Text(item.completionRate.toString() + "%", color = Green, fontWeight = FontWeight.Bold, fontSize = 18.sp) } } }
+        else -> data.classes.take(2).forEach { item ->
+            val classStudents = data.students.filter { it.className == item.name }
+            val completionRate = if (classStudents.isEmpty()) item.completionRate else classStudents.count { (state.local.studentTaskStatuses[it.id] ?: it.taskStatus) == com.xiangshang.youth.core.model.TaskStatus.Completed } * 100 / classStudents.size
+            Surface(Modifier.fillMaxWidth().padding(vertical = 5.dp).semantics { role = Role.Button; contentDescription = "查看${item.name}学生列表，完成率${completionRate}%" }.clickable { nav.navigate("${Destinations.Students}?className=${android.net.Uri.encode(item.name)}") }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(13.dp), verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(item.name, color = Navy, fontWeight = FontWeight.Bold); Text(item.studentCount.toString() + "人 · " + item.teacherName, fontSize = 10.sp, color = Color.Gray) }; Text(completionRate.toString() + "%", color = Green, fontWeight = FontWeight.Bold, fontSize = 18.sp) } }
+        }
     }
 }
 @Composable

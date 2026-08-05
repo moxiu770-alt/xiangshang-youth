@@ -668,6 +668,8 @@ struct TeacherClassesView: View {
                     EmptyStateView(title: "暂无管理班级", detail: "学校分班后会自动同步到这里。")
                 } else if let data = state.data {
                     ForEach(Array(data.classes.prefix(2))) { item in
+                        let classStudents = data.students.filter { $0.className == item.name }
+                        let completionRate = classStudents.isEmpty ? item.completionRate : Int((Double(classStudents.filter { state.taskStatus(for: $0) == .completed }.count) / Double(classStudents.count) * 100).rounded())
                         Button { router.push(.studentList(item)) } label: {
                             HStack {
                                 VStack(alignment: .leading) {
@@ -676,7 +678,7 @@ struct TeacherClassesView: View {
                                 }
                                 Spacer()
                                 VStack(alignment: .trailing) {
-                                    Text("\(item.completionRate)%").font(.system(size: 17, weight: .bold)).foregroundStyle(ReferenceColor.green)
+                                    Text("\(completionRate)%").font(.system(size: 17, weight: .bold)).foregroundStyle(ReferenceColor.green)
                                     Text("完成率").font(.system(size: 8)).foregroundStyle(.secondary)
                                 }
                             }

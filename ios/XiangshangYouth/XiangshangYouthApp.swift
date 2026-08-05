@@ -10,6 +10,7 @@ struct RootView: View {
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var router: AppRouter
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.scenePhase) private var scenePhase
     var body: some View {
         ZStack {
         NavigationStack(path: $router.path) {
@@ -38,6 +39,10 @@ struct RootView: View {
         }
         .onChange(of: state.selectedRole) { _ in router.activatePendingDeepLink(using: state) }
         .onChange(of: state.data?.students.count ?? 0) { _ in router.activatePendingDeepLink(using: state) }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active, state.profile != nil, state.data != nil else { return }
+            Task { await state.refreshDashboard() }
+        }
         .transaction { transaction in
             if state.localFeatures.settings.reduceMotion {
                 transaction.disablesAnimations = true

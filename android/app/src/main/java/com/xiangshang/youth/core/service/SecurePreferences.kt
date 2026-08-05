@@ -48,7 +48,7 @@ class SecurePreferences(context: Context, name: String) {
 
         fun putString(key: String, value: String?): Editor {
             if (value == null) delegate.remove(key)
-            else delegate.remove(key).putString(key, cipher?.encrypt(value) ?: value)
+            else delegate.remove(key).putString(key, encryptOrPlain(value))
             return this
         }
 
@@ -56,20 +56,23 @@ class SecurePreferences(context: Context, name: String) {
             if (value == null) delegate.remove(key)
             else {
                 val encoded = JSONArray(value.toList()).toString()
-                if (cipher == null) delegate.remove(key).putStringSet(key, value)
-                else delegate.remove(key).putString(key, cipher.encrypt(encoded))
+                val encrypted = runCatching { cipher?.encrypt(encoded) }.getOrNull()
+                if (encrypted == null) delegate.remove(key).putStringSet(key, value)
+                else delegate.remove(key).putString(key, encrypted)
             }
             return this
         }
 
         fun putBoolean(key: String, value: Boolean): Editor {
-            delegate.remove(key).putString(key, cipher?.encrypt(if (value) "1" else "0") ?: value.toString())
+            delegate.remove(key).putString(key, encryptOrPlain(if (value) "1" else "0"))
             return this
         }
 
         fun remove(key: String): Editor { delegate.remove(key); return this }
         fun clear(): Editor { delegate.clear(); return this }
         fun apply() { delegate.apply() }
+
+        private fun encryptOrPlain(value: String): String = runCatching { cipher?.encrypt(value) }.getOrNull() ?: value
     }
 
     private fun decodeSet(raw: String): Set<String> = runCatching {

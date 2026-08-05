@@ -12,4 +12,4 @@ xcodebuild -project XiangshangYouth.xcodeproj -scheme XiangshangYouth -destinati
 
 登录页使用预填测试手机号即可进入；选择家长、教师或校长后进入对应工作台。
 
-启动海报使用 `Assets.xcassets/LaunchPoster.imageset` 的 1x/2x/3x 清晰资源；隐私清单位于 `PrivacyInfo.xcprivacy`，后端联调前无需修改页面路由。
+启动海报使用 `Assets.xcassets/LaunchPoster.imageset` 的 1x/2x/3x 清晰资源，画面已去除嵌入式时间、信号、电量和 Home 指示条；隐私清单位于 `PrivacyInfo.xcprivacy`，后端联调前无需修改页面路由。

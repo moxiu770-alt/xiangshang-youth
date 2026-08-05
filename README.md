@@ -46,7 +46,7 @@ export ANDROID_HOME="/Users/luyanpeng/Library/Android/sdk"
 - 本地草稿、绑定关系、测评状态、班级动态和课程进度会保存，登录失败、恢复失败、空数据和重试状态均由页面处理；双端根工作台支持主动刷新，Android 提供刷新按钮与全局错误重试，iOS 支持系统下拉刷新；登录页可打开协议/隐私说明。
 - 深链格式：`xiangshang-youth://open?target=report&studentId=s01`，支持报告、复核、任务和风险入口。
 - Android 页面和关键卡片已补充 TalkBack 语义；iOS 使用 VoiceOver accessibility label。
-- 启动海报已统一为用户提供的 `379.PNG` 清晰源图：iOS 1x/2x/3x 与 Android `drawable-nodpi` 使用同一画面比例；iOS 包含 `PrivacyInfo.xcprivacy`，Android 禁止明文流量和自动备份。
+- 启动海报已统一为清理系统状态栏和底部 Home 指示条后的清晰视觉资源：iOS 1x/2x/3x 与 Android `drawable-nodpi` 使用同一画面比例；iOS 包含 `PrivacyInfo.xcprivacy`，Android 禁止明文流量和自动备份。
 
 ## 前端落地差距（不含后端）
 

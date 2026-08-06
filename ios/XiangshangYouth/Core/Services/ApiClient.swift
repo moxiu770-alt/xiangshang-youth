@@ -113,8 +113,8 @@ final class ApiClient {
     }
 }
 
-/// Keychain-backed token storage. UserDefaults continues to hold only local UI
-/// drafts and mock interaction state; credentials never rely on that store.
+/// Keychain-backed token storage. Local workflow state uses a separate
+/// device-only Keychain item; credentials never rely on UserDefaults.
 private struct SecureTokenStore {
     private let service = Bundle.main.bundleIdentifier ?? "com.xiangshang.youth"
     private let account = "api-token"

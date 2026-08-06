@@ -364,7 +364,7 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
         OutlinedButton(onClick = { logout(); nav.navigate(Destinations.Login) { popUpTo(nav.graph.id) { inclusive = true } } }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red)) { Text("切换账号") }
     }
     if (settingsOpen) SettingsDialog(state.local.settings.notificationsEnabled, state.local.settings.reduceMotion, updateSettings, clearLocalData = { logout(); nav.navigate(Destinations.Login) { popUpTo(nav.graph.id) { inclusive = true } } }) { settingsOpen = false }
-    accountInfo?.let { title -> AccountInfoDialog(title, sendSupport) { accountInfo = null } }
+    accountInfo?.let { title -> AccountInfoDialog(title, state, sendSupport) { accountInfo = null } }
 }
 
 @Composable fun SettingsDialog(notifications: Boolean, reduceMotion: Boolean, update: (Boolean?, Boolean?) -> Unit, clearLocalData: () -> Unit = {}, dismiss: () -> Unit) {
@@ -407,7 +407,7 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
 }
 
 @Composable
-private fun AccountInfoDialog(title: String, sendSupport: (String) -> Unit, dismiss: () -> Unit) {
+private fun AccountInfoDialog(title: String, state: AppUiState, sendSupport: (String) -> Unit, dismiss: () -> Unit) {
     var feedback by rememberSaveable(title) { mutableStateOf("") }
     var submitted by rememberSaveable(title) { mutableStateOf(false) }
     AlertDialog(
@@ -421,7 +421,13 @@ private fun AccountInfoDialog(title: String, sendSupport: (String) -> Unit, dism
                     Text("绑定码由学校或班主任提供；报告生成后会在消息中心通知。", color = Color.Gray, fontSize = 10.sp, modifier = Modifier.padding(top = 7.dp))
                 }
             } else if (title == "个人资料") {
-                Text("王女士\n绑定学校：向上实验小学\n当前角色：家长\n\n资料由家庭账户维护，后续可在学校服务同步后更新。", color = Color.Gray, fontSize = 11.sp)
+                val profile = state.profile
+                val phone = profile?.phone.orEmpty()
+                val maskedPhone = if (phone.filter(Char::isDigit).length >= 7) {
+                    val digits = phone.filter(Char::isDigit)
+                    "${digits.take(3)}****${digits.takeLast(4)}"
+                } else "未绑定手机号"
+                Text("${profile?.name ?: "王女士"}\n绑定学校：${profile?.schoolName ?: "向上实验小学"}\n当前角色：${state.role?.label ?: "家长"}\n手机号：$maskedPhone\n\n资料由家庭账户维护，后续可在学校服务同步后更新。", color = Color.Gray, fontSize = 11.sp)
             } else {
                 Text("向上少年仅在获得授权后处理学生健康与运动数据，用于测评、报告和课程建议。儿童账号和家庭绑定数据不会用于商业推广。\n\n协议版本：2026.1", color = Color.Gray, fontSize = 11.sp)
             }

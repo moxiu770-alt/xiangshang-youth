@@ -325,9 +325,9 @@ struct AccountInfoSheet: View {
             Form {
                 if title == "个人资料" || title == "个人信息" {
                     Section("账号信息") {
-                        LabeledContent("姓名", value: "王女士")
-                        LabeledContent("手机号", value: "138****8000")
-                        LabeledContent("所属学校", value: "向上实验小学")
+                        LabeledContent("姓名", value: state.profile?.name ?? "王女士")
+                        LabeledContent("手机号", value: maskedPhone(state.profile?.phone ?? ""))
+                        LabeledContent("所属学校", value: state.profile?.schoolName ?? "向上实验小学")
                         Text("账号信息由学校或平台管理员维护。") .font(.footnote).foregroundStyle(.secondary)
                     }
                 } else if title == "我的权限" {
@@ -354,6 +354,14 @@ struct AccountInfoSheet: View {
             .navigationTitle(title)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
         }
+    }
+
+    private func maskedPhone(_ phone: String) -> String {
+        let digits = phone.filter(\.isNumber)
+        guard digits.count >= 7 else { return phone.isEmpty ? "未绑定手机号" : phone }
+        let start = digits.prefix(3)
+        let end = digits.suffix(4)
+        return "\(start)****\(end)"
     }
 }
 

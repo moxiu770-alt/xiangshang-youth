@@ -320,7 +320,7 @@ fun TeacherAccountScreen(state: AppUiState, nav: NavHostController, logout: () -
             OutlinedButton(onClick = { logout(); nav.navigate(Destinations.Login) { popUpTo(nav.graph.id) { inclusive = true } } }, modifier = Modifier.fillMaxWidth().padding(top = 7.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red)) { Text("切换账号") }
         }
     }
-    detail?.let { title -> AlertDialog(onDismissRequest = { detail = null }, confirmButton = { TextButton(onClick = { detail = null }) { Text("我知道了") } }, title = { Text(title) }, text = { Text(if (title == "个人信息") "李老师 · 三年级2班班主任。个人资料将在学校统一账户管理后同步更新。" else "当前账户已获得三年级2班的测评、预警与课程管理权限。") }) }
+    detail?.let { title -> AlertDialog(onDismissRequest = { detail = null }, confirmButton = { TextButton(onClick = { detail = null }) { Text("我知道了") } }, title = { Text(title) }, text = { Text(if (title == "个人信息") "${state.profile?.name ?: "李老师"} · 三年级2班班主任。个人资料将在学校统一账户管理后同步更新。" else "当前账户已获得三年级2班的测评、预警与课程管理权限。") }) }
     if (settingsOpen) SettingsDialog(state.local.settings.notificationsEnabled, state.local.settings.reduceMotion, updateSettings, clearLocalData = { logout(); nav.navigate(Destinations.Login) { popUpTo(nav.graph.id) { inclusive = true } } }) { settingsOpen = false }
 }
 

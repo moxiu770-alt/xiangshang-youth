@@ -26,7 +26,7 @@ class MainActivityFlowTest {
     }
 
     @Test
-    fun loginFlowsToRoleChoiceAndParentHome() {
+    fun loginFlowsThroughAllRolesAndParentBinding() {
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("微信登录").fetchSemanticsNodes().isNotEmpty()
         }
@@ -39,6 +39,36 @@ class MainActivityFlowTest {
         composeRule.onNodeWithText("家庭端").assertIsDisplayed()
         composeRule.onNodeWithText("学校端").assertIsDisplayed()
         composeRule.onNodeWithText("校长端").assertIsDisplayed()
+        // Teacher workbench: verify the dashboard is reachable and that the
+        // account switch returns to the full role picker instead of forcing a
+        // parent account.
+        composeRule.onNodeWithText("学校端").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("班级健康概览").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription("我的").performClick()
+        composeRule.onNodeWithText("切换使用角色").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("请选择进入方式").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Principal workbench: verify the dedicated risk tab is a real route.
+        composeRule.onNodeWithText("校长端").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("学校运动健康总览").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription("风险").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("重点风险学生").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription("总览").performClick()
+        composeRule.onNodeWithText("退出校长端").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("请选择进入方式").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Parent workbench: a new session still requires the child-binding
+        // guard, and the school-code help is reachable from the dialog.
         composeRule.onNodeWithText("家庭端").performClick()
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             // A new family session must bind a child before child-specific

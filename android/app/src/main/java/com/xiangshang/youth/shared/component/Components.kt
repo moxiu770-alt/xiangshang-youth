@@ -28,7 +28,7 @@ import com.xiangshang.youth.app.*
 import com.xiangshang.youth.core.model.*
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable fun AppScaffold(title: String, onBack: (() -> Unit)? = null, onSwitchRole: (() -> Unit)? = null, onNotifications: (() -> Unit)? = null, notificationCount: Int = 0, onRefresh: (() -> Unit)? = null, isRefreshing: Boolean = false, errorMessage: String? = null, onRetry: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
+@Composable fun AppScaffold(title: String, onBack: (() -> Unit)? = null, onSwitchRole: (() -> Unit)? = null, onNotifications: (() -> Unit)? = null, notificationCount: Int = 0, onRefresh: (() -> Unit)? = null, isRefreshing: Boolean = false, errorMessage: String? = null, onRetry: (() -> Unit)? = null, bottomBar: @Composable () -> Unit = {}, content: @Composable ColumnScope.() -> Unit) {
     Scaffold(containerColor = Canvas, topBar = {
         CenterAlignedTopAppBar(
             title = { Text(title, color = Navy, fontSize = 16.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) },
@@ -56,7 +56,7 @@ import com.xiangshang.youth.core.model.*
                 }
             }
         )
-    }) { padding ->
+    }, bottomBar = bottomBar) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().padding(horizontal = 12.dp).verticalScroll(rememberScrollState())) {
             if (errorMessage != null) {
                 ErrorState(errorMessage, retry = onRetry ?: {})

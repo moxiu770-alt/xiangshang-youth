@@ -20,11 +20,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import com.xiangshang.youth.app.*
 import com.xiangshang.youth.shared.component.*
 import java.util.Locale
 
-@Composable fun PrincipalHomeScreen(state: AppUiState, nav: NavHostController, switchRole: () -> Unit, refreshDashboard: () -> Unit = {}) = AppScaffold("学校运动健康总览", onNotifications = { nav.navigate(Destinations.Notifications) }, notificationCount = state.unreadMessageCount, onRefresh = refreshDashboard, isRefreshing = state.loading, errorMessage = state.error?.takeIf { state.data != null }, onRetry = refreshDashboard, onSwitchRole = { switchRole(); nav.navigate(Destinations.Role) { popUpTo(Destinations.Principal) { inclusive = true } } }) {
+@Composable fun PrincipalHomeScreen(state: AppUiState, nav: NavHostController, switchRole: () -> Unit, refreshDashboard: () -> Unit = {}) = AppScaffold("学校运动健康总览", onNotifications = { nav.navigate(Destinations.Notifications) }, notificationCount = state.unreadMessageCount, onRefresh = refreshDashboard, isRefreshing = state.loading, errorMessage = state.error?.takeIf { state.data != null }, onRetry = refreshDashboard, onSwitchRole = { switchRole(); nav.navigate(Destinations.Role) { popUpTo(Destinations.Principal) { inclusive = true } } }, bottomBar = { PrincipalBottomBar(nav) }) {
     if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }
     if (state.data.students.isEmpty()) { EmptyState("暂无学校测评数据，场地端上传后会显示在这里。"); return@AppScaffold }
     Surface(Modifier.fillMaxWidth().padding(bottom = 8.dp), color = Color.White, shape = RoundedCornerShape(12.dp), shadowElevation = 1.dp) {
@@ -77,6 +78,33 @@ import java.util.Locale
         text = { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { Text("南湖校区", color = Navy, fontWeight = FontWeight.Bold); Text("覆盖3个年级 · 6个班级 · ${state.data.students.size}名学生", color = Color.Gray, fontSize = 11.sp); HorizontalDivider(); Text("粤北山区", color = Navy, fontWeight = FontWeight.Bold); Text("${state.data.students.count { it.isPovertyArea }}名贫困地区学生已纳入公益运动课程支持", color = Color.Gray, fontSize = 11.sp); Text("地区标签和公益资格由学校管理端维护，场地端上传成绩后会自动刷新。", color = Color.Gray, fontSize = 10.sp) } },
         confirmButton = { TextButton(onClick = { regionDetailShown = false }) { Text("关闭") } }
     )
+}
+
+@Composable
+private fun PrincipalBottomBar(nav: NavHostController) {
+    val route = nav.currentBackStackEntryAsState().value?.destination?.route
+    val items = listOf(
+        Destinations.Principal to ("总览" to Icons.Filled.BarChart),
+        Destinations.Grades to ("年级" to Icons.Filled.School),
+        Destinations.ClassStats to ("班级" to Icons.Filled.Groups),
+        Destinations.Risk to ("风险" to Icons.Filled.WarningAmber)
+    )
+    NavigationBar(containerColor = Color.White, tonalElevation = 1.dp) {
+        items.forEach { (destination, item) ->
+            NavigationBarItem(
+                selected = route == destination || (destination == Destinations.ClassStats && route == Destinations.ClassStatsRoute) || (destination == Destinations.Risk && route == Destinations.RiskRoute),
+                onClick = {
+                    nav.navigate(destination) {
+                        popUpTo(Destinations.Principal) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                },
+                icon = { Icon(item.second, contentDescription = item.first) },
+                label = { Text(item.first, fontSize = 9.sp) }
+            )
+        }
+    }
 }
 
 @Composable private fun PrincipalMetric(title: String, value: String, note: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier, onClick: () -> Unit) = Surface(onClick = onClick, modifier = modifier.semantics { role = Role.Button; contentDescription = "$title：$value，$note" }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Column(Modifier.padding(9.dp)) { Icon(icon, null, tint = color, modifier = Modifier.size(17.dp)); Text(value, color = Navy, fontWeight = FontWeight.Bold, fontSize = 19.sp, modifier = Modifier.padding(top = 4.dp)); Text(title, color = Navy, fontSize = 10.sp); Text(note, color = Color.Gray, fontSize = 8.sp) } }

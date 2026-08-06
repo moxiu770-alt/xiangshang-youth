@@ -19,6 +19,8 @@ xcodebuild test \
   CODE_SIGNING_ALLOWED=NO
 ```
 
+该 scheme 已包含 `XiangshangYouthUITests`：会从启动海报等待登录页，完成协议确认、Mock 微信登录、校长端进入/退出、家庭端进入；如只需运行这条冒烟链路，可追加 `-only-testing:XiangshangYouthUITests/LaunchAndRoleFlowTests`。
+
 ### Android
 
 ```bash
@@ -72,7 +74,7 @@ export ANDROID_HOME="/Users/luyanpeng/Library/Android/sdk"
 
 ### P2：规模化运行前
 
-- **质量工程**：补齐 iOS XCTest/SwiftUI UI Test、Android JVM/Compose UI Test、关键路径覆盖率、lint/format、依赖和资源检查、视觉快照回归。
+- **质量工程**：iOS XCTest 与首条 SwiftUI UI 冒烟链路已接入，Android JVM/Compose UI Test、关键路径覆盖率、lint/format、依赖和资源检查、视觉快照回归仍需继续补齐。
 - **发布配置**：生产 Bundle/Application ID、通知权限说明、文件/相机权限文案、Universal Link、签名、Release 构建和崩溃兜底页；隐私清单、通知权限代码、应用 Scheme 和 Android 明文流量/备份策略已落地，真实渠道与签名仍需在联调发布阶段替换。
 - **性能与资源**：图片缓存/失败兜底、列表分页或窗口化、骨架屏、动画减弱模式、启动耗时和大数据量看板性能基线。
 - **可观测性**：前端错误日志、页面/按钮埋点、关键流程漏斗、版本和环境开关；不记录手机号、学生健康数据等敏感明文。

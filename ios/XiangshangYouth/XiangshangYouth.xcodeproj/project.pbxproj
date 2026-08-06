@@ -8,10 +8,18 @@
 
 /* Begin PBXBuildFile section */
 		B2C3D4E5F600000000000003 /* ../XiangshangYouthTests/LocalFeatureStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F600000000000002 /* ../XiangshangYouthTests/LocalFeatureStateTests.swift */; };
+		C2C3D4E5F600000000000003 /* ../XiangshangYouthUITests/LaunchAndRoleFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2C3D4E5F600000000000002 /* ../XiangshangYouthUITests/LaunchAndRoleFlowTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
 		B2C3D4E5F600000000000004 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A1B2C3D4E5F6000000000004 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A1B2C3D4E5F6000000000005;
+			remoteInfo = XiangshangYouth;
+		};
+		C2C3D4E5F600000000000004 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = A1B2C3D4E5F6000000000004 /* Project object */;
 			proxyType = 1;
@@ -26,6 +34,8 @@
 		A1B2C3D4E5F6000000000003 /* XiangshangYouth.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = XiangshangYouth.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B2C3D4E5F600000000000001 /* XiangshangYouthTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = XiangshangYouthTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B2C3D4E5F600000000000002 /* ../XiangshangYouthTests/LocalFeatureStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../XiangshangYouthTests/LocalFeatureStateTests.swift; sourceTree = SOURCE_ROOT; };
+		C2C3D4E5F600000000000001 /* XiangshangYouthUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = XiangshangYouthUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C2C3D4E5F600000000000002 /* ../XiangshangYouthUITests/LaunchAndRoleFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../XiangshangYouthUITests/LaunchAndRoleFlowTests.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -63,6 +73,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C2C3D4E5F600000000000009 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -81,6 +98,7 @@
 			children = (
 				A1B2C3D4E5F6000000000003 /* XiangshangYouth.app */,
 				B2C3D4E5F600000000000001 /* XiangshangYouthTests.xctest */,
+				C2C3D4E5F600000000000001 /* XiangshangYouthUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -90,6 +108,7 @@
 			children = (
 				A1B2C3D4E5F6000000000001,
 				B2C3D4E5F600000000000005 /* XiangshangYouthTests */,
+				C2C3D4E5F600000000000005 /* XiangshangYouthUITests */,
 				A1B2C3D4E5F6000000000002 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -100,6 +119,14 @@
 				B2C3D4E5F600000000000002 /* ../XiangshangYouthTests/LocalFeatureStateTests.swift */,
 			);
 			path = XiangshangYouthTests;
+			sourceTree = "<group>";
+		};
+		C2C3D4E5F600000000000005 /* XiangshangYouthUITests */ = {
+			isa = PBXGroup;
+			children = (
+				C2C3D4E5F600000000000002 /* ../XiangshangYouthUITests/LaunchAndRoleFlowTests.swift */,
+			);
+			path = XiangshangYouthUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -144,6 +171,23 @@
 			productReference = B2C3D4E5F600000000000001 /* XiangshangYouthTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		C2C3D4E5F600000000000006 /* XiangshangYouthUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C2C3D4E5F600000000000007 /* Build configuration list for PBXNativeTarget "XiangshangYouthUITests" */;
+			buildPhases = (
+				C2C3D4E5F600000000000008 /* Sources */,
+				C2C3D4E5F600000000000009 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C2C3D4E5F600000000000010 /* PBXTargetDependency */,
+			);
+			name = XiangshangYouthUITests;
+			productName = XiangshangYouthUITests;
+			productReference = C2C3D4E5F600000000000001 /* XiangshangYouthUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -186,6 +230,7 @@
 			targets = (
 				A1B2C3D4E5F6000000000005 /* XiangshangYouth */,
 				B2C3D4E5F600000000000006 /* XiangshangYouthTests */,
+				C2C3D4E5F600000000000006 /* XiangshangYouthUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -216,6 +261,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C2C3D4E5F600000000000008 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C2C3D4E5F600000000000003 /* ../XiangshangYouthUITests/LaunchAndRoleFlowTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -223,6 +276,11 @@
 			isa = PBXTargetDependency;
 			target = A1B2C3D4E5F6000000000005 /* XiangshangYouth */;
 			targetProxy = B2C3D4E5F600000000000004 /* PBXContainerItemProxy */;
+		};
+		C2C3D4E5F600000000000010 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A1B2C3D4E5F6000000000005 /* XiangshangYouth */;
+			targetProxy = C2C3D4E5F600000000000004 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -328,6 +386,32 @@
 			};
 			name = Release;
 		};
+		C2C3D4E5F600000000000011 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.xiangshang.youth.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = XiangshangYouth;
+			};
+			name = Debug;
+		};
+		C2C3D4E5F600000000000012 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.xiangshang.youth.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = XiangshangYouth;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -354,6 +438,15 @@
 			buildConfigurations = (
 				B2C3D4E5F600000000000011 /* Debug */,
 				B2C3D4E5F600000000000012 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C2C3D4E5F600000000000007 /* Build configuration list for PBXNativeTarget "XiangshangYouthUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C2C3D4E5F600000000000011 /* Debug */,
+				C2C3D4E5F600000000000012 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

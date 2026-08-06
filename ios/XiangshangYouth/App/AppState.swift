@@ -15,6 +15,11 @@ import SwiftUI
         self.repository = repository
         let resolvedFeatureStore = featureStore ?? LocalFeatureStore()
         self.featureStore = resolvedFeatureStore
+        // UI smoke tests must not inherit a developer's previous session or
+        // bound-child state. This flag is inert for normal and release launches.
+        if ProcessInfo.processInfo.arguments.contains("-ui-testing") {
+            resolvedFeatureStore.reset()
+        }
         self.localFeatures = resolvedFeatureStore.state
         if let sessionProfile = localFeatures.sessionProfile {
             profile = sessionProfile

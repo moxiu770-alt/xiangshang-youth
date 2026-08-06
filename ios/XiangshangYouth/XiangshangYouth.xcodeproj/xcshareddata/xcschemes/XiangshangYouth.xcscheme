@@ -8,12 +8,18 @@
          <BuildActionEntry buildForTesting="YES" buildForRunning="NO" buildForProfiling="NO" buildForArchiving="NO" buildForAnalyzing="YES">
             <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="B2C3D4E5F600000000000006" BuildableName="XiangshangYouthTests.xctest" BlueprintName="XiangshangYouthTests" ReferencedContainer="container:XiangshangYouth.xcodeproj"/>
          </BuildActionEntry>
+         <BuildActionEntry buildForTesting="YES" buildForRunning="NO" buildForProfiling="NO" buildForArchiving="NO" buildForAnalyzing="YES">
+            <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="C2C3D4E5F600000000000006" BuildableName="XiangshangYouthUITests.xctest" BlueprintName="XiangshangYouthUITests" ReferencedContainer="container:XiangshangYouth.xcodeproj"/>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.DebuggerFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="YES">
       <Testables>
          <TestableReference skipped="NO">
             <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="B2C3D4E5F600000000000006" BuildableName="XiangshangYouthTests.xctest" BlueprintName="XiangshangYouthTests" ReferencedContainer="container:XiangshangYouth.xcodeproj"/>
+         </TestableReference>
+         <TestableReference skipped="NO">
+            <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="C2C3D4E5F600000000000006" BuildableName="XiangshangYouthUITests.xctest" BlueprintName="XiangshangYouthUITests" ReferencedContainer="container:XiangshangYouth.xcodeproj"/>
          </TestableReference>
       </Testables>
    </TestAction>

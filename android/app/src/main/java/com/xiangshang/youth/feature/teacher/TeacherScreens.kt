@@ -266,7 +266,8 @@ fun TeacherClassCircleScreen(
         confirmLabel = "发布",
         command = state.workflowStates["post:李老师"] ?: WorkflowCommandState(),
         commandDriven = true,
-        onConfirm = { content -> submitPost("李老师", content); clearDraft(composerDraftKey) },
+        onConfirm = { content -> submitPost("李老师", content) },
+        onSuccess = { clearDraft(composerDraftKey) },
         onDraftChanged = { saveDraft(composerDraftKey, it) },
         onDismiss = { composer = false }
     )
@@ -315,13 +316,19 @@ private fun TeacherPostEditorDialog(
     command: WorkflowCommandState = WorkflowCommandState(),
     commandDriven: Boolean = false,
     onConfirm: (String) -> Unit,
+    onSuccess: () -> Unit = {},
     onDraftChanged: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
     var content by rememberSaveable(initialContent) { mutableStateOf(initialContent) }
     var error by remember { mutableStateOf<String?>(null) }
     var success by remember { mutableStateOf(false) }
-    LaunchedEffect(command.status) { if (commandDriven && command.status == WorkflowCommandStatus.Succeeded) success = true }
+    LaunchedEffect(command.status) {
+        if (commandDriven && command.status == WorkflowCommandStatus.Succeeded) {
+            success = true
+            onSuccess()
+        }
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },

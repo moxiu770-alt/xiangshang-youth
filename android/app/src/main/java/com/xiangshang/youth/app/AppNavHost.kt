@@ -116,7 +116,7 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
                 loading = state.loading,
                 serverError = state.error,
                 onClearError = viewModel::clearError,
-                onLogin = { viewModel.login { nav.navigate(Destinations.Role) { popUpTo(Destinations.Login) { inclusive = true }; launchSingleTop = true } } },
+                onLogin = { identifier -> viewModel.login(identifier) { nav.navigate(Destinations.Role) { popUpTo(Destinations.Login) { inclusive = true }; launchSingleTop = true } } },
                 onRegister = { nav.navigate(Destinations.Register) },
                 onForgotPassword = { nav.navigate(Destinations.PasswordReset) }
             )
@@ -124,7 +124,7 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
         composable(Destinations.Register) {
             RegisterScreen(
                 onBack = { nav.popBackStack() },
-                onRegistered = { viewModel.login { nav.navigate(Destinations.Role) { popUpTo(Destinations.Register) { inclusive = true }; launchSingleTop = true } } },
+                onRegistered = { phone -> viewModel.login(phone) { nav.navigate(Destinations.Role) { popUpTo(Destinations.Register) { inclusive = true }; launchSingleTop = true } } },
                 loading = state.loading,
                 serverError = state.error,
                 onClearError = viewModel::clearError

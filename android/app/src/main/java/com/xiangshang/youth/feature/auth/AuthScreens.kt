@@ -51,7 +51,7 @@ fun SplashScreen(onFinished: () -> Unit, canFinish: () -> Boolean = { true }) {
 
 @Composable
 fun LoginScreen(
-    onLogin: () -> Unit,
+    onLogin: (String) -> Unit,
     onRegister: () -> Unit,
     onForgotPassword: () -> Unit = {},
     loading: Boolean = false,
@@ -106,13 +106,13 @@ fun LoginScreen(
                     Button(onClick = {
                         when {
                             !agreement -> error = "请先阅读并同意用户协议和儿童隐私政策。"
-                            method == 0 -> onLogin()
+                            method == 0 -> onLogin("wechat_mock")
                             method == 1 && phone.filter(Char::isDigit).length != 11 -> error = "请输入有效的 11 位手机号。"
                             method == 1 && !codeSent -> error = "请先获取短信验证码。"
                             method == 1 && code.length < 4 -> error = "请输入短信验证码。"
                             method == 2 && account.isBlank() -> error = "请输入账号或手机号。"
                             method == 2 && password.length < 6 -> error = "密码至少需要 6 位。"
-                            else -> onLogin()
+                            else -> onLogin(if (method == 1) phone else account)
                         }
                     }, enabled = !loading, modifier = Modifier.fillMaxWidth().height(44.dp), shape = CircleShape) {
                         if (loading) CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(18.dp)) else Icon(if (method == 0) Icons.Filled.VerifiedUser else Icons.Filled.ArrowForward, null)
@@ -146,7 +146,7 @@ fun LoginScreen(
 @Composable
 fun RegisterScreen(
     onBack: () -> Unit,
-    onRegistered: () -> Unit,
+    onRegistered: (String) -> Unit,
     loading: Boolean = false,
     serverError: String? = null,
     onClearError: () -> Unit = {}
@@ -175,7 +175,7 @@ fun RegisterScreen(
     AppScaffold(title = "注册账号", onBack = onBack) {
         if (success) {
             Column(Modifier.fillMaxWidth().padding(top = 80.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Filled.CheckCircle, null, tint = Green, modifier = Modifier.size(54.dp)); Text("注册成功", color = Navy, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp)); Text("账号已创建，请登录后选择使用角色。", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp)); Button(onClick = { onClearError(); onRegistered() }, enabled = !loading, modifier = Modifier.padding(top = 20.dp)) { if (loading) CircularProgressIndicator(Modifier.size(17.dp), color = Color.White, strokeWidth = 2.dp) else Text("开始使用") }
+                Icon(Icons.Filled.CheckCircle, null, tint = Green, modifier = Modifier.size(54.dp)); Text("注册成功", color = Navy, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp)); Text("账号已创建，请登录后选择使用角色。", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp)); Button(onClick = { onClearError(); onRegistered(phone) }, enabled = !loading, modifier = Modifier.padding(top = 20.dp)) { if (loading) CircularProgressIndicator(Modifier.size(17.dp), color = Color.White, strokeWidth = 2.dp) else Text("开始使用") }
             }
             return@AppScaffold
         }

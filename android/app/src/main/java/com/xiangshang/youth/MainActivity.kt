@@ -26,8 +26,6 @@ class MainActivity : ComponentActivity() {
         // The visual spec uses full-bleed artwork on the launch/login surfaces.
         // Draw behind system bars so Android does not add a black status-bar band.
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.statusBarColor = android.graphics.Color.TRANSPARENT
-        window.navigationBarColor = android.graphics.Color.TRANSPARENT
         WindowInsetsControllerCompat(window, window.decorView).apply {
             isAppearanceLightStatusBars = false
             isAppearanceLightNavigationBars = true

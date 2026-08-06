@@ -137,7 +137,8 @@ import Network
         return data.students.filter { localFeatures.boundChildIDs.contains($0.id) }
     }
     var unreadMessageCount: Int {
-        (data?.messages ?? []).filter { !$0.isRead && !localFeatures.readMessageIDs.contains($0.id) }.count
+        guard localFeatures.settings.notificationsEnabled else { return 0 }
+        return (data?.messages ?? []).filter { !$0.isRead && !localFeatures.readMessageIDs.contains($0.id) }.count
     }
     func markMessageRead(_ id: String) { mutateLocal { $0.readMessageIDs.insert(id) } }
     @discardableResult

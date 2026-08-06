@@ -134,6 +134,18 @@ class LocalFeatureStateTest {
     }
 
     @Test
+    fun notificationsSettingSuppressesUnreadBadgeWithoutDeletingMessages() = runBlocking {
+        val data = MockRepository().dashboard()
+        val initial = AppUiState(data = data)
+        assertEquals(1, initial.unreadMessageCount)
+        val muted = initial.copy(local = LocalFeatureState(settings = com.xiangshang.youth.core.service.LocalAppSettings(notificationsEnabled = false)))
+        assertEquals(0, muted.unreadMessageCount)
+        assertEquals(2, muted.data?.messages?.size)
+        val restored = muted.copy(local = muted.local.copy(settings = com.xiangshang.youth.core.service.LocalAppSettings(notificationsEnabled = true)))
+        assertEquals(1, restored.unreadMessageCount)
+    }
+
+    @Test
     fun childBindingRequiresMatchingNameAndSchoolCode() = runBlocking {
         val students = MockRepository().dashboard().students
         assertEquals(null, ChildBindingValidator.findMatch(students, "王小明", "wrong-code"))

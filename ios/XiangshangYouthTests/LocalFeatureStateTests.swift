@@ -198,6 +198,21 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertTrue(LocalFeatureStore(defaults: defaults).state.readMessageIDs.contains("m1"))
     }
 
+    func testNotificationsSettingSuppressesUnreadBadgeWithoutDeletingMessages() async {
+        let suite = "xiangshang.youth.notification-setting-tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let state = AppState(featureStore: LocalFeatureStore(defaults: defaults))
+        await state.login(phone: "13800138000")
+
+        XCTAssertEqual(state.unreadMessageCount, 1)
+        state.updateSettings(notificationsEnabled: false)
+        XCTAssertEqual(state.unreadMessageCount, 0)
+        XCTAssertEqual(state.data?.messages.count, 2)
+        state.updateSettings(notificationsEnabled: true)
+        XCTAssertEqual(state.unreadMessageCount, 1)
+    }
+
     func testFamilyBindingRequiresMatchingNameAndSchoolCode() async {
         let suite = "xiangshang.youth.binding-tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!

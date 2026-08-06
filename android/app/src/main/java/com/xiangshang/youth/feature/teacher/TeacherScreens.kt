@@ -286,7 +286,7 @@ private fun TeacherPostEditorDialog(
             if (success) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = Green, modifier = Modifier.size(42.dp))
-                    Text("动态已保存到班级圈。", color = Navy, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
+                    Text("动态已保存到本机，后端联调后同步到班级圈。", color = Navy, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
                 }
             } else Column {
                 OutlinedTextField(

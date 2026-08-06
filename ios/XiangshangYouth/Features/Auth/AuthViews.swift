@@ -128,6 +128,7 @@ struct LoginView: View {
             }
             .padding(.bottom, 8)
             }
+            .scrollDismissesKeyboard(.interactively)
         }
         .task {
             withAnimation(.easeInOut(duration: 5.5).repeatForever(autoreverses: true)) { landscapeDrifts = true }
@@ -403,6 +404,7 @@ struct RegisterView: View {
                 }
             }
             .navigationTitle("注册账号")
+            .scrollDismissesKeyboard(.interactively)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(submitted ? "完成" : "取消") { dismiss() } } }
         }
         .sheet(item: $legalDocument) { document in LegalDocumentView(document: document) }
@@ -491,6 +493,7 @@ struct ResetPasswordView: View {
                 }
             }
             .navigationTitle("忘记密码")
+            .scrollDismissesKeyboard(.interactively)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(submitted ? "完成" : "取消") { dismiss() }

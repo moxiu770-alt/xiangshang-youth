@@ -85,6 +85,18 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertNil(state.selectedRole)
     }
 
+    func testWechatAuthorizationIdentifierIsNeverExposedAsProfilePhone() async {
+        let suite = "xiangshang.youth.wechat-login-tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let state = AppState(featureStore: LocalFeatureStore(defaults: defaults))
+
+        await state.login(phone: "wechat_authorization")
+
+        XCTAssertEqual(state.profile?.phone, "13800138000")
+        XCTAssertNotEqual(state.localFeatures.sessionProfile?.phone, "wechat_authorization")
+    }
+
     func testFeatureStorePersistsCommercialWorkflowRecords() {
         let suite = "xiangshang.youth.tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!

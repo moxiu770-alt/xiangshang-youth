@@ -101,7 +101,7 @@ import com.xiangshang.youth.core.model.*
 @Composable fun GradeClassSelector(grades: List<String> = listOf("三年级"), classes: List<String> = listOf("三年级2班"), selectedGrade: String = grades.firstOrNull().orEmpty(), selectedClass: String = classes.firstOrNull().orEmpty(), onGradeSelected: (String) -> Unit = {}, onClassSelected: (String) -> Unit = {}) {
     Row(Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(10.dp)).padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
         DropdownSelector(selectedGrade, grades, onGradeSelected, "选择年级")
-        Divider(Modifier.height(22.dp).padding(horizontal = 4.dp))
+        HorizontalDivider(Modifier.height(22.dp).padding(horizontal = 4.dp))
         DropdownSelector(selectedClass, classes, onClassSelected, "选择班级")
     }
 }

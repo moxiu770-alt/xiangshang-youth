@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -55,7 +56,7 @@ fun ReportDetailScreen(report: DiagnosisReport, isRefreshing: Boolean, onRefresh
         ReportSection("风险提示", Icons.Filled.WarningAmber) {
             report.riskAlerts.forEach { alert -> Row(Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "查看风险提示：$alert" }.clickable { selectedDetail = "风险提示\n$alert" }, verticalAlignment = Alignment.Top) { Icon(Icons.Filled.Circle, null, tint = if (alert == "暂无高风险提示") Green else Color.Red, modifier = Modifier.size(8.dp).padding(top = 4.dp)); Spacer(Modifier.width(7.dp)); Text(alert, color = if (alert == "暂无高风险提示") Green else Color.Red, fontSize = 12.sp) } }
         }
-        ReportSection("训练建议", Icons.Filled.DirectionsRun) {
+        ReportSection("训练建议", Icons.AutoMirrored.Filled.DirectionsRun) {
             report.trainingAdvice.forEach { advice -> Text("• $advice", color = Navy, fontSize = 12.sp, modifier = Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "查看训练建议：$advice" }.clickable { selectedDetail = "训练建议\n$advice" }.padding(vertical = 3.dp)) }
         }
         ReportSection("课程建议", Icons.Filled.PlayCircleFilled) {

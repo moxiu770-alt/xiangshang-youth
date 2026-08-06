@@ -206,7 +206,14 @@ val LocalDashboardClearError = compositionLocalOf<() -> Unit> { {} }
                         androidx.compose.material3.Button(onClick = { nav.navigate(Destinations.Children) }) { Text("去绑定孩子") }
                     }
                 }
-                else -> ReportDetailScreen(viewModel.report(child), state.loading, viewModel::refreshDashboard, nav)
+                else -> ReportDetailScreen(
+                    report = viewModel.report(child),
+                    isRefreshing = state.reportLoadingStudentId == child.id,
+                    onRefresh = { viewModel.refreshReport(child) },
+                    reportError = state.reportError,
+                    onDismissReportError = viewModel::clearReportError,
+                    nav = nav
+                )
             }
         }
         composable(Destinations.Teacher) { TeacherHomeScreen(state, nav, viewModel::refreshDashboard) }

@@ -2,6 +2,7 @@ package com.xiangshang.youth.core.repository
 import com.xiangshang.youth.core.mock.MockRepository
 import com.xiangshang.youth.core.model.*
 import com.xiangshang.youth.core.service.ApiClient
+import com.xiangshang.youth.core.service.ReportApi
 import com.xiangshang.youth.core.service.StatsApi
 
 /**
@@ -11,8 +12,10 @@ import com.xiangshang.youth.core.service.StatsApi
  */
 class RemoteRepository(
     private val statsApi: StatsApi = ApiClient.retrofit.create(StatsApi::class.java),
+    private val reportApi: ReportApi = ApiClient.retrofit.create(ReportApi::class.java),
     private val reportFallback: YouthRepository = MockRepository()
 ) : YouthRepository {
     override suspend fun dashboard(): DashboardData = statsApi.dashboard("school-1")
     override fun report(student: Student): DiagnosisReport = reportFallback.report(student)
+    override suspend fun loadReport(student: Student): DiagnosisReport = reportApi.report(student.id)
 }

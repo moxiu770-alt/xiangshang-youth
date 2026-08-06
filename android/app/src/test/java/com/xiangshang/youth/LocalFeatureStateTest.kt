@@ -125,6 +125,14 @@ class LocalFeatureStateTest {
     }
 
     @Test
+    fun asyncReportSeamKeepsMockReportRenderable() = runBlocking {
+        val student = MockRepository().dashboard().students.first()
+        val report = MockRepository().loadReport(student)
+        assertEquals(student.id, report.student.id)
+        assertEquals(7, report.scores.size)
+    }
+
+    @Test
     fun messageReadStateClearsTheSharedTeacherAndParentBadge() = runBlocking {
         val data = MockRepository().dashboard()
         val initial = AppUiState(data = data)

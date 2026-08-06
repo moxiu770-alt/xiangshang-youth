@@ -47,6 +47,14 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertEqual(report.totalScore, 28.5, accuracy: 0.001)
     }
 
+    func testAsyncReportSeamKeepsMockReportRenderable() async throws {
+        let dashboard = try await MockRepository.shared.loadDashboard()
+        let student = try XCTUnwrap(dashboard.students.first)
+        let report = try await MockRepository.shared.loadReport(for: student)
+        XCTAssertEqual(report.student.id, student.id)
+        XCTAssertEqual(report.scores.count, 7)
+    }
+
     func testLoginRoleSwitchAndTaskStatusAreKeptInAppState() async {
         let suite = "xiangshang.youth.login-tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!

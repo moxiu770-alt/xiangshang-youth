@@ -49,6 +49,7 @@ export ANDROID_HOME="/Users/luyanpeng/Library/Android/sdk"
 - Token 使用 iOS Keychain / Android Keystore；本地草稿、绑定关系和测评交互状态默认使用 iOS Keychain / Android Keystore 加密保存。Android Keystore 暂时不可用时会降级，不阻塞 Mock 启动。
 - 本地草稿、绑定关系、测评状态、班级动态和课程进度会保存，测评步骤/答案支持配置变更后的恢复；登录失败、恢复失败、空数据和重试状态均由页面处理；本地提交使用独立的 `pendingSync` 状态，兼容旧版本 `submitted` 数据，避免把 Mock 写入误当成学校服务已确认；双端根工作台支持主动刷新，Android 提供刷新按钮与全局错误重试，iOS 支持系统下拉刷新；登录页可打开协议/隐私说明。双端会监听网络状态，在断网时显示“离线模式”提示，明确当前内容可能是本地 Mock/缓存数据。
 - 深链格式：`xiangshang-youth://open?target=report&studentId=s01`，支持报告、复核、任务和风险入口。
+- 报告详情页保留本地可读报告，进入页面或点击“同步报告”会走独立的异步报告数据源；请求期间只锁定报告同步按钮，失败显示页内重试/关闭，不覆盖其他工作台的刷新状态；切换账号或退出登录时会丢弃未完成请求的旧会话响应。
 - Android 页面和关键卡片已补充 TalkBack 语义；iOS 使用 VoiceOver accessibility label。
 - 启动海报已统一为清理系统状态栏和底部 Home 指示条后的清晰视觉资源：iOS 1x/2x/3x 与 Android `drawable-nodpi` 使用同一画面比例；iOS 包含 `PrivacyInfo.xcprivacy`，Android 禁止明文流量和自动备份。
 

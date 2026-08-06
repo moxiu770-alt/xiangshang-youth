@@ -26,6 +26,8 @@ import Network
     @Published var data: DashboardData?
     @Published var selectedChild: Student?
     @Published var loading = false
+    @Published private(set) var reportLoading = false
+    @Published private(set) var reportError: String?
     @Published private(set) var isOffline = false
     /// Session restoration happens behind the launch artwork. Keeping this separate
     /// from `loading` prevents the retry overlay from flashing before login/role
@@ -130,8 +132,26 @@ import Network
     }
     func selectRole(_ role: UserRole) { selectedRole = role; if var profile { profile = UserProfile(id: profile.id, name: role == .teacher ? "李老师" : role == .principal ? "周校长" : "王女士", phone: profile.phone, role: role, schoolName: profile.schoolName, avatarInitials: role == .teacher ? "李" : role == .principal ? "周" : "王"); self.profile = profile; persistSession() } }
     func chooseAnotherRole() { selectedRole = nil }
-    func switchAccount() { ApiClient.shared.token = nil; featureStore.reset(); localFeatures = featureStore.state; profile = nil; selectedRole = nil; selectedChild = nil; data = nil; error = nil }
-    func report(for student: Student) -> DiagnosisReport { repository.report(for: student) }
+    func switchAccount() { ApiClient.shared.token = nil; featureStore.reset(); localFeatures = featureStore.state; profile = nil; selectedRole = nil; selectedChild = nil; data = nil; error = nil; reportLoading = false; reportError = nil; refreshedReports.removeAll() }
+    private var refreshedReports: [String: DiagnosisReport] = [:]
+    func report(for student: Student) -> DiagnosisReport { refreshedReports[student.id] ?? repository.report(for: student) }
+    func refreshReport(for student: Student) async {
+        guard profile != nil, !reportLoading else { return }
+        reportLoading = true
+        reportError = nil
+        defer { reportLoading = false }
+        do {
+            let loadedReport = try await repository.loadReport(for: student)
+            // A user can switch accounts while the request is in flight. Never
+            // let a previous account's response repopulate the new session.
+            guard profile != nil else { return }
+            refreshedReports[student.id] = loadedReport
+        } catch {
+            if case ApiError.cancelled = error { return }
+            reportError = error.localizedDescription
+        }
+    }
+    func clearReportError() { reportError = nil }
     func selectChild(_ student: Student) { selectedChild = student; persistSelectedChild() }
     var boundChildren: [Student] {
         guard let data else { return [] }

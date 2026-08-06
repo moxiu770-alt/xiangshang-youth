@@ -11,4 +11,6 @@ data class DashboardData(
 interface YouthRepository {
     suspend fun dashboard(): DashboardData
     fun report(student: Student): DiagnosisReport
+    /** Mock falls back synchronously; RemoteRepository replaces this with ReportApi. */
+    suspend fun loadReport(student: Student): DiagnosisReport = report(student)
 }

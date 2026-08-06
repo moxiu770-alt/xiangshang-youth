@@ -28,7 +28,20 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-data class AppUiState(val profile: UserProfile? = null, val role: UserRole? = null, val data: DashboardData? = null, val selectedChild: Student? = null, val loading: Boolean = false, val error: String? = null, val local: LocalFeatureState = LocalFeatureState(), val restoringSession: Boolean = false, val isOffline: Boolean = false) {
+data class AppUiState(
+    val profile: UserProfile? = null,
+    val role: UserRole? = null,
+    val data: DashboardData? = null,
+    val selectedChild: Student? = null,
+    val loading: Boolean = false,
+    val error: String? = null,
+    val local: LocalFeatureState = LocalFeatureState(),
+    val restoringSession: Boolean = false,
+    val isOffline: Boolean = false,
+    val reportOverrides: Map<String, DiagnosisReport> = emptyMap(),
+    val reportLoadingStudentId: String? = null,
+    val reportError: String? = null
+) {
     val unreadMessageCount: Int get() = if (!local.settings.notificationsEnabled) 0 else data?.messages?.count { !it.isRead && it.id !in local.readMessageIds } ?: 0
     /** Local writes waiting for the future remote sync worker. */
     val pendingSyncCount: Int get() = local.activityRegistrations.count { it.status == LocalSubmissionStatus.PendingSync } + local.expertAppointments.count { it.status == LocalSubmissionStatus.PendingSync } + local.courseUploads.count { it.status == LocalSubmissionStatus.PendingSync }
@@ -97,7 +110,25 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         return true
     }
     fun logout() { ApiClient.clearToken(); featureStore.clear(); _state.value = AppUiState() }
-    fun report(student: Student) = repository.report(student)
+    fun report(student: Student): DiagnosisReport = _state.value.reportOverrides[student.id] ?: repository.report(student)
+    fun refreshReport(student: Student) = viewModelScope.launch {
+        if (_state.value.profile == null || _state.value.reportLoadingStudentId != null) return@launch
+        _state.value = _state.value.copy(reportLoadingStudentId = student.id, reportError = null)
+        try {
+            val report = repository.loadReport(student)
+            // Logout/account switching can happen while a request is in flight;
+            // do not leak the previous account's response into the new session.
+            if (_state.value.profile == null) return@launch
+            val reports = _state.value.reportOverrides + (student.id to report)
+            _state.value = _state.value.copy(reportOverrides = reports, reportLoadingStudentId = null)
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            _state.value = _state.value.copy(reportLoadingStudentId = null)
+            throw error
+        } catch (error: Throwable) {
+            _state.value = _state.value.copy(reportLoadingStudentId = null, reportError = error.message ?: "报告刷新失败")
+        }
+    }
+    fun clearReportError() { _state.value = _state.value.copy(reportError = null) }
     fun registerActivity(contactName: String, phone: String) {
         if (contactName.isBlank() || phone.filter(Char::isDigit).length != 11) return
         mutate { local ->

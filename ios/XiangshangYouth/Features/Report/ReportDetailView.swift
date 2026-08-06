@@ -19,19 +19,24 @@ struct ReportDetailView: View {
                         VStack(alignment: .trailing, spacing: 4) {
                             Text("\(report.totalScore, specifier: "%.1f") / 35").font(.title2.bold()).foregroundStyle(.white)
                             Button {
-                                Task { await state.refreshDashboard() }
+                                Task { await state.refreshReport(for: currentStudent) }
                             } label: {
-                                Label(state.loading ? "同步中" : "同步报告", systemImage: "arrow.clockwise")
+                                Label(state.reportLoading ? "同步中" : "同步报告", systemImage: "arrow.clockwise")
                                     .font(.caption2.weight(.semibold))
                             }
                             .buttonStyle(.bordered)
                             .tint(.white)
-                            .disabled(state.loading)
-                            .accessibilityLabel(state.loading ? "正在同步报告" : "同步最新体测报告")
+                            .disabled(state.reportLoading)
+                            .accessibilityLabel(state.reportLoading ? "正在同步报告" : "同步最新体测报告")
                         }
                     }
                     Divider().overlay(.white.opacity(0.25)); Label(report.student.region, systemImage: "mappin.and.ellipse").font(.caption).foregroundStyle(.white.opacity(0.9)); if report.student.isPovertyArea { Label("贫困地区专项帮扶标签", systemImage: "heart.text.square").font(.caption.weight(.semibold)).foregroundStyle(.white) }; Text("测评日期：\(report.assessmentDate) · 规则：\(report.ruleVersion)").font(.caption2).foregroundStyle(.white.opacity(0.8))
                 }.padding(18).background(LinearGradient(colors: [AppTheme.primary, AppTheme.teal], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 20))
+                if let reportError = state.reportError {
+                    ErrorStateView(message: reportError, retry: { Task { await state.refreshReport(for: currentStudent) } }, dismiss: state.clearReportError)
+                        .frame(minHeight: 150)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 16))
+                }
                 Text("7项能力得分").font(.headline).frame(maxWidth: .infinity, alignment: .leading)
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                     ForEach(report.scores) { score in
@@ -46,6 +51,7 @@ struct ReportDetailView: View {
                 section("课程建议", icon: "play.rectangle.fill") { VStack(spacing: 10) { ForEach(report.courseSuggestions) { course in Button { selectedDetail = "课程建议\n\(course.title)\n\(course.focus) · \(course.duration)\n\(course.isPublicBenefit ? "公益课程" : "推荐课程")" } label: { HStack { Image(systemName: "play.circle.fill").font(.title2).foregroundStyle(AppTheme.teal); VStack(alignment: .leading) { Text(course.title).font(.subheadline.weight(.semibold)); Text("\(course.focus) · \(course.duration)").font(.caption).foregroundStyle(AppTheme.muted) }; Spacer(); Text(course.isPublicBenefit ? "公益" : "推荐").font(.caption2.weight(.semibold)).foregroundStyle(AppTheme.primary) }.padding(10).background(AppTheme.surface, in: RoundedRectangle(cornerRadius: 10)).accessibilityElement(children: .combine).accessibilityLabel("课程建议：\(course.title)，\(course.focus)，\(course.duration)") }.buttonStyle(.plain) } } }
             }
         }
+        .task(id: currentStudent.id) { await state.refreshReport(for: currentStudent) }
         .alert("报告详情", isPresented: Binding(get: { selectedDetail != nil }, set: { if !$0 { selectedDetail = nil } })) {
             Button("知道了") { selectedDetail = nil }
         } message: {

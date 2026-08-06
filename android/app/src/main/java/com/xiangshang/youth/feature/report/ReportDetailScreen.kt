@@ -29,18 +29,33 @@ import com.xiangshang.youth.core.model.CourseSuggestion
 import com.xiangshang.youth.core.model.DiagnosisReport
 import com.xiangshang.youth.core.model.ScoreResult
 import com.xiangshang.youth.shared.component.AppScaffold
+import com.xiangshang.youth.shared.component.ErrorState
 import androidx.navigation.NavHostController
 import java.util.Locale
 
 /** Full report parity with iOS: student context, seven metrics and actionable advice. */
 @Composable
-fun ReportDetailScreen(report: DiagnosisReport, isRefreshing: Boolean, onRefresh: () -> Unit, nav: NavHostController? = null) = AppScaffold("体测报告", onBack = nav?.let { { it.popBackStack() } }) {
+fun ReportDetailScreen(
+    report: DiagnosisReport,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
+    reportError: String? = null,
+    onDismissReportError: (() -> Unit)? = null,
+    nav: NavHostController? = null
+) = AppScaffold("体测报告", onBack = nav?.let { { it.popBackStack() } }) {
     var selectedDetail by remember { mutableStateOf<String?>(null) }
     Column(
         Modifier.fillMaxSize().padding(vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(11.dp)
     ) {
         ReportHero(report, isRefreshing, onRefresh)
+        reportError?.let { message ->
+            ErrorState(
+                text = message,
+                retry = onRefresh,
+                dismiss = onDismissReportError
+            )
+        }
         Text("7项能力得分", color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp)
         report.scores.chunked(2).forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {

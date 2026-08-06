@@ -78,7 +78,11 @@ struct PrincipalDashboard: View {
 
     var body: some View {
         Group {
-            if state.loading || state.data == nil {
+            if let error = state.error, state.data == nil {
+                ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(ReferenceColor.canvas)
+            } else if state.loading || state.data == nil {
                 LoadingStateView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(ReferenceColor.canvas)

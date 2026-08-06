@@ -318,9 +318,10 @@ struct HealthProfileView: View { var body: some View { HealthDashboard() } }
 struct HealthDashboard: View {
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var router: AppRouter
+    @State private var checkInDetailShown = false
     private var report: DiagnosisReport? { state.selectedChild.map { state.report(for: $0) } }
     var body: some View { ScrollView { VStack(spacing: 10) { ParentPageNavigation(title: "健康档案", showsBack: true); ReferenceHeader(name: state.selectedChild?.name ?? "王小明", school: state.selectedChild?.className ?? "三年级2班", initial: String((state.selectedChild?.name ?? "王").prefix(1)), avatarAsset: "ChildAvatar"); ReferenceSectionTitle(title: "健康报告", trailing: "查看全部报告", action: { if let child = state.selectedChild { router.push(.report(child)) } }).padding(.horizontal, 12); HStack(spacing: 7) { healthMetric("figure.run", "体质", reportSummary, ReferenceColor.blue); healthMetric("eye.fill", "视力", reportSummary, ReferenceColor.green); healthMetric("mouth.fill", "口腔", reportSummary, ReferenceColor.purple); healthMetric("brain.head.profile", "心理", reportSummary, ReferenceColor.pink) }.padding(.horizontal, 12)
-        ReferenceCard { VStack(alignment: .leading, spacing: 8) { ReferenceSectionTitle(title: "本月打卡", trailing: "打卡记录"); let days = ["日", "一", "二", "三", "四", "五", "六"]; HStack { ForEach(days, id: \.self) { Text($0).font(.system(size: 9)).frame(maxWidth: .infinity).foregroundStyle(.secondary) } }; LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 8) { ForEach(1...28, id: \.self) { day in Text("\(day)").font(.system(size: 9, weight: day % 3 == 0 ? .bold : .regular)).foregroundStyle(day % 3 == 0 ? ReferenceColor.green : ReferenceColor.navy).frame(width: 17, height: 17).background(day % 3 == 0 ? ReferenceColor.green.opacity(0.12) : .clear, in: Circle()) } } } }.padding(.horizontal, 12)
+        ReferenceCard { VStack(alignment: .leading, spacing: 8) { ReferenceSectionTitle(title: "本月打卡", trailing: "查看记录", action: { checkInDetailShown = true }); let days = ["日", "一", "二", "三", "四", "五", "六"]; HStack { ForEach(days, id: \.self) { Text($0).font(.system(size: 9)).frame(maxWidth: .infinity).foregroundStyle(.secondary) } }; LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 8) { ForEach(1...28, id: \.self) { day in Text("\(day)").font(.system(size: 9, weight: day % 3 == 0 ? .bold : .regular)).foregroundStyle(day % 3 == 0 ? ReferenceColor.green : ReferenceColor.navy).frame(width: 17, height: 17).background(day % 3 == 0 ? ReferenceColor.green.opacity(0.12) : .clear, in: Circle()) } } } }.padding(.horizontal, 12)
         RecentFamilyActivities().padding(.horizontal, 12)
         CourseSuggestionBanner().padding(.horizontal, 12)
         UpcomingTrainingCard().padding(.horizontal, 12)
@@ -335,7 +336,21 @@ struct HealthDashboard: View {
                 } else if state.selectedChild == nil {
                     ParentBindingPrompt()
                 }
-            } }
+            }
+        .sheet(isPresented: $checkInDetailShown) {
+            NavigationStack {
+                VStack(spacing: 12) {
+                    Image(systemName: "checkmark.seal.fill").font(.system(size: 44)).foregroundStyle(ReferenceColor.green)
+                    Text("本月已保存 \(state.localFeatures.checkInDates.count) 次运动打卡").font(.headline)
+                    Text("打卡记录会先保存在本机，后端联调后同步到成长档案。")
+                        .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    Spacer()
+                }.padding(24)
+                .navigationTitle("本月运动打卡")
+                .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { checkInDetailShown = false } } }
+            }
+        }
+    }
     private var reportSummary: String { "\(report?.assessmentDate ?? "待测评") · \(((report?.student.totalScore ?? 0) >= 25) ? "良好" : "需关注")" }
     private func healthMetric(_ icon: String, _ title: String, _ subtitle: String, _ color: Color) -> some View {
         Button { if let child = state.selectedChild { router.push(.report(child)) } } label: {

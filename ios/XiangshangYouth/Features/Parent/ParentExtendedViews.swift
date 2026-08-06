@@ -342,7 +342,9 @@ struct AccountInfoSheet: View {
     @EnvironmentObject private var state: AppState
     @State private var feedback = ""
     @State private var feedbackSubmitted = false
+    private let feedbackDraftKey = "account-feedback"
     var body: some View {
+        let commandState = state.workflowState(for: "support")
         NavigationStack {
             Form {
                 if title == "个人资料" || title == "个人信息" {
@@ -359,13 +361,16 @@ struct AccountInfoSheet: View {
                         if feedbackSubmitted {
                             Label("反馈已保存到本机，后端联调后发送；客服会在工作时间内回复。", systemImage: "checkmark.circle.fill").foregroundStyle(ReferenceColor.green)
                         } else {
-                            TextEditor(text: $feedback).frame(minHeight: 110)
-                            Button("提交反馈") {
+                            TextEditor(text: $feedback).frame(minHeight: 110).onChange(of: feedback) { _, value in state.saveDraft(value, key: feedbackDraftKey) }
+                            if case let .failed(message) = commandState { Text(message).font(.caption).foregroundStyle(.red) }
+                            Button {
                                 let message = feedback.trimmingCharacters(in: .whitespacesAndNewlines)
                                 guard !message.isEmpty else { return }
-                                state.sendSupportMessage(message)
-                                feedbackSubmitted = true
-                            }.disabled(feedback.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                                Task { if await state.submitSupportCommand(message) { state.clearDraft(feedbackDraftKey); feedbackSubmitted = true } }
+                            } label: {
+                                HStack(spacing: 6) { if commandState.isSubmitting { ProgressView() }; Text(commandState.isSubmitting ? "正在提交…" : "提交反馈") }
+                            }
+                            .disabled(commandState.isSubmitting || feedback.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         }
                     }
                     Section("常见问题") { Text("孩子绑定码由学校或班主任提供。\n测评报告生成后会在消息中心通知。\n如遇数据异常，请联系学校管理员。") .font(.footnote).foregroundStyle(.secondary) }
@@ -375,6 +380,12 @@ struct AccountInfoSheet: View {
             }
             .navigationTitle(title)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
+            .task {
+                if title == "帮助与反馈" {
+                    state.clearWorkflowState("support")
+                    feedback = state.localFeatures.drafts[feedbackDraftKey] ?? ""
+                }
+            }
         }
     }
 
@@ -430,7 +441,10 @@ struct PublishClassPostSheet: View {
             }
             .padding(18)
             .navigationBarTitleDisplayMode(.inline)
-            .task { content = editingPost?.content ?? state.localFeatures.drafts[draftKey] ?? "" }
+            .task {
+                if editingPost == nil { state.clearWorkflowState("post:\(author)") }
+                content = editingPost?.content ?? state.localFeatures.drafts[draftKey] ?? ""
+            }
         }
     }
 }
@@ -535,7 +549,7 @@ struct CourseDetailSheet: View {
         } else {
             Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill").font(.system(size: 48)).foregroundStyle(ReferenceColor.blue); Text(title).font(.title3.bold()); Text("已为您加载课程视频。播放进度会先保存在本机，后端联调后同步到孩子的学习记录。").font(.system(size: 13)).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal, 28); ProgressView(value: progress).tint(ReferenceColor.green).padding(.horizontal, 30); Button { isPlaying.toggle(); if isPlaying { withAnimation(.linear(duration: 2.5)) { progress = 0.8 }; state.updateCourseProgress(title, progress: 0.8) } } label: { Label(isPlaying ? "暂停学习" : "播放课程", systemImage: isPlaying ? "pause.fill" : "play.fill") }.buttonStyle(.borderedProminent)
         }
-    }.frame(maxWidth: .infinity, maxHeight: .infinity).navigationTitle(title).navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }.task { progress = state.localFeatures.courseProgress[title] ?? progress; draft = state.localFeatures.drafts[supportDraftKey] ?? "" } } }
+    }.frame(maxWidth: .infinity, maxHeight: .infinity).navigationTitle(title).navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }.task { if title == "客服咨询" { state.clearWorkflowState("support") }; progress = state.localFeatures.courseProgress[title] ?? progress; draft = state.localFeatures.drafts[supportDraftKey] ?? "" } } }
     private var supportDraftKey: String { "support-\(title)" }
     private func bubble(_ text: String, mine: Bool) -> some View { Text(text).font(.system(size: 12)).foregroundStyle(mine ? .white : ReferenceColor.navy).padding(9).background(mine ? ReferenceColor.blue : ReferenceColor.sky, in: RoundedRectangle(cornerRadius: 10)).frame(maxWidth: .infinity, alignment: mine ? .trailing : .leading) }
 }

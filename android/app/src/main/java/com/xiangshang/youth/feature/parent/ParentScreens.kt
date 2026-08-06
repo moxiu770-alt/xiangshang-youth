@@ -347,8 +347,9 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
 }
 @Composable private fun RowScope.ParentNavItem(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean, onClick: () -> Unit) = NavigationBarItem(selected = selected, onClick = onClick, icon = { Icon(icon, null) }, label = { Text(label, fontSize = 9.sp) }, modifier = Modifier.semantics { contentDescription = "$label${if (selected) "，当前页面" else ""}" })
 
-@Composable fun ParentCoursesScreen(state: AppUiState, nav: NavHostController, updateCourseProgress: (String, Float) -> Unit, sendSupport: (String) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit, openSupport: Boolean = false, submitSupport: (String) -> Unit = sendSupport) {
+@Composable fun ParentCoursesScreen(state: AppUiState, nav: NavHostController, updateCourseProgress: (String, Float) -> Unit, sendSupport: (String) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit, openSupport: Boolean = false, submitSupport: (String) -> Unit = sendSupport, clearWorkflow: (String) -> Unit = {}) {
     var paid by remember { mutableStateOf(false) }; var detail by rememberSaveable(openSupport) { mutableStateOf<String?>(if (openSupport) "客服咨询" else null) }
+    LaunchedEffect(openSupport) { if (openSupport) clearWorkflow("support") }
     ParentTabScaffold(nav, Destinations.Courses) {
         val dashboardError = state.error
         if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current); return@ParentTabScaffold }
@@ -360,12 +361,12 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
         Spacer(Modifier.height(10.dp)); ParentSection(if (paid) "精选学校课程" else "公益课堂", "全部课程") { detail = if (paid) "全部学校课程" else "全部公益课程" }
         val items = listOf("体质成长课" to Icons.AutoMirrored.Filled.DirectionsRun, "视力守护课" to Icons.Filled.RemoveRedEye, "口腔健康课" to Icons.Filled.MedicalServices, "心理舒展课" to Icons.Filled.Favorite)
         items.chunked(2).forEach { row -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { row.forEach { (title, icon) -> Surface(Modifier.weight(1f).height(105.dp).semantics { role = Role.Button; contentDescription = "打开课程：$title" }.clickable { updateCourseProgress(title, .8f); detail = title }, color = Sky, shape = RoundedCornerShape(10.dp)) { Column(Modifier.padding(12.dp)) { Icon(icon, null, tint = Blue); Spacer(Modifier.height(8.dp)); Text(title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text(if ((state.local.courseProgress[title] ?: 0f) > 0f) "学习进度 80%" else if (paid) "校内课程 · 查看课程" else "公益 · 立即学习", color = Green, fontSize = 9.sp) } } }; if (row.size == 1) Spacer(Modifier.weight(1f)) }; Spacer(Modifier.height(8.dp)) }
-        Surface(Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "打开课程咨询" }.clickable { detail = "客服咨询" }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.AutoMirrored.Filled.Message, null, tint = Blue); Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Text("课程咨询", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text("客服老师会在工作时间回复您", color = Color.Gray, fontSize = 9.sp) }; Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray) } }
+        Surface(Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "打开课程咨询" }.clickable { clearWorkflow("support"); detail = "客服咨询" }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.AutoMirrored.Filled.Message, null, tint = Blue); Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Text("课程咨询", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text("客服老师会在工作时间回复您", color = Color.Gray, fontSize = 9.sp) }; Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray) } }
     }
     detail?.let { title -> SimpleDialog(title = title, messages = state.local.supportMessages, drafts = state.local.drafts, send = sendSupport, submit = submitSupport, command = state.workflowStates["support"] ?: WorkflowCommandState(), commandDriven = title == "客服咨询", saveDraft = saveDraft, clearDraft = clearDraft, dismiss = { detail = null }) }
 }
 
-@Composable fun ParentClassCircleScreen(state: AppUiState, nav: NavHostController, publishPost: (String, String) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit, toggleLike: (String) -> Unit, addComment: (String, String) -> Unit, submitPost: (String, String) -> Unit = publishPost) {
+@Composable fun ParentClassCircleScreen(state: AppUiState, nav: NavHostController, publishPost: (String, String) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit, toggleLike: (String) -> Unit, addComment: (String, String) -> Unit, submitPost: (String, String) -> Unit = publishPost, clearWorkflow: (String) -> Unit = {}) {
     var detail by remember { mutableStateOf<String?>(null) }
     var filter by rememberSaveable { mutableIntStateOf(0) }
     var commentPost by remember { mutableStateOf<String?>(null) }
@@ -384,7 +385,7 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
         Text("${selectedChild.name} · ${selectedChild.className} · 42人", color = Color.Gray, fontSize = 10.sp)
         Surface(Modifier.fillMaxWidth().padding(top = 9.dp), color = Sky, shape = RoundedCornerShape(12.dp)) { Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("本班家校圈", color = Navy, fontWeight = FontWeight.Bold, fontSize = 15.sp); Text("分享运动成长，和老师保持联系", color = Color.Gray, fontSize = 9.sp) }; Column(horizontalAlignment = Alignment.End) { Text("42", color = Blue, fontWeight = FontWeight.Bold, fontSize = 20.sp); Text("班级成员", color = Color.Gray, fontSize = 8.sp) } } }
         Row(Modifier.fillMaxWidth().padding(top = 9.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) { listOf("全部", "老师动态", "家长分享").forEachIndexed { index, title -> FilterChip(selected = filter == index, onClick = { filter = index }, label = { Text(title, fontSize = 10.sp) }) } }
-        Button(onClick = { detail = "发布班级动态" }, modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) { Icon(Icons.Filled.Edit, null); Spacer(Modifier.width(7.dp)); Text("发布班级动态") }
+        Button(onClick = { clearWorkflow("post:王女士"); detail = "发布班级动态" }, modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) { Icon(Icons.Filled.Edit, null); Spacer(Modifier.width(7.dp)); Text("发布班级动态") }
         val posts = state.local.classPosts.filter { filter == 0 || (filter == 1 && it.author.contains("老师")) || (filter == 2 && !it.author.contains("老师")) }
         if (posts.isEmpty()) {
             Surface(Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(10.dp)) { Column(Modifier.padding(12.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.School, null, tint = Blue); Spacer(Modifier.width(8.dp)); Column { Text("李老师", color = Blue, fontWeight = FontWeight.Bold, fontSize = 11.sp); Text("今天 08:30 · 置顶通知", color = Color.Gray, fontSize = 8.sp) } }; Text("本周运动打卡已开启，欢迎家长分享孩子的练习瞬间。", color = Navy, fontSize = 11.sp, modifier = Modifier.padding(top = 7.dp)); Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) { Text(if (mockPostLiked) "已赞 13" else "♡ 12", color = if (mockPostLiked) Blue else Color.Gray, fontSize = 9.sp, modifier = Modifier.semantics { role = Role.Button; contentDescription = if (mockPostLiked) "取消点赞" else "点赞" }.clickable { mockPostLiked = !mockPostLiked }); Text("评论 3", color = Color.Gray, fontSize = 9.sp, modifier = Modifier.semantics { role = Role.Button; contentDescription = "评论置顶通知" }.clickable { mockCommentOpen = true }); Spacer(Modifier.weight(1f)); Text("班级通知", color = Blue, fontSize = 9.sp) } } }
@@ -406,7 +407,7 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
     if (mockCommentOpen) AlertDialog(onDismissRequest = { mockCommentOpen = false }, title = { Text("班级通知评论") }, text = { Text("这条置顶通知暂不开放评论。你可以发布班级动态，与老师和家长交流。", color = Color.Gray, fontSize = 11.sp) }, confirmButton = { TextButton(onClick = { mockCommentOpen = false }) { Text("知道了") } })
 }
 
-@Composable fun AccountScreen(state: AppUiState, nav: NavHostController, chooseRole: (UserRole) -> Unit, logout: () -> Unit, updateSettings: (Boolean?, Boolean?) -> Unit, sendSupport: (String) -> Unit) {
+@Composable fun AccountScreen(state: AppUiState, nav: NavHostController, chooseRole: (UserRole) -> Unit, logout: () -> Unit, updateSettings: (Boolean?, Boolean?) -> Unit, sendSupport: (String) -> Unit, onRoleSelected: (UserRole) -> Unit = chooseRole, submitSupport: (String) -> Unit = sendSupport, clearWorkflow: (String) -> Unit = {}) {
     var settingsOpen by remember { mutableStateOf(false) }
     var accountInfo by remember { mutableStateOf<String?>(null) }
     ParentTabScaffold(nav, Destinations.Account) {
@@ -423,12 +424,12 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
                 "设置" -> settingsOpen = true
             }
         } }
-        Text("服务与安全", color = Navy, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)); AccountRow("帮助与反馈", Icons.AutoMirrored.Filled.HelpOutline, Blue) { accountInfo = "帮助与反馈" }; AccountRow("用户协议与隐私政策", Icons.Filled.Description, Color.Gray) { accountInfo = "用户协议与隐私政策" }
-        Spacer(Modifier.height(8.dp)); Text("切换使用角色", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) { listOf(UserRole.Parent, UserRole.Teacher, UserRole.Principal).forEach { role -> OutlinedButton(onClick = { chooseRole(role); val destination = if (role == UserRole.Parent) Destinations.Parent else if (role == UserRole.Teacher) Destinations.Teacher else Destinations.Principal; nav.navigate(destination) { popUpTo(Destinations.Account) { inclusive = true }; launchSingleTop = true } }, modifier = Modifier.weight(1f)) { Text(role.label, fontSize = 9.sp) } } }
+        Text("服务与安全", color = Navy, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)); AccountRow("帮助与反馈", Icons.AutoMirrored.Filled.HelpOutline, Blue) { clearWorkflow("support"); accountInfo = "帮助与反馈" }; AccountRow("用户协议与隐私政策", Icons.Filled.Description, Color.Gray) { accountInfo = "用户协议与隐私政策" }
+        Spacer(Modifier.height(8.dp)); Text("切换使用角色", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) { listOf(UserRole.Parent, UserRole.Teacher, UserRole.Principal).forEach { role -> OutlinedButton(onClick = { onRoleSelected(role) }, modifier = Modifier.weight(1f)) { Text(role.label, fontSize = 9.sp) } } }
         OutlinedButton(onClick = { logout(); nav.navigate(Destinations.Login) { popUpTo(nav.graph.id) { inclusive = true } } }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red)) { Text("切换账号") }
     }
     if (settingsOpen) SettingsDialog(state.local.settings.notificationsEnabled, state.local.settings.reduceMotion, state.pendingSyncCount, updateSettings, clearLocalData = { logout(); nav.navigate(Destinations.Login) { popUpTo(nav.graph.id) { inclusive = true } } }) { settingsOpen = false }
-    accountInfo?.let { title -> AccountInfoDialog(title, state, sendSupport) { accountInfo = null } }
+    accountInfo?.let { title -> AccountInfoDialog(title, state, submitSupport) { accountInfo = null } }
 }
 
 @Composable fun SettingsDialog(notifications: Boolean, reduceMotion: Boolean, pendingSyncCount: Int, update: (Boolean?, Boolean?) -> Unit, clearLocalData: () -> Unit = {}, dismiss: () -> Unit) {
@@ -474,9 +475,11 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
 }
 
 @Composable
-private fun AccountInfoDialog(title: String, state: AppUiState, sendSupport: (String) -> Unit, dismiss: () -> Unit) {
+private fun AccountInfoDialog(title: String, state: AppUiState, submitSupport: (String) -> Unit, dismiss: () -> Unit) {
     var feedback by rememberSaveable(title) { mutableStateOf("") }
     var submitted by rememberSaveable(title) { mutableStateOf(false) }
+    val command = if (title == "帮助与反馈") state.workflowStates["support"] ?: WorkflowCommandState() else WorkflowCommandState()
+    LaunchedEffect(command.status) { if (command.status == WorkflowCommandStatus.Succeeded) submitted = true }
     AlertDialog(
         onDismissRequest = dismiss,
         title = { Text(title) },
@@ -485,6 +488,8 @@ private fun AccountInfoDialog(title: String, state: AppUiState, sendSupport: (St
                 if (submitted) Text("反馈已保存到本机，后端联调后发送；客服会在工作时间内回复。", color = Green)
                 else Column {
                     OutlinedTextField(value = feedback, onValueChange = { feedback = it }, label = { Text("问题描述") }, minLines = 3)
+                    if (command.status == WorkflowCommandStatus.Failed) Text(command.message ?: "提交失败，请重试。", color = Color.Red, fontSize = 10.sp, modifier = Modifier.padding(top = 6.dp))
+                    if (command.isSubmitting) Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) { CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp); Spacer(Modifier.width(7.dp)); Text("正在提交反馈…", color = Blue, fontSize = 10.sp) }
                     Text("绑定码由学校或班主任提供；报告生成后会在消息中心通知。", color = Color.Gray, fontSize = 10.sp, modifier = Modifier.padding(top = 7.dp))
                 }
             } else if (title == "个人资料") {
@@ -500,9 +505,9 @@ private fun AccountInfoDialog(title: String, state: AppUiState, sendSupport: (St
             }
         },
         confirmButton = {
-            TextButton(enabled = title != "帮助与反馈" || submitted || feedback.trim().isNotEmpty(), onClick = {
-                if (title == "帮助与反馈" && !submitted) { sendSupport(feedback.trim()); submitted = true } else dismiss()
-            }) { Text(if (title == "帮助与反馈" && !submitted) "提交反馈" else "完成") }
+            TextButton(enabled = !command.isSubmitting && (title != "帮助与反馈" || submitted || feedback.trim().isNotEmpty()), onClick = {
+                if (title == "帮助与反馈" && !submitted) submitSupport(feedback.trim()) else dismiss()
+            }) { Text(if (title == "帮助与反馈" && !submitted) if (command.status == WorkflowCommandStatus.Failed) "重新提交" else "提交反馈" else "完成") }
         },
         dismissButton = if (submitted || title != "帮助与反馈") null else ({ TextButton(onClick = dismiss) { Text("取消") } })
     )

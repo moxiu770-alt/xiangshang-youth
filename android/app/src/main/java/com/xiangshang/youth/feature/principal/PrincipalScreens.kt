@@ -25,7 +25,7 @@ import com.xiangshang.youth.app.*
 import com.xiangshang.youth.shared.component.*
 import java.util.Locale
 
-@Composable fun PrincipalHomeScreen(state: AppUiState, nav: NavHostController, switchRole: () -> Unit, refreshDashboard: () -> Unit = {}) = AppScaffold("学校运动健康总览", onNotifications = { nav.navigateSingleTop(Destinations.Notifications) }, notificationCount = state.unreadMessageCount, onRefresh = refreshDashboard, isRefreshing = state.loading, onSwitchRole = { switchRole(); nav.navigate(Destinations.Role) { popUpTo(Destinations.Principal) { inclusive = true } } }, bottomBar = { PrincipalBottomBar(nav) }) {
+@Composable fun PrincipalHomeScreen(state: AppUiState, nav: NavHostController, onChooseAnotherRole: () -> Unit, refreshDashboard: () -> Unit = {}) = AppScaffold("学校运动健康总览", onNotifications = { nav.navigateSingleTop(Destinations.Notifications) }, notificationCount = state.unreadMessageCount, onRefresh = refreshDashboard, isRefreshing = state.loading, onSwitchRole = onChooseAnotherRole, bottomBar = { PrincipalBottomBar(nav) }) {
     val dashboardError = state.error
     if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = { refreshDashboard() }, dismiss = LocalDashboardClearError.current); return@AppScaffold }
     if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }
@@ -41,10 +41,7 @@ import java.util.Locale
                 Text("向上实验小学 · 南湖校区", color = Color.Gray, fontSize = 10.sp)
             }
             TextButton(
-                onClick = {
-                    switchRole()
-                    nav.navigate(Destinations.Role) { popUpTo(Destinations.Principal) { inclusive = true }; launchSingleTop = true }
-                },
+                onClick = onChooseAnotherRole,
                 contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                 modifier = Modifier.semantics { contentDescription = "退出校长端" }
             ) { Text("退出校长端", color = Blue, fontSize = 10.sp) }

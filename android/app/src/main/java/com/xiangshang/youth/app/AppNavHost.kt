@@ -43,6 +43,24 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
  * the same callbacks through every feature screen. */
 val LocalDashboardRetry = compositionLocalOf<() -> Unit> { {} }
 val LocalDashboardClearError = compositionLocalOf<() -> Unit> { {} }
+
+/**
+ * Role workbenches are true application roots. Replacing the root instead of
+ * popping just the current page prevents Android's system back button from
+ * revealing a previous role (for example principal → teacher) after an
+ * account switch, exit action, or cold deep link.
+ */
+private fun NavHostController.replaceRoot(destination: String) {
+    navigate(destination) {
+        // The splash destination is intentionally removed after launch, so it
+        // cannot be used as a reliable pop target. The root graph remains in
+        // every back stack and clearing it removes every prior workbench.
+        popUpTo(graph.id) { inclusive = true }
+        launchSingleTop = true
+        restoreState = false
+    }
+}
+
 @Composable fun AppNavHost(viewModel: AppViewModel, incomingDeepLink: Uri? = null, nav: NavHostController = rememberNavController()) {
     val state by viewModel.state.collectAsState()
     val view = LocalView.current
@@ -91,10 +109,8 @@ val LocalDashboardClearError = compositionLocalOf<() -> Unit> { {} }
             // visible. Establish the role workbench first so the destination
             // always has a valid back stack. Warm links keep the current stack
             // and switch roots only when needed.
-            if (nav.currentDestination?.route == Destinations.Splash) {
-                nav.navigate(root) { popUpTo(Destinations.Splash) { inclusive = true }; launchSingleTop = true }
-            } else if (nav.currentDestination?.route != root) {
-                nav.navigate(root) { launchSingleTop = true }
+            if (nav.currentDestination?.route != root) {
+                nav.replaceRoot(root)
             }
             return root
         }
@@ -142,7 +158,7 @@ val LocalDashboardClearError = compositionLocalOf<() -> Unit> { {} }
                     state.role == UserRole.Teacher -> Destinations.Teacher
                     else -> Destinations.Principal
                 }
-                nav.navigate(destination) { popUpTo(Destinations.Splash) { inclusive = true } }
+                nav.replaceRoot(destination)
                 },
                 canFinish = { !state.restoringSession }
             )
@@ -152,7 +168,7 @@ val LocalDashboardClearError = compositionLocalOf<() -> Unit> { {} }
                 loading = state.loading,
                 serverError = state.error,
                 onClearError = viewModel::clearError,
-                onLogin = { identifier -> viewModel.login(identifier) { nav.navigate(Destinations.Role) { popUpTo(Destinations.Login) { inclusive = true }; launchSingleTop = true } } },
+                onLogin = { identifier -> viewModel.login(identifier) { nav.replaceRoot(Destinations.Role) } },
                 onRegister = { nav.navigate(Destinations.Register) },
                 onForgotPassword = { nav.navigate(Destinations.PasswordReset) }
             )
@@ -160,7 +176,7 @@ val LocalDashboardClearError = compositionLocalOf<() -> Unit> { {} }
         composable(Destinations.Register) {
             RegisterScreen(
                 onBack = { nav.popBackStack() },
-                onRegistered = { phone -> viewModel.login(phone) { nav.navigate(Destinations.Role) { popUpTo(Destinations.Register) { inclusive = true }; launchSingleTop = true } } },
+                onRegistered = { phone -> viewModel.login(phone) { nav.replaceRoot(Destinations.Role) } },
                 loading = state.loading,
                 serverError = state.error,
                 onClearError = viewModel::clearError
@@ -170,23 +186,42 @@ val LocalDashboardClearError = compositionLocalOf<() -> Unit> { {} }
         composable(Destinations.Role) { RoleSelectScreen(onRole = { role ->
             viewModel.chooseRole(role)
             val destination = if (role.name == "Parent") Destinations.Parent else if (role.name == "Teacher") Destinations.Teacher else Destinations.Principal
-            nav.navigate(destination) { popUpTo(Destinations.Role) { inclusive = true }; launchSingleTop = true }
-        }, onLogout = { viewModel.logout(); nav.navigate(Destinations.Login) { popUpTo(Destinations.Role) { inclusive = true }; launchSingleTop = true } }) }
+            nav.replaceRoot(destination)
+        }, onLogout = { viewModel.logout(); nav.replaceRoot(Destinations.Login) }) }
         composable(Destinations.Parent) { ParentHomeScreen(state, nav, viewModel::registerActivity, viewModel::checkInToday, viewModel::bookExpert, viewModel::saveDraft, viewModel::clearDraft, { viewModel.refreshDashboard() }, { name, phone -> viewModel.submitActivityCommand(name, phone) }, { name, date, note -> viewModel.submitExpertCommand(name, date, note) }) }
         composable(Destinations.Children) { ChildrenScreen(state, nav, viewModel::bindChild, choose = { viewModel.chooseChild(it); nav.popBackStack() }, onBound = { nav.popBackStack() }) }
         composable(Destinations.ParentEvaluations) { ParentEvaluationsScreen(state, nav, state.selectedChild?.let(viewModel::report)) }
         composable("${Destinations.Assessment}/{category}") { entry -> AssessmentFlowScreen(state, nav, entry.arguments?.getString("category") ?: "fitness", viewModel::completeAssessment, viewModel::saveDraft, viewModel::clearDraft) }
-        composable(Destinations.Courses) { ParentCoursesScreen(state, nav, viewModel::updateCourseProgress, viewModel::sendSupport, viewModel::saveDraft, viewModel::clearDraft, submitSupport = viewModel::submitSupportCommand) }
+        composable(Destinations.Courses) { ParentCoursesScreen(state, nav, viewModel::updateCourseProgress, viewModel::sendSupport, viewModel::saveDraft, viewModel::clearDraft, submitSupport = viewModel::submitSupportCommand, clearWorkflow = viewModel::clearWorkflowState) }
         composable(Destinations.CoursesRoute) { entry ->
             ParentCoursesScreen(
                 state, nav, viewModel::updateCourseProgress, viewModel::sendSupport,
                 viewModel::saveDraft, viewModel::clearDraft,
                 openSupport = entry.arguments?.getString("openSupport") == "true",
-                submitSupport = viewModel::submitSupportCommand
+                submitSupport = viewModel::submitSupportCommand,
+                clearWorkflow = viewModel::clearWorkflowState
             )
         }
-        composable(Destinations.Circle) { ParentClassCircleScreen(state, nav, viewModel::publishPost, viewModel::saveDraft, viewModel::clearDraft, viewModel::togglePostLike, viewModel::addPostComment, viewModel::submitClassPostCommand) }
-        composable(Destinations.Account) { if (state.role?.name == "Teacher") TeacherAccountScreen(state, nav, viewModel::logout, viewModel::updateSettings) else AccountScreen(state, nav, viewModel::chooseRole, viewModel::logout, viewModel::updateSettings, viewModel::sendSupport) }
+        composable(Destinations.Circle) { ParentClassCircleScreen(state, nav, viewModel::publishPost, viewModel::saveDraft, viewModel::clearDraft, viewModel::togglePostLike, viewModel::addPostComment, viewModel::submitClassPostCommand, viewModel::clearWorkflowState) }
+        composable(Destinations.Account) {
+            if (state.role?.name == "Teacher") {
+                TeacherAccountScreen(state, nav, viewModel::logout, viewModel::updateSettings) {
+                    viewModel.clearRoleSelection()
+                    nav.replaceRoot(Destinations.Role)
+                }
+            } else {
+                AccountScreen(
+                    state, nav, viewModel::chooseRole, viewModel::logout, viewModel::updateSettings,
+                    viewModel::sendSupport,
+                    onRoleSelected = { role ->
+                        viewModel.chooseRole(role)
+                        nav.replaceRoot(if (role == UserRole.Parent) Destinations.Parent else if (role == UserRole.Teacher) Destinations.Teacher else Destinations.Principal)
+                    },
+                    submitSupport = viewModel::submitSupportCommand,
+                    clearWorkflow = viewModel::clearWorkflowState
+                )
+            }
+        }
         composable(Destinations.Messages) { ParentMessagesScreen(state, nav, viewModel::markMessageRead) }
         composable(Destinations.Notifications) { NotificationsScreen(state, nav, viewModel::markMessageRead) }
         composable(Destinations.Health) { HealthProfileScreen(state, nav) }
@@ -228,7 +263,9 @@ val LocalDashboardClearError = compositionLocalOf<() -> Unit> { {} }
                 updatePost = viewModel::updatePost,
                 saveDraft = viewModel::saveDraft,
                 clearDraft = viewModel::clearDraft,
-                refreshDashboard = viewModel::refreshDashboard
+                refreshDashboard = viewModel::refreshDashboard,
+                submitPost = viewModel::submitClassPostCommand,
+                clearWorkflow = viewModel::clearWorkflowState
             )
         }
         composable(Destinations.TeacherBoard) { TeacherClassBoardScreen(state, nav) { student -> viewModel.chooseChild(student); nav.navigateSingleTop(Destinations.Report) } }
@@ -237,7 +274,12 @@ val LocalDashboardClearError = compositionLocalOf<() -> Unit> { {} }
         composable(Destinations.Tasks) { TeacherTasksScreen(state, nav, viewModel::saveCourseUpload, { taskId, attendance, notes, attachment -> viewModel.submitCourseUploadCommand(taskId, attendance, notes, attachment) }) }
         composable(Destinations.TaskDetailRoute) { entry -> TeacherTaskDetailScreen(state, nav, viewModel::updateStudentTaskStatus, entry.arguments?.getString("taskId"), viewModel::submitTaskStatusCommand) }
         composable(Destinations.Review) { ReviewListScreen(state, nav, viewModel::submitReviewDecision, viewModel::saveDraft, viewModel::clearDraft, viewModel::submitTaskStatusCommand) }
-        composable(Destinations.Principal) { PrincipalHomeScreen(state, nav, viewModel::clearRoleSelection, viewModel::refreshDashboard) }
+        composable(Destinations.Principal) {
+            PrincipalHomeScreen(state, nav, onChooseAnotherRole = {
+                viewModel.clearRoleSelection()
+                nav.replaceRoot(Destinations.Role)
+            }, refreshDashboard = viewModel::refreshDashboard)
+        }
         composable(Destinations.PrincipalGrades) { GradeStatsScreen(state, nav, rootTab = true) }
         composable(Destinations.PrincipalClassStats) { ClassStatsScreen(state, nav, null, rootTab = true) }
         composable(Destinations.PrincipalRisk) { RiskStudentsScreen(state, nav, null, rootTab = true) { student -> viewModel.chooseChild(student); nav.navigateSingleTop(Destinations.Report) } }

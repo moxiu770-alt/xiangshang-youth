@@ -234,7 +234,9 @@ fun TeacherClassCircleScreen(
     updatePost: (String, String) -> Unit,
     saveDraft: (String, String) -> Unit,
     clearDraft: (String) -> Unit,
-    refreshDashboard: () -> Unit = {}
+    refreshDashboard: () -> Unit = {},
+    submitPost: (String, String) -> Unit = publishPost,
+    clearWorkflow: (String) -> Unit = {}
 ) {
     val dashboardError = state.error
     if (dashboardError != null && state.data == null) {
@@ -253,7 +255,7 @@ fun TeacherClassCircleScreen(
     Scaffold(containerColor = Canvas, bottomBar = { TeacherBottomBar(nav, Destinations.TeacherCircle) }) { padding -> Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
         Row(Modifier.fillMaxWidth().background(Color.White).padding(13.dp), verticalAlignment = Alignment.CenterVertically) { Image(painterResource(R.drawable.teacher_avatar), null, Modifier.size(38.dp).clip(CircleShape), contentScale = ContentScale.Crop); Spacer(Modifier.width(8.dp)); Column(Modifier.weight(1f)) { Text("三年级2班 · 班级圈", color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp); Text("向上实验小学 · ${state.data.students.count { it.className == "三年级2班" }}名学生", color = Color.Gray, fontSize = 9.sp) }; IconButton(onClick = { nav.navigateSingleTop(Destinations.TeacherMessages) }) { Icon(Icons.Filled.Notifications, contentDescription = "消息通知", tint = Blue) } }
         Surface(Modifier.padding(12.dp).fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(12.dp)) { Column(Modifier.padding(12.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.Campaign, null, tint = Blue); Spacer(Modifier.width(7.dp)); Text("班级公告", color = Navy, fontWeight = FontWeight.Bold); Spacer(Modifier.weight(1f)); Text("全部公告 ›", color = Blue, fontSize = 9.sp, modifier = Modifier.semantics { role = Role.Button; contentDescription = "查看全部班级公告" }.clickable { notice = "全部班级公告" }) }; Text("秋季综合测评通知", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp).semantics { role = Role.Button; contentDescription = "查看秋季综合测评通知" }.clickable { notice = "秋季综合测评通知" }); Text("请家长于 9 月 12 日前完成孩子健康信息确认。", color = Color.Gray, fontSize = 9.sp) } }
-        Button(onClick = { composer = true }, modifier = Modifier.padding(horizontal = 12.dp).fillMaxWidth()) { Icon(Icons.Filled.Edit, null); Spacer(Modifier.width(7.dp)); Text("发布动态 / 群发通知") }
+        Button(onClick = { clearWorkflow("post:李老师"); composer = true }, modifier = Modifier.padding(horizontal = 12.dp).fillMaxWidth()) { Icon(Icons.Filled.Edit, null); Spacer(Modifier.width(7.dp)); Text("发布动态 / 群发通知") }
         Text("班级动态", color = Blue, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.padding(12.dp))
         state.local.classPosts.forEach { post -> Surface(Modifier.padding(horizontal = 12.dp, vertical = 4.dp).fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(10.dp)) { Column(Modifier.padding(12.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Text(post.author, color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1f)); if (post.author == "李老师") IconButton(onClick = { editingPost = post }, modifier = Modifier.size(28.dp)) { Icon(Icons.Filled.Edit, contentDescription = "编辑已发布动态", tint = Blue, modifier = Modifier.size(16.dp)) } }; Text(post.content, color = Color.Gray, fontSize = 9.sp, modifier = Modifier.padding(top = 3.dp)); Text("刚刚", color = Green, fontSize = 8.sp, modifier = Modifier.padding(top = 5.dp)) } } }
         listOf("今日体能活动" to "孩子们完成了侧向滑步与障碍跳练习，表现很棒！", "家校共育小贴士" to "建议每天安排 20 分钟亲子运动时间。").forEach { (title, detail) -> Surface(Modifier.padding(horizontal = 12.dp, vertical = 4.dp).fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(10.dp)) { Column(Modifier.padding(12.dp)) { Text(title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text(detail, color = Color.Gray, fontSize = 9.sp, modifier = Modifier.padding(top = 3.dp)); Text("李老师 · 今天", color = Green, fontSize = 8.sp, modifier = Modifier.padding(top = 5.dp)) } } }
@@ -262,7 +264,9 @@ fun TeacherClassCircleScreen(
         title = "发布班级动态",
         initialContent = state.local.drafts[composerDraftKey].orEmpty(),
         confirmLabel = "发布",
-        onConfirm = { content -> publishPost("李老师", content); clearDraft(composerDraftKey); composer = false },
+        command = state.workflowStates["post:李老师"] ?: WorkflowCommandState(),
+        commandDriven = true,
+        onConfirm = { content -> submitPost("李老师", content); clearDraft(composerDraftKey) },
         onDraftChanged = { saveDraft(composerDraftKey, it) },
         onDismiss = { composer = false }
     )
@@ -272,7 +276,7 @@ fun TeacherClassCircleScreen(
             title = "编辑班级动态",
             initialContent = state.local.drafts[draftKey] ?: post.content,
             confirmLabel = "保存修改",
-            onConfirm = { content -> updatePost(post.id, content); clearDraft(draftKey); editingPost = null },
+            onConfirm = { content -> updatePost(post.id, content); clearDraft(draftKey) },
             onDraftChanged = { saveDraft(draftKey, it) },
             onDismiss = { editingPost = null }
         )
@@ -308,6 +312,8 @@ private fun TeacherPostEditorDialog(
     title: String,
     initialContent: String,
     confirmLabel: String,
+    command: WorkflowCommandState = WorkflowCommandState(),
+    commandDriven: Boolean = false,
     onConfirm: (String) -> Unit,
     onDraftChanged: (String) -> Unit,
     onDismiss: () -> Unit
@@ -315,6 +321,7 @@ private fun TeacherPostEditorDialog(
     var content by rememberSaveable(initialContent) { mutableStateOf(initialContent) }
     var error by remember { mutableStateOf<String?>(null) }
     var success by remember { mutableStateOf(false) }
+    LaunchedEffect(command.status) { if (commandDriven && command.status == WorkflowCommandStatus.Succeeded) success = true }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
@@ -333,19 +340,24 @@ private fun TeacherPostEditorDialog(
                     minLines = 3
                 )
                 error?.let { Text(it, color = Color.Red, fontSize = 10.sp, modifier = Modifier.padding(top = 5.dp)) }
+                if (commandDriven && command.status == WorkflowCommandStatus.Failed) Text(command.message ?: "提交失败，请重试。", color = Color.Red, fontSize = 10.sp, modifier = Modifier.padding(top = 5.dp))
+                if (commandDriven && command.isSubmitting) Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) { CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp); Spacer(Modifier.width(7.dp)); Text("正在提交动态…", color = Blue, fontSize = 10.sp) }
             }
         },
         confirmButton = {
-            TextButton(onClick = {
-                if (success) onDismiss() else if (content.trim().length < 4) error = "请至少输入 4 个字后再提交。" else { onConfirm(content.trim()); success = true }
-            }) { Text(if (success) "完成" else confirmLabel) }
+            TextButton(enabled = !command.isSubmitting, onClick = {
+                if (success) onDismiss() else if (content.trim().length < 4) error = "请至少输入 4 个字后再提交。" else {
+                    onConfirm(content.trim())
+                    if (!commandDriven) success = true
+                }
+            }) { if (command.isSubmitting) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp) else Text(if (success) "完成" else if (command.status == WorkflowCommandStatus.Failed) "重新提交" else confirmLabel) }
         },
         dismissButton = if (success) null else ({ TextButton(onClick = onDismiss) { Text("取消") } })
     )
 }
 
 @Composable
-fun TeacherAccountScreen(state: AppUiState, nav: NavHostController, logout: () -> Unit, updateSettings: (Boolean?, Boolean?) -> Unit) {
+fun TeacherAccountScreen(state: AppUiState, nav: NavHostController, logout: () -> Unit, updateSettings: (Boolean?, Boolean?) -> Unit, onChooseAnotherRole: () -> Unit) {
     var detail by remember { mutableStateOf<String?>(null) }; var settingsOpen by remember { mutableStateOf(false) }
     Scaffold(containerColor = Canvas, bottomBar = { TeacherBottomBar(nav, Destinations.Account) }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 12.dp).verticalScroll(rememberScrollState())) {
@@ -353,14 +365,7 @@ fun TeacherAccountScreen(state: AppUiState, nav: NavHostController, logout: () -
             Surface(Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "查看教师个人资料" }.clickable { detail = "个人信息" }, color = Color.White, shape = RoundedCornerShape(12.dp)) { Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Image(painterResource(R.drawable.teacher_avatar), null, Modifier.size(52.dp).clip(CircleShape), contentScale = ContentScale.Crop); Spacer(Modifier.width(11.dp)); Column(Modifier.weight(1f)) { Text(state.profile?.name ?: "李老师", color = Navy, fontWeight = FontWeight.Bold); Text("向上实验小学 · 三年级2班", color = Color.Gray, fontSize = 9.sp); Text("班主任 / 体育老师", color = Green, fontSize = 9.sp) }; Icon(Icons.Filled.ChevronRight, "查看个人资料", tint = Color.Gray) } }
             Spacer(Modifier.height(10.dp))
             listOf("个人信息" to Icons.Filled.Person, "我的权限" to Icons.Filled.AdminPanelSettings, "工作数据" to Icons.Filled.BarChart, "设置" to Icons.Filled.Settings, "消息" to Icons.Filled.Notifications).forEach { (title, icon) -> Surface(Modifier.fillMaxWidth().padding(vertical = 4.dp).semantics { role = Role.Button; contentDescription = "打开$title" }.clickable { when (title) { "工作数据" -> nav.navigateSingleTop(Destinations.TeacherBoard); "设置" -> settingsOpen = true; "消息" -> nav.navigateSingleTop(Destinations.TeacherMessages); else -> detail = title } }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = Blue); Spacer(Modifier.width(10.dp)); Text(title, color = Navy, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f)); Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray) } } }
-            Spacer(Modifier.height(9.dp)); OutlinedButton(onClick = {
-                // Keep the authenticated session, but let the user choose any
-                // authorized workbench instead of silently forcing Parent.
-                nav.navigate(Destinations.Role) {
-                    popUpTo(Destinations.Account) { inclusive = true }
-                    launchSingleTop = true
-                }
-            }, modifier = Modifier.fillMaxWidth().semantics { contentDescription = "重新选择使用角色" }) { Text("切换使用角色") }
+            Spacer(Modifier.height(9.dp)); OutlinedButton(onClick = onChooseAnotherRole, modifier = Modifier.fillMaxWidth().semantics { contentDescription = "重新选择使用角色" }) { Text("切换使用角色") }
             OutlinedButton(onClick = { logout(); nav.navigate(Destinations.Login) { popUpTo(nav.graph.id) { inclusive = true } } }, modifier = Modifier.fillMaxWidth().padding(top = 7.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red)) { Text("切换账号") }
         }
     }

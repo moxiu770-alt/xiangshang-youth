@@ -17,4 +17,15 @@ class DeepLinkResolverTest {
         assertNull(DeepLinkResolver.parse("xiangshang-youth://other?target=report"))
         assertNull(DeepLinkResolver.parse("xiangshang-youth://open?target=unknown"))
     }
+
+    @Test fun parsesAllSupportedDashboardTargets() {
+        mapOf(
+            "report" to DeepLinkTarget.Report,
+            "review" to DeepLinkTarget.Review,
+            "tasks" to DeepLinkTarget.Tasks,
+            "risk" to DeepLinkTarget.Risk
+        ).forEach { (target, expected) ->
+            assertEquals(expected, DeepLinkResolver.parse("xiangshang-youth://open?target=$target")?.target)
+        }
+    }
 }

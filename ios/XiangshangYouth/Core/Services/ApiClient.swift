@@ -6,6 +6,7 @@ enum ApiError: LocalizedError {
     case invalidResponse
     case unauthorized
     case network
+    case cancelled
     case server(statusCode: Int)
 
     var errorDescription: String? {
@@ -14,6 +15,7 @@ enum ApiError: LocalizedError {
         case .invalidResponse: "服务响应异常"
         case .unauthorized: "登录已过期，请重新登录"
         case .network: "网络连接异常，请检查网络后重试"
+        case .cancelled: "操作已取消"
         case .server: "服务暂时不可用，请稍后重试"
         }
     }
@@ -44,6 +46,10 @@ final class ApiClient {
             }
         } catch let error as ApiError {
             throw error
+        } catch is CancellationError {
+            throw ApiError.cancelled
+        } catch let error as URLError where error.code == .cancelled {
+            throw ApiError.cancelled
         } catch is URLError {
             throw ApiError.network
         } catch is DecodingError {

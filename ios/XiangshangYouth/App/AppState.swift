@@ -233,6 +233,7 @@ import Network
     private func persistSession() { mutateLocal { values in values.sessionProfile = profile; values.sessionRole = selectedRole } }
     private func persistSelectedChild() { mutateLocal { values in values.selectedChildID = selectedChild?.id } }
     private func handleDashboardError(_ error: Error) {
+        if case ApiError.cancelled = error { return }
         if case ApiError.unauthorized = error {
             ApiClient.shared.token = nil
             featureStore.reset()

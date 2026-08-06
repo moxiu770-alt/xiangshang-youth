@@ -34,4 +34,4 @@ final class MockRepository: YouthRepository {
     func loadDashboard() async throws -> DashboardData { try await Task.sleep(for: .milliseconds(350)); return DashboardData(school: school, students: students, classes: classes, grades: grades, tasks: tasks, parentChildren: [ParentChild(id: "pc1", parentId: "p1", student: students[0], relation: "母子"), ParentChild(id: "pc2", parentId: "p1", student: students[1], relation: "母女")], messages: [MessageItem(id: "m1", title: "测评报告已生成", content: "王小明的秋季综合运动能力测评报告已生成。", time: "今天 10:30", isRead: false, category: "报告"), MessageItem(id: "m2", title: "补测提醒", content: "请关注班级补测安排，携带运动鞋按时到场。", time: "昨天 16:00", isRead: true, category: "任务")]) }
 }
 
-struct DashboardData { let school: School; let students: [Student]; let classes: [ClassInfo]; let grades: [Grade]; let tasks: [TestTask]; let parentChildren: [ParentChild]; let messages: [MessageItem] }
+struct DashboardData: Codable { let school: School; let students: [Student]; let classes: [ClassInfo]; let grades: [Grade]; let tasks: [TestTask]; let parentChildren: [ParentChild]; let messages: [MessageItem] }

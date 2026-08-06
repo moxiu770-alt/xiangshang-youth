@@ -1,7 +1,9 @@
 package com.xiangshang.youth.core.service
 
 import android.content.Context
+import com.xiangshang.youth.BuildConfig
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
@@ -12,11 +14,11 @@ sealed class ApiError(message: String) : IOException(message) {
     object NotConfigured : ApiError("服务尚未配置")
     object Unauthorized : ApiError("登录已过期")
     object InvalidResponse : ApiError("服务响应异常")
+    class Server(val statusCode: Int) : ApiError("服务暂时不可用")
     class Network(cause: Throwable) : ApiError("网络连接异常") { init { initCause(cause) } }
 }
 
 object ApiClient {
-    private const val BaseUrl = "https://api.example.com/"
     @Volatile private var token: String? = null
     @Volatile private var secureTokenStore: SecureTokenStore? = null
 
@@ -29,6 +31,9 @@ object ApiClient {
     }
 
     private val client = OkHttpClient.Builder()
+        .connectTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(45, TimeUnit.SECONDS)
+        .writeTimeout(20, TimeUnit.SECONDS)
         .addInterceptor(authInterceptor)
         .addInterceptor { chain ->
             try {
@@ -37,6 +42,11 @@ object ApiClient {
                     response.close()
                     throw ApiError.Unauthorized
                 }
+                if (!response.isSuccessful) {
+                    val code = response.code
+                    response.close()
+                    throw if (code in 500..599) ApiError.Server(code) else ApiError.InvalidResponse
+                }
                 response
             } catch (error: IOException) {
                 throw if (error is ApiError) error else ApiError.Network(error)
@@ -44,7 +54,7 @@ object ApiClient {
         }
         .build()
     val retrofit: Retrofit = Retrofit.Builder()
-        .baseUrl(BaseUrl)
+        .baseUrl(BuildConfig.API_BASE_URL.ensureTrailingSlash())
         .client(client)
         .addConverterFactory(MoshiConverterFactory.create())
         .build()
@@ -67,4 +77,6 @@ object ApiClient {
         secureTokenStore?.write(null)
     }
     fun hasToken(): Boolean = token != null
+
+    private fun String.ensureTrailingSlash(): String = if (endsWith('/')) this else "$this/"
 }

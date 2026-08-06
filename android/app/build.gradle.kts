@@ -6,6 +6,7 @@ plugins {
 android {
     namespace = "com.xiangshang.youth"
     compileSdk = 36
+    val configuredApiBaseUrl = providers.gradleProperty("apiBaseUrl").orElse("https://api.example.com/").get()
     defaultConfig {
         applicationId = "com.xiangshang.youth"
         minSdk = 26
@@ -13,6 +14,7 @@ android {
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "API_BASE_URL", "\"$configuredApiBaseUrl\"")
     }
     buildFeatures { compose = true; buildConfig = true }
     composeOptions { kotlinCompilerExtensionVersion = "1.5.15" }

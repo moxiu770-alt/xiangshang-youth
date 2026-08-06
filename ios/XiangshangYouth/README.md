@@ -1,6 +1,6 @@
 # 向上少年 iOS
 
-SwiftUI + MVVM 的一期原生客户端。默认使用 `MockRepository`，网络层已通过 `ApiClient` 和各 API 类型预留，替换为 `RemoteRepository` 不影响页面层。
+SwiftUI + MVVM 的一期原生客户端。默认使用 `MockRepository`，网络层已通过 `ApiClient` 和各 API 类型预留，替换为 `RemoteRepository` 不影响页面层。联调时可通过 `XS_API_BASE_URL` 注入服务地址；URLSession 统一处理 token、超时、取消、401/403/5xx 与解码错误。
 
 ## 启动
 

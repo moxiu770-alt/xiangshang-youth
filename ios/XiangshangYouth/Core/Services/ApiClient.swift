@@ -23,19 +23,68 @@ enum ApiError: LocalizedError {
 
 final class ApiClient {
     static let shared = ApiClient()
+    let baseURL: URL
     private let tokenStore = SecureTokenStore()
+    private let session: URLSession
     var token: String? {
         didSet { tokenStore.write(token) }
     }
-    private init() { token = tokenStore.read() }
+
+    init(baseURL: URL? = nil) {
+        let configuredURL = baseURL
+            ?? ProcessInfo.processInfo.environment["XS_API_BASE_URL"].flatMap(URL.init(string:))
+            ?? URL(string: "https://api.example.com/")!
+        self.baseURL = configuredURL
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 20
+        configuration.timeoutIntervalForResource = 45
+        configuration.waitsForConnectivity = false
+        self.session = URLSession(configuration: configuration)
+        self.token = tokenStore.read()
+    }
+
+    func makeRequest(path: String, method: String = "GET", query: [URLQueryItem] = [], body: Data? = nil) -> URLRequest {
+        var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
+        components.queryItems = query.isEmpty ? nil : query
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = method
+        request.httpBody = body
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
+        return request
+    }
+
+    func request<T: Decodable, Body: Encodable>(path: String, method: String = "GET", query: [URLQueryItem] = [], body: Body?, type: T.Type) async throws -> T {
+        let encodedBody = try body.map { try JSONEncoder().encode($0) }
+        return try await request(makeRequest(path: path, method: method, query: query, body: encodedBody), type: type)
+    }
+
+    func request<T: Decodable>(path: String, method: String = "GET", query: [URLQueryItem] = [], type: T.Type) async throws -> T {
+        try await request(makeRequest(path: path, method: method, query: query), type: type)
+    }
+
+    func send(path: String, method: String = "POST", query: [URLQueryItem] = [], body: Data? = nil) async throws {
+        _ = try await perform(makeRequest(path: path, method: method, query: query, body: body))
+    }
+
     func request<T: Decodable>(_ request: URLRequest, type: T.Type) async throws -> T {
-        var request = request; if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        let data = try await perform(request)
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch is DecodingError {
+            throw ApiError.invalidResponse
+        }
+    }
+
+    private func perform(_ originalRequest: URLRequest) async throws -> Data {
+        var request = originalRequest
+        if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        do {
+            let (data, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse else { throw ApiError.invalidResponse }
             switch http.statusCode {
             case 200..<300:
-                return try JSONDecoder().decode(T.self, from: data)
+                return data
             case 401, 403:
                 token = nil
                 throw ApiError.unauthorized
@@ -52,8 +101,6 @@ final class ApiClient {
             throw ApiError.cancelled
         } catch is URLError {
             throw ApiError.network
-        } catch is DecodingError {
-            throw ApiError.invalidResponse
         } catch {
             throw ApiError.network
         }

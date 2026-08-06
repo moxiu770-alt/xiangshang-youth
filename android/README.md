@@ -2,6 +2,8 @@
 
 Kotlin + Jetpack Compose + MVVM + StateFlow 的一期原生客户端。默认使用 `MockRepository`，网络层通过 Retrofit/OkHttp 的 `ApiClient` 和各 API 类型预留，切换到 `RemoteRepository` 不需要修改页面。
 
+联调时可用 `-PapiBaseUrl=https://staging.example.com/` 注入 Retrofit 地址；请求统一附带 KeyStore 中的 Bearer token，并将超时、取消、401/403、5xx 和网络异常映射到 `ApiError`。不传该参数时仍使用示例地址，Mock 模式不会发起网络请求。
+
 ## 启动
 
 ```bash

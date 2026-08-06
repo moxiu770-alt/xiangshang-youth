@@ -3,6 +3,26 @@ import XCTest
 
 @MainActor
 final class LocalFeatureStateTests: XCTestCase {
+    func testApiClientBuildsAuthenticatedReadyJSONRequest() throws {
+        let client = ApiClient(baseURL: URL(string: "https://example.test/api/")!)
+        let body = Data("{\"status\":\"待复核\"}".utf8)
+
+        let request = client.makeRequest(
+            path: "v1/tasks/task-1/students/s01/status",
+            method: "PATCH",
+            query: [URLQueryItem(name: "source", value: "teacher")],
+            body: body
+        )
+
+        XCTAssertEqual(request.httpMethod, "PATCH")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "application/json")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+        XCTAssertEqual(request.httpBody, body)
+        XCTAssertEqual(request.url?.path, "/api/v1/tasks/task-1/students/s01/status")
+        XCTAssertEqual(URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false)?.queryItems?.first?.name, "source")
+        XCTAssertEqual(URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false)?.queryItems?.first?.value, "teacher")
+    }
+
     func testMockDashboardMatchesPhaseOneDataContract() async throws {
         let data = try await MockRepository.shared.loadDashboard()
         XCTAssertEqual(data.students.count, 20)

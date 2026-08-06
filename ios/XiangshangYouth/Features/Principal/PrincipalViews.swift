@@ -37,7 +37,10 @@ struct PrincipalHomeView: View {
             }
             .foregroundStyle(selectedTab == index ? ReferenceColor.blue : Color.secondary)
             .frame(maxWidth: .infinity)
-        }.buttonStyle(.plain)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityHint(selectedTab == index ? "当前页面" : "打开\(title)")
     }
 }
 struct PrincipalDashboard: View {

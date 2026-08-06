@@ -45,6 +45,8 @@ struct ParentHomeView: View {
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityHint(selectedTab == index ? "当前页面" : "打开\(title)")
     }
 }
 

@@ -1,6 +1,7 @@
 package com.xiangshang.youth.feature.teacher
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -32,6 +33,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -397,6 +399,7 @@ fun TeacherClassBoardScreen(state: AppUiState, nav: NavHostController, onOpenRep
     val completed = classStudents.count { (state.local.studentTaskStatuses[it.id] ?: it.taskStatus).name == "Completed" }
     val completionRate = if (classStudents.isEmpty()) 0 else completed * 100 / classStudents.size
     val risk = classStudents.count { val status = state.local.studentTaskStatuses[it.id] ?: it.taskStatus; (it.totalScore ?: 35.0) < 25 || status.name == "Review" || status.name == "Retest" }
+    val context = LocalContext.current
     var selectedPeriod by rememberSaveable { mutableStateOf("本轮综合测评") }
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(vertical = 4.dp)) {
         listOf("本轮综合测评", "2026春季").forEach { period ->
@@ -408,6 +411,13 @@ fun TeacherClassBoardScreen(state: AppUiState, nav: NavHostController, onOpenRep
     Spacer(Modifier.height(7.dp)); BoardCard("四维测评健康度", "健康明细", onClick = { nav.navigateSingleTop(Destinations.Review) }) { Row { listOf("体质" to Blue, "心理" to Color(0xFFFF638E), "视力" to Green, "口腔" to Color(0xFF8A5AF5)).forEach { (label, color) -> Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) { Text(label, fontSize = 9.sp); CircularProgressIndicator(progress = { completionRate / 100f }, modifier = Modifier.size(42.dp).padding(3.dp), color = color, strokeWidth = 4.dp); Text("$completed", color = color, fontWeight = FontWeight.Bold, fontSize = 11.sp) } } } }
     Spacer(Modifier.height(7.dp)); BoardCard("测评平均完成趋势", "查看详情", onClick = { nav.navigateSingleTop(Destinations.Tasks) }) { LinearProgressIndicator(progress = { completionRate / 100f }, modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape), color = Green, trackColor = Sky); Text("当前班级完成率 $completionRate%", color = Color.Gray, fontSize = 8.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) }
     Spacer(Modifier.height(7.dp)); BoardCard("重点关注学生", "查看全部", onClick = { nav.navigateSingleTop(Destinations.Review) }) { classStudents.filter { student -> val status = state.local.studentTaskStatuses[student.id] ?: student.taskStatus; (student.totalScore ?: 35.0) < 25 || status.name == "Review" || status.name == "Retest" }.take(3).forEach { student -> val status = state.local.studentTaskStatuses[student.id] ?: student.taskStatus; Row(Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "查看${student.name}报告，状态${status.label}" }.clickable { onOpenReport(student) }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) { Text("${student.name}   ${student.className}   ${status.label}", color = Navy, fontSize = 10.sp, modifier = Modifier.weight(1f)); Icon(Icons.Filled.ChevronRight, contentDescription = "查看${student.name}报告", tint = Color.Gray, modifier = Modifier.size(14.dp)) } }; if (risk == 0) Text("当前班级暂无重点风险学生", color = Color.Gray, fontSize = 10.sp) }
+    Spacer(Modifier.height(9.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(onClick = {
+            val report = "向上少年 · 三年级2班测评数据报告\\n测评完成率：$completionRate%\\n已完成：$completed / ${classStudents.size} 人\\n待处理预警：$risk 人\\n规则版本：小学综合运动能力标准 v1.0"
+            context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, report) }, "导出班级数据报告"))
+        }, modifier = Modifier.weight(1f)) { Icon(Icons.Filled.IosShare, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text("导出班级报告", fontSize = 10.sp) }
+        Button(onClick = { nav.navigateSingleTop(Destinations.Review) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4444))) { Icon(Icons.Filled.WarningAmber, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text("处理重点预警", fontSize = 10.sp) }
+    }
 }
 
 @Composable private fun BoardCard(title: String, action: String, onClick: () -> Unit, body: @Composable ColumnScope.() -> Unit) = Surface(modifier = Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(10.dp), shadowElevation = 1.dp) { Column(Modifier.padding(10.dp)) { SectionHeader(title, action, onClick); Spacer(Modifier.height(7.dp)); body() } }

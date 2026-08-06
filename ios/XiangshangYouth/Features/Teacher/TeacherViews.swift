@@ -505,7 +505,6 @@ struct TeacherClassBoardView: View {
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var router: AppRouter
     @State private var dashboardAppeared = false
-    @State private var actionMessage: String?
     @State private var selectedPeriod = 0
     private var classInfo: ClassInfo? { state.data?.classes.first(where: { $0.name == "三年级2班" }) }
     private var classStudents: [Student] { state.data?.students.filter { $0.className == "三年级2班" } ?? [] }
@@ -617,8 +616,17 @@ struct TeacherClassBoardView: View {
 
                 HStack(spacing: 7) {
                     actionButton("推送班级通知", "bell.fill", ReferenceColor.blue) { router.push(.teacherMessages) }
-                    actionButton("导出班级数据报告", "doc.text.fill", ReferenceColor.purple) { actionMessage = "班级数据报告已生成，可在消息通知中查看。" }
-                    actionButton("批量发出预警", "exclamationmark.shield.fill", .red) { actionMessage = "已向待处理学生发送预警通知。" }
+                    ShareLink(item: classBoardExport, subject: Text("三年级2班测评数据报告")) {
+                        Label("导出班级数据报告", systemImage: "square.and.arrow.up")
+                            .font(.system(size: 8, weight: .bold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 9)
+                            .foregroundStyle(.white)
+                            .background(ReferenceColor.purple, in: RoundedRectangle(cornerRadius: 7))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("导出班级数据报告")
+                    actionButton("处理重点预警", "exclamationmark.shield.fill", .red) { router.push(.reviewList) }
                 }
                 .padding(.horizontal, 12)
             }
@@ -649,11 +657,17 @@ struct TeacherClassBoardView: View {
                 dashboardAppeared = true
             }
         }
-        .alert("操作完成", isPresented: Binding(get: { actionMessage != nil }, set: { if !$0 { actionMessage = nil } })) {
-            Button("知道了") { actionMessage = nil }
-        } message: {
-            Text(actionMessage ?? "")
-        }
+    }
+
+    private var classBoardExport: String {
+        """
+        向上少年 · 三年级2班测评数据报告
+        测评完成率：\(Int(completion * 100))%
+        已完成：\(measuredCount) / \(classStudents.count) 人
+        待处理预警：\(riskCount) 人
+        待复核：\(reviewCount) 人；待补测：\(retestCount) 人
+        规则版本：小学综合运动能力标准 v1.0
+        """
     }
 
     private func chip(_ text: String, selected: Bool, action: @escaping () -> Void) -> some View {

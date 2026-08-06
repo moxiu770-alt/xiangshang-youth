@@ -32,6 +32,9 @@ struct LocalFeatureState: Codable, Equatable {
 
 enum LocalSubmissionStatus: String, Codable, Equatable {
     case draft, submitting, submitted, failed
+    /// Accepted by the local Mock workflow but not acknowledged by the remote service.
+    /// `submitted` remains decodable for state created by earlier builds.
+    case pendingSync
 }
 
 struct ActivityRegistration: Codable, Identifiable, Equatable {

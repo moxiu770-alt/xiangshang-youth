@@ -160,7 +160,7 @@ import Network
         mutateLocal { values in
             values.registeredActivities.insert(id)
             values.activityRegistrations.removeAll { $0.activityID == id }
-            values.activityRegistrations.insert(ActivityRegistration(id: UUID(), activityID: id, contactName: contactName.trimmingCharacters(in: .whitespacesAndNewlines), phone: phone, status: .submitted, createdAt: .now), at: 0)
+            values.activityRegistrations.insert(ActivityRegistration(id: UUID(), activityID: id, contactName: contactName.trimmingCharacters(in: .whitespacesAndNewlines), phone: phone, status: .pendingSync, createdAt: .now), at: 0)
         }
     }
     func completeAssessment(_ category: AssessmentCategory) { mutateLocal { $0.completedAssessments.insert("\(selectedChild?.id ?? "anonymous")-\(category.rawValue)") } }
@@ -201,13 +201,13 @@ import Network
     func clearDrafts(prefix: String) { mutateLocal { values in let keys = values.drafts.keys.filter { $0.hasPrefix(prefix) }; keys.forEach { values.drafts.removeValue(forKey: $0) } } }
     func bookExpert(name: String, preferredDate: String, note: String) {
         guard !preferredDate.isEmpty, !note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        mutateLocal { $0.expertAppointments.insert(ExpertAppointment(id: UUID(), expertName: name, preferredDate: preferredDate, note: note, status: .submitted, createdAt: .now), at: 0) }
+        mutateLocal { $0.expertAppointments.insert(ExpertAppointment(id: UUID(), expertName: name, preferredDate: preferredDate, note: note, status: .pendingSync, createdAt: .now), at: 0) }
     }
     func saveCourseUpload(taskID: String, attendanceCount: Int, notes: String, attachmentName: String, submit: Bool) {
         let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         guard attendanceCount >= 0, (!submit || (!trimmedNotes.isEmpty && !attachmentName.isEmpty)) else { return }
         mutateLocal { values in
-            let status: LocalSubmissionStatus = submit ? .submitted : .draft
+            let status: LocalSubmissionStatus = submit ? .pendingSync : .draft
             let record = CourseUploadRecord(id: UUID(), taskID: taskID, attendanceCount: attendanceCount, notes: trimmedNotes, attachmentName: attachmentName, status: status, createdAt: .now)
             values.courseUploads.removeAll { $0.taskID == taskID }
             values.courseUploads.insert(record, at: 0)

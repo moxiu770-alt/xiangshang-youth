@@ -65,10 +65,10 @@ final class LocalFeatureStateTests: XCTestCase {
 
         store.update { value in
             value.registeredActivities.insert("health-growth-season-2026")
-            value.activityRegistrations.append(ActivityRegistration(id: UUID(), activityID: "health-growth-season-2026", contactName: "王女士", phone: "13800138000", status: .submitted, createdAt: .now))
+            value.activityRegistrations.append(ActivityRegistration(id: UUID(), activityID: "health-growth-season-2026", contactName: "王女士", phone: "13800138000", status: .pendingSync, createdAt: .now))
             value.drafts["assessment-s01-fitness-0"] = "身高132cm，体重30kg"
-            value.expertAppointments.append(ExpertAppointment(id: UUID(), expertName: "张教授", preferredDate: "周五上午", note: "运动发展咨询", status: .submitted, createdAt: .now))
-            value.courseUploads.append(CourseUploadRecord(id: UUID(), taskID: "after-class-upload", attendanceCount: 26, notes: "已完成课程", attachmentName: "课堂.jpg", status: .submitted, createdAt: .now))
+            value.expertAppointments.append(ExpertAppointment(id: UUID(), expertName: "张教授", preferredDate: "周五上午", note: "运动发展咨询", status: .pendingSync, createdAt: .now))
+            value.courseUploads.append(CourseUploadRecord(id: UUID(), taskID: "after-class-upload", attendanceCount: 26, notes: "已完成课程", attachmentName: "课堂.jpg", status: .pendingSync, createdAt: .now))
             value.studentTaskStatuses["s01"] = .review
             value.reviewNotes["s01"] = "核验视频后建议周五补测。"
             value.settings.reduceMotion = true
@@ -81,7 +81,7 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertTrue(restored.registeredActivities.contains("health-growth-season-2026"))
         XCTAssertEqual(restored.activityRegistrations.first?.contactName, "王女士")
         XCTAssertEqual(restored.drafts["assessment-s01-fitness-0"], "身高132cm，体重30kg")
-        XCTAssertEqual(restored.expertAppointments.first?.status, .submitted)
+        XCTAssertEqual(restored.expertAppointments.first?.status, .pendingSync)
         XCTAssertEqual(restored.courseUploads.first?.attachmentName, "课堂.jpg")
         XCTAssertEqual(restored.studentTaskStatuses["s01"], .review)
         XCTAssertEqual(restored.reviewNotes["s01"], "核验视频后建议周五补测。")

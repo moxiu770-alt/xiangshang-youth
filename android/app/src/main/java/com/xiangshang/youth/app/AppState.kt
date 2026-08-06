@@ -96,7 +96,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun registerActivity(contactName: String, phone: String) {
         if (contactName.isBlank() || phone.filter(Char::isDigit).length != 11) return
         mutate { local ->
-            val record = com.xiangshang.youth.core.service.ActivityRegistration(activityId = "health-growth-season-2026", contactName = contactName.trim(), phone = phone)
+            val record = com.xiangshang.youth.core.service.ActivityRegistration(activityId = "health-growth-season-2026", contactName = contactName.trim(), phone = phone, status = LocalSubmissionStatus.PendingSync)
             local.copy(activityRegistered = true, activityRegistrations = listOf(record) + local.activityRegistrations.filterNot { it.activityId == record.activityId })
         }
     }
@@ -109,8 +109,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun addPostComment(postId: String, content: String) { val trimmed = content.trim(); if (trimmed.isBlank()) return; mutate { local -> local.copy(postComments = local.postComments + (postId to (local.postComments[postId].orEmpty() + trimmed))) } }
     fun saveDraft(key: String, content: String) = mutate { it.copy(drafts = it.drafts + (key to content)) }
     fun clearDraft(key: String) = mutate { it.copy(drafts = it.drafts - key) }
-    fun bookExpert(name: String, date: String, note: String) { if (date.isBlank() || note.isBlank()) return; mutate { it.copy(expertAppointments = listOf(ExpertAppointment(expertName = name, preferredDate = date, note = note)) + it.expertAppointments) } }
-    fun saveCourseUpload(taskId: String, attendance: Int, notes: String, attachment: String, submit: Boolean) { if (attendance < 0 || (submit && (notes.isBlank() || attachment.isBlank()))) return; mutate { local -> val record=CourseUploadRecord(taskId=taskId, attendanceCount=attendance, notes=notes.trim(), attachmentName=attachment, status=if (submit) LocalSubmissionStatus.Submitted else LocalSubmissionStatus.Draft); local.copy(courseUploads=listOf(record)+local.courseUploads.filterNot { it.taskId==taskId }, uploadedTaskIds=if (submit) local.uploadedTaskIds+taskId else local.uploadedTaskIds) } }
+    fun bookExpert(name: String, date: String, note: String) { if (date.isBlank() || note.isBlank()) return; mutate { it.copy(expertAppointments = listOf(ExpertAppointment(expertName = name, preferredDate = date, note = note, status = LocalSubmissionStatus.PendingSync)) + it.expertAppointments) } }
+    fun saveCourseUpload(taskId: String, attendance: Int, notes: String, attachment: String, submit: Boolean) { if (attendance < 0 || (submit && (notes.isBlank() || attachment.isBlank()))) return; mutate { local -> val record=CourseUploadRecord(taskId=taskId, attendanceCount=attendance, notes=notes.trim(), attachmentName=attachment, status=if (submit) LocalSubmissionStatus.PendingSync else LocalSubmissionStatus.Draft); local.copy(courseUploads=listOf(record)+local.courseUploads.filterNot { it.taskId==taskId }, uploadedTaskIds=if (submit) local.uploadedTaskIds+taskId else local.uploadedTaskIds) } }
     fun updateStudentTaskStatus(studentId: String, status: TaskStatus) = mutate { local -> local.copy(studentTaskStatuses = local.studentTaskStatuses + (studentId to status)) }
     fun submitReviewDecision(studentId: String, status: TaskStatus, note: String) {
         val trimmed = note.trim()

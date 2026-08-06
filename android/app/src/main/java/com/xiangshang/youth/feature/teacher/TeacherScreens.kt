@@ -403,7 +403,7 @@ fun TeacherTasksScreen(state: AppUiState, nav: NavHostController, saveUpload: (S
             }
         }
         state.local.courseUploads.firstOrNull { it.taskId == taskId }?.let {
-            Text("${if (it.status.name == "Submitted") "本机已保存 · 待同步" else "草稿"} · 出勤 ${it.attendanceCount} 人 · ${it.attachmentName}", color = Green, fontSize = 10.sp, modifier = Modifier.padding(top = 7.dp))
+            Text("${if (it.status.name == "PendingSync" || it.status.name == "Submitted") "本机已保存 · 待同步" else "草稿"} · 出勤 ${it.attendanceCount} 人 · ${it.attachmentName}", color = Green, fontSize = 10.sp, modifier = Modifier.padding(top = 7.dp))
         }
         Spacer(Modifier.height(9.dp))
         when {

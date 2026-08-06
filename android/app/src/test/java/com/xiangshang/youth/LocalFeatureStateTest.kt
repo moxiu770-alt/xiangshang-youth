@@ -48,7 +48,7 @@ class LocalFeatureStateTest {
             likedPostIds = setOf("post-1"),
             postComments = mapOf("post-1" to listOf("继续加油")),
             expertAppointments = listOf(ExpertAppointment(expertName = "张教授", preferredDate = "周五上午", note = "运动发展咨询")),
-            courseUploads = listOf(CourseUploadRecord(taskId = "after-class-upload", attendanceCount = 26, notes = "已完成课程", attachmentName = "课堂.jpg", status = LocalSubmissionStatus.Submitted)),
+            courseUploads = listOf(CourseUploadRecord(taskId = "after-class-upload", attendanceCount = 26, notes = "已完成课程", attachmentName = "课堂.jpg", status = LocalSubmissionStatus.PendingSync)),
             uploadedTaskIds = setOf("after-class-upload"),
             checkedInToday = true,
             studentTaskStatuses = mapOf("s01" to TaskStatus.Review),
@@ -67,7 +67,7 @@ class LocalFeatureStateTest {
         assertTrue("post-1" in state.likedPostIds)
         assertEquals("继续加油", state.postComments["post-1"]?.single())
         assertEquals("张教授", state.expertAppointments.single().expertName)
-        assertEquals(LocalSubmissionStatus.Submitted, state.courseUploads.single().status)
+        assertEquals(LocalSubmissionStatus.PendingSync, state.courseUploads.single().status)
         assertTrue("after-class-upload" in state.uploadedTaskIds)
         assertEquals(TaskStatus.Review, state.studentTaskStatuses["s01"])
         assertEquals("核验视频后建议周五补测。", state.reviewNotes["s01"])

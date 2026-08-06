@@ -3,7 +3,7 @@ import SwiftUI
 @main struct XiangshangYouthApp: App {
     @StateObject private var state = AppState()
     @StateObject private var router = AppRouter()
-    var body: some Scene { WindowGroup { RootView().environmentObject(state).environmentObject(router).tint(AppTheme.primary).dynamicTypeSize(.xSmall ... .accessibility3).preferredColorScheme(.light) } }
+    var body: some Scene { WindowGroup { RootView().environmentObject(state).environmentObject(router).tint(AppTheme.primary).dynamicTypeSize(.xSmall ... .accessibility5).preferredColorScheme(.light) } }
 }
 
 struct RootView: View {

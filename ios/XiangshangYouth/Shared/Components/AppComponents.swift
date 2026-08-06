@@ -7,7 +7,7 @@ struct AppScaffold<Content: View>: View {
     var body: some View {
         VStack(spacing: 0) {
             ZStack {
-                Button(action: { if router.path.isEmpty { dismiss() } else { router.pop() } }) { Image(systemName: "chevron.left").font(.system(size: 15, weight: .bold)).foregroundStyle(AppTheme.ink).frame(width: 34, height: 34).background(.ultraThinMaterial, in: Circle()) }.accessibilityLabel("返回").frame(maxWidth: .infinity, alignment: .leading)
+                Button(action: { if router.path.isEmpty { dismiss() } else { router.pop() } }) { Image(systemName: "chevron.left").font(.system(size: 15, weight: .bold)).foregroundStyle(AppTheme.ink).frame(width: 34, height: 34).background(.ultraThinMaterial, in: Circle()).frame(width: 44, height: 44) }.accessibilityLabel("返回").frame(maxWidth: .infinity, alignment: .leading)
                 Text(title).font(.system(size: 16, weight: .bold)).foregroundStyle(AppTheme.ink)
             }.padding(.horizontal, 14).frame(height: 52).background { Rectangle().fill(.ultraThinMaterial).ignoresSafeArea(edges: .top) }
             ScrollView {

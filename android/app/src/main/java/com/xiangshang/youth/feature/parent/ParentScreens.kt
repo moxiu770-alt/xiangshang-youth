@@ -542,7 +542,12 @@ private fun SimpleDialog(
     var draft by remember(title) { mutableStateOf(drafts[draftKey] ?: initial) }
     var validation by remember(title) { mutableStateOf<String?>(null) }
     var success by remember(title) { mutableStateOf<String?>(null) }
-    LaunchedEffect(command.status) { if (command.status == WorkflowCommandStatus.Succeeded) success = command.message ?: "提交成功。" }
+    LaunchedEffect(command.status) {
+        if (command.status == WorkflowCommandStatus.Succeeded) {
+            success = command.message ?: "提交成功。"
+            clearDraft(draftKey)
+        }
+    }
     val isEditable = title == "客服咨询" || title == "发布班级动态"
     AlertDialog(
         onDismissRequest = dismiss,
@@ -555,8 +560,10 @@ private fun SimpleDialog(
                 } else if (draft.trim().isBlank()) {
                     validation = if (title == "客服咨询") "请输入咨询内容。" else "动态内容不能为空。"
                 } else {
-                    if (commandDriven) submit(draft.trim()) else send(draft.trim())
-                    clearDraft(draftKey)
+                    if (commandDriven) submit(draft.trim()) else {
+                        send(draft.trim())
+                        clearDraft(draftKey)
+                    }
                     validation = null
                     if (!commandDriven) success = if (title == "客服咨询") "咨询已保存到本机，后端联调后发送；客服老师将在工作时间内回复。" else "动态已保存到本机，后端联调后同步到本班家校圈。"
                 }

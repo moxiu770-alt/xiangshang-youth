@@ -83,6 +83,8 @@ fun ParentHomeScreen(state: AppUiState, nav: NavHostController, registerActivity
         }
     }
     Scaffold(containerColor = Canvas, bottomBar = { ParentBottomBar(nav, Destinations.Parent) }) { contentPadding ->
+    val dashboardError = state.error
+    if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = { refreshDashboard() }, dismiss = LocalDashboardClearError.current); return@Scaffold }
     if (state.loading || state.data == null) { LoadingState(); return@Scaffold }
     if (state.selectedChild == null) {
         Column(Modifier.fillMaxSize().padding(contentPadding).padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
@@ -129,6 +131,8 @@ fun ParentHomeScreen(state: AppUiState, nav: NavHostController, registerActivity
 @Composable private fun ParentHeader(name: String, onClick: () -> Unit, onMessages: (() -> Unit)? = null, unreadCount: Int = 0, onRefresh: (() -> Unit)? = null, isRefreshing: Boolean = false) = Row(Modifier.fillMaxWidth().background(Color.White).padding(horizontal = 14.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) { Surface(Modifier.size(40.dp), color = Color(0xFF16AFA5), shape = CircleShape) { Text(name.take(1), color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 9.dp)) }; Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Text(name, color = Navy, fontWeight = FontWeight.Bold, fontSize = 14.sp); Text("三年级2班 · 点击切换孩子", color = Color.Gray, fontSize = 9.sp) }; IconButton(onClick = onClick) { Icon(Icons.Filled.ChevronRight, "切换孩子", tint = Blue) }; onRefresh?.let { action -> IconButton(onClick = action, enabled = !isRefreshing) { if (isRefreshing) CircularProgressIndicator(Modifier.size(17.dp), color = Blue, strokeWidth = 2.dp) else Icon(Icons.Filled.Refresh, "刷新数据", tint = Navy, modifier = Modifier.size(19.dp)) } }; onMessages?.let { action -> IconButton(onClick = action) { BadgedBox(badge = { if (unreadCount > 0) Badge(containerColor = Color.Red, modifier = Modifier.size(6.dp)) {} }) { Icon(Icons.Filled.NotificationsNone, contentDescription = "消息通知", tint = Navy, modifier = Modifier.size(20.dp)) } } } }
 
 @Composable fun NotificationsScreen(state: AppUiState, nav: NavHostController, markMessageRead: (String) -> Unit) = AppScaffold("消息通知", onBack = { nav.popBackStack() }) {
+    val dashboardError = state.error
+    if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current); return@AppScaffold }
     if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }
     if (state.data.messages.isEmpty()) { EmptyState("暂无消息通知"); return@AppScaffold }
     Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) { Text("全部通知", color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp); Spacer(Modifier.weight(1f)); Text("未读 ${state.unreadMessageCount}", color = Blue, fontSize = 10.sp) }
@@ -170,6 +174,7 @@ fun ChildrenScreen(state: AppUiState, nav: NavHostController, bindChild: (String
     val boundIds = state.local.boundChildIds
     val children = data?.students?.filter { it.id in boundIds }.orEmpty()
     when {
+        state.error != null && state.data == null -> ErrorState(state.error, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current)
         state.loading || state.data == null -> LoadingState()
         else -> {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) { Text("已绑定孩子 ${children.size} 人", color = Navy, fontWeight = FontWeight.Bold); Spacer(Modifier.weight(1f)); Button(onClick = { bindingOpen = true }) { Text("绑定孩子", fontSize = 11.sp) } }
@@ -196,6 +201,8 @@ fun ChildrenScreen(state: AppUiState, nav: NavHostController, bindChild: (String
 }
 @Composable
 fun ParentEvaluationsScreen(state: AppUiState, nav: NavHostController, report: DiagnosisReport?) = ParentTabScaffold(nav, Destinations.ParentEvaluations) {
+    val dashboardError = state.error
+    if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current); return@ParentTabScaffold }
     if (state.loading || state.data == null) { LoadingState(); return@ParentTabScaffold }
     if (state.selectedChild == null) { EmptyState("暂无孩子档案，请先完成孩子绑定。"); Button(onClick = { nav.navigate(Destinations.Children) }, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("去绑定孩子") }; return@ParentTabScaffold }
     val selectedChild = state.selectedChild
@@ -257,15 +264,23 @@ fun ParentEvaluationsScreen(state: AppUiState, nav: NavHostController, report: D
     var selectedTime by remember { mutableStateOf("") }
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     ParentTabScaffold(nav, Destinations.Messages) {
+    val data = state.data
+    val dashboardError = state.error
+    if (dashboardError != null && data == null) {
+        ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current)
+        return@ParentTabScaffold
+    }
+    if (state.loading || data == null) {
+        LoadingState()
+        return@ParentTabScaffold
+    }
     Row(Modifier.fillMaxWidth().padding(bottom = 7.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
         listOf("消息提醒", "系统通知").forEachIndexed { index, title ->
             FilterChip(selected = selectedTab == index, onClick = { selectedTab = index }, label = { Text(title, fontSize = 10.sp) }, modifier = Modifier.weight(1f))
         }
     }
-    val data = state.data
-    val visibleMessages = data?.messages.orEmpty().filter { message -> if (selectedTab == 0) message.category != "系统" else message.category == "系统" }.ifEmpty { if (selectedTab == 0) data?.messages.orEmpty() else emptyList() }
+    val visibleMessages = data.messages.filter { message -> if (selectedTab == 0) message.category != "系统" else message.category == "系统" }.ifEmpty { if (selectedTab == 0) data.messages else emptyList() }
     when {
-        state.loading || data == null -> LoadingState()
         data.messages.isEmpty() || visibleMessages.isEmpty() -> EmptyState(if (selectedTab == 0) "暂无消息提醒" else "暂无系统通知")
         else -> visibleMessages.forEachIndexed { index, item -> Surface(Modifier.fillMaxWidth().padding(vertical = 4.dp).semantics { role = Role.Button; contentDescription = "查看消息：${item.title}" }.clickable { markMessageRead(item.id); selectedTitle = item.title; selectedContent = item.content; selectedTime = item.time }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(11.dp)) { Icon(if (index % 2 == 0) Icons.Filled.Warning else Icons.Filled.Notifications, null, tint = if (index % 2 == 0) Color.Red else Blue); Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Row(verticalAlignment = Alignment.CenterVertically) { Text(item.title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); if (!item.isRead && item.id !in state.local.readMessageIds) Box(Modifier.size(5.dp).background(Color.Red, CircleShape).padding(start = 4.dp)) }; Text(item.content, color = Color.Gray, fontSize = 9.sp, maxLines = 1); Text(item.category, color = Blue, fontSize = 8.sp) }; Text(item.time, color = Color.Gray, fontSize = 8.sp) } } }
     }
@@ -276,6 +291,8 @@ fun ParentEvaluationsScreen(state: AppUiState, nav: NavHostController, report: D
 fun HealthProfileScreen(state: AppUiState, nav: NavHostController) {
     var checkInDetail by rememberSaveable { mutableStateOf(false) }
     ParentTabScaffold(nav, Destinations.Health) {
+    val dashboardError = state.error
+    if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current); return@ParentTabScaffold }
     if (state.loading || state.data == null) { LoadingState(); return@ParentTabScaffold }
     if (state.selectedChild == null) { EmptyState("暂无健康档案，请先完成孩子绑定。"); Button(onClick = { nav.navigate(Destinations.Children) }, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("去绑定孩子") }; return@ParentTabScaffold }
     ParentSection("健康报告", "查看全部报告") { nav.navigate(Destinations.Report) }
@@ -331,6 +348,8 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
 @Composable fun ParentCoursesScreen(state: AppUiState, nav: NavHostController, updateCourseProgress: (String, Float) -> Unit, sendSupport: (String) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit, openSupport: Boolean = false) {
     var paid by remember { mutableStateOf(false) }; var detail by rememberSaveable(openSupport) { mutableStateOf<String?>(if (openSupport) "客服咨询" else null) }
     ParentTabScaffold(nav, Destinations.Courses) {
+        val dashboardError = state.error
+        if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current); return@ParentTabScaffold }
         if (state.loading || state.data == null) { LoadingState(); return@ParentTabScaffold }
         if (state.selectedChild == null) { EmptyState("暂无孩子档案，请先完成孩子绑定。"); Button(onClick = { nav.navigate(Destinations.Children) }) { Text("去绑定孩子") }; return@ParentTabScaffold }
         val selectedChild = state.selectedChild
@@ -354,6 +373,8 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
     var mockCommentOpen by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     ParentTabScaffold(nav, Destinations.Circle) {
+        val dashboardError = state.error
+        if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current); return@ParentTabScaffold }
         if (state.loading || state.data == null) { LoadingState(); return@ParentTabScaffold }
         if (state.selectedChild == null) { EmptyState("暂无孩子档案，请先完成孩子绑定。"); Button(onClick = { nav.navigate(Destinations.Children) }) { Text("去绑定孩子") }; return@ParentTabScaffold }
         Text("班级圈", color = Navy, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 10.dp))
@@ -544,7 +565,11 @@ private fun SimpleDialog(
 }
 
 @Composable fun AssessmentFlowScreen(state: AppUiState, nav: NavHostController, category: String, completeAssessment: (String) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit) {
-    var step by remember { mutableIntStateOf(0) }; var done by remember(state.selectedChild?.id, category) { mutableStateOf(state.selectedChild?.let { "${it.id}-$category" in state.local.completedAssessments } == true) }; var answer by remember { mutableStateOf("") }; var validation by remember { mutableStateOf<String?>(null) }
+    val childKey = state.selectedChild?.id ?: "anonymous"
+    var step by rememberSaveable(childKey, category) { mutableIntStateOf(0) }
+    var done by rememberSaveable(childKey, category) { mutableStateOf("$childKey-$category" in state.local.completedAssessments) }
+    var answer by rememberSaveable(childKey, category, step) { mutableStateOf("") }
+    var validation by rememberSaveable(childKey, category, step) { mutableStateOf<String?>(null) }
     if (state.selectedChild == null) { AppScaffold("绑定孩子", onBack = { nav.popBackStack() }) { EmptyState("请先绑定孩子，再开始健康测评。"); Button(onClick = { nav.navigate(Destinations.Children) }) { Text("去绑定孩子") } }; return }
     val selectedChild = state.selectedChild
     val title = when (category) { "vision" -> "视力"; "oral" -> "口腔"; "mental" -> "心理"; else -> "体质" }

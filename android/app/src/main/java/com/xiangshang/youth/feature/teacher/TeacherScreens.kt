@@ -51,11 +51,16 @@ import com.xiangshang.youth.shared.component.*
 /** Mirrors the two teacher workbenches in the supplied mobile reference screens. */
 @Composable
 fun TeacherHomeScreen(state: AppUiState, nav: NavHostController, refreshDashboard: () -> Unit = {}) {
-    if (state.loading || state.data == null) {
-        LoadingState()
+    var sportsTeacher by rememberSaveable { mutableStateOf(false) }
+    val dashboardError = state.error
+    if (dashboardError != null && state.data == null) {
+        TeacherUnavailableState(state, nav, dashboardError, refreshDashboard)
         return
     }
-    var sportsTeacher by rememberSaveable { mutableStateOf(false) }
+    if (state.loading || state.data == null) {
+        TeacherUnavailableState(state, nav, null, refreshDashboard)
+        return
+    }
     val reduceMotion = LocalReduceMotion.current
     val transition = rememberInfiniteTransition(label = "teacher-card-breath")
     val pulse by transition.animateFloat(
@@ -79,7 +84,7 @@ fun TeacherHomeScreen(state: AppUiState, nav: NavHostController, refreshDashboar
 }
 
 @Composable
-private fun TeacherIdentity(sportsTeacher: Boolean, nav: NavHostController, unreadCount: Int, isRefreshing: Boolean, onRefresh: () -> Unit, onSwitchRole: () -> Unit) = Row(
+private fun TeacherIdentity(sportsTeacher: Boolean, nav: NavHostController, unreadCount: Int, isRefreshing: Boolean, onRefresh: () -> Unit, onSwitchRole: (() -> Unit)? = null) = Row(
     Modifier.fillMaxWidth().background(Color.White).padding(horizontal = 13.dp, vertical = 8.dp),
     verticalAlignment = Alignment.CenterVertically
 ) {
@@ -90,8 +95,10 @@ private fun TeacherIdentity(sportsTeacher: Boolean, nav: NavHostController, unre
         Text("向上实验小学", color = Color(0xFF7B8798), fontSize = 9.sp)
         Text(if (sportsTeacher) "体育老师" else "三年级2班", color = Green, fontWeight = FontWeight.SemiBold, fontSize = 8.sp)
     }
-    AssistChip(onClick = onSwitchRole, label = { Text("⇄  切换角色", fontSize = 9.sp) }, modifier = Modifier.height(29.dp))
-    Spacer(Modifier.width(7.dp))
+    onSwitchRole?.let { action ->
+        AssistChip(onClick = action, label = { Text("⇄  切换角色", fontSize = 9.sp) }, modifier = Modifier.height(29.dp))
+        Spacer(Modifier.width(7.dp))
+    }
     IconButton(onClick = onRefresh, enabled = !isRefreshing) { if (isRefreshing) CircularProgressIndicator(Modifier.size(17.dp), color = Blue, strokeWidth = 2.dp) else Icon(Icons.Filled.Refresh, contentDescription = "刷新数据", tint = Navy, modifier = Modifier.size(19.dp)) }
         IconButton(onClick = { nav.navigateSingleTop(Destinations.TeacherMessages) }) { BadgedBox(badge = { if (unreadCount > 0) Badge(containerColor = Color.Red, modifier = Modifier.size(6.dp)) {} }) { Icon(Icons.Filled.NotificationsNone, contentDescription = "消息通知", tint = Navy, modifier = Modifier.size(20.dp)) } }
 }
@@ -230,8 +237,14 @@ fun TeacherClassCircleScreen(
     refreshDashboard: () -> Unit = {}
 ) {
     val dashboardError = state.error
-    if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = refreshDashboard); return }
-    if (state.loading || state.data == null) { LoadingState(); return }
+    if (dashboardError != null && state.data == null) {
+        TeacherUnavailableState(state, nav, dashboardError, refreshDashboard, selected = Destinations.TeacherCircle)
+        return
+    }
+    if (state.loading || state.data == null) {
+        TeacherUnavailableState(state, nav, null, refreshDashboard, selected = Destinations.TeacherCircle)
+        return
+    }
     if (state.data.students.isEmpty()) { EmptyState("暂无班级动态，班级名单同步后会显示在这里。") ; return }
     var composer by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf<String?>(null) }
@@ -265,6 +278,29 @@ fun TeacherClassCircleScreen(
         )
     }
     notice?.let { AlertDialog(onDismissRequest = { notice = null }, title = { Text(it) }, text = { Text("请家长于 9 月 12 日前完成孩子健康信息确认。") }, confirmButton = { TextButton(onClick = { notice = null }) { Text("我知道了") } }) }
+}
+
+/** Keeps the root teacher tabs and notification entry usable while the first
+ * dashboard load is pending or has failed. A full-screen spinner without any
+ * navigation would strand the teacher on a cold-start error. */
+@Composable
+private fun TeacherUnavailableState(
+    state: AppUiState,
+    nav: NavHostController,
+    error: String?,
+    retry: () -> Unit,
+    selected: String = Destinations.Teacher
+) {
+    Scaffold(containerColor = Canvas, bottomBar = { TeacherBottomBar(nav, selected) }) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            TeacherIdentity(false, nav, state.unreadMessageCount, error == null, retry)
+            if (error != null) {
+                ErrorState(error, retry = retry, dismiss = LocalDashboardClearError.current)
+            } else {
+                LoadingState()
+            }
+        }
+    }
 }
 
 @Composable
@@ -334,10 +370,9 @@ fun TeacherAccountScreen(state: AppUiState, nav: NavHostController, logout: () -
 
 @Composable
 fun TeacherClassBoardScreen(state: AppUiState, nav: NavHostController, onOpenReport: (com.xiangshang.youth.core.model.Student) -> Unit) = AppScaffold("三年级2班 · 班级数据看板", onBack = { nav.popBackStack() }) {
-    if (state.loading || state.data == null) {
-        LoadingState()
-        return@AppScaffold
-    }
+    val dashboardError = state.error
+    if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current); return@AppScaffold }
+    if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }
     val classStudents = state.data.students.filter { it.className == "三年级2班" }
     if (classStudents.isEmpty()) {
         EmptyState("暂无三年级2班数据，学生名单同步后会显示在这里。")
@@ -362,9 +397,11 @@ fun TeacherClassBoardScreen(state: AppUiState, nav: NavHostController, onOpenRep
 @Composable private fun BoardCard(title: String, action: String, onClick: () -> Unit, body: @Composable ColumnScope.() -> Unit) = Surface(modifier = Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(10.dp), shadowElevation = 1.dp) { Column(Modifier.padding(10.dp)) { SectionHeader(title, action, onClick); Spacer(Modifier.height(7.dp)); body() } }
 
 @Composable fun TeacherClassesScreen(state: AppUiState, nav: NavHostController) = AppScaffold("我管理的班级", onBack = { nav.popBackStack() }) {
+    val dashboardError = state.error
+    if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current); return@AppScaffold }
+    if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }
     val data = state.data
     when {
-        state.loading || data == null -> LoadingState()
         data.classes.isEmpty() -> EmptyState("暂无管理班级，学校分班后会自动同步。")
         else -> data.classes.take(2).forEach { item ->
             val classStudents = data.students.filter { it.className == item.name }
@@ -375,8 +412,10 @@ fun TeacherClassBoardScreen(state: AppUiState, nav: NavHostController, onOpenRep
 }
 @Composable
 fun StudentListScreen(state: AppUiState, nav: NavHostController, className: String? = null, onOpenStudent: (com.xiangshang.youth.core.model.Student) -> Unit) = AppScaffold("学生列表", onBack = { nav.popBackStack() }) {
+    val dashboardError = state.error
+    if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current); return@AppScaffold }
+    if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }
     when {
-        state.loading || state.data == null -> LoadingState()
         state.data.students.isEmpty() -> EmptyState("暂无学生数据，班级名单同步后会显示在这里。")
         else -> state.data.students.filter { className == null || it.className == className }.forEach {
             StudentCard(it) { onOpenStudent(it) }
@@ -391,6 +430,9 @@ fun TeacherTasksScreen(state: AppUiState, nav: NavHostController, saveUpload: (S
     val uploaded = state.local.uploadedTaskIds.contains(taskId)
     var formOpen by remember { mutableStateOf(false) }
     AppScaffold("延时课程上传", onBack = { nav.popBackStack() }) {
+        val dashboardError = state.error
+        if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current); return@AppScaffold }
+        if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }
         Surface(Modifier.fillMaxWidth(), color = Color(0xFFFFF2E4), shape = RoundedCornerShape(10.dp)) {
             Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.CameraAlt, null, tint = Color(0xFFFF8B1F))
@@ -407,7 +449,6 @@ fun TeacherTasksScreen(state: AppUiState, nav: NavHostController, saveUpload: (S
         }
         Spacer(Modifier.height(9.dp))
         when {
-            state.loading || state.data == null -> LoadingState()
             state.data.tasks.isEmpty() -> EmptyState("暂无延时课程任务，学校发布任务后会显示在这里。")
             else -> state.data.tasks.forEach {
                 TestTaskCard(it) { nav.navigate("${Destinations.TaskDetail}/${it.id}") }
@@ -471,8 +512,10 @@ private fun UploadDialog(taskId: String, state: AppUiState, save: (String, Int, 
 @Composable
 fun TeacherTaskDetailScreen(state: AppUiState, nav: NavHostController, updateStatus: (String, com.xiangshang.youth.core.model.TaskStatus) -> Unit, taskId: String?) = AppScaffold("任务详情", onBack = { nav.popBackStack() }) {
     var selectedStudent by remember { mutableStateOf<com.xiangshang.youth.core.model.Student?>(null) }
+    val dashboardError = state.error
+    if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current); return@AppScaffold }
+    if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }
     val data = state.data
-    if (state.loading || data == null) { LoadingState(); return@AppScaffold }
     val task = data.tasks.firstOrNull { it.id == taskId } ?: data.tasks.firstOrNull()
     if (task == null) { EmptyState("暂无体测任务，学校发布任务后会显示在这里。"); return@AppScaffold }
     TestTaskCard(task)
@@ -497,8 +540,10 @@ fun TeacherTaskDetailScreen(state: AppUiState, nav: NavHostController, updateSta
 @Composable
 fun ReviewListScreen(state: AppUiState, nav: NavHostController, submitDecision: (String, com.xiangshang.youth.core.model.TaskStatus, String) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit) = AppScaffold("预警中心", onBack = { nav.popBackStack() }) {
     var selectedStudent by remember { mutableStateOf<com.xiangshang.youth.core.model.Student?>(null) }
+    val dashboardError = state.error
+    if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current); return@AppScaffold }
+    if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }
     val data = state.data
-    if (state.loading || data == null) { LoadingState(); return@AppScaffold }
     val students = data.students.filter { student ->
         val status = state.local.studentTaskStatuses[student.id] ?: student.taskStatus
         status.name == "Review" || status.name == "Retest" || status.name == "Absent"
@@ -601,7 +646,7 @@ private fun statusColor(status: com.xiangshang.youth.core.model.TaskStatus): Col
     val items = listOf("m1" to ("学生预警通知" to "王小明体质指标需关注，请及时跟进。"), "m2" to ("学校通知" to "秋季综合测评工作安排已发布。"), "teacher-course" to ("课程通知" to "三年级2班延时课程将在明日 16:30 开始。"), "teacher-system" to ("系统消息" to "测评数据已完成同步。"))
     val error = state.error
     when {
-        error != null && state.data == null -> ErrorState(error, retry = refreshDashboard)
+        error != null && state.data == null -> ErrorState(error, retry = refreshDashboard, dismiss = LocalDashboardClearError.current)
         state.loading || state.data == null -> LoadingState()
         items.isEmpty() -> EmptyState("暂无消息通知，新的测评和班级通知会显示在这里。")
         else -> items.forEachIndexed { index, (messageId, item) ->

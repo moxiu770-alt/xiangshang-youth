@@ -98,7 +98,20 @@ import com.xiangshang.youth.core.model.*
 @Composable fun ReportMetricCard(score: ScoreResult) { Card(Modifier.fillMaxWidth().semantics { contentDescription = "${score.item.label}，${score.score}分，满分5分" }) { Column(Modifier.padding(10.dp)) { Text(score.item.label, fontSize = 11.sp); Text(score.score.toString(), color = Blue, fontSize = 18.sp); Text("满分5分", fontSize = 10.sp, color = Color.Gray) } } }
 @Composable fun EmptyState(text: String = "暂无数据") { Box(Modifier.fillMaxWidth().padding(32.dp).semantics { contentDescription = text }, contentAlignment = Alignment.Center) { Text(text, color = Color.Gray) } }
 @Composable fun LoadingState() { Box(Modifier.fillMaxWidth().padding(32.dp).semantics { contentDescription = "正在加载" }, contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
-@Composable fun ErrorState(text: String, retry: () -> Unit = {}) { Column(Modifier.fillMaxWidth().padding(24.dp).semantics { contentDescription = "加载失败：$text" }, horizontalAlignment = Alignment.CenterHorizontally) { Text(text, color = Color.Red); TextButton(onClick = retry) { Text("重试") } } }
+@Composable fun ErrorState(text: String, retry: () -> Unit = {}, dismiss: (() -> Unit)? = null) {
+    Column(
+        Modifier.fillMaxWidth().padding(24.dp).semantics { contentDescription = "加载失败：$text" },
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("加载失败", color = Color.Red, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+        Text(text, color = Color.Red, fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
+            TextButton(onClick = retry) { Text("重试") }
+            dismiss?.let { action -> TextButton(onClick = action) { Text("关闭") } }
+        }
+    }
+}
+
 @Composable fun FilterBar(options: List<String> = listOf("本轮综合测评", "2026秋季"), selected: String = options.firstOrNull().orEmpty(), onSelected: (String) -> Unit = {}) {
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         options.forEach { option ->

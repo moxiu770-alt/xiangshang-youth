@@ -26,6 +26,8 @@ import com.xiangshang.youth.shared.component.*
 import java.util.Locale
 
 @Composable fun PrincipalHomeScreen(state: AppUiState, nav: NavHostController, switchRole: () -> Unit, refreshDashboard: () -> Unit = {}) = AppScaffold("学校运动健康总览", onNotifications = { nav.navigateSingleTop(Destinations.Notifications) }, notificationCount = state.unreadMessageCount, onRefresh = refreshDashboard, isRefreshing = state.loading, onSwitchRole = { switchRole(); nav.navigate(Destinations.Role) { popUpTo(Destinations.Principal) { inclusive = true } } }, bottomBar = { PrincipalBottomBar(nav) }) {
+    val dashboardError = state.error
+    if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = { refreshDashboard() }, dismiss = LocalDashboardClearError.current); return@AppScaffold }
     if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }
     if (state.data.students.isEmpty()) { EmptyState("暂无学校测评数据，场地端上传后会显示在这里。"); return@AppScaffold }
     Surface(Modifier.fillMaxWidth().padding(bottom = 8.dp), color = Color.White, shape = RoundedCornerShape(12.dp), shadowElevation = 1.dp) {
@@ -112,6 +114,8 @@ private fun PrincipalBottomBar(nav: NavHostController) {
 @Composable private fun PrincipalEntry(title: String, note: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier, onClick: () -> Unit) = Surface(onClick = onClick, modifier = modifier.semantics { role = Role.Button; contentDescription = "$title：$note" }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(9.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = color); Spacer(Modifier.width(7.dp)); Column { Text(title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 10.sp); Text(note, color = Color.Gray, fontSize = 8.sp) } } }
 @Composable
 fun GradeStatsScreen(state: AppUiState, nav: NavHostController, rootTab: Boolean = false) = AppScaffold("不同年级对比", onBack = if (rootTab) null else ({ nav.popBackStack() }), bottomBar = if (rootTab) ({ PrincipalBottomBar(nav) }) else ({})) {
+    val dashboardError = state.error
+    if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current); return@AppScaffold }
     if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }
     if (state.data.grades.isEmpty()) { EmptyState("暂无年级统计数据。"); return@AppScaffold }
     var metric by rememberSaveable { mutableStateOf("完成率") }
@@ -162,6 +166,8 @@ fun GradeStatsScreen(state: AppUiState, nav: NavHostController, rootTab: Boolean
 
 @Composable
 fun ClassStatsScreen(state: AppUiState, nav: NavHostController, initialGrade: String?, rootTab: Boolean = false) = AppScaffold("班级完成率", onBack = if (rootTab) null else ({ nav.popBackStack() }), bottomBar = if (rootTab) ({ PrincipalBottomBar(nav) }) else ({})) {
+    val dashboardError = state.error
+    if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current); return@AppScaffold }
     if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }
     var selectedGrade by rememberSaveable { mutableStateOf(initialGrade ?: "全部年级") }
     val allClasses = state.data.classes
@@ -186,6 +192,8 @@ fun ClassStatsScreen(state: AppUiState, nav: NavHostController, initialGrade: St
 
 @Composable
 fun RiskStudentsScreen(state: AppUiState, nav: NavHostController, className: String?, rootTab: Boolean = false, onOpenReport: (com.xiangshang.youth.core.model.Student) -> Unit) = AppScaffold("重点风险学生", onBack = if (rootTab) null else ({ nav.popBackStack() }), bottomBar = if (rootTab) ({ PrincipalBottomBar(nav) }) else ({})) {
+    val dashboardError = state.error
+    if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current); return@AppScaffold }
     if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }
     var riskFilter by rememberSaveable { mutableStateOf("全部") }
     val students = state.data.students.filter { student ->

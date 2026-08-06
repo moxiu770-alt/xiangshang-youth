@@ -72,7 +72,7 @@ struct RootView: View {
             Color.black.opacity(0.18).ignoresSafeArea()
             ErrorStateView(message: error) {
                 Task { if state.profile == nil { await state.login(phone: "13800138000") } else { await state.refreshDashboard() } }
-            }
+            } dismiss: { state.error = nil }
             .background(.white, in: RoundedRectangle(cornerRadius: 20)).padding(32)
         }
     }

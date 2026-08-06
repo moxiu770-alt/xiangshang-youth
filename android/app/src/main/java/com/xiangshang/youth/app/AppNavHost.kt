@@ -15,6 +15,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -34,10 +35,14 @@ import com.xiangshang.youth.feature.teacher.*
 import com.xiangshang.youth.core.model.UserRole
 import com.xiangshang.youth.core.util.DeepLinkResolver
 import com.xiangshang.youth.core.util.DeepLinkTarget
-import com.xiangshang.youth.shared.component.ErrorState
-import com.xiangshang.youth.shared.component.OfflineBanner
+import com.xiangshang.youth.shared.component.*
 
 object Destinations { const val Splash="splash"; const val Login="login"; const val Register="register"; const val PasswordReset="passwordReset"; const val Role="role"; const val Parent="parent"; const val Children="children"; const val ParentEvaluations="parentEvaluations"; const val Assessment="assessment"; const val Courses="courses"; const val CoursesRoute="courses?openSupport={openSupport}"; const val Circle="circle"; const val Account="account"; const val Messages="messages"; const val Notifications="notifications"; const val Health="health"; const val Report="report"; const val Teacher="teacher"; const val TeacherMessages="teacherMessages"; const val Classes="classes"; const val TeacherCircle="teacherCircle"; const val TeacherBoard="teacherBoard"; const val Students="students"; const val StudentsRoute="students?className={className}"; const val Tasks="tasks"; const val TaskDetail="taskDetail"; const val TaskDetailRoute="taskDetail/{taskId}"; const val Review="review"; const val Principal="principal"; const val PrincipalGrades="principalGrades"; const val PrincipalClassStats="principalClassStats"; const val PrincipalRisk="principalRisk"; const val Grades="grades"; const val ClassStats="classStats"; const val ClassStatsRoute="classStats?grade={grade}"; const val Risk="risk"; const val RiskRoute="risk?className={className}" }
+
+/** Shared retry actions keep page-level failures actionable without threading
+ * the same callbacks through every feature screen. */
+val LocalDashboardRetry = compositionLocalOf<() -> Unit> { {} }
+val LocalDashboardClearError = compositionLocalOf<() -> Unit> { {} }
 @Composable fun AppNavHost(viewModel: AppViewModel, incomingDeepLink: Uri? = null, nav: NavHostController = rememberNavController()) {
     val state by viewModel.state.collectAsState()
     val view = LocalView.current
@@ -114,7 +119,11 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
         }
         handledDeepLink = value
     }
-    CompositionLocalProvider(LocalReduceMotion provides state.local.settings.reduceMotion) {
+    CompositionLocalProvider(
+        LocalReduceMotion provides state.local.settings.reduceMotion,
+        LocalDashboardRetry provides { viewModel.refreshDashboard() },
+        LocalDashboardClearError provides viewModel::clearError
+    ) {
     Box {
     NavHost(
         nav,
@@ -183,10 +192,19 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
         composable(Destinations.Report) {
             val child = state.selectedChild
             when {
-                state.loading || state.data == null -> com.xiangshang.youth.shared.component.LoadingState()
-                child == null -> Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                    com.xiangshang.youth.shared.component.EmptyState("暂无孩子报告，请先完成孩子绑定。")
-                    androidx.compose.material3.Button(onClick = { nav.navigate(Destinations.Children) }) { Text("去绑定孩子") }
+                state.error != null && state.data == null -> AppScaffold("体测报告", onBack = { nav.popBackStack() }) {
+                    ErrorState(
+                        state.error ?: "数据加载失败",
+                        retry = { viewModel.refreshDashboard() },
+                        dismiss = viewModel::clearError
+                    )
+                }
+                state.loading || state.data == null -> AppScaffold("体测报告", onBack = { nav.popBackStack() }) { LoadingState() }
+                child == null -> AppScaffold("体测报告", onBack = { nav.popBackStack() }) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                        EmptyState("暂无孩子报告，请先完成孩子绑定。")
+                        androidx.compose.material3.Button(onClick = { nav.navigate(Destinations.Children) }) { Text("去绑定孩子") }
+                    }
                 }
                 else -> ReportDetailScreen(viewModel.report(child), state.loading, viewModel::refreshDashboard, nav)
             }
@@ -232,7 +250,7 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
     // secondary pages that intentionally keep their last successful content.
     // Login remains inline so the small loading/error window never covers the
     // authentication form.
-    if (state.error != null && state.profile != null && !state.restoringSession) {
+    if (state.error != null && state.profile != null && state.data != null && !state.restoringSession) {
         androidx.compose.foundation.layout.Box(
             Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.16f)),
             contentAlignment = Alignment.Center
@@ -243,7 +261,11 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
                 shadowElevation = 8.dp
             ) {
-                ErrorState(state.error ?: "数据加载失败", retry = { viewModel.refreshDashboard() })
+                ErrorState(
+                    state.error ?: "数据加载失败",
+                    retry = { viewModel.refreshDashboard() },
+                    dismiss = viewModel::clearError
+                )
             }
         }
     }

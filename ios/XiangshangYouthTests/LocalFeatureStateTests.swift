@@ -242,6 +242,19 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertEqual(state.localFeatures.expertAppointments.count, 1)
         XCTAssertEqual(state.localFeatures.expertAppointments.first?.status, .pendingSync)
     }
+
+    func testPendingSyncCountExposesUnacknowledgedLocalWrites() {
+        let suite = "xiangshang.youth.pending-count-tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let state = AppState(featureStore: LocalFeatureStore(defaults: defaults))
+
+        state.registerActivity("health-growth-season-2026", contactName: "王女士", phone: "13800138000")
+        state.bookExpert(name: "张教授", preferredDate: "周五上午", note: "运动发展咨询")
+        state.saveCourseUpload(taskID: "after-class-upload", attendanceCount: 20, notes: "课堂记录", attachmentName: "课堂.jpg", submit: true)
+
+        XCTAssertEqual(state.pendingSyncCount, 3)
+    }
 }
 
 private struct FailingRepository: YouthRepository {

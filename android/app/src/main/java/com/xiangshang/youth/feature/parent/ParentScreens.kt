@@ -391,11 +391,11 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
         Spacer(Modifier.height(8.dp)); Text("切换使用角色", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) { listOf(UserRole.Parent, UserRole.Teacher, UserRole.Principal).forEach { role -> OutlinedButton(onClick = { chooseRole(role); val destination = if (role == UserRole.Parent) Destinations.Parent else if (role == UserRole.Teacher) Destinations.Teacher else Destinations.Principal; nav.navigate(destination) { popUpTo(Destinations.Account) { inclusive = true }; launchSingleTop = true } }, modifier = Modifier.weight(1f)) { Text(role.label, fontSize = 9.sp) } } }
         OutlinedButton(onClick = { logout(); nav.navigate(Destinations.Login) { popUpTo(nav.graph.id) { inclusive = true } } }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red)) { Text("切换账号") }
     }
-    if (settingsOpen) SettingsDialog(state.local.settings.notificationsEnabled, state.local.settings.reduceMotion, updateSettings, clearLocalData = { logout(); nav.navigate(Destinations.Login) { popUpTo(nav.graph.id) { inclusive = true } } }) { settingsOpen = false }
+    if (settingsOpen) SettingsDialog(state.local.settings.notificationsEnabled, state.local.settings.reduceMotion, state.pendingSyncCount, updateSettings, clearLocalData = { logout(); nav.navigate(Destinations.Login) { popUpTo(nav.graph.id) { inclusive = true } } }) { settingsOpen = false }
     accountInfo?.let { title -> AccountInfoDialog(title, state, sendSupport) { accountInfo = null } }
 }
 
-@Composable fun SettingsDialog(notifications: Boolean, reduceMotion: Boolean, update: (Boolean?, Boolean?) -> Unit, clearLocalData: () -> Unit = {}, dismiss: () -> Unit) {
+@Composable fun SettingsDialog(notifications: Boolean, reduceMotion: Boolean, pendingSyncCount: Int, update: (Boolean?, Boolean?) -> Unit, clearLocalData: () -> Unit = {}, dismiss: () -> Unit) {
     var notify by remember { mutableStateOf(notifications) }
     var reduce by remember { mutableStateOf(reduceMotion) }
     var permissionMessage by remember { mutableStateOf<String?>(null) }
@@ -418,6 +418,9 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
             Row(verticalAlignment = Alignment.CenterVertically) { Text("减少动态效果", modifier = Modifier.weight(1f)); Switch(checked = reduce, onCheckedChange = { reduce = it }) }
             permissionMessage?.let { Text(it, color = Color(0xFFFF8B1F), fontSize = 10.sp, modifier = Modifier.padding(top = 7.dp)) }
             Text("设置会自动保存并在下次启动后保留。", color = Color.Gray, fontSize = 10.sp, modifier = Modifier.padding(top = 9.dp))
+            Text("本机同步", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp))
+            Text("待同步记录：$pendingSyncCount 条", color = if (pendingSyncCount == 0) Green else Color(0xFFFF8B1F), fontSize = 11.sp)
+            Text(if (pendingSyncCount == 0) "当前没有等待同步的本地操作。" else "记录已安全保存在本机，后端联调后将由同步任务提交并更新状态。", color = Color.Gray, fontSize = 10.sp, modifier = Modifier.padding(top = 3.dp))
             Spacer(Modifier.height(8.dp))
             Text("退出登录会清除本机保存的绑定孩子、草稿和通知状态；不会删除学校侧的测评记录。", color = Color.Gray, fontSize = 10.sp)
             TextButton(onClick = { clearConfirmation = true }, colors = ButtonDefaults.textButtonColors(contentColor = Color.Red), modifier = Modifier.align(Alignment.Start)) { Text("清除本机数据并退出登录") }

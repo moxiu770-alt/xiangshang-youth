@@ -30,6 +30,8 @@ import java.util.Locale
 
 data class AppUiState(val profile: UserProfile? = null, val role: UserRole? = null, val data: DashboardData? = null, val selectedChild: Student? = null, val loading: Boolean = false, val error: String? = null, val local: LocalFeatureState = LocalFeatureState(), val restoringSession: Boolean = false, val isOffline: Boolean = false) {
     val unreadMessageCount: Int get() = if (!local.settings.notificationsEnabled) 0 else data?.messages?.count { !it.isRead && it.id !in local.readMessageIds } ?: 0
+    /** Local writes waiting for the future remote sync worker. */
+    val pendingSyncCount: Int get() = local.activityRegistrations.count { it.status == LocalSubmissionStatus.PendingSync } + local.expertAppointments.count { it.status == LocalSubmissionStatus.PendingSync } + local.courseUploads.count { it.status == LocalSubmissionStatus.PendingSync }
 }
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val connectivityManager = application.getSystemService(ConnectivityManager::class.java)

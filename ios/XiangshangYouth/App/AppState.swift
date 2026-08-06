@@ -140,6 +140,13 @@ import Network
         guard localFeatures.settings.notificationsEnabled else { return 0 }
         return (data?.messages ?? []).filter { !$0.isRead && !localFeatures.readMessageIDs.contains($0.id) }.count
     }
+    /// Local writes that have not been acknowledged by a remote service yet.
+    var pendingSyncCount: Int {
+        let activity = localFeatures.activityRegistrations.count(where: { $0.status == .pendingSync })
+        let experts = localFeatures.expertAppointments.count(where: { $0.status == .pendingSync })
+        let uploads = localFeatures.courseUploads.count(where: { $0.status == .pendingSync })
+        return activity + experts + uploads
+    }
     func markMessageRead(_ id: String) { mutateLocal { $0.readMessageIDs.insert(id) } }
     @discardableResult
     func bindChild(name: String, code: String) -> Bool {

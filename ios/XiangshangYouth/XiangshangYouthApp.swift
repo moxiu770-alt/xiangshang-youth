@@ -17,7 +17,8 @@ struct RootView: View {
             navigationRoot
             globalOverlay
         }
-        .onAppear { networkMonitor.start() }
+        .onAppear { networkMonitor.start(); state.setOffline(networkMonitor.isOffline) }
+        .onChange(of: networkMonitor.isOffline) { _, value in state.setOffline(value) }
     }
     private var navigationRoot: some View {
         NavigationStack(path: $router.path) {

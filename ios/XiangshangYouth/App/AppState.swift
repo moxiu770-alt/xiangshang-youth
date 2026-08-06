@@ -26,6 +26,7 @@ import Network
     @Published var data: DashboardData?
     @Published var selectedChild: Student?
     @Published var loading = false
+    @Published private(set) var isOffline = false
     /// Session restoration happens behind the launch artwork. Keeping this separate
     /// from `loading` prevents the retry overlay from flashing before login/role
     /// selection is ready.
@@ -119,7 +120,7 @@ import Network
         } catch { self.handleDashboardError(error) }
     }
     func refreshDashboard() async {
-        guard profile != nil, !loading else { return }
+        guard profile != nil, !loading, !isOffline else { return }
         loading = true; error = nil; defer { loading = false }
         do {
             data = try await repository.loadDashboard()
@@ -241,6 +242,7 @@ import Network
             if let reduceMotion { values.settings.reduceMotion = reduceMotion }
         }
     }
+    func setOffline(_ value: Bool) { isOffline = value }
     func submitUpload(taskID: String) { saveCourseUpload(taskID: taskID, attendanceCount: 0, notes: "已确认课后测评记录", attachmentName: "课堂记录.jpg", submit: true) }
     func checkInToday() { mutateLocal { $0.checkInDates.insert(Self.dayFormatter.string(from: .now)) } }
     private func persistSession() { mutateLocal { values in values.sessionProfile = profile; values.sessionRole = selectedRole } }

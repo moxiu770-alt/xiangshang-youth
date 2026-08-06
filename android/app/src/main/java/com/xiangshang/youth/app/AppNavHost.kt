@@ -15,7 +15,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -46,7 +45,12 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
     val isSplash = currentEntry?.destination?.route == Destinations.Splash
     var handledDeepLink by rememberSaveable { mutableStateOf<String?>(null) }
 
-    SideEffect {
+    // System-bar mutations are expensive IPC calls. Running them from a
+    // SideEffect on every Compose recomposition can overwhelm Android System UI
+    // during the animated splash, which presents as a misleading "System UI
+    // isn't responding" dialog over the launch artwork. Reapply only when the
+    // route/session chrome actually changes.
+    LaunchedEffect(isSplash, state.profile != null, state.restoringSession) {
         (view.context as? Activity)?.window?.let { window ->
             WindowInsetsControllerCompat(window, view).apply {
                 // Dark artwork/gradient surfaces use light icons; dashboard surfaces are

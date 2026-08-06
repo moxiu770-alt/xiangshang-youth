@@ -194,7 +194,9 @@ struct ChildrenView: View {
                 Form {
                     Section("孩子信息") {
                         TextField("孩子姓名", text: $childName)
+                            .accessibilityIdentifier("child-name-field")
                         TextField("绑定码（Mock 示例 XS-S01）", text: $bindingCode)
+                            .accessibilityIdentifier("child-binding-code-field")
                         HStack(alignment: .top, spacing: 8) {
                             Image(systemName: "info.circle.fill").foregroundStyle(ReferenceColor.blue)
                             VStack(alignment: .leading, spacing: 4) {
@@ -213,6 +215,11 @@ struct ChildrenView: View {
                     Section { Button("确认绑定") {
                         guard state.bindChild(name: childName, code: bindingCode) else { bindingError = "姓名或绑定码不匹配，请核对后重试。"; return }
                         bindingError = nil; childName = ""; bindingCode = ""; bindingPresented = false
+                        // Return to the page that requested binding so the newly
+                        // selected child immediately unlocks the report/task
+                        // entry point instead of leaving the family in a dead-end
+                        // management screen.
+                        router.pop()
                     }.frame(maxWidth: .infinity) }
                 }
                 .navigationTitle("绑定孩子")

@@ -425,7 +425,7 @@ fun StudentListScreen(state: AppUiState, nav: NavHostController, className: Stri
 }
 
 @Composable
-fun TeacherTasksScreen(state: AppUiState, nav: NavHostController, saveUpload: (String, Int, String, String, Boolean) -> Unit) {
+fun TeacherTasksScreen(state: AppUiState, nav: NavHostController, saveUpload: (String, Int, String, String, Boolean) -> Unit, submitUpload: (String, Int, String, String) -> Unit = { taskId, attendance, notes, attachment -> saveUpload(taskId, attendance, notes, attachment, true) }) {
     val taskId = "after-class-upload"
     val uploaded = state.local.uploadedTaskIds.contains(taskId)
     var formOpen by remember { mutableStateOf(false) }
@@ -456,11 +456,11 @@ fun TeacherTasksScreen(state: AppUiState, nav: NavHostController, saveUpload: (S
             }
         }
     }
-    if (formOpen) UploadDialog(taskId, state, saveUpload) { formOpen = false }
+    if (formOpen) UploadDialog(taskId, state, saveUpload, submitUpload) { formOpen = false }
 }
 
 @Composable
-private fun UploadDialog(taskId: String, state: AppUiState, save: (String, Int, String, String, Boolean) -> Unit, dismiss: () -> Unit) {
+private fun UploadDialog(taskId: String, state: AppUiState, save: (String, Int, String, String, Boolean) -> Unit, submit: (String, Int, String, String) -> Unit, dismiss: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val existing = state.local.courseUploads.firstOrNull { it.taskId == taskId }
     var attendance by remember { mutableStateOf(existing?.attendanceCount?.toString() ?: "26") }
@@ -468,6 +468,7 @@ private fun UploadDialog(taskId: String, state: AppUiState, save: (String, Int, 
     var attachment by remember { mutableStateOf(existing?.attachmentName ?: "课堂活动照片.jpg") }
     var error by remember { mutableStateOf<String?>(null) }
     var result by remember { mutableStateOf<String?>(null) }
+    val command = state.workflowStates["course:$taskId"] ?: WorkflowCommandState()
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> if (uri != null) attachment = uri.lastPathSegment?.substringAfterLast('/') ?: "课堂活动照片.jpg" }
     val cameraPicker = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap -> if (bitmap != null) attachment = "课堂照片-${System.currentTimeMillis()}.jpg" else error = "没有获得照片，请重试或使用文件选择。" }
     val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> if (granted) cameraPicker.launch(null) else error = "相机权限未开启，请在系统设置中允许相机，或使用文件选择。" }
@@ -479,7 +480,7 @@ private fun UploadDialog(taskId: String, state: AppUiState, save: (String, Int, 
         onDismissRequest = dismiss,
         title = { Text("延时课程上传") },
         text = {
-            if (result != null) {
+            if (result != null || command.status == WorkflowCommandStatus.Succeeded) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Filled.CheckCircle, null, tint = Green, modifier = Modifier.size(42.dp))
                     Text(result!!, color = Navy, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
@@ -491,18 +492,19 @@ private fun UploadDialog(taskId: String, state: AppUiState, save: (String, Int, 
                 OutlinedButton(onClick = { openCamera() }, modifier = Modifier.padding(top = 4.dp)) { Icon(Icons.Filled.PhotoCamera, null); Spacer(Modifier.width(5.dp)); Text("拍摄课堂照片") }
                 OutlinedButton(onClick = { imagePicker.launch("image/*") }, modifier = Modifier.padding(top = 4.dp)) { Icon(Icons.Filled.Photo, null); Spacer(Modifier.width(5.dp)); Text("选择课堂照片") }
                 error?.let { Text(it, color = Color.Red, fontSize = 10.sp) }
+                if (command.status == WorkflowCommandStatus.Failed) Text(command.message ?: "提交失败，请重试", color = Color.Red, fontSize = 10.sp)
             }
         },
         confirmButton = {
             TextButton(onClick = {
-                if (result != null) dismiss() else {
+                if (result != null || command.status == WorkflowCommandStatus.Succeeded) dismiss() else {
                     val count = attendance.toIntOrNull()
-                    if (count == null || count < 0 || notes.isBlank() || attachment.isBlank()) error = "请补齐有效出勤人数、课堂记录和附件。"
-                    else { save(taskId, count, notes.trim(), attachment, true); result = "课程记录已保存到本机，后端联调后同步到任务状态。" }
+                    if (count == null || count <= 0 || notes.isBlank() || attachment.isBlank()) error = "请补齐有效出勤人数、课堂记录和附件。"
+                    else submit(taskId, count, notes.trim(), attachment)
                 }
-            }) { Text(if (result != null) "完成" else "提交审核") }
+            }, enabled = !command.isSubmitting) { if (command.isSubmitting) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp) else Text(if (result != null || command.status == WorkflowCommandStatus.Succeeded) "完成" else if (command.status == WorkflowCommandStatus.Failed) "重新提交" else "提交审核") }
         },
-        dismissButton = if (result == null) ({ TextButton(onClick = {
+        dismissButton = if (result == null && command.status != WorkflowCommandStatus.Succeeded) ({ TextButton(onClick = {
             val count = attendance.toIntOrNull() ?: 0
             save(taskId, count, notes.trim(), attachment, false)
             result = "草稿已保存，可稍后继续编辑。"
@@ -510,7 +512,7 @@ private fun UploadDialog(taskId: String, state: AppUiState, save: (String, Int, 
     )
 }
 @Composable
-fun TeacherTaskDetailScreen(state: AppUiState, nav: NavHostController, updateStatus: (String, com.xiangshang.youth.core.model.TaskStatus) -> Unit, taskId: String?) = AppScaffold("任务详情", onBack = { nav.popBackStack() }) {
+fun TeacherTaskDetailScreen(state: AppUiState, nav: NavHostController, updateStatus: (String, com.xiangshang.youth.core.model.TaskStatus) -> Unit, taskId: String?, submitStatus: (String, com.xiangshang.youth.core.model.TaskStatus, String?) -> Unit = { studentId, status, _ -> updateStatus(studentId, status) }) = AppScaffold("任务详情", onBack = { nav.popBackStack() }) {
     var selectedStudent by remember { mutableStateOf<com.xiangshang.youth.core.model.Student?>(null) }
     val dashboardError = state.error
     if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current); return@AppScaffold }
@@ -533,12 +535,18 @@ fun TeacherTaskDetailScreen(state: AppUiState, nav: NavHostController, updateSta
     }
     selectedStudent?.let { student ->
         val current = state.local.studentTaskStatuses[student.id] ?: student.taskStatus
-        StatusSelectorDialog(student.name, current, onSelect = { status -> updateStatus(student.id, status); selectedStudent = null }, dismiss = { selectedStudent = null })
+        StatusSelectorDialog(
+            student.name,
+            current,
+            state.workflowStates["task-status:${student.id}"] ?: WorkflowCommandState(),
+            onSelect = { status -> submitStatus(student.id, status, null) },
+            dismiss = { selectedStudent = null }
+        )
     }
 }
 
 @Composable
-fun ReviewListScreen(state: AppUiState, nav: NavHostController, submitDecision: (String, com.xiangshang.youth.core.model.TaskStatus, String) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit) = AppScaffold("预警中心", onBack = { nav.popBackStack() }) {
+fun ReviewListScreen(state: AppUiState, nav: NavHostController, submitDecision: (String, com.xiangshang.youth.core.model.TaskStatus, String) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit, submitStatus: (String, com.xiangshang.youth.core.model.TaskStatus, String?) -> Unit = { studentId, status, note -> submitDecision(studentId, status, note.orEmpty()) }) = AppScaffold("预警中心", onBack = { nav.popBackStack() }) {
     var selectedStudent by remember { mutableStateOf<com.xiangshang.youth.core.model.Student?>(null) }
     val dashboardError = state.error
     if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current); return@AppScaffold }
@@ -560,7 +568,16 @@ fun ReviewListScreen(state: AppUiState, nav: NavHostController, submitDecision: 
     selectedStudent?.let { student ->
         val current = state.local.studentTaskStatuses[student.id] ?: student.taskStatus
         val draftKey = "review-note-${student.id}"
-        ReviewDecisionDialog(student.name, current, state.local.drafts[draftKey] ?: state.local.reviewNotes[student.id].orEmpty(), onDraftChanged = { saveDraft(draftKey, it) }, onSubmit = { status, note -> clearDraft(draftKey); submitDecision(student.id, status, note); selectedStudent = null }, dismiss = { selectedStudent = null })
+        ReviewDecisionDialog(
+            student.name,
+            current,
+            state.local.drafts[draftKey] ?: state.local.reviewNotes[student.id].orEmpty(),
+            state.workflowStates["task-status:${student.id}"] ?: WorkflowCommandState(),
+            onDraftChanged = { saveDraft(draftKey, it) },
+            onSubmit = { status, note -> submitStatus(student.id, status, note) },
+            onSuccess = { clearDraft(draftKey); selectedStudent = null },
+            dismiss = { selectedStudent = null }
+        )
     }
 }
 
@@ -579,6 +596,7 @@ private fun TeacherStudentStatusRow(student: com.xiangshang.youth.core.model.Stu
 private fun StatusSelectorDialog(
     studentName: String,
     current: com.xiangshang.youth.core.model.TaskStatus,
+    command: WorkflowCommandState,
     onSelect: (com.xiangshang.youth.core.model.TaskStatus) -> Unit,
     dismiss: () -> Unit
 ) {
@@ -587,8 +605,14 @@ private fun StatusSelectorDialog(
         title = { Text("更新${studentName}的测评状态") },
         text = {
             Column {
+                when (command.status) {
+                    WorkflowCommandStatus.Submitting -> Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp); Spacer(Modifier.width(7.dp)); Text("正在提交状态…", color = Blue, fontSize = 10.sp) }
+                    WorkflowCommandStatus.Succeeded -> Text(command.message ?: "状态已提交。", color = Green, fontSize = 10.sp)
+                    WorkflowCommandStatus.Failed -> Text(command.message ?: "提交失败，请重试。", color = Color.Red, fontSize = 10.sp)
+                    WorkflowCommandStatus.Idle -> Unit
+                }
                 com.xiangshang.youth.core.model.TaskStatus.values().forEach { status ->
-                    TextButton(onClick = { onSelect(status) }, modifier = Modifier.fillMaxWidth()) {
+                    TextButton(onClick = { onSelect(status) }, enabled = !command.isSubmitting, modifier = Modifier.fillMaxWidth()) {
                         Text(
                             status.label,
                             color = if (status == current) Blue else Navy,
@@ -598,7 +622,7 @@ private fun StatusSelectorDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = dismiss) { Text("取消") } }
+        confirmButton = { TextButton(onClick = dismiss) { Text(if (command.status == WorkflowCommandStatus.Succeeded) "完成" else "取消") } }
     )
 }
 
@@ -607,13 +631,16 @@ private fun ReviewDecisionDialog(
     studentName: String,
     current: com.xiangshang.youth.core.model.TaskStatus,
     initialNote: String,
+    command: WorkflowCommandState,
     onDraftChanged: (String) -> Unit,
     onSubmit: (com.xiangshang.youth.core.model.TaskStatus, String) -> Unit,
+    onSuccess: () -> Unit,
     dismiss: () -> Unit
 ) {
     var note by rememberSaveable(studentName) { mutableStateOf(initialNote) }
     var selectedStatus by rememberSaveable(studentName) { mutableStateOf(current) }
     var validation by rememberSaveable(studentName) { mutableStateOf<String?>(null) }
+    LaunchedEffect(command.status) { if (command.status == WorkflowCommandStatus.Succeeded) onSuccess() }
     AlertDialog(
         onDismissRequest = dismiss,
         title = { Text("处理${studentName}预警") },
@@ -622,6 +649,11 @@ private fun ReviewDecisionDialog(
                 Text("记录证据核验结果、是否需要补测及后续处理。", color = Color.Gray, fontSize = 11.sp)
                 OutlinedTextField(value = note, onValueChange = { note = it; onDraftChanged(it); validation = null }, label = { Text("复核 / 补测处理意见") }, minLines = 3, isError = validation != null)
                 validation?.let { Text(it, color = Color.Red, fontSize = 10.sp) }
+                when (command.status) {
+                    WorkflowCommandStatus.Submitting -> Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp); Spacer(Modifier.width(7.dp)); Text("正在提交处理…", color = Blue, fontSize = 10.sp) }
+                    WorkflowCommandStatus.Failed -> Text(command.message ?: "提交失败，请重试。", color = Color.Red, fontSize = 10.sp)
+                    else -> Unit
+                }
                 Text("处理结论", color = Navy, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 com.xiangshang.youth.core.model.TaskStatus.values().forEach { status ->
                     FilterChip(selected = selectedStatus == status, onClick = { selectedStatus = status }, label = { Text(status.label, fontSize = 10.sp) })
@@ -629,9 +661,9 @@ private fun ReviewDecisionDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = {
+            TextButton(enabled = !command.isSubmitting, onClick = {
                 if (note.trim().isBlank()) validation = "请填写复核或补测处理意见。" else onSubmit(selectedStatus, note)
-            }) { Text("提交处理") }
+            }) { if (command.isSubmitting) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp) else Text(if (command.status == WorkflowCommandStatus.Failed) "重新提交" else "提交处理") }
         },
         dismissButton = { TextButton(onClick = dismiss) { Text("取消") } }
     )

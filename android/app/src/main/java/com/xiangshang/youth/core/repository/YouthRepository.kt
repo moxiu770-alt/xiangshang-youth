@@ -13,4 +13,10 @@ interface YouthRepository {
     fun report(student: Student): DiagnosisReport
     /** Mock falls back synchronously; RemoteRepository replaces this with ReportApi. */
     suspend fun loadReport(student: Student): DiagnosisReport = report(student)
+    suspend fun submitActivity(value: com.xiangshang.youth.core.service.ActivityRegistration) {}
+    suspend fun bookExpert(value: com.xiangshang.youth.core.service.ExpertAppointment) {}
+    suspend fun uploadCourse(value: com.xiangshang.youth.core.service.CourseUploadRecord) {}
+    suspend fun updateTaskStatus(studentId: String, status: TaskStatus, note: String?) {}
+    suspend fun publishClassPost(author: String, content: String) {}
+    suspend fun sendSupportMessage(content: String) {}
 }

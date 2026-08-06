@@ -397,7 +397,42 @@ struct PublishClassPostSheet: View {
     @State private var validationMessage: String?
     @State private var submitted = false
     private var draftKey: String { "class-post-\(editingPost?.id.uuidString ?? author)" }
-    var body: some View { NavigationStack { VStack(alignment: .leading, spacing: 14) { if submitted { VStack(spacing: 12) { Image(systemName: "checkmark.circle.fill").font(.system(size: 48)).foregroundStyle(ReferenceColor.green); Text(editingPost == nil ? "动态已保存" : "修改已保存").font(.title3.bold()); Text("内容已保存到本机，后端联调后同步到本班家校圈。").font(.system(size: 12)).foregroundStyle(.secondary).multilineTextAlignment(.center); Spacer(); Button("完成") { dismiss() }.font(.system(size: 14, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 12).foregroundStyle(.white).background(ReferenceColor.blue, in: RoundedRectangle(cornerRadius: 11)) } } else { Text(editingPost == nil ? "发布班级动态" : "编辑班级动态").font(.title3.bold()); Text("内容会先保存在本机，后端联调后同步到本班家校圈。请勿发布学生隐私信息。").font(.system(size: 12)).foregroundStyle(.secondary); TextEditor(text: $content).frame(minHeight: 160).padding(8).overlay(RoundedRectangle(cornerRadius: 10).stroke(validationMessage == nil ? ReferenceColor.navy.opacity(0.15) : .red, lineWidth: 1)).onChange(of: content) { _, value in state.saveDraft(value, key: draftKey) }; if let validationMessage { Text(validationMessage).font(.system(size: 10)).foregroundStyle(.red) }; Spacer(); Button { let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines); guard !trimmed.isEmpty else { validationMessage = "动态内容不能为空。"; return }; if let editingPost { state.updateClassPost(id: editingPost.id, text: trimmed) } else { state.publishClassPost(trimmed, author: author) }; state.clearDraft(draftKey); submitted = true } label: { Text(editingPost == nil ? "保存动态" : "保存修改").font(.system(size: 14, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 12).foregroundStyle(.white).background(ReferenceColor.blue, in: RoundedRectangle(cornerRadius: 11)) }.disabled(content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) } }.padding(18).navigationBarTitleDisplayMode(.inline) }.task { content = editingPost?.content ?? state.localFeatures.drafts[draftKey] ?? "" } }
+    var body: some View {
+        let commandState = state.workflowState(for: "post:\(author)")
+        return NavigationStack {
+            VStack(alignment: .leading, spacing: 14) {
+                if submitted {
+                    VStack(spacing: 12) {
+                        Image(systemName: "checkmark.circle.fill").font(.system(size: 48)).foregroundStyle(ReferenceColor.green)
+                        Text(editingPost == nil ? "动态已保存" : "修改已保存").font(.title3.bold())
+                        Text("内容已保存到本机，后端联调后同步到本班家校圈。").font(.system(size: 12)).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                        Spacer()
+                        Button("完成") { dismiss() }.font(.system(size: 14, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 12).foregroundStyle(.white).background(ReferenceColor.blue, in: RoundedRectangle(cornerRadius: 11))
+                    }
+                } else {
+                    Text(editingPost == nil ? "发布班级动态" : "编辑班级动态").font(.title3.bold())
+                    Text("内容会先保存在本机，后端联调后同步到本班家校圈。请勿发布学生隐私信息。").font(.system(size: 12)).foregroundStyle(.secondary)
+                    TextEditor(text: $content).frame(minHeight: 160).padding(8).overlay(RoundedRectangle(cornerRadius: 10).stroke(validationMessage == nil ? ReferenceColor.navy.opacity(0.15) : .red, lineWidth: 1)).onChange(of: content) { _, value in state.saveDraft(value, key: draftKey) }
+                    if let validationMessage { Text(validationMessage).font(.system(size: 10)).foregroundStyle(.red) }
+                    if case let .failed(message) = commandState { Text(message).font(.system(size: 10)).foregroundStyle(.red) }
+                    Spacer()
+                    Button {
+                        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !trimmed.isEmpty else { validationMessage = "动态内容不能为空。"; return }
+                        if let editingPost { state.updateClassPost(id: editingPost.id, text: trimmed); state.clearDraft(draftKey); submitted = true }
+                        else { Task { if await state.submitClassPostCommand(trimmed, author: author) { state.clearDraft(draftKey); submitted = true } } }
+                    } label: {
+                        HStack { if commandState.isSubmitting { ProgressView().tint(.white) }; Text(commandState.isSubmitting ? "正在提交…" : editingPost == nil ? "保存动态" : "保存修改") }
+                            .font(.system(size: 14, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 12).foregroundStyle(.white).background(ReferenceColor.blue, in: RoundedRectangle(cornerRadius: 11))
+                    }
+                    .disabled(commandState.isSubmitting || content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .padding(18)
+            .navigationBarTitleDisplayMode(.inline)
+            .task { content = editingPost?.content ?? state.localFeatures.drafts[draftKey] ?? "" }
+        }
+    }
 }
 struct HealthArticleSheet: View {
     let title: String
@@ -430,16 +465,19 @@ struct ActivityDetailSheet: View {
     @State private var validationMessage: String?
     private let activityID = "health-growth-season-2026"
     private var draftKey: String { "activity-registration-\(activityID)" }
+    private var commandKey: String { "activity:\(activityID)" }
 
     var body: some View {
         let registered = state.localFeatures.registeredActivities.contains(activityID)
+        let commandState = state.workflowState(for: commandKey)
+        let hasFailure: Bool = { if case .failed = commandState { return true }; return false }()
         NavigationStack { ScrollView { VStack(alignment: .leading, spacing: 14) {
             Image("ParentCampaign").resizable().scaledToFill().frame(height: 180).clipShape(RoundedRectangle(cornerRadius: 14))
             Text(title).font(.title3.bold())
             Label("7 月 16 日–8 月 15 日", systemImage: "calendar").font(.system(size: 12)).foregroundStyle(.secondary)
             Text("完成综合健康测评，了解孩子的运动发展与健康成长情况。Mock 阶段先保存在本机，后端联调后同步到孩子档案。") .font(.system(size: 13)).foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 7) { Text("活动说明").font(.system(size: 15, weight: .bold)); Text("• 完成四项健康测评\n• 查看个性化成长报告\n• 可预约学校体测场地") .font(.system(size: 12)).foregroundStyle(ReferenceColor.navy) }.padding(12).background(ReferenceColor.sky, in: RoundedRectangle(cornerRadius: 12))
-            if registered {
+            if registered && !hasFailure {
                 Label("报名信息已保存到本机，后端联调后提交；活动开始前将通过消息中心通知您。", systemImage: "checkmark.circle.fill").font(.system(size: 12, weight: .medium)).foregroundStyle(ReferenceColor.green)
             } else {
                 VStack(alignment: .leading, spacing: 8) {
@@ -451,16 +489,25 @@ struct ActivityDetailSheet: View {
                 .onChange(of: contactName) { _, _ in saveDraft() }
                 .onChange(of: phone) { _, _ in saveDraft() }
                 if let validationMessage { Text(validationMessage).font(.system(size: 10)).foregroundStyle(.red) }
+                if case let .failed(message) = commandState { Text(message).font(.system(size: 10)).foregroundStyle(.red) }
             }
             Button {
                 guard !contactName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { validationMessage = "请填写联系人姓名。"; return }
                 guard phone.filter(\.isNumber).count == 11 else { validationMessage = "请填写 11 位手机号。"; return }
                 guard consented else { validationMessage = "请先确认活动说明和通知授权。"; return }
-                state.registerActivity(activityID, contactName: contactName, phone: phone)
-                state.clearDraft(draftKey)
                 validationMessage = nil
-            } label: { Text(registered ? "本机已保存，待同步" : "确认报名").font(.system(size: 14, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 12).foregroundStyle(.white).background(registered ? ReferenceColor.green : ReferenceColor.blue, in: RoundedRectangle(cornerRadius: 12)) }
-            .buttonStyle(.plain).disabled(registered)
+                Task {
+                    let success = await state.submitActivityCommand(activityID, contactName: contactName, phone: phone)
+                    if success { state.clearDraft(draftKey) }
+                }
+            } label: {
+                HStack(spacing: 7) {
+                    if commandState.isSubmitting { ProgressView().tint(.white) }
+                    Text(commandState.isSubmitting ? "正在提交…" : registered ? "重新提交同步" : "确认报名")
+                }
+                .font(.system(size: 14, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 12).foregroundStyle(.white).background(hasFailure ? .orange : registered ? ReferenceColor.green : ReferenceColor.blue, in: RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain).disabled(commandState.isSubmitting || (registered && !hasFailure))
         }.padding(16) }.navigationTitle("活动详情").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }
         .task { if let values = state.localFeatures.drafts[draftKey]?.split(separator: "|", maxSplits: 1).map(String.init), values.count == 2 { contactName = values[0]; phone = values[1] } }
         }
@@ -477,13 +524,14 @@ struct CourseDetailSheet: View {
     @State private var progress = 0.15
     @State private var draft = ""
     @State private var replyError: String?
-    var body: some View { NavigationStack { VStack(spacing: 14) {
+    var body: some View { let commandState = state.workflowState(for: "support"); return NavigationStack { VStack(spacing: 14) {
         if title == "客服咨询" {
             Image(systemName: "message.fill").font(.system(size: 42)).foregroundStyle(ReferenceColor.blue)
             Text("课程咨询").font(.title3.bold())
             ScrollView { VStack(alignment: .leading, spacing: 8) { bubble("您好，我是向上少年客服老师，请问想咨询哪一类课程？", mine: false); ForEach(state.localFeatures.supportMessages) { message in bubble(message.text, mine: message.isMine) } }.frame(maxWidth: .infinity, alignment: .leading) }.frame(maxHeight: 220).padding(.horizontal, 18)
-            HStack { TextField("输入咨询内容", text: $draft).textFieldStyle(.roundedBorder).onChange(of: draft) { _, value in state.saveDraft(value, key: supportDraftKey) }; Button("发送") { let text = draft.trimmingCharacters(in: .whitespacesAndNewlines); guard !text.isEmpty else { replyError = "请输入咨询内容。"; return }; state.sendSupportMessage(text); state.clearDraft(supportDraftKey); draft = ""; replyError = nil } .buttonStyle(.borderedProminent).disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }.padding(.horizontal, 18)
+            HStack { TextField("输入咨询内容", text: $draft).textFieldStyle(.roundedBorder).onChange(of: draft) { _, value in state.saveDraft(value, key: supportDraftKey) }; Button { let text = draft.trimmingCharacters(in: .whitespacesAndNewlines); guard !text.isEmpty else { replyError = "请输入咨询内容。"; return }; Task { if await state.submitSupportCommand(text) { state.clearDraft(supportDraftKey); draft = ""; replyError = nil } } } label: { HStack(spacing: 4) { if commandState.isSubmitting { ProgressView() }; Text(commandState.isSubmitting ? "发送中" : "发送") } }.buttonStyle(.borderedProminent).disabled(commandState.isSubmitting || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }.padding(.horizontal, 18)
             if let replyError { Text(replyError).font(.system(size: 10)).foregroundStyle(.red) }
+            if case let .failed(message) = commandState { Text(message).font(.system(size: 10)).foregroundStyle(.red) }
         } else {
             Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill").font(.system(size: 48)).foregroundStyle(ReferenceColor.blue); Text(title).font(.title3.bold()); Text("已为您加载课程视频。播放进度会先保存在本机，后端联调后同步到孩子的学习记录。").font(.system(size: 13)).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal, 28); ProgressView(value: progress).tint(ReferenceColor.green).padding(.horizontal, 30); Button { isPlaying.toggle(); if isPlaying { withAnimation(.linear(duration: 2.5)) { progress = 0.8 }; state.updateCourseProgress(title, progress: 0.8) } } label: { Label(isPlaying ? "暂停学习" : "播放课程", systemImage: isPlaying ? "pause.fill" : "play.fill") }.buttonStyle(.borderedProminent)
         }
@@ -500,12 +548,15 @@ struct ExpertDetailSheet: View {
     @State private var note = "想了解孩子的运动发展建议。"
     @State private var submitted = false
     private var draftKey: String { "expert-\(name)" }
+    private var commandKey: String { "expert:\(name)" }
     var body: some View { NavigationStack { VStack(spacing: 14) {
         Image(systemName: "person.crop.circle.badge.checkmark").font(.system(size: 48)).foregroundStyle(ReferenceColor.blue)
         Text("\(name) · 健康成长专家").font(.title3.bold())
         Text("擅长儿童运动发展与健康评估，可为孩子提供体质、运动及成长建议。Mock 阶段先保存在本机，后端联调后提交至学校服务。")
             .font(.system(size: 13)).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal, 28)
-        if submitted { Label("预约信息已保存到本机，后端联调后提交给专家团队。", systemImage: "checkmark.circle.fill").font(.system(size: 12)).foregroundStyle(ReferenceColor.green) } else { VStack(spacing: 8) { TextField("期望咨询时间", text: $date).textFieldStyle(.roundedBorder); TextField("咨询说明", text: $note, axis: .vertical).lineLimit(3...5).textFieldStyle(.roundedBorder) }.padding(.horizontal, 20).onChange(of: date) { _, _ in state.saveDraft("\(date)|\(note)", key: draftKey) }.onChange(of: note) { _, _ in state.saveDraft("\(date)|\(note)", key: draftKey) }; Button("提交预约") { state.bookExpert(name: name, preferredDate: date, note: note); state.clearDraft(draftKey); submitted = true }.buttonStyle(.borderedProminent).disabled(date.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
+        let commandState = state.workflowState(for: commandKey)
+        let failed: Bool = { if case .failed = commandState { return true }; return false }()
+        if submitted && !failed { Label("预约信息已保存到本机，后端联调后提交给专家团队。", systemImage: "checkmark.circle.fill").font(.system(size: 12)).foregroundStyle(ReferenceColor.green) } else { VStack(spacing: 8) { TextField("期望咨询时间", text: $date).textFieldStyle(.roundedBorder); TextField("咨询说明", text: $note, axis: .vertical).lineLimit(3...5).textFieldStyle(.roundedBorder) }.padding(.horizontal, 20).onChange(of: date) { _, _ in state.saveDraft("\(date)|\(note)", key: draftKey) }.onChange(of: note) { _, _ in state.saveDraft("\(date)|\(note)", key: draftKey) }; if case let .failed(message) = commandState { Text(message).font(.caption).foregroundStyle(.red) }; Button { Task { if await state.submitExpertCommand(name: name, preferredDate: date, note: note) { state.clearDraft(draftKey); submitted = true } } } label: { HStack { if commandState.isSubmitting { ProgressView() }; Text(commandState.isSubmitting ? "正在提交…" : submitted ? "重新提交" : "提交预约") } }.buttonStyle(.borderedProminent).disabled(commandState.isSubmitting || date.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
     }.frame(maxWidth: .infinity, maxHeight: .infinity).navigationTitle("专家详情").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }.task { if let saved = state.localFeatures.drafts[draftKey]?.split(separator: "|", maxSplits: 1).map(String.init), saved.count == 2 { date = saved[0]; note = saved[1] }; submitted = state.localFeatures.expertAppointments.contains { $0.expertName == name && ($0.status == .pendingSync || $0.status == .submitted) } } } }
 }
 

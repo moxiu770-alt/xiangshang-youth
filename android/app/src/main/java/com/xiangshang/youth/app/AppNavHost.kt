@@ -172,19 +172,20 @@ val LocalDashboardClearError = compositionLocalOf<() -> Unit> { {} }
             val destination = if (role.name == "Parent") Destinations.Parent else if (role.name == "Teacher") Destinations.Teacher else Destinations.Principal
             nav.navigate(destination) { popUpTo(Destinations.Role) { inclusive = true }; launchSingleTop = true }
         }, onLogout = { viewModel.logout(); nav.navigate(Destinations.Login) { popUpTo(Destinations.Role) { inclusive = true }; launchSingleTop = true } }) }
-        composable(Destinations.Parent) { ParentHomeScreen(state, nav, viewModel::registerActivity, viewModel::checkInToday, viewModel::bookExpert, viewModel::saveDraft, viewModel::clearDraft, viewModel::refreshDashboard) }
+        composable(Destinations.Parent) { ParentHomeScreen(state, nav, viewModel::registerActivity, viewModel::checkInToday, viewModel::bookExpert, viewModel::saveDraft, viewModel::clearDraft, { viewModel.refreshDashboard() }, { name, phone -> viewModel.submitActivityCommand(name, phone) }, { name, date, note -> viewModel.submitExpertCommand(name, date, note) }) }
         composable(Destinations.Children) { ChildrenScreen(state, nav, viewModel::bindChild, choose = { viewModel.chooseChild(it); nav.popBackStack() }, onBound = { nav.popBackStack() }) }
         composable(Destinations.ParentEvaluations) { ParentEvaluationsScreen(state, nav, state.selectedChild?.let(viewModel::report)) }
         composable("${Destinations.Assessment}/{category}") { entry -> AssessmentFlowScreen(state, nav, entry.arguments?.getString("category") ?: "fitness", viewModel::completeAssessment, viewModel::saveDraft, viewModel::clearDraft) }
-        composable(Destinations.Courses) { ParentCoursesScreen(state, nav, viewModel::updateCourseProgress, viewModel::sendSupport, viewModel::saveDraft, viewModel::clearDraft) }
+        composable(Destinations.Courses) { ParentCoursesScreen(state, nav, viewModel::updateCourseProgress, viewModel::sendSupport, viewModel::saveDraft, viewModel::clearDraft, submitSupport = viewModel::submitSupportCommand) }
         composable(Destinations.CoursesRoute) { entry ->
             ParentCoursesScreen(
                 state, nav, viewModel::updateCourseProgress, viewModel::sendSupport,
                 viewModel::saveDraft, viewModel::clearDraft,
-                openSupport = entry.arguments?.getString("openSupport") == "true"
+                openSupport = entry.arguments?.getString("openSupport") == "true",
+                submitSupport = viewModel::submitSupportCommand
             )
         }
-        composable(Destinations.Circle) { ParentClassCircleScreen(state, nav, viewModel::publishPost, viewModel::saveDraft, viewModel::clearDraft, viewModel::togglePostLike, viewModel::addPostComment) }
+        composable(Destinations.Circle) { ParentClassCircleScreen(state, nav, viewModel::publishPost, viewModel::saveDraft, viewModel::clearDraft, viewModel::togglePostLike, viewModel::addPostComment, viewModel::submitClassPostCommand) }
         composable(Destinations.Account) { if (state.role?.name == "Teacher") TeacherAccountScreen(state, nav, viewModel::logout, viewModel::updateSettings) else AccountScreen(state, nav, viewModel::chooseRole, viewModel::logout, viewModel::updateSettings, viewModel::sendSupport) }
         composable(Destinations.Messages) { ParentMessagesScreen(state, nav, viewModel::markMessageRead) }
         composable(Destinations.Notifications) { NotificationsScreen(state, nav, viewModel::markMessageRead) }
@@ -233,9 +234,9 @@ val LocalDashboardClearError = compositionLocalOf<() -> Unit> { {} }
         composable(Destinations.TeacherBoard) { TeacherClassBoardScreen(state, nav) { student -> viewModel.chooseChild(student); nav.navigateSingleTop(Destinations.Report) } }
         composable(Destinations.Students) { StudentListScreen(state, nav, null) { student -> viewModel.chooseChild(student); nav.navigateSingleTop(Destinations.Report) } }
         composable(Destinations.StudentsRoute) { entry -> StudentListScreen(state, nav, entry.arguments?.getString("className")) { student -> viewModel.chooseChild(student); nav.navigateSingleTop(Destinations.Report) } }
-        composable(Destinations.Tasks) { TeacherTasksScreen(state, nav, viewModel::saveCourseUpload) }
-        composable(Destinations.TaskDetailRoute) { entry -> TeacherTaskDetailScreen(state, nav, viewModel::updateStudentTaskStatus, entry.arguments?.getString("taskId")) }
-        composable(Destinations.Review) { ReviewListScreen(state, nav, viewModel::submitReviewDecision, viewModel::saveDraft, viewModel::clearDraft) }
+        composable(Destinations.Tasks) { TeacherTasksScreen(state, nav, viewModel::saveCourseUpload, { taskId, attendance, notes, attachment -> viewModel.submitCourseUploadCommand(taskId, attendance, notes, attachment) }) }
+        composable(Destinations.TaskDetailRoute) { entry -> TeacherTaskDetailScreen(state, nav, viewModel::updateStudentTaskStatus, entry.arguments?.getString("taskId"), viewModel::submitTaskStatusCommand) }
+        composable(Destinations.Review) { ReviewListScreen(state, nav, viewModel::submitReviewDecision, viewModel::saveDraft, viewModel::clearDraft, viewModel::submitTaskStatusCommand) }
         composable(Destinations.Principal) { PrincipalHomeScreen(state, nav, viewModel::clearRoleSelection, viewModel::refreshDashboard) }
         composable(Destinations.PrincipalGrades) { GradeStatsScreen(state, nav, rootTab = true) }
         composable(Destinations.PrincipalClassStats) { ClassStatsScreen(state, nav, null, rootTab = true) }

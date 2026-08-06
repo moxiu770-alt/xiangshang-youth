@@ -67,6 +67,12 @@ final class ApiClient {
         _ = try await perform(makeRequest(path: path, method: method, query: query, body: body))
     }
 
+    /// Encodes workflow command payloads at the transport boundary so feature
+    /// views never need to know about JSON or HTTP details.
+    func send<Body: Encodable>(path: String, method: String = "POST", query: [URLQueryItem] = [], body: Body) async throws {
+        try await send(path: path, method: method, query: query, body: JSONEncoder().encode(body))
+    }
+
     func request<T: Decodable>(_ request: URLRequest, type: T.Type) async throws -> T {
         let data = try await perform(request)
         do {

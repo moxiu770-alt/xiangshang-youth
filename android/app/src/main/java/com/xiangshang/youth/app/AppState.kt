@@ -28,6 +28,14 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+enum class WorkflowCommandStatus { Idle, Submitting, Succeeded, Failed }
+data class WorkflowCommandState(
+    val status: WorkflowCommandStatus = WorkflowCommandStatus.Idle,
+    val message: String? = null
+) {
+    val isSubmitting: Boolean get() = status == WorkflowCommandStatus.Submitting
+}
+
 data class AppUiState(
     val profile: UserProfile? = null,
     val role: UserRole? = null,
@@ -40,7 +48,8 @@ data class AppUiState(
     val isOffline: Boolean = false,
     val reportOverrides: Map<String, DiagnosisReport> = emptyMap(),
     val reportLoadingStudentId: String? = null,
-    val reportError: String? = null
+    val reportError: String? = null,
+    val workflowStates: Map<String, WorkflowCommandState> = emptyMap()
 ) {
     val unreadMessageCount: Int get() = if (!local.settings.notificationsEnabled) 0 else data?.messages?.count { !it.isRead && it.id !in local.readMessageIds } ?: 0
     /** Local writes waiting for the future remote sync worker. */
@@ -129,6 +138,62 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     fun clearReportError() { _state.value = _state.value.copy(reportError = null) }
+    fun workflowState(key: String): WorkflowCommandState = _state.value.workflowStates[key] ?: WorkflowCommandState()
+    fun clearWorkflowState(key: String) { _state.value = _state.value.copy(workflowStates = _state.value.workflowStates + (key to WorkflowCommandState())) }
+
+    private fun executeWorkflow(key: String, operation: suspend () -> Unit) = viewModelScope.launch {
+        val current = workflowState(key)
+        if (current.isSubmitting) return@launch
+        _state.value = _state.value.copy(workflowStates = _state.value.workflowStates + (key to WorkflowCommandState(WorkflowCommandStatus.Submitting)))
+        try {
+            operation()
+            _state.value = _state.value.copy(workflowStates = _state.value.workflowStates + (key to WorkflowCommandState(WorkflowCommandStatus.Succeeded, "已提交，本机记录将继续等待同步确认。")))
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            _state.value = _state.value.copy(workflowStates = _state.value.workflowStates + (key to WorkflowCommandState()))
+            throw error
+        } catch (error: Throwable) {
+            _state.value = _state.value.copy(workflowStates = _state.value.workflowStates + (key to WorkflowCommandState(WorkflowCommandStatus.Failed, error.message ?: "提交失败，请重试")))
+        }
+    }
+
+    fun submitActivityCommand(contactName: String, phone: String) = executeWorkflow("activity:health-growth-season-2026") {
+        if (contactName.isBlank() || phone.filter(Char::isDigit).length != 11) throw IllegalArgumentException("请填写有效的联系人和手机号。")
+        registerActivity(contactName.trim(), phone.trim())
+        val record = _state.value.local.activityRegistrations.firstOrNull { it.activityId == "health-growth-season-2026" } ?: throw IllegalArgumentException("报名信息不完整。")
+        repository.submitActivity(record)
+    }
+
+    fun submitExpertCommand(name: String, date: String, note: String) = executeWorkflow("expert:$name") {
+        if (date.isBlank() || note.trim().isBlank()) throw IllegalArgumentException("请填写咨询时间和说明。")
+        bookExpert(name, date.trim(), note.trim())
+        val record = _state.value.local.expertAppointments.firstOrNull { it.expertName == name } ?: throw IllegalArgumentException("预约信息不完整。")
+        repository.bookExpert(record)
+    }
+
+    fun submitCourseUploadCommand(taskId: String, attendance: Int, notes: String, attachment: String) = executeWorkflow("course:$taskId") {
+        if (attendance <= 0 || notes.trim().isBlank() || attachment.trim().isBlank()) throw IllegalArgumentException("提交前请补齐出勤人数、课堂记录和附件。")
+        saveCourseUpload(taskId, attendance, notes, attachment, true)
+        val record = _state.value.local.courseUploads.firstOrNull { it.taskId == taskId } ?: throw IllegalArgumentException("课程记录不完整。")
+        repository.uploadCourse(record)
+    }
+
+    fun submitTaskStatusCommand(studentId: String, status: TaskStatus, note: String?) = executeWorkflow("task-status:$studentId") {
+        if (studentId.isBlank()) throw IllegalArgumentException("学生信息缺失。")
+        submitReviewDecision(studentId, status, note.orEmpty().ifBlank { "已完成状态处理" })
+        repository.updateTaskStatus(studentId, status, note)
+    }
+
+    fun submitClassPostCommand(author: String, content: String) = executeWorkflow("post:$author") {
+        if (content.trim().isBlank()) throw IllegalArgumentException("动态内容不能为空。")
+        publishPost(author, content.trim())
+        repository.publishClassPost(author, content.trim())
+    }
+
+    fun submitSupportCommand(content: String) = executeWorkflow("support") {
+        if (content.trim().isBlank()) throw IllegalArgumentException("请输入咨询内容。")
+        sendSupport(content.trim())
+        repository.sendSupportMessage(content.trim())
+    }
     fun registerActivity(contactName: String, phone: String) {
         if (contactName.isBlank() || phone.filter(Char::isDigit).length != 11) return
         mutate { local ->

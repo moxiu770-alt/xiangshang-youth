@@ -132,7 +132,49 @@ struct CourseUploadSheet: View {
     @State private var isImporterShown = false
     @State private var isCameraShown = false
     private var draftKey: String { "course-upload-\(taskID)" }
-    var body: some View { NavigationStack { Form { Section("课程记录") { TextField("出勤人数", text: $attendance).keyboardType(.numberPad); TextField("课堂记录", text: $notes, axis: .vertical).lineLimit(3...5); LabeledContent("课堂附件", value: attachment); Button("拍摄课堂照片") { openCamera() }.accessibilityHint("需要相机权限；模拟器或无相机设备可使用文件选择"); Button("从文件选择照片") { isImporterShown = true } }; Section { Button("保存草稿") { save(submit: false) }; Button("提交审核") { save(submit: true) }.disabled(notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || attachment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }; if let error { Section { Text(error).foregroundStyle(.red) } } }.navigationTitle("延时课程上传").toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }.task { if let record = state.localFeatures.courseUploads.first(where: { $0.taskID == taskID }) { attendance = String(record.attendanceCount); notes = record.notes; attachment = record.attachmentName } else if let draft = state.localFeatures.drafts[draftKey]?.split(separator: "|", maxSplits: 2).map(String.init), draft.count == 3 { attendance = draft[0]; notes = draft[1]; attachment = draft[2] } }.onChange(of: attendance) { _, _ in saveDraft() }.onChange(of: notes) { _, _ in saveDraft() }.onChange(of: attachment) { _, _ in saveDraft() }.fileImporter(isPresented: $isImporterShown, allowedContentTypes: [.image]) { result in if case let .success(url) = result { attachment = url.lastPathComponent } }.sheet(isPresented: $isCameraShown) { CameraPicker(onImage: { _ in attachment = "课堂照片-\(Self.fileStamp()).jpg"; isCameraShown = false }, onCancel: { isCameraShown = false }) } } }
+    var body: some View {
+        let commandState = state.workflowState(for: "course:\(taskID)")
+        return NavigationStack {
+            Form {
+                Section("课程记录") {
+                    TextField("出勤人数", text: $attendance).keyboardType(.numberPad)
+                    TextField("课堂记录", text: $notes, axis: .vertical).lineLimit(3...5)
+                    LabeledContent("课堂附件", value: attachment)
+                    Button("拍摄课堂照片") { openCamera() }.accessibilityHint("需要相机权限；模拟器或无相机设备可使用文件选择")
+                    Button("从文件选择照片") { isImporterShown = true }
+                }
+                Section {
+                    Button("保存草稿") { save(submit: false) }
+                    Button {
+                        guard let count = Int(attendance), count >= 0 else { error = "请填写有效的出勤人数。"; return }
+                        guard !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !attachment.isEmpty else { error = "提交前请补齐课堂记录和附件。"; return }
+                        Task {
+                            if await state.submitCourseUploadCommand(taskID: taskID, attendanceCount: count, notes: notes, attachmentName: attachment) {
+                                state.clearDraft(draftKey)
+                                dismiss()
+                            }
+                        }
+                    } label: {
+                        HStack { if commandState.isSubmitting { ProgressView() }; Text(commandState.isSubmitting ? "正在提交…" : "提交审核") }
+                    }
+                    .disabled(commandState.isSubmitting || notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || attachment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    if case let .failed(message) = commandState { Text(message).foregroundStyle(.red) }
+                }
+                if let error { Section { Text(error).foregroundStyle(.red) } }
+            }
+            .navigationTitle("延时课程上传")
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }
+            .task {
+                if let record = state.localFeatures.courseUploads.first(where: { $0.taskID == taskID }) { attendance = String(record.attendanceCount); notes = record.notes; attachment = record.attachmentName }
+                else if let draft = state.localFeatures.drafts[draftKey]?.split(separator: "|", maxSplits: 2).map(String.init), draft.count == 3 { attendance = draft[0]; notes = draft[1]; attachment = draft[2] }
+            }
+            .onChange(of: attendance) { _, _ in saveDraft() }
+            .onChange(of: notes) { _, _ in saveDraft() }
+            .onChange(of: attachment) { _, _ in saveDraft() }
+            .fileImporter(isPresented: $isImporterShown, allowedContentTypes: [.image]) { result in if case let .success(url) = result { attachment = url.lastPathComponent } }
+            .sheet(isPresented: $isCameraShown) { CameraPicker(onImage: { _ in attachment = "课堂照片-\(Self.fileStamp()).jpg"; isCameraShown = false }, onCancel: { isCameraShown = false }) }
+        }
+    }
     private func saveDraft() { state.saveDraft("\(attendance)|\(notes)|\(attachment)", key: draftKey) }
     private func save(submit: Bool) { guard let count = Int(attendance), count >= 0 else { error = "请填写有效的出勤人数。"; return }; if submit && (notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || attachment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) { error = "提交前请补齐课堂记录和附件。"; return }; state.saveCourseUpload(taskID: taskID, attendanceCount: count, notes: notes, attachmentName: attachment, submit: submit); if submit { state.clearDraft(draftKey); dismiss() } else { error = "草稿已保存，可稍后继续编辑。" } }
     private func openCamera() {
@@ -1014,20 +1056,25 @@ private struct TaskStatusSheet: View {
                         if let validationMessage { Text(validationMessage).font(.caption).foregroundStyle(.red) }
                     }
                 }
-                Section("处理结论") {
-                    ForEach(TaskStatus.allCases, id: \.self) { item in
+                    Section("处理结论") {
+                        ForEach(TaskStatus.allCases, id: \.self) { item in
                         Button {
                             if requiresReviewNote && reviewNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                 validationMessage = "请先填写复核或补测处理意见。"
                                 return
                             }
-                            state.updateTaskStatus(for: student, status: item, reviewNote: reviewNote)
-                            state.clearDraft(draftKey)
-                            dismiss()
+                            Task {
+                                if await state.submitTaskStatusCommand(studentID: student.id, status: item, note: reviewNote) {
+                                    state.clearDraft(draftKey)
+                                    dismiss()
+                                }
+                            }
                         } label: {
-                            HStack { Text(item.rawValue); Spacer(); if item == status { Image(systemName: "checkmark").foregroundStyle(ReferenceColor.blue) } }
+                            HStack { Text(item.rawValue); Spacer(); if state.workflowState(for: "task-status:\(student.id)").isSubmitting { ProgressView() } else if item == status { Image(systemName: "checkmark").foregroundStyle(ReferenceColor.blue) } }
                         }.foregroundStyle(item == status ? ReferenceColor.blue : ReferenceColor.navy)
+                            .disabled(state.workflowState(for: "task-status:\(student.id)").isSubmitting)
                     }
+                    if case let .failed(message) = state.workflowState(for: "task-status:\(student.id)") { Text(message).font(.caption).foregroundStyle(.red) }
                 }
             }
             .navigationTitle("处理\(student.name)预警")

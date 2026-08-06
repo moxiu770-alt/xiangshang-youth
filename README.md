@@ -5,7 +5,7 @@
 - `ios/XiangshangYouth`：SwiftUI + MVVM + Combine/ObservableObject
 - `android`：Kotlin + Jetpack Compose + ViewModel + StateFlow
 
-两端默认使用一致的 `MockRepository`，页面不依赖后端即可启动。网络层已通过 `ApiClient`、Auth/Student/Task/Report/Message/Stats API 和 `RemoteRepository` 预留；后端联调时只需切换数据源，不修改页面路由和组件。
+两端默认使用一致的 `MockRepository`，页面不依赖后端即可启动。网络层已通过 `ApiClient`、Auth/Student/Task/Report/Message/Stats API、`WorkflowApi` 和 `RemoteRepository` 预留；报名、专家预约、课程上传、复核/补测、班级动态、客服咨询等写操作统一经过 command/use-case 状态边界，后端联调时只需切换数据源，不修改页面路由和组件。
 
 ## 本地验证
 
@@ -50,6 +50,7 @@ export ANDROID_HOME="/Users/luyanpeng/Library/Android/sdk"
 - 本地草稿、绑定关系、测评状态、班级动态和课程进度会保存，测评步骤/答案支持配置变更后的恢复；登录失败、恢复失败、空数据和重试状态均由页面处理；本地提交使用独立的 `pendingSync` 状态，兼容旧版本 `submitted` 数据，避免把 Mock 写入误当成学校服务已确认；双端根工作台支持主动刷新，Android 提供刷新按钮与全局错误重试，iOS 支持系统下拉刷新；登录页可打开协议/隐私说明。双端会监听网络状态，在断网时显示“离线模式”提示，明确当前内容可能是本地 Mock/缓存数据。
 - 深链格式：`xiangshang-youth://open?target=report&studentId=s01`，支持报告、复核、任务和风险入口。
 - 报告详情页保留本地可读报告，进入页面或点击“同步报告”会走独立的异步报告数据源；请求期间只锁定报告同步按钮，失败显示页内重试/关闭，不覆盖其他工作台的刷新状态；切换账号或退出登录时会丢弃未完成请求的旧会话响应。
+- 报名、专家预约、课程上传、教师状态更新、班级动态和客服咨询均使用独立的 workflow command 状态（`idle / submitting / succeeded / failed`），页面统一显示提交中、成功、失败和重试；Mock 实现不发网络请求，Remote 实现调用版本化 endpoint，后端联调不需要重写页面状态。
 - Android 页面和关键卡片已补充 TalkBack 语义；iOS 使用 VoiceOver accessibility label。
 - 启动海报已统一为清理系统状态栏和底部 Home 指示条后的清晰视觉资源：iOS 1x/2x/3x 与 Android `drawable-nodpi` 使用同一画面比例；iOS 包含 `PrivacyInfo.xcprivacy`，Android 禁止明文流量和自动备份。
 
@@ -60,7 +61,7 @@ export ANDROID_HOME="/Users/luyanpeng/Library/Android/sdk"
 ### P0：试点前必须补齐
 
 - **逐页状态机**：每个列表、详情、提交、上传和刷新入口都要统一覆盖 `idle / loading / success / empty / error / retry`，并补充防重复提交、超时和取消行为。当前 Mock 主流程、教师/家长/校长主要列表与详情、通知/班级圈/课程上传已补齐页面级加载、空、错误和重试；真实接口接入时仍需把服务端失败、取消和超时映射到同一状态容器。
-- **真实交互反馈**：报名、复核、补测、动态、课程上传、客服咨询、设置和忘记密码已具备 Mock 校验、成功反馈与本地持久化；联调前要把本地写入抽象为可替换 command/use-case，并补充失败回滚与超时模拟。
+- **真实交互反馈**：报名、复核、补测、动态、课程上传和客服咨询已具备 Mock 校验、成功反馈、本地持久化及统一 command/use-case 状态；设置与忘记密码仍需接入完整账户服务，真实联调前还要用服务端错误码补齐失败回滚、超时和取消模拟。
 - **登录与账号恢复**：微信/手机号/账号登录的回调、验证码失效、切换账号、注销、会话过期和深链冷启动需要在真实设备上走通；当前页面和本地会话已具备，第三方 SDK 回调待接入。
 - **网络接入边界**：iOS `URLSession` 与 Android `Retrofit/OkHttp` 已具备统一超时、鉴权、取消、401/403/5xx/网络错误映射和版本化 endpoint；默认仍为 Mock，联调时通过 iOS `XS_API_BASE_URL` 环境变量或 Android `-PapiBaseUrl=https://.../` 注入服务地址，不改页面层。
 - **权限与系统能力**：通知权限已接入 iOS `UNUserNotificationCenter` 与 Android 13+ `POST_NOTIFICATIONS`，并覆盖拒绝后的可恢复提示；照片/文件选择、相机、分享、系统浏览器和外部登录回跳仍需在真实业务接入时统一权限解释、拒绝后的降级 UI。

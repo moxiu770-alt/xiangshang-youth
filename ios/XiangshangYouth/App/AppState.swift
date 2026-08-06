@@ -19,6 +19,18 @@ import Network
     deinit { monitor.cancel() }
 }
 
+enum WorkflowCommandState: Equatable {
+    case idle
+    case submitting
+    case succeeded(String)
+    case failed(String)
+
+    var isSubmitting: Bool {
+        if case .submitting = self { return true }
+        return false
+    }
+}
+
 @MainActor final class AppState: ObservableObject {
     @Published var isShowingSplash = true
     @Published var profile: UserProfile?
@@ -28,6 +40,7 @@ import Network
     @Published var loading = false
     @Published private(set) var reportLoading = false
     @Published private(set) var reportError: String?
+    @Published private(set) var workflowStates: [String: WorkflowCommandState] = [:]
     @Published private(set) var isOffline = false
     /// Session restoration happens behind the launch artwork. Keeping this separate
     /// from `loading` prevents the retry overlay from flashing before login/role
@@ -132,7 +145,7 @@ import Network
     }
     func selectRole(_ role: UserRole) { selectedRole = role; if var profile { profile = UserProfile(id: profile.id, name: role == .teacher ? "李老师" : role == .principal ? "周校长" : "王女士", phone: profile.phone, role: role, schoolName: profile.schoolName, avatarInitials: role == .teacher ? "李" : role == .principal ? "周" : "王"); self.profile = profile; persistSession() } }
     func chooseAnotherRole() { selectedRole = nil }
-    func switchAccount() { ApiClient.shared.token = nil; featureStore.reset(); localFeatures = featureStore.state; profile = nil; selectedRole = nil; selectedChild = nil; data = nil; error = nil; reportLoading = false; reportError = nil; refreshedReports.removeAll() }
+    func switchAccount() { ApiClient.shared.token = nil; featureStore.reset(); localFeatures = featureStore.state; profile = nil; selectedRole = nil; selectedChild = nil; data = nil; error = nil; reportLoading = false; reportError = nil; workflowStates.removeAll(); refreshedReports.removeAll() }
     private var refreshedReports: [String: DiagnosisReport] = [:]
     func report(for student: Student) -> DiagnosisReport { refreshedReports[student.id] ?? repository.report(for: student) }
     func refreshReport(for student: Student) async {
@@ -152,6 +165,106 @@ import Network
         }
     }
     func clearReportError() { reportError = nil }
+
+    func workflowState(for key: String) -> WorkflowCommandState { workflowStates[key] ?? .idle }
+    func clearWorkflowState(_ key: String) { workflowStates[key] = .idle }
+
+    /// Executes a write-side command through the repository seam. Local-first
+    /// screens can show the same submitting/success/failure states in Mock and
+    /// Remote modes, while the operation itself remains replaceable.
+    private func executeWorkflow(_ key: String, operation: @escaping () async throws -> Void) async -> Bool {
+        guard !workflowState(for: key).isSubmitting else { return false }
+        workflowStates[key] = .submitting
+        do {
+            try await operation()
+            workflowStates[key] = .succeeded("已提交，本机记录将继续等待同步确认。")
+            return true
+        } catch {
+            if error is CancellationError || (error as? ApiError).map({ if case .cancelled = $0 { true } else { false } }) == true {
+                workflowStates[key] = .idle
+                return false
+            }
+            workflowStates[key] = .failed(error.localizedDescription)
+            return false
+        }
+    }
+
+    func submitActivityCommand(_ activityID: String, contactName: String, phone: String) async -> Bool {
+        guard !contactName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              phone.filter(\.isNumber).count == 11 else {
+            workflowStates["activity:\(activityID)"] = .failed("报名信息不完整，请检查姓名和手机号。")
+            return false
+        }
+        registerActivity(activityID, contactName: contactName, phone: phone)
+        guard let record = localFeatures.activityRegistrations.first(where: { $0.activityID == activityID }) else {
+            workflowStates["activity:\(activityID)"] = .failed("报名信息不完整，请检查姓名和手机号。")
+            return false
+        }
+        return await executeWorkflow("activity:\(activityID)") { try await self.repository.submitActivity(record) }
+    }
+
+    func submitExpertCommand(name: String, preferredDate: String, note: String) async -> Bool {
+        guard !preferredDate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            workflowStates["expert:\(name)"] = .failed("预约信息不完整，请填写时间和咨询说明。")
+            return false
+        }
+        bookExpert(name: name, preferredDate: preferredDate, note: note)
+        guard let record = localFeatures.expertAppointments.first(where: { $0.expertName == name }) else {
+            workflowStates["expert:\(name)"] = .failed("预约信息不完整，请填写时间和咨询说明。")
+            return false
+        }
+        return await executeWorkflow("expert:\(name)") { try await self.repository.bookExpert(record) }
+    }
+
+    func submitCourseUploadCommand(taskID: String, attendanceCount: Int, notes: String, attachmentName: String) async -> Bool {
+        guard attendanceCount > 0,
+              !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !attachmentName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            workflowStates["course:\(taskID)"] = .failed("提交前请补齐出勤人数、课堂记录和附件。")
+            return false
+        }
+        saveCourseUpload(taskID: taskID, attendanceCount: attendanceCount, notes: notes, attachmentName: attachmentName, submit: true)
+        guard let record = localFeatures.courseUploads.first(where: { $0.taskID == taskID }) else {
+            workflowStates["course:\(taskID)"] = .failed("提交前请补齐出勤人数、课堂记录和附件。")
+            return false
+        }
+        return await executeWorkflow("course:\(taskID)") { try await self.repository.uploadCourse(record) }
+    }
+
+    func submitTaskStatusCommand(studentID: String, status: TaskStatus, note: String?) async -> Bool {
+        guard !studentID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            workflowStates["task-status:\(studentID)"] = .failed("学生信息缺失，无法提交状态。")
+            return false
+        }
+        mutateLocal { values in
+            values.studentTaskStatuses[studentID] = status
+            if let note, !note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { values.reviewNotes[studentID] = note.trimmingCharacters(in: .whitespacesAndNewlines) }
+        }
+        return await executeWorkflow("task-status:\(studentID)") { try await self.repository.updateTaskStatus(studentID: studentID, status: status, note: note) }
+    }
+
+    func submitClassPostCommand(_ content: String, author: String) async -> Bool {
+        guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            workflowStates["post:\(author)"] = .failed("动态内容不能为空。")
+            return false
+        }
+        publishClassPost(content, author: author)
+        guard localFeatures.classPosts.contains(where: { $0.author == author && $0.content == content }) else {
+            workflowStates["post:\(author)"] = .failed("动态内容不能为空。")
+            return false
+        }
+        return await executeWorkflow("post:\(author)") { try await self.repository.publishClassPost(author: author, content: content) }
+    }
+
+    func submitSupportCommand(_ content: String) async -> Bool {
+        sendSupportMessage(content)
+        guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            workflowStates["support"] = .failed("请输入咨询内容。")
+            return false
+        }
+        return await executeWorkflow("support") { try await self.repository.sendSupportMessage(content) }
+    }
     func selectChild(_ student: Student) { selectedChild = student; persistSelectedChild() }
     var boundChildren: [Student] {
         guard let data else { return [] }

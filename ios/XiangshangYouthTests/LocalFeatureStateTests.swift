@@ -271,6 +271,27 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertEqual(state.localFeatures.expertAppointments.first?.status, .pendingSync)
     }
 
+    func testMockWorkflowCommandsExposeTerminalSuccessAndValidationStates() async {
+        let suite = "xiangshang.youth.workflow-command-tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let state = AppState(repository: MockRepository.shared, featureStore: LocalFeatureStore(defaults: defaults))
+        await state.login(phone: "13800138000")
+
+        let activityResult = await state.submitActivityCommand("health-growth-season-2026", contactName: "王女士", phone: "13800138000")
+        XCTAssertTrue(activityResult)
+        if case .succeeded = state.workflowState(for: "activity:health-growth-season-2026") {} else { XCTFail("Mock activity command should reach succeeded") }
+
+        let invalidActivityResult = await state.submitActivityCommand("health-growth-season-2026", contactName: "", phone: "123")
+        XCTAssertFalse(invalidActivityResult)
+        if case .failed = state.workflowState(for: "activity:health-growth-season-2026") {} else { XCTFail("Invalid activity command should expose failure") }
+
+        let statusResult = await state.submitTaskStatusCommand(studentID: "s01", status: .review, note: "请核验动作视频")
+        XCTAssertTrue(statusResult)
+        if case .succeeded = state.workflowState(for: "task-status:s01") {} else { XCTFail("Mock task status command should reach succeeded") }
+        XCTAssertEqual(state.taskStatus(for: state.data!.students[0]), .review)
+    }
+
     func testPendingSyncCountExposesUnacknowledgedLocalWrites() {
         let suite = "xiangshang.youth.pending-count-tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!

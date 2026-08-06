@@ -34,6 +34,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.xiangshang.youth.BuildConfig
 import com.xiangshang.youth.R
 import com.xiangshang.youth.app.*
 import com.xiangshang.youth.core.model.UserRole
@@ -144,7 +145,7 @@ fun LoginScreen(
         }
     }
     legalDocument?.let { document ->
-        AlertDialog(onDismissRequest = { legalDocument = null }, title = { Text(document) }, text = { Text("本页面为一期内测版展示。正式上线前将替换为经审核的完整文本，并说明账号、儿童健康数据、通知和第三方登录的处理规则。当前 Mock 数据不会上传到服务器。") }, confirmButton = { TextButton(onClick = { legalDocument = null }) { Text("完成") } })
+        AlertDialog(onDismissRequest = { legalDocument = null }, title = { Text(document) }, text = { Text("本协议说明账号注册、儿童健康档案、通知服务及第三方登录的处理规则。请在使用前认真阅读，并以平台正式发布的完整条款为准。") }, confirmButton = { TextButton(onClick = { legalDocument = null }) { Text("完成") } })
     }
 }
 
@@ -214,7 +215,7 @@ fun RegisterScreen(
         }, enabled = agreement, modifier = Modifier.fillMaxWidth().padding(top = 12.dp).height(44.dp), shape = CircleShape) { Text("注册并登录", fontWeight = FontWeight.Bold) }
     }
     legalDocument?.let { document ->
-        AlertDialog(onDismissRequest = { legalDocument = null }, title = { Text(document) }, text = { Text("本页面为一期内测版展示。正式上线前将替换为经审核的完整文本，并说明账号、儿童健康数据、通知和第三方登录的处理规则。当前 Mock 数据不会上传到服务器。") }, confirmButton = { TextButton(onClick = { legalDocument = null }) { Text("完成") } })
+        AlertDialog(onDismissRequest = { legalDocument = null }, title = { Text(document) }, text = { Text("本协议说明账号注册、儿童健康档案、通知服务及第三方登录的处理规则。请在使用前认真阅读，并以平台正式发布的完整条款为准。") }, confirmButton = { TextButton(onClick = { legalDocument = null }) { Text("完成") } })
     }
 }
 
@@ -251,7 +252,7 @@ fun PasswordResetScreen(onBack: () -> Unit) {
         }
 
         Text("找回向上少年账号", color = Navy, fontSize = 21.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp))
-        Text("验证手机号后设置新密码，验证码为 Mock 1234。", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.padding(top = 5.dp, bottom = 14.dp))
+        Text(if (BuildConfig.DEBUG) "验证手机号后设置新密码。测试环境验证码：1234。" else "验证手机号后设置新密码，验证码将通过短信发送。", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.padding(top = 5.dp, bottom = 14.dp))
         OutlinedTextField(
             value = phone,
             onValueChange = { phone = it; error = null },

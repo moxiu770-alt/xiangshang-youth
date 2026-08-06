@@ -489,7 +489,7 @@ struct ActivityDetailSheet: View {
             Image("ParentCampaign").resizable().scaledToFill().frame(height: 180).clipShape(RoundedRectangle(cornerRadius: 14))
             Text(title).font(.title3.bold())
             Label("7 月 16 日–8 月 15 日", systemImage: "calendar").font(.system(size: 12)).foregroundStyle(.secondary)
-            Text("完成综合健康测评，了解孩子的运动发展与健康成长情况。Mock 阶段先保存在本机，后端联调后同步到孩子档案。") .font(.system(size: 13)).foregroundStyle(.secondary)
+            Text("完成综合健康测评，了解孩子的运动发展与健康成长情况。提交后将同步至孩子成长档案。") .font(.system(size: 13)).foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 7) { Text("活动说明").font(.system(size: 15, weight: .bold)); Text("• 完成四项健康测评\n• 查看个性化成长报告\n• 可预约学校体测场地") .font(.system(size: 12)).foregroundStyle(ReferenceColor.navy) }.padding(12).background(ReferenceColor.sky, in: RoundedRectangle(cornerRadius: 12))
             if registered && !hasFailure {
                 Label("报名信息已保存到本机，后端联调后提交；活动开始前将通过消息中心通知您。", systemImage: "checkmark.circle.fill").font(.system(size: 12, weight: .medium)).foregroundStyle(ReferenceColor.green)
@@ -566,7 +566,7 @@ struct ExpertDetailSheet: View {
     var body: some View { NavigationStack { VStack(spacing: 14) {
         Image(systemName: "person.crop.circle.badge.checkmark").font(.system(size: 48)).foregroundStyle(ReferenceColor.blue)
         Text("\(name) · 健康成长专家").font(.title3.bold())
-        Text("擅长儿童运动发展与健康评估，可为孩子提供体质、运动及成长建议。Mock 阶段先保存在本机，后端联调后提交至学校服务。")
+        Text("擅长儿童运动发展与健康评估，可为孩子提供体质、运动及成长建议。预约信息提交后将由学校服务团队跟进。")
             .font(.system(size: 13)).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal, 28)
         let commandState = state.workflowState(for: commandKey)
         let failed: Bool = { if case .failed = commandState { return true }; return false }()

@@ -261,7 +261,7 @@ private struct LegalDocumentView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                Text("《\(document.rawValue)》\n\n本页面为一期内测版展示。正式上线前将替换为经审核的完整文本，并说明账号、儿童健康数据、通知和第三方登录的处理规则。当前 Mock 数据不会上传到服务器。\n\n如需帮助，请联系学校管理员或平台客服。")
+                Text("《\(document.rawValue)》\n\n本协议说明账号注册、儿童健康档案、通知服务及第三方登录的处理规则。请在使用前认真阅读，并以平台正式发布的完整条款为准。\n\n如需帮助，请联系学校管理员或平台客服。")
                     .font(.body).foregroundStyle(ReferenceColor.navy).frame(maxWidth: .infinity, alignment: .leading).padding(20)
             }
             .navigationTitle(document.rawValue)
@@ -388,9 +388,22 @@ struct ResetPasswordView: View {
     @State private var submitted = false
     @State private var countdownTask: Task<Void, Never>?
 
+    private var verificationHint: String {
+        #if DEBUG
+        "验证手机号后设置新密码。测试环境验证码：1234。"
+        #else
+        "验证手机号后设置新密码，验证码将通过短信发送。"
+        #endif
+    }
+
     var body: some View {
         NavigationStack {
             Form {
+                if !submitted {
+                    Text(verificationHint)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
                 if submitted {
                     Section {
                         VStack(spacing: 12) {

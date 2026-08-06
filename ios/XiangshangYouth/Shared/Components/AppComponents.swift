@@ -10,7 +10,13 @@ struct AppScaffold<Content: View>: View {
                 Button(action: { if router.path.isEmpty { dismiss() } else { router.pop() } }) { Image(systemName: "chevron.left").font(.system(size: 15, weight: .bold)).foregroundStyle(AppTheme.ink).frame(width: 34, height: 34).background(.ultraThinMaterial, in: Circle()) }.accessibilityLabel("返回").frame(maxWidth: .infinity, alignment: .leading)
                 Text(title).font(.system(size: 16, weight: .bold)).foregroundStyle(AppTheme.ink)
             }.padding(.horizontal, 14).frame(height: 52).background { Rectangle().fill(.ultraThinMaterial).ignoresSafeArea(edges: .top) }
-            ScrollView { content.padding(.horizontal, 12).padding(.bottom, 18) }
+            ScrollView {
+                content
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 18)
+                    .frame(maxWidth: 720)
+                    .frame(maxWidth: .infinity)
+            }
         }
         .background(AppTheme.surface.ignoresSafeArea())
         .navigationBarBackButtonHidden(true)

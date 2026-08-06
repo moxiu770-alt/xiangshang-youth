@@ -67,22 +67,40 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
         val value = link.toString()
         val deepLink = DeepLinkResolver.parse(value)
         if (handledDeepLink == value || deepLink == null || state.profile == null || state.data == null) return@LaunchedEffect
+        fun navigateRoleRoot(role: UserRole): String {
+            viewModel.chooseRole(role)
+            val root = when (role) {
+                UserRole.Parent -> Destinations.Parent
+                UserRole.Teacher -> Destinations.Teacher
+                UserRole.Principal -> Destinations.Principal
+            }
+            // A cold deep link is delivered while the launch route is still
+            // visible. Establish the role workbench first so the destination
+            // always has a valid back stack. Warm links keep the current stack
+            // and switch roots only when needed.
+            if (nav.currentDestination?.route == Destinations.Splash) {
+                nav.navigate(root) { popUpTo(Destinations.Splash) { inclusive = true }; launchSingleTop = true }
+            } else if (nav.currentDestination?.route != root) {
+                nav.navigate(root) { launchSingleTop = true }
+            }
+            return root
+        }
         when (deepLink.target) {
             DeepLinkTarget.Report -> {
-                viewModel.chooseRole(UserRole.Parent)
+                navigateRoleRoot(UserRole.Parent)
                 deepLink.studentId?.let { studentId -> state.data?.students?.firstOrNull { it.id == studentId }?.let(viewModel::chooseChild) }
                 nav.navigate(Destinations.Report) { launchSingleTop = true }
             }
             DeepLinkTarget.Review -> {
-                viewModel.chooseRole(UserRole.Teacher)
+                navigateRoleRoot(UserRole.Teacher)
                 nav.navigate(Destinations.Review) { launchSingleTop = true }
             }
             DeepLinkTarget.Tasks -> {
-                viewModel.chooseRole(UserRole.Teacher)
+                navigateRoleRoot(UserRole.Teacher)
                 nav.navigate(Destinations.Tasks) { launchSingleTop = true }
             }
             DeepLinkTarget.Risk -> {
-                viewModel.chooseRole(UserRole.Principal)
+                navigateRoleRoot(UserRole.Principal)
                 nav.navigate(Destinations.Risk) { launchSingleTop = true }
             }
         }

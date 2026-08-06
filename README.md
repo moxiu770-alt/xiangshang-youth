@@ -15,7 +15,7 @@
 xcodebuild test \
   -project ios/XiangshangYouth/XiangshangYouth.xcodeproj \
   -scheme XiangshangYouth \
-  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5' \
   CODE_SIGNING_ALLOWED=NO
 ```
 
@@ -33,6 +33,8 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 export ANDROID_HOME="/Users/luyanpeng/Library/Android/sdk"
 ./gradlew :app:assembleAndroidTest
 ```
+
+如果 AVD 启动后出现 Android 系统自身的 “System UI isn't responding”，先重启或更换 AVD；该弹窗来自模拟器系统进程，不代表 APK 构建失败。`assembleDebug`、`testDebugUnitTest` 和 `lintDebug` 可在没有可用设备时完成静态验收。
 
 发布构建可用 `./gradlew :app:assembleRelease` 验证；当前输出为 `app-release-unsigned.apk`，需接入学校/发行方签名证书后才能上架。
 

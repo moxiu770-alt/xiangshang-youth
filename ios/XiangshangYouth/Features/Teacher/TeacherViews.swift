@@ -551,8 +551,14 @@ struct TeacherClassBoardView: View {
         ScrollView {
             VStack(spacing: 7) {
                 HStack {
-                    Button { router.pop() } label: { Image(systemName: "chevron.left") }
-                        .accessibilityLabel("返回")
+                    Button { router.pop() } label: {
+                        Image(systemName: "chevron.left")
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("返回")
+                    .accessibilityHint("返回班主任首页")
                     Spacer()
                     VStack(spacing: 1) {
                         Text("三年级2班 · 班级数据看板").font(.system(size: 14, weight: .bold))

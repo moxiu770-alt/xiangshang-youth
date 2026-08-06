@@ -367,6 +367,7 @@ struct TeacherDashboard: View {
                 .background(.white, in: Capsule()).overlay(Capsule().stroke(ReferenceColor.navy.opacity(0.10), lineWidth: 1)) }.buttonStyle(.plain)
             Button { router.push(.teacherMessages) } label: { Image(systemName: "bell").font(.system(size: 16, weight: .medium)).foregroundStyle(ReferenceColor.navy)
                 .overlay(alignment: .topTrailing) { if state.unreadMessageCount > 0 { Circle().fill(.red).frame(width: 5, height: 5).offset(x: 2, y: -2) } }
+                .frame(width: 44, height: 44).contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityLabel("消息通知").accessibilityHint("打开消息中心")
         }
         .padding(.horizontal, 13).padding(.vertical, 8)
@@ -569,7 +570,9 @@ struct TeacherClassBoardView: View {
                         Image(systemName: "bell").overlay(alignment: .topTrailing) {
                             if state.unreadMessageCount > 0 { Circle().fill(.red).frame(width: 5, height: 5) }
                         }
-                    }.buttonStyle(.plain).accessibilityLabel("消息通知")
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                    }.buttonStyle(.plain).accessibilityLabel("消息通知").accessibilityHint("打开消息中心")
                 }
                 .font(.system(size: 14, weight: .semibold))
                 .padding(.horizontal, 14)

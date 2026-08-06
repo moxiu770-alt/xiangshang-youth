@@ -22,8 +22,8 @@ struct ReferenceHeader: View {
             identityContent
         }
         Spacer()
-        if let roleAction { Button(action: roleAction) { Image(systemName: "arrow.left.arrow.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(ReferenceColor.blue) }.accessibilityLabel("切换使用角色") }
-        if showsBell { Button { router.push(state.selectedRole == .teacher ? .teacherMessages : .notifications) } label: { Image(systemName: "bell").font(.system(size: 16, weight: .medium)).foregroundStyle(ReferenceColor.navy).frame(width: 32, height: 32).contentShape(Rectangle()).overlay(alignment: .topTrailing) { if state.unreadMessageCount > 0 { Circle().fill(.red).frame(width: 5, height: 5).offset(x: 2, y: -2) } } }.buttonStyle(.plain).accessibilityLabel("消息通知") }
+        if let roleAction { Button(action: roleAction) { Image(systemName: "arrow.left.arrow.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(ReferenceColor.blue).frame(width: 44, height: 44).contentShape(Rectangle()) }.buttonStyle(.plain).accessibilityLabel("切换使用角色") }
+        if showsBell { Button { router.push(state.selectedRole == .teacher ? .teacherMessages : .notifications) } label: { Image(systemName: "bell").font(.system(size: 16, weight: .medium)).foregroundStyle(ReferenceColor.navy).frame(width: 32, height: 32).contentShape(Rectangle()).frame(width: 44, height: 44).contentShape(Rectangle()).overlay(alignment: .topTrailing) { if state.unreadMessageCount > 0 { Circle().fill(.red).frame(width: 5, height: 5).offset(x: -3, y: 3) } } }.buttonStyle(.plain).accessibilityLabel("消息通知").accessibilityHint("打开消息中心") }
     }.padding(.horizontal, 14).padding(.vertical, 9).background { Rectangle().fill(.ultraThinMaterial).ignoresSafeArea(edges: .top) }.overlay(alignment: .bottom) { Rectangle().fill(ReferenceColor.navy.opacity(0.08)).frame(height: 0.5) } }
     private var identityContent: some View {
         HStack(spacing: 9) {

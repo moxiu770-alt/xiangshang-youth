@@ -250,9 +250,12 @@ struct ParentPageNavigation: View {
                         .font(.system(size: 14, weight: .bold))
                         .frame(width: 32, height: 32)
                         .background(.ultraThinMaterial, in: Circle())
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("返回")
+                .accessibilityHint("返回上一页")
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             Text(title).font(.system(size: 15, weight: .bold))
@@ -265,7 +268,9 @@ struct ParentPageNavigation: View {
                                 Circle().fill(.red).frame(width: 4, height: 4).offset(x: 2, y: -2)
                             }
                         }
-                }.buttonStyle(.plain).accessibilityLabel("消息通知")
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }.buttonStyle(.plain).accessibilityLabel("消息通知").accessibilityHint("打开消息中心")
             }
         }
         .foregroundStyle(ReferenceColor.navy)

@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import org.junit.Rule
 import org.junit.Test
 
@@ -97,5 +98,22 @@ class MainActivityFlowTest {
         composeRule.onNodeWithText("绑定孩子").performClick()
         composeRule.onNodeWithText("绑定码在哪找？").performClick()
         composeRule.onNodeWithText("绑定码获取说明").assertIsDisplayed()
+        composeRule.onNodeWithText("知道了").performClick()
+        composeRule.onNodeWithText("孩子姓名").performTextInput("王小明")
+        composeRule.onNodeWithText("绑定码（Mock 示例 XS-S01）").performTextInput("XS-S01")
+        composeRule.onNodeWithText("确认绑定").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("查看详细报告", substring = true).fetchSemanticsNodes().isNotEmpty()
+        }
+        // Once a child is bound, the report route must render real seven-item
+        // content and expose a working back action rather than a dead card.
+        composeRule.onNodeWithText("查看详细报告", substring = true).performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("7项能力得分").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription("返回").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("查看详细报告", substring = true).fetchSemanticsNodes().isNotEmpty()
+        }
     }
 }

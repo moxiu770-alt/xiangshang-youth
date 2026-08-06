@@ -160,7 +160,7 @@ private fun ParentSection(title: String, action: String, onAction: (() -> Unit)?
     }
 
 @Composable
-fun ChildrenScreen(state: AppUiState, nav: NavHostController, bindChild: (String, String) -> Boolean, choose: (Student) -> Unit) = AppScaffold("孩子管理", onBack = { nav.popBackStack() }) {
+fun ChildrenScreen(state: AppUiState, nav: NavHostController, bindChild: (String, String) -> Boolean, choose: (Student) -> Unit, onBound: () -> Unit = {}) = AppScaffold("孩子管理", onBack = { nav.popBackStack() }) {
     var bindingOpen by rememberSaveable { mutableStateOf(false) }
     var childName by rememberSaveable { mutableStateOf("") }
     var bindingCode by rememberSaveable { mutableStateOf("") }
@@ -184,7 +184,7 @@ fun ChildrenScreen(state: AppUiState, nav: NavHostController, bindChild: (String
         onDismissRequest = { bindingOpen = false },
         title = { Text("绑定孩子") },
         text = { Column { OutlinedTextField(value = childName, onValueChange = { childName = it; bindingError = null }, label = { Text("孩子姓名") }, modifier = Modifier.fillMaxWidth()); OutlinedTextField(value = bindingCode, onValueChange = { bindingCode = it; bindingError = null }, label = { Text("绑定码（Mock 示例 XS-S01）") }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)); Text("绑定码由学校或班主任提供，用于确认家庭与孩子关系。", color = Color.Gray, fontSize = 9.sp, modifier = Modifier.padding(top = 7.dp)); TextButton(onClick = { bindingHelpOpen = true }, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp), modifier = Modifier.semantics { contentDescription = "查看绑定码获取说明" }) { Text("绑定码在哪找？", color = Blue, fontSize = 10.sp) }; bindingError?.let { Text(it, color = Color.Red, fontSize = 10.sp, modifier = Modifier.padding(top = 5.dp)) } } },
-        confirmButton = { TextButton(onClick = { if (bindChild(childName, bindingCode)) { childName = ""; bindingCode = ""; bindingError = null; bindingOpen = false } else bindingError = "姓名或绑定码不匹配，请核对后重试。" }) { Text("确认绑定") } },
+        confirmButton = { TextButton(onClick = { if (bindChild(childName, bindingCode)) { childName = ""; bindingCode = ""; bindingError = null; bindingOpen = false; onBound() } else bindingError = "姓名或绑定码不匹配，请核对后重试。" }) { Text("确认绑定") } },
         dismissButton = { TextButton(onClick = { bindingOpen = false }) { Text("取消") } }
     )
     if (bindingHelpOpen) AlertDialog(

@@ -68,7 +68,25 @@ struct TeacherClassCircleDashboard: View {
         ForEach(state.localFeatures.classPosts) { post in ReferenceCard { VStack(alignment: .leading, spacing: 5) { HStack { Text(post.author).font(.system(size: 10, weight: .bold)).foregroundStyle(ReferenceColor.blue); Spacer(); if post.author == "李老师" { Button("编辑") { editingPost = post }.font(.system(size: 9, weight: .semibold)).foregroundStyle(ReferenceColor.blue) } }; Text(post.content).font(.system(size: 12)); Text("刚刚发布").font(.system(size: 8)).foregroundStyle(.secondary) } }.padding(.horizontal, 12) }
         ReferenceSectionTitle(title: "班级动态", trailing: "本班最新").padding(.horizontal, 12)
         ForEach([("今日体能活动", "孩子们完成了侧向滑步与障碍跳练习，表现很棒！"), ("家校共育小贴士", "建议每天安排 20 分钟亲子运动时间。")], id: \.0) { item in ReferenceCard { VStack(alignment: .leading, spacing: 5) { Text(item.0).font(.system(size: 12, weight: .bold)); Text(item.1).font(.system(size: 9)).foregroundStyle(.secondary); Text("李老师 · 今天").font(.system(size: 8)).foregroundStyle(ReferenceColor.green) } }.padding(.horizontal, 12) }
-    }.padding(.bottom, 10) }.background(ReferenceColor.canvas).sheet(isPresented: $composerShown) { PublishClassPostSheet(author: "李老师") }.sheet(item: $editingPost) { post in PublishClassPostSheet(author: post.author, editingPost: post) }.sheet(item: Binding(get: { selectedNotice.map(CourseSheetItem.init) }, set: { selectedNotice = $0?.name })) { item in CourseDetailSheet(title: item.name) } }
+    }.padding(.bottom, 10) }
+        .background(ReferenceColor.canvas)
+        .overlay {
+            if let error = state.error, state.data == nil {
+                ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(ReferenceColor.canvas)
+            } else if state.loading || state.data == nil {
+                ZStack { ReferenceColor.canvas.ignoresSafeArea(); LoadingStateView() }
+            } else if state.data?.students.isEmpty == true {
+                EmptyStateView(title: "暂无班级动态", detail: "班级名单同步后，公告和家校动态会显示在这里。")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(ReferenceColor.canvas)
+            }
+        }
+        .sheet(isPresented: $composerShown) { PublishClassPostSheet(author: "李老师") }
+        .sheet(item: $editingPost) { post in PublishClassPostSheet(author: post.author, editingPost: post) }
+        .sheet(item: Binding(get: { selectedNotice.map(CourseSheetItem.init) }, set: { selectedNotice = $0?.name })) { item in CourseDetailSheet(title: item.name) }
+    }
 }
 
 struct SportsUploadDashboard: View {
@@ -82,7 +100,23 @@ struct SportsUploadDashboard: View {
         let submitted = state.localFeatures.uploadedTaskIDs.contains(taskID)
         Button { isUploadFormShown = true } label: { Text(submitted ? "查看已提交课程记录" : "填写并提交课程记录").font(.system(size: 13, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 11).foregroundStyle(.white).background(submitted ? ReferenceColor.green : .orange, in: RoundedRectangle(cornerRadius: 10)) }.buttonStyle(.plain).padding(.horizontal, 12)
         if let record = state.localFeatures.courseUploads.first(where: { $0.taskID == taskID }) { Text(record.status == .submitted ? "已提交：\(record.attachmentName) · 出勤 \(record.attendanceCount) 人" : "已保存草稿：\(record.notes)").font(.system(size: 9)).foregroundStyle(.secondary).padding(.horizontal, 14) }
-    }.padding(.bottom, 10) }.background(ReferenceColor.canvas).sheet(isPresented: $isUploadFormShown) { CourseUploadSheet(taskID: taskID) } }
+    }.padding(.bottom, 10) }
+        .background(ReferenceColor.canvas)
+        .overlay {
+            if let error = state.error, state.data == nil {
+                ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(ReferenceColor.canvas)
+            } else if state.loading || state.data == nil {
+                ZStack { ReferenceColor.canvas.ignoresSafeArea(); LoadingStateView() }
+            } else if state.data?.tasks.isEmpty == true {
+                EmptyStateView(title: "暂无课程上传任务", detail: "学校发布延时课程后，上传入口会显示在这里。")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(ReferenceColor.canvas)
+            }
+        }
+        .sheet(isPresented: $isUploadFormShown) { CourseUploadSheet(taskID: taskID) }
+    }
     private func uploadTile(_ icon: String, _ title: String) -> some View { Button { isUploadFormShown = true } label: { VStack(spacing: 5) { Image(systemName: icon).font(.system(size: 18)).foregroundStyle(ReferenceColor.blue); Text(title).font(.system(size: 9, weight: .medium)) }.frame(maxWidth: .infinity).padding(.vertical, 8).background(ReferenceColor.sky, in: RoundedRectangle(cornerRadius: 8)) }.buttonStyle(.plain).accessibilityLabel("上传\(title)") }
     private func uploadTask(_ title: String, _ status: String) -> some View { Button { isUploadFormShown = true } label: { HStack { Image(systemName: "figure.run").foregroundStyle(ReferenceColor.green); VStack(alignment: .leading) { Text(title).font(.system(size: 11, weight: .bold)); Text(status).font(.system(size: 9)).foregroundStyle(.secondary) }; Spacer(); Image(systemName: "chevron.right").font(.system(size: 9)).foregroundStyle(.secondary) }.padding(.vertical, 4) }.buttonStyle(.plain).accessibilityLabel("查看\(title)\(status)") }
 }

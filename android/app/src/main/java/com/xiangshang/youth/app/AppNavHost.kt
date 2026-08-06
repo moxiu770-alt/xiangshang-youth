@@ -175,7 +175,8 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
                 publishPost = viewModel::publishPost,
                 updatePost = viewModel::updatePost,
                 saveDraft = viewModel::saveDraft,
-                clearDraft = viewModel::clearDraft
+                clearDraft = viewModel::clearDraft,
+                refreshDashboard = viewModel::refreshDashboard
             )
         }
         composable(Destinations.TeacherBoard) { TeacherClassBoardScreen(state, nav) { student -> viewModel.chooseChild(student); nav.navigateSingleTop(Destinations.Report) } }

@@ -226,14 +226,19 @@ fun TeacherClassCircleScreen(
     publishPost: (String, String) -> Unit,
     updatePost: (String, String) -> Unit,
     saveDraft: (String, String) -> Unit,
-    clearDraft: (String) -> Unit
+    clearDraft: (String) -> Unit,
+    refreshDashboard: () -> Unit = {}
 ) {
+    val dashboardError = state.error
+    if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = refreshDashboard); return }
+    if (state.loading || state.data == null) { LoadingState(); return }
+    if (state.data.students.isEmpty()) { EmptyState("暂无班级动态，班级名单同步后会显示在这里。") ; return }
     var composer by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf<String?>(null) }
     var editingPost by remember { mutableStateOf<com.xiangshang.youth.core.service.ClassPost?>(null) }
     val composerDraftKey = "teacher-class-circle-composer"
     Scaffold(containerColor = Canvas, bottomBar = { TeacherBottomBar(nav, Destinations.TeacherCircle) }) { padding -> Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
-        Row(Modifier.fillMaxWidth().background(Color.White).padding(13.dp), verticalAlignment = Alignment.CenterVertically) { Image(painterResource(R.drawable.teacher_avatar), null, Modifier.size(38.dp).clip(CircleShape), contentScale = ContentScale.Crop); Spacer(Modifier.width(8.dp)); Column(Modifier.weight(1f)) { Text("三年级2班 · 班级圈", color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp); Text("向上实验小学 · ${state.data?.students?.count { it.className == "三年级2班" } ?: 0}名学生", color = Color.Gray, fontSize = 9.sp) }; IconButton(onClick = { nav.navigateSingleTop(Destinations.TeacherMessages) }) { Icon(Icons.Filled.Notifications, contentDescription = "消息通知", tint = Blue) } }
+        Row(Modifier.fillMaxWidth().background(Color.White).padding(13.dp), verticalAlignment = Alignment.CenterVertically) { Image(painterResource(R.drawable.teacher_avatar), null, Modifier.size(38.dp).clip(CircleShape), contentScale = ContentScale.Crop); Spacer(Modifier.width(8.dp)); Column(Modifier.weight(1f)) { Text("三年级2班 · 班级圈", color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp); Text("向上实验小学 · ${state.data.students.count { it.className == "三年级2班" }}名学生", color = Color.Gray, fontSize = 9.sp) }; IconButton(onClick = { nav.navigateSingleTop(Destinations.TeacherMessages) }) { Icon(Icons.Filled.Notifications, contentDescription = "消息通知", tint = Blue) } }
         Surface(Modifier.padding(12.dp).fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(12.dp)) { Column(Modifier.padding(12.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.Campaign, null, tint = Blue); Spacer(Modifier.width(7.dp)); Text("班级公告", color = Navy, fontWeight = FontWeight.Bold); Spacer(Modifier.weight(1f)); Text("全部公告 ›", color = Blue, fontSize = 9.sp, modifier = Modifier.semantics { role = Role.Button; contentDescription = "查看全部班级公告" }.clickable { notice = "全部班级公告" }) }; Text("秋季综合测评通知", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp).semantics { role = Role.Button; contentDescription = "查看秋季综合测评通知" }.clickable { notice = "秋季综合测评通知" }); Text("请家长于 9 月 12 日前完成孩子健康信息确认。", color = Color.Gray, fontSize = 9.sp) } }
         Button(onClick = { composer = true }, modifier = Modifier.padding(horizontal = 12.dp).fillMaxWidth()) { Icon(Icons.Filled.Edit, null); Spacer(Modifier.width(7.dp)); Text("发布动态 / 群发通知") }
         Text("班级动态", color = Blue, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.padding(12.dp))

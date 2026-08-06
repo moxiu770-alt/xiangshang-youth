@@ -44,7 +44,7 @@ class MainActivity : ComponentActivity() {
         // Refresh only when an authenticated session exists; AppViewModel safely
         // no-ops during the splash/login flow. This keeps dashboards current after
         // returning from Settings, WeChat, file pickers, or another app.
-        if (::appViewModel.isInitialized) appViewModel.refreshDashboard()
+        if (::appViewModel.isInitialized && !appViewModel.state.value.isOffline) appViewModel.refreshDashboard()
     }
 
     override fun onNewIntent(intent: Intent) {

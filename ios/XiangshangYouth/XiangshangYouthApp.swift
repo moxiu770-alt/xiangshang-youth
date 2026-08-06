@@ -36,7 +36,7 @@ struct RootView: View {
         .onChange(of: state.data?.students.count ?? 0) { _, _ in router.activatePendingDeepLink(using: state) }
         .onChange(of: router.path.count) { _, _ in router.syncStackToPathCount() }
         .onChange(of: scenePhase) { _, phase in
-            guard phase == .active, state.profile != nil, state.data != nil else { return }
+            guard phase == .active, !networkMonitor.isOffline, state.profile != nil, state.data != nil else { return }
             Task { await state.refreshDashboard() }
         }
         .transaction { transaction in

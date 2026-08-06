@@ -146,7 +146,7 @@ struct CourseUploadSheet: View {
                 Section {
                     Button("保存草稿") { save(submit: false) }
                     Button {
-                        guard let count = Int(attendance), count >= 0 else { error = "请填写有效的出勤人数。"; return }
+                        guard let count = Int(attendance), count > 0 else { error = "请填写大于 0 的有效出勤人数。"; return }
                         guard !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !attachment.isEmpty else { error = "提交前请补齐课堂记录和附件。"; return }
                         Task {
                             if await state.submitCourseUploadCommand(taskID: taskID, attendanceCount: count, notes: notes, attachmentName: attachment) {
@@ -157,7 +157,7 @@ struct CourseUploadSheet: View {
                     } label: {
                         HStack { if commandState.isSubmitting { ProgressView() }; Text(commandState.isSubmitting ? "正在提交…" : "提交审核") }
                     }
-                    .disabled(commandState.isSubmitting || notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || attachment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(commandState.isSubmitting || (Int(attendance) ?? 0) <= 0 || notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || attachment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     if case let .failed(message) = commandState { Text(message).foregroundStyle(.red) }
                 }
                 if let error { Section { Text(error).foregroundStyle(.red) } }

@@ -83,11 +83,12 @@ fun ParentHomeScreen(state: AppUiState, nav: NavHostController, registerActivity
         }
     }
     Scaffold(containerColor = Canvas, bottomBar = { ParentBottomBar(nav, Destinations.Parent) }) { contentPadding ->
+    Box(Modifier.padding(contentPadding).fillMaxSize(), contentAlignment = Alignment.TopCenter) {
     val dashboardError = state.error
     if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = { refreshDashboard() }, dismiss = LocalDashboardClearError.current); return@Scaffold }
     if (state.loading || state.data == null) { LoadingState(); return@Scaffold }
     if (state.selectedChild == null) {
-        Column(Modifier.fillMaxSize().padding(contentPadding).padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().fillMaxHeight().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             ParentHeader("请先绑定孩子", { nav.navigate(Destinations.Children) }, { nav.navigateSingleTop(Destinations.Notifications) }, state.unreadMessageCount)
             EmptyState("绑定孩子后才能查看测评、报告和课程。")
             Button(onClick = { nav.navigate(Destinations.Children) }) { Text("去绑定孩子") }
@@ -95,7 +96,7 @@ fun ParentHomeScreen(state: AppUiState, nav: NavHostController, registerActivity
         return@Scaffold
     }
     val selectedChild = state.selectedChild
-    Column(Modifier.fillMaxSize().padding(contentPadding).background(Canvas).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+    Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().fillMaxHeight().background(Canvas).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(9.dp)) {
         ParentHeader(selectedChild.name, { nav.navigate(Destinations.Children) }, { nav.navigateSingleTop(Destinations.Notifications) }, state.unreadMessageCount, refreshDashboard, state.loading)
         Surface(Modifier.padding(horizontal = 10.dp).fillMaxWidth().semantics { role = Role.Button; contentDescription = "打开健康成长季活动报名" }.clickable { state.local.drafts[activityDraftKey]?.split("|", limit = 2)?.takeIf { it.size == 2 }?.let { (name, phone) -> activityName = name; activityPhone = phone }; activityDetail = true }, color = Color.White, shape = RoundedCornerShape(12.dp), shadowElevation = 1.dp) {
             Box(Modifier.height(108.dp)) {
@@ -122,7 +123,7 @@ fun ParentHomeScreen(state: AppUiState, nav: NavHostController, registerActivity
         Row(Modifier.padding(horizontal = 14.dp)) { listOf(R.drawable.expert_professor to "张教授", R.drawable.expert_doctor to "李医生", R.drawable.expert_coach to "王教练", R.drawable.expert_counselor to "刘主任").forEach { (image, name) -> Column(Modifier.weight(1f).semantics { role = Role.Button; contentDescription = "预约$name" }.clickable { expert = name }, horizontalAlignment = Alignment.CenterHorizontally) { Image(painterResource(image), null, Modifier.size(37.dp).clip(CircleShape), contentScale = ContentScale.Crop); Text(name, color = Navy, fontSize = 9.sp) } } }
         ParentSection("健康科普", "点击文章查看")
         listOf("儿童科学长高的 5 个关键习惯", "居家体态训练 10 分钟").forEach { title -> Surface(Modifier.padding(horizontal = 12.dp, vertical = 3.dp).fillMaxWidth().semantics { role = Role.Button; contentDescription = "阅读健康科普：$title" }.clickable { wechatError = false; article = title }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.AutoMirrored.Filled.MenuBook, null, tint = Green); Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Text(title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 11.sp); Text("健康专栏 · 今日推荐", color = Color.Gray, fontSize = 8.sp) }; Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray) } } }
-    } }
+    } } }
     val activityCommand = state.workflowStates["activity:health-growth-season-2026"] ?: WorkflowCommandState()
     val activityFailed = activityCommand.status == WorkflowCommandStatus.Failed
     val activitySaved = state.local.activityRegistered && !activityFailed && !activityCommand.isSubmitting

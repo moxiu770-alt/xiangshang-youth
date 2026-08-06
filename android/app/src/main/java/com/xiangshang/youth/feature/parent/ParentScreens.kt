@@ -338,7 +338,11 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
     }
 }
 @Composable private fun MiniActivity(image: Int, title: String, modifier: Modifier, onClick: () -> Unit) = Surface(onClick = onClick, modifier = modifier, color = Color.White, shape = RoundedCornerShape(8.dp)) { Column(Modifier.padding(4.dp)) { Image(painterResource(image), null, Modifier.fillMaxWidth().height(44.dp).clip(RoundedCornerShape(6.dp)), contentScale = ContentScale.Crop); Text(title, color = Navy, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.padding(top = 3.dp)) } }
-@Composable private fun ParentTabScaffold(nav: NavHostController, selected: String, body: @Composable ColumnScope.() -> Unit) = Scaffold(containerColor = Canvas, bottomBar = { ParentBottomBar(nav, selected) }) { padding -> Column(Modifier.padding(padding).fillMaxSize().padding(horizontal = 12.dp).verticalScroll(rememberScrollState()), content = body) }
+@Composable private fun ParentTabScaffold(nav: NavHostController, selected: String, body: @Composable ColumnScope.() -> Unit) = Scaffold(containerColor = Canvas, bottomBar = { ParentBottomBar(nav, selected) }) { padding ->
+    Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().fillMaxHeight().padding(horizontal = 12.dp).verticalScroll(rememberScrollState()), content = body)
+    }
+}
 @Composable private fun ParentBottomBar(nav: NavHostController, selected: String) = NavigationBar(containerColor = Color.White, tonalElevation = 1.dp) {
     fun go(route: String) { nav.navigate(route) { popUpTo(Destinations.Parent) { saveState = true }; launchSingleTop = true; restoreState = true } }
     ParentNavItem("首页", Icons.Filled.Home, selected == Destinations.Parent) { go(Destinations.Parent) }

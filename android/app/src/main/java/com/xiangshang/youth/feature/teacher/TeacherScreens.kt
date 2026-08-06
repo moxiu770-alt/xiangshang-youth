@@ -68,8 +68,9 @@ fun TeacherHomeScreen(state: AppUiState, nav: NavHostController, refreshDashboar
         animationSpec = infiniteRepeatable(tween(1800, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "teacher-card-scale"
     )
     Scaffold(containerColor = Canvas, bottomBar = { TeacherBottomBar(nav, sportsTeacher = sportsTeacher) }) { inset ->
+        Box(Modifier.padding(inset).fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(inset),
+            modifier = Modifier.widthIn(max = 720.dp).fillMaxWidth().fillMaxHeight(),
             contentPadding = PaddingValues(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item { TeacherIdentity(sportsTeacher, nav, state.unreadMessageCount, state.loading, refreshDashboard) { sportsTeacher = !sportsTeacher } }
@@ -79,6 +80,7 @@ fun TeacherHomeScreen(state: AppUiState, nav: NavHostController, refreshDashboar
                     if (isSports) SportsTeacherPanel(state, nav, pulse) else ClassTeacherPanel(state, nav, pulse)
                 }
             }
+        }
         }
     }
 }

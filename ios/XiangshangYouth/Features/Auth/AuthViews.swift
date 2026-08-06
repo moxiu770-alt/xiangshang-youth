@@ -207,7 +207,7 @@ struct LoginView: View {
     private func submitLogin() {
         guard agreementAccepted else { validationMessage = "请先阅读并同意用户协议和儿童隐私政策。"; return }
         if method == .wechat {
-            Task { await state.login(phone: "wechat_mock") }
+            Task { await state.login(phone: "wechat_authorization") }
             return
         }
         if method == .phone {

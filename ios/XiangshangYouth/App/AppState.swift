@@ -122,7 +122,11 @@ enum WorkflowCommandState: Equatable {
         loading = true
         error = nil
         defer { loading = false }
-        let candidate = UserProfile(id: "u1", name: "王女士", phone: phone, role: .parent, schoolName: "向上实验小学", avatarInitials: "王")
+        // Third-party authorization does not expose a raw phone number to this
+        // screen. Keep its internal identifier out of the account profile until
+        // the real WeChat bind endpoint returns the verified mobile number.
+        let displayPhone = phone == "wechat_authorization" ? "13800138000" : phone
+        let candidate = UserProfile(id: "u1", name: "王女士", phone: displayPhone, role: .parent, schoolName: "向上实验小学", avatarInitials: "王")
         do {
             // Commit the session only after the dashboard has loaded. A failed login
             // therefore stays on the form and can show its error inline instead of

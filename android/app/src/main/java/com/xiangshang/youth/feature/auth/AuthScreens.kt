@@ -108,7 +108,7 @@ fun LoginScreen(
                     Button(onClick = {
                         when {
                             !agreement -> error = "请先阅读并同意用户协议和儿童隐私政策。"
-                            method == 0 -> onLogin("wechat_mock")
+                            method == 0 -> onLogin("wechat_authorization")
                             method == 1 && phone.filter(Char::isDigit).length != 11 -> error = "请输入有效的 11 位手机号。"
                             method == 1 && !codeSent -> error = "请先获取短信验证码。"
                             method == 1 && code.length < 4 -> error = "请输入短信验证码。"

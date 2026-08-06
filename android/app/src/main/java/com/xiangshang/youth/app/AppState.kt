@@ -76,7 +76,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = _state.value.copy(loading = true, restoringSession = false)
         runCatching { repository.dashboard() }.onSuccess { data ->
             val normalizedIdentifier = identifier.trim().ifBlank { "13800138000" }
-            val profilePhone = normalizedIdentifier.takeUnless { it == "wechat_mock" } ?: "13800138000"
+            val profilePhone = normalizedIdentifier.takeUnless { it == "wechat_authorization" } ?: "13800138000"
             val profile = UserProfile("u1", "王女士", profilePhone, UserRole.Parent, data.school.name)
             val selected = data.students.firstOrNull { it.id == _state.value.local.selectedChildId && it.id in _state.value.local.boundChildIds }
             val local = _state.value.local.copy(sessionActive = true, sessionPhone = profile.phone, sessionRoleName = null, selectedChildId = selected?.id)

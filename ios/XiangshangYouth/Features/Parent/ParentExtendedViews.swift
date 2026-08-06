@@ -346,7 +346,7 @@ struct AccountInfoSheet: View {
                 } else if title == "帮助与反馈" {
                     Section("问题反馈") {
                         if feedbackSubmitted {
-                            Label("反馈已提交，客服会在工作时间内回复。", systemImage: "checkmark.circle.fill").foregroundStyle(ReferenceColor.green)
+                            Label("反馈已保存到本机，后端联调后发送；客服会在工作时间内回复。", systemImage: "checkmark.circle.fill").foregroundStyle(ReferenceColor.green)
                         } else {
                             TextEditor(text: $feedback).frame(minHeight: 110)
                             Button("提交反馈") {
@@ -429,7 +429,7 @@ struct ActivityDetailSheet: View {
             Text("完成综合健康测评，了解孩子的运动发展与健康成长情况。活动成绩将自动同步到孩子档案。") .font(.system(size: 13)).foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 7) { Text("活动说明").font(.system(size: 15, weight: .bold)); Text("• 完成四项健康测评\n• 查看个性化成长报告\n• 可预约学校体测场地") .font(.system(size: 12)).foregroundStyle(ReferenceColor.navy) }.padding(12).background(ReferenceColor.sky, in: RoundedRectangle(cornerRadius: 12))
             if registered {
-                Label("已报名，活动开始前将通过消息中心通知您。", systemImage: "checkmark.circle.fill").font(.system(size: 12, weight: .medium)).foregroundStyle(ReferenceColor.green)
+                Label("报名信息已保存到本机，后端联调后提交；活动开始前将通过消息中心通知您。", systemImage: "checkmark.circle.fill").font(.system(size: 12, weight: .medium)).foregroundStyle(ReferenceColor.green)
             } else {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("报名信息").font(.system(size: 15, weight: .bold))
@@ -494,7 +494,7 @@ struct ExpertDetailSheet: View {
         Text("\(name) · 健康成长专家").font(.title3.bold())
         Text("擅长儿童运动发展与健康评估，可为孩子提供体质、运动及成长建议。在线咨询申请提交后将同步至学校服务。")
             .font(.system(size: 13)).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal, 28)
-        if submitted { Label("预约已提交，专家团队会在 1 个工作日内确认。", systemImage: "checkmark.circle.fill").font(.system(size: 12)).foregroundStyle(ReferenceColor.green) } else { VStack(spacing: 8) { TextField("期望咨询时间", text: $date).textFieldStyle(.roundedBorder); TextField("咨询说明", text: $note, axis: .vertical).lineLimit(3...5).textFieldStyle(.roundedBorder) }.padding(.horizontal, 20).onChange(of: date) { _, _ in state.saveDraft("\(date)|\(note)", key: draftKey) }.onChange(of: note) { _, _ in state.saveDraft("\(date)|\(note)", key: draftKey) }; Button("提交预约") { state.bookExpert(name: name, preferredDate: date, note: note); state.clearDraft(draftKey); submitted = true }.buttonStyle(.borderedProminent).disabled(date.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
+        if submitted { Label("预约信息已保存到本机，后端联调后提交给专家团队。", systemImage: "checkmark.circle.fill").font(.system(size: 12)).foregroundStyle(ReferenceColor.green) } else { VStack(spacing: 8) { TextField("期望咨询时间", text: $date).textFieldStyle(.roundedBorder); TextField("咨询说明", text: $note, axis: .vertical).lineLimit(3...5).textFieldStyle(.roundedBorder) }.padding(.horizontal, 20).onChange(of: date) { _, _ in state.saveDraft("\(date)|\(note)", key: draftKey) }.onChange(of: note) { _, _ in state.saveDraft("\(date)|\(note)", key: draftKey) }; Button("提交预约") { state.bookExpert(name: name, preferredDate: date, note: note); state.clearDraft(draftKey); submitted = true }.buttonStyle(.borderedProminent).disabled(date.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
     }.frame(maxWidth: .infinity, maxHeight: .infinity).navigationTitle("专家详情").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }.task { if let saved = state.localFeatures.drafts[draftKey]?.split(separator: "|", maxSplits: 1).map(String.init), saved.count == 2 { date = saved[0]; note = saved[1] }; submitted = state.localFeatures.expertAppointments.contains { $0.expertName == name && $0.status == .submitted } } } }
 }
 

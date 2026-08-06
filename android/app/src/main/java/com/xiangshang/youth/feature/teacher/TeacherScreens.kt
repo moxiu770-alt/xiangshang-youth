@@ -403,7 +403,7 @@ fun TeacherTasksScreen(state: AppUiState, nav: NavHostController, saveUpload: (S
             }
         }
         state.local.courseUploads.firstOrNull { it.taskId == taskId }?.let {
-            Text("${if (it.status.name == "Submitted") "已提交" else "草稿"} · 出勤 ${it.attendanceCount} 人 · ${it.attachmentName}", color = Green, fontSize = 10.sp, modifier = Modifier.padding(top = 7.dp))
+            Text("${if (it.status.name == "Submitted") "本机已保存 · 待同步" else "草稿"} · 出勤 ${it.attendanceCount} 人 · ${it.attachmentName}", color = Green, fontSize = 10.sp, modifier = Modifier.padding(top = 7.dp))
         }
         Spacer(Modifier.height(9.dp))
         when {
@@ -457,7 +457,7 @@ private fun UploadDialog(taskId: String, state: AppUiState, save: (String, Int, 
                 if (result != null) dismiss() else {
                     val count = attendance.toIntOrNull()
                     if (count == null || count < 0 || notes.isBlank() || attachment.isBlank()) error = "请补齐有效出勤人数、课堂记录和附件。"
-                    else { save(taskId, count, notes.trim(), attachment, true); result = "课程记录已提交审核，提交结果将同步到任务状态。" }
+                    else { save(taskId, count, notes.trim(), attachment, true); result = "课程记录已保存到本机，后端联调后同步到任务状态。" }
                 }
             }) { Text(if (result != null) "完成" else "提交审核") }
         },

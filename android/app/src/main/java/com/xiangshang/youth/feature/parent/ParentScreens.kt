@@ -290,7 +290,7 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
     ParentNavItem("班级圈", Icons.Filled.Groups, selected == Destinations.Circle) { go(Destinations.Circle) }
     ParentNavItem("我的", Icons.Filled.Person, selected == Destinations.Account) { go(Destinations.Account) }
 }
-@Composable private fun RowScope.ParentNavItem(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean, onClick: () -> Unit) = NavigationBarItem(selected = selected, onClick = onClick, icon = { Icon(icon, null) }, label = { Text(label, fontSize = 9.sp) })
+@Composable private fun RowScope.ParentNavItem(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean, onClick: () -> Unit) = NavigationBarItem(selected = selected, onClick = onClick, icon = { Icon(icon, null) }, label = { Text(label, fontSize = 9.sp) }, modifier = Modifier.semantics { contentDescription = "$label${if (selected) "，当前页面" else ""}" })
 
 @Composable fun ParentCoursesScreen(state: AppUiState, nav: NavHostController, updateCourseProgress: (String, Float) -> Unit, sendSupport: (String) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit, openSupport: Boolean = false) {
     var paid by remember { mutableStateOf(false) }; var detail by rememberSaveable(openSupport) { mutableStateOf<String?>(if (openSupport) "客服咨询" else null) }

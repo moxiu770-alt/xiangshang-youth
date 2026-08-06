@@ -101,7 +101,8 @@ private fun PrincipalBottomBar(nav: NavHostController) {
                     }
                 },
                 icon = { Icon(item.second, contentDescription = item.first) },
-                label = { Text(item.first, fontSize = 9.sp) }
+                label = { Text(item.first, fontSize = 9.sp) },
+                modifier = Modifier.semantics { contentDescription = "${item.first}${if (route == destination) "，当前页面" else ""}" }
             )
         }
     }

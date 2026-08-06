@@ -210,10 +210,10 @@ private fun SportsTeacherPanel(state: AppUiState, nav: NavHostController, pulse:
 @Composable
 private fun TeacherBottomBar(nav: NavHostController, selected: String = Destinations.Teacher, sportsTeacher: Boolean = false) = NavigationBar(containerColor = Color.White, tonalElevation = 1.dp) {
     fun go(route: String) { nav.navigate(route) { popUpTo(Destinations.Teacher) { saveState = true }; launchSingleTop = true; restoreState = true } }
-    NavigationBarItem(selected = selected == Destinations.Teacher, onClick = { go(Destinations.Teacher) }, icon = { Icon(Icons.Filled.Home, null) }, label = { Text("首页", fontSize = 9.sp) })
+    NavigationBarItem(selected = selected == Destinations.Teacher, onClick = { go(Destinations.Teacher) }, icon = { Icon(Icons.Filled.Home, null) }, label = { Text("首页", fontSize = 9.sp) }, modifier = Modifier.semantics { contentDescription = "首页${if (selected == Destinations.Teacher) "，当前页面" else ""}" })
     val secondary = if (sportsTeacher) Destinations.Tasks else Destinations.TeacherCircle
-    NavigationBarItem(selected = selected == secondary, onClick = { go(secondary) }, icon = { Icon(if (sportsTeacher) Icons.Filled.CameraAlt else Icons.Filled.Dashboard, null) }, label = { Text(if (sportsTeacher) "延时上传" else "班级圈", fontSize = 9.sp) })
-    NavigationBarItem(selected = selected == Destinations.Account, onClick = { go(Destinations.Account) }, icon = { Icon(Icons.Filled.PersonOutline, null) }, label = { Text("我的", fontSize = 9.sp) })
+    NavigationBarItem(selected = selected == secondary, onClick = { go(secondary) }, icon = { Icon(if (sportsTeacher) Icons.Filled.CameraAlt else Icons.Filled.Dashboard, null) }, label = { Text(if (sportsTeacher) "延时上传" else "班级圈", fontSize = 9.sp) }, modifier = Modifier.semantics { contentDescription = "${if (sportsTeacher) "延时上传" else "班级圈"}${if (selected == secondary) "，当前页面" else ""}" })
+    NavigationBarItem(selected = selected == Destinations.Account, onClick = { go(Destinations.Account) }, icon = { Icon(Icons.Filled.PersonOutline, null) }, label = { Text("我的", fontSize = 9.sp) }, modifier = Modifier.semantics { contentDescription = "我的${if (selected == Destinations.Account) "，当前页面" else ""}" })
 }
 
 @Composable

@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -115,7 +116,7 @@ fun LoginScreen(
                             else -> onLogin(if (method == 1) phone else account)
                         }
                     }, enabled = !loading, modifier = Modifier.fillMaxWidth().height(44.dp), shape = CircleShape) {
-                        if (loading) CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(18.dp)) else Icon(if (method == 0) Icons.Filled.VerifiedUser else Icons.Filled.ArrowForward, null)
+                        if (loading) CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(18.dp)) else Icon(if (method == 0) Icons.Filled.VerifiedUser else Icons.AutoMirrored.Filled.ArrowForward, null)
                         Spacer(Modifier.width(7.dp)); Text(if (loading) "正在登录…" else if (method == 0) "微信授权登录" else "登录", fontWeight = FontWeight.Bold)
                     }
                     (error ?: serverError)?.let { Text(it, color = Color.Red, fontSize = 10.sp) }
@@ -129,7 +130,11 @@ fun LoginScreen(
                             Checkbox(checked = agreement, onCheckedChange = { agreement = it })
                             Text(if (agreement) "已阅读并同意相关协议" else "请阅读并同意相关协议", color = if (agreement) Green else Color.Gray, fontSize = 8.sp)
                         }
-                        TextButton(onClick = { legalDocument = "用户协议" }, contentPadding = PaddingValues(0.dp)) { Text("查看协议", color = Blue, fontSize = 9.sp) }
+                        Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+                            TextButton(onClick = { legalDocument = "用户协议" }, contentPadding = PaddingValues(0.dp)) { Text("用户协议", color = Blue, fontSize = 8.sp) }
+                            TextButton(onClick = { legalDocument = "隐私政策" }, contentPadding = PaddingValues(0.dp)) { Text("隐私政策", color = Blue, fontSize = 8.sp) }
+                            TextButton(onClick = { legalDocument = "儿童隐私" }, contentPadding = PaddingValues(0.dp), modifier = Modifier.semantics { contentDescription = "查看儿童隐私政策" }) { Text("儿童隐私", color = Blue, fontSize = 8.sp) }
+                        }
                     }
                 }
             }
@@ -160,6 +165,7 @@ fun RegisterScreen(
     var success by rememberSaveable { mutableStateOf(false) }
     var codeSent by rememberSaveable { mutableStateOf(false) }
     var codeCountdown by rememberSaveable { mutableIntStateOf(0) }
+    var legalDocument by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(codeCountdown > 0) {
         while (codeCountdown > 0) {
             delay(1000)
@@ -189,6 +195,11 @@ fun RegisterScreen(
         }
         OutlinedTextField(value = password, onValueChange = { password = it; error = null }, label = { Text("设置密码（至少 6 位）") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 9.dp))
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp).semantics { role = Role.Checkbox; contentDescription = if (agreement) "已同意用户协议、隐私政策和儿童隐私政策" else "同意用户协议、隐私政策和儿童隐私政策" }.clickable { agreement = !agreement }) { Checkbox(checked = agreement, onCheckedChange = { agreement = it }); Text("我已阅读并同意用户协议、隐私政策和儿童隐私政策", color = Navy, fontSize = 10.sp) }
+        Row(horizontalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.padding(top = 2.dp)) {
+            TextButton(onClick = { legalDocument = "用户协议" }, contentPadding = PaddingValues(0.dp)) { Text("查看用户协议", color = Blue, fontSize = 9.sp) }
+            TextButton(onClick = { legalDocument = "隐私政策" }, contentPadding = PaddingValues(0.dp)) { Text("隐私政策", color = Blue, fontSize = 9.sp) }
+            TextButton(onClick = { legalDocument = "儿童隐私" }, contentPadding = PaddingValues(0.dp)) { Text("儿童隐私政策", color = Blue, fontSize = 9.sp) }
+        }
         error?.let { Text(it, color = Color.Red, fontSize = 10.sp) }
         Button(onClick = {
             when {
@@ -201,6 +212,9 @@ fun RegisterScreen(
                 else -> success = true
             }
         }, enabled = agreement, modifier = Modifier.fillMaxWidth().padding(top = 12.dp).height(44.dp), shape = CircleShape) { Text("注册并登录", fontWeight = FontWeight.Bold) }
+    }
+    legalDocument?.let { document ->
+        AlertDialog(onDismissRequest = { legalDocument = null }, title = { Text(document) }, text = { Text("本页面为一期内测版展示。正式上线前将替换为经审核的完整文本，并说明账号、儿童健康数据、通知和第三方登录的处理规则。当前 Mock 数据不会上传到服务器。") }, confirmButton = { TextButton(onClick = { legalDocument = null }) { Text("完成") } })
     }
 }
 

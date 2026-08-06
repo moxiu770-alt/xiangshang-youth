@@ -196,8 +196,16 @@ struct LoginView: View {
                         .font(.system(size: 9)).foregroundStyle(agreementAccepted ? ReferenceColor.green : .secondary)
                 }.buttonStyle(.plain)
                 Spacer()
-                Button("查看协议") { legalDocument = .userAgreement }
-                    .font(.system(size: 9, weight: .semibold)).foregroundStyle(ReferenceColor.blue).buttonStyle(.plain)
+                Menu {
+                    Button("用户协议") { legalDocument = .userAgreement }
+                    Button("隐私政策") { legalDocument = .privacy }
+                    Button("儿童隐私政策") { legalDocument = .childPrivacy }
+                } label: {
+                    Text("查看协议")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(ReferenceColor.blue)
+                }
+                .accessibilityLabel("查看用户协议、隐私政策和儿童隐私政策")
             }
         }
         .padding(20)
@@ -302,6 +310,7 @@ struct RegisterView: View {
     @State private var codeSent = false
     @State private var codeCountdown = 0
     @State private var countdownTask: Task<Void, Never>?
+    @State private var legalDocument: LegalDocument?
 
     var body: some View {
         NavigationStack {
@@ -346,6 +355,15 @@ struct RegisterView: View {
                             Label("我已阅读并同意用户协议、隐私政策和儿童隐私政策", systemImage: confirmed ? "checkmark.circle.fill" : "circle")
                         }
                         .foregroundStyle(confirmed ? ReferenceColor.green : ReferenceColor.navy)
+                        Menu {
+                            Button("用户协议") { legalDocument = .userAgreement }
+                            Button("隐私政策") { legalDocument = .privacy }
+                            Button("儿童隐私政策") { legalDocument = .childPrivacy }
+                        } label: {
+                            Label("分别查看三份协议", systemImage: "doc.text.magnifyingglass")
+                                .font(.caption)
+                                .foregroundStyle(ReferenceColor.blue)
+                        }
                         if let error { Text(error).font(.caption).foregroundStyle(.red) }
                         Button("注册并登录") { register() }
                             .frame(maxWidth: .infinity)
@@ -356,6 +374,7 @@ struct RegisterView: View {
             .navigationTitle("注册账号")
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(submitted ? "完成" : "取消") { dismiss() } } }
         }
+        .sheet(item: $legalDocument) { document in LegalDocumentView(document: document) }
         .onChange(of: state.profile?.id) { _, profileID in
             if submitted, profileID != nil { dismiss() }
         }

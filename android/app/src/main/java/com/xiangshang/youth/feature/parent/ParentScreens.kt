@@ -313,6 +313,8 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
     var commentPost by remember { mutableStateOf<String?>(null) }
     var comment by remember { mutableStateOf("") }
     var commentSubmitted by remember { mutableStateOf(false) }
+    var mockPostLiked by rememberSaveable { mutableStateOf(false) }
+    var mockCommentOpen by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     ParentTabScaffold(nav, Destinations.Circle) {
         if (state.loading || state.data == null) { LoadingState(); return@ParentTabScaffold }
@@ -324,7 +326,7 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
         Button(onClick = { detail = "发布班级动态" }, modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) { Icon(Icons.Filled.Edit, null); Spacer(Modifier.width(7.dp)); Text("发布班级动态") }
         val posts = state.local.classPosts.filter { filter == 0 || (filter == 1 && it.author.contains("老师")) || (filter == 2 && !it.author.contains("老师")) }
         if (posts.isEmpty()) {
-            Surface(Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(10.dp)) { Column(Modifier.padding(12.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.School, null, tint = Blue); Spacer(Modifier.width(8.dp)); Column { Text("李老师", color = Blue, fontWeight = FontWeight.Bold, fontSize = 11.sp); Text("今天 08:30 · 置顶通知", color = Color.Gray, fontSize = 8.sp) } }; Text("本周运动打卡已开启，欢迎家长分享孩子的练习瞬间。", color = Navy, fontSize = 11.sp, modifier = Modifier.padding(top = 7.dp)); Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) { Text("♡ 12", color = Color.Gray, fontSize = 9.sp); Text("评论 3", color = Color.Gray, fontSize = 9.sp); Text("班级通知", color = Blue, fontSize = 9.sp) } } }
+            Surface(Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(10.dp)) { Column(Modifier.padding(12.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.School, null, tint = Blue); Spacer(Modifier.width(8.dp)); Column { Text("李老师", color = Blue, fontWeight = FontWeight.Bold, fontSize = 11.sp); Text("今天 08:30 · 置顶通知", color = Color.Gray, fontSize = 8.sp) } }; Text("本周运动打卡已开启，欢迎家长分享孩子的练习瞬间。", color = Navy, fontSize = 11.sp, modifier = Modifier.padding(top = 7.dp)); Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) { Text(if (mockPostLiked) "已赞 13" else "♡ 12", color = if (mockPostLiked) Blue else Color.Gray, fontSize = 9.sp, modifier = Modifier.semantics { role = Role.Button; contentDescription = if (mockPostLiked) "取消点赞" else "点赞" }.clickable { mockPostLiked = !mockPostLiked }); Text("评论 3", color = Color.Gray, fontSize = 9.sp, modifier = Modifier.semantics { role = Role.Button; contentDescription = "评论置顶通知" }.clickable { mockCommentOpen = true }); Spacer(Modifier.weight(1f)); Text("班级通知", color = Blue, fontSize = 9.sp) } } }
         }
         posts.forEach { post ->
             Surface(Modifier.padding(vertical = 4.dp).fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(10.dp), shadowElevation = 1.dp) { Column(Modifier.padding(11.dp)) {
@@ -340,6 +342,7 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
     }
     detail?.let { title -> SimpleDialog(title = title, drafts = state.local.drafts, send = { content -> if (title == "发布班级动态") publishPost("王女士", content) }, saveDraft = saveDraft, clearDraft = clearDraft, dismiss = { detail = null }) }
     commentPost?.let { postId -> AlertDialog(onDismissRequest = { commentPost = null }, title = { Text(if (commentSubmitted) "评论已发布" else "给这条动态留言") }, text = { if (commentSubmitted) Text("班级成员可以看到你的留言。", color = Green) else OutlinedTextField(value = comment, onValueChange = { comment = it }, label = { Text("评论内容") }, minLines = 2) }, confirmButton = { TextButton(enabled = commentSubmitted || comment.trim().isNotBlank(), onClick = { if (commentSubmitted) commentPost = null else { addComment(postId, comment); commentSubmitted = true } }) { Text(if (commentSubmitted) "完成" else "发布评论") } }, dismissButton = if (commentSubmitted) null else ({ TextButton(onClick = { commentPost = null }) { Text("取消") } })) }
+    if (mockCommentOpen) AlertDialog(onDismissRequest = { mockCommentOpen = false }, title = { Text("班级通知评论") }, text = { Text("这条置顶通知暂不开放评论。你可以发布班级动态，与老师和家长交流。", color = Color.Gray, fontSize = 11.sp) }, confirmButton = { TextButton(onClick = { mockCommentOpen = false }) { Text("知道了") } })
 }
 
 @Composable fun AccountScreen(state: AppUiState, nav: NavHostController, chooseRole: (UserRole) -> Unit, logout: () -> Unit, updateSettings: (Boolean?, Boolean?) -> Unit, sendSupport: (String) -> Unit) {

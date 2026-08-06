@@ -126,6 +126,7 @@ struct ParentClassCircleDashboard: View {
     @State private var commentDraft = ""
     @State private var commentSubmitted = false
     @State private var selectedFilter = "全部"
+    @State private var mockPostLiked = false
     var body: some View {
         ScrollView {
             VStack(spacing: 10) {
@@ -149,7 +150,7 @@ struct ParentClassCircleDashboard: View {
                     selectedFilter == "全部" || (selectedFilter == "老师动态" && post.author.contains("老师")) || (selectedFilter == "家长分享" && !post.author.contains("老师"))
                 }
                 if visiblePosts.isEmpty {
-                    circleMockPost(author: "李老师", content: "本周运动打卡已开启，欢迎家长分享孩子的练习瞬间。", isTeacher: true)
+                    circleMockPost(author: "李老师", content: "本周运动打卡已开启，欢迎家长分享孩子的练习瞬间。", isTeacher: true, isLiked: $mockPostLiked, onComment: { selectedMoment = "班级通知评论" })
                 }
                 ForEach(visiblePosts) { post in
                     ReferenceCard {
@@ -188,7 +189,7 @@ struct ParentClassCircleDashboard: View {
         .sheet(isPresented: $isComposerShown) { PublishClassPostSheet(author: "王女士") }
         .sheet(item: $editingPost) { post in PublishClassPostSheet(author: post.author, editingPost: post) }
         .sheet(item: Binding(get: { selectedMoment.map(CourseSheetItem.init) }, set: { selectedMoment = $0?.name })) { item in
-            if item.name.contains("榜单") || item.name.contains("打卡记录") {
+            if item.name.contains("榜单") || item.name.contains("打卡记录") || item.name.contains("评论") {
                 CircleInfoSheet(title: item.name)
             } else {
                 CourseDetailSheet(title: item.name)
@@ -198,7 +199,7 @@ struct ParentClassCircleDashboard: View {
             NavigationStack { VStack(spacing: 14) { if commentSubmitted { Image(systemName: "checkmark.circle.fill").font(.system(size: 44)).foregroundStyle(ReferenceColor.green); Text("评论已发布").font(.headline); Text("班级成员可以看到你的留言。").font(.footnote).foregroundStyle(.secondary); Button("完成") { commentPostID = nil }.buttonStyle(.borderedProminent) } else { Text("给这条动态留言").font(.headline); TextField("说点鼓励的话…", text: $commentDraft, axis: .vertical).textFieldStyle(.roundedBorder); Button("发布评论") { if let postID = commentPostID { state.addClassPostComment(postID: postID, text: commentDraft) }; commentSubmitted = true }.buttonStyle(.borderedProminent).disabled(commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }; Spacer() }.padding(20).navigationTitle("评论").toolbar { ToolbarItem(placement: .topBarTrailing) { Button("取消") { commentPostID = nil } } } }
         }
     }
-    private func circleMockPost(author: String, content: String, isTeacher: Bool) -> some View { ReferenceCard { VStack(alignment: .leading, spacing: 7) { HStack { Image(systemName: isTeacher ? "graduationcap.circle.fill" : "person.crop.circle.fill").font(.system(size: 28)).foregroundStyle(ReferenceColor.blue); VStack(alignment: .leading, spacing: 1) { Text(author).font(.system(size: 11, weight: .bold)).foregroundStyle(ReferenceColor.blue); Text("今天 08:30 · 本班可见").font(.system(size: 8)).foregroundStyle(.secondary) }; Spacer(); Text("置顶").font(.system(size: 9, weight: .bold)).foregroundStyle(ReferenceColor.yellow) }; Text(content).font(.system(size: 12)).foregroundStyle(ReferenceColor.navy); HStack { Label("12", systemImage: "hand.thumbsup"); Label("3", systemImage: "bubble.left"); Spacer(); Text("班级通知").foregroundStyle(ReferenceColor.blue) }.font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary) } }.padding(.horizontal, 12) }
+    private func circleMockPost(author: String, content: String, isTeacher: Bool, isLiked: Binding<Bool>, onComment: @escaping () -> Void) -> some View { ReferenceCard { VStack(alignment: .leading, spacing: 7) { HStack { Image(systemName: isTeacher ? "graduationcap.circle.fill" : "person.crop.circle.fill").font(.system(size: 28)).foregroundStyle(ReferenceColor.blue); VStack(alignment: .leading, spacing: 1) { Text(author).font(.system(size: 11, weight: .bold)).foregroundStyle(ReferenceColor.blue); Text("今天 08:30 · 本班可见").font(.system(size: 8)).foregroundStyle(.secondary) }; Spacer(); Text("置顶").font(.system(size: 9, weight: .bold)).foregroundStyle(ReferenceColor.yellow) }; Text(content).font(.system(size: 12)).foregroundStyle(ReferenceColor.navy); HStack { Button { isLiked.wrappedValue.toggle() } label: { Label(isLiked.wrappedValue ? "已赞" : "点赞", systemImage: isLiked.wrappedValue ? "hand.thumbsup.fill" : "hand.thumbsup") }.buttonStyle(.plain); Button(action: onComment) { Label("评论", systemImage: "bubble.left") }.buttonStyle(.plain); Spacer(); ShareLink(item: content) { Label("分享", systemImage: "square.and.arrow.up") } }.font(.system(size: 10, weight: .semibold)).foregroundStyle(isLiked.wrappedValue ? ReferenceColor.blue : .secondary) }.accessibilityElement(children: .contain) }.padding(.horizontal, 12) }
     private func star(_ title: String, _ name: String, _ color: Color) -> some View { VStack(spacing: 3) { Image(systemName: "star.fill").foregroundStyle(color).font(.system(size: 21)); Text(title).font(.system(size: 9, weight: .bold)); Text(name).font(.system(size: 8)).foregroundStyle(.secondary) }.frame(maxWidth: .infinity) }
     private func moment(_ image: String, _ title: String) -> some View { Button { selectedMoment = title } label: { VStack(alignment: .leading, spacing: 4) { Image(image).resizable().scaledToFill().frame(height: 48).frame(maxWidth: .infinity).clipped().clipShape(RoundedRectangle(cornerRadius: 7)); Text(title).font(.system(size: 9, weight: .bold)).foregroundStyle(ReferenceColor.navy) }.frame(maxWidth: .infinity) }.buttonStyle(.plain) }
 }
@@ -211,7 +212,13 @@ private struct CircleInfoSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                if title.contains("榜单") {
+                if title.contains("评论") {
+                    Section("班级通知评论") {
+                        Text("这条置顶通知暂不开放评论。你可以在下方发布班级动态，与老师和家长交流。")
+                        Text("评论能力会在学校开启家校互动后同步开放。")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                } else if title.contains("榜单") {
                     Section("本月班级之星") {
                         LabeledContent("勤劳之星", value: "陈乐乐")
                         LabeledContent("运动之星", value: "王小明")

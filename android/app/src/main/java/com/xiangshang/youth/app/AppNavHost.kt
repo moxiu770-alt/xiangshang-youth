@@ -218,7 +218,9 @@ private fun NavHostController.replaceRoot(destination: String) {
                         nav.replaceRoot(if (role == UserRole.Parent) Destinations.Parent else if (role == UserRole.Teacher) Destinations.Teacher else Destinations.Principal)
                     },
                     submitSupport = viewModel::submitSupportCommand,
-                    clearWorkflow = viewModel::clearWorkflowState
+                    clearWorkflow = viewModel::clearWorkflowState,
+                    saveDraft = viewModel::saveDraft,
+                    clearDraft = viewModel::clearDraft
                 )
             }
         }

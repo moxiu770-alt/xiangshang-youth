@@ -407,7 +407,7 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
     if (mockCommentOpen) AlertDialog(onDismissRequest = { mockCommentOpen = false }, title = { Text("班级通知评论") }, text = { Text("这条置顶通知暂不开放评论。你可以发布班级动态，与老师和家长交流。", color = Color.Gray, fontSize = 11.sp) }, confirmButton = { TextButton(onClick = { mockCommentOpen = false }) { Text("知道了") } })
 }
 
-@Composable fun AccountScreen(state: AppUiState, nav: NavHostController, chooseRole: (UserRole) -> Unit, logout: () -> Unit, updateSettings: (Boolean?, Boolean?) -> Unit, sendSupport: (String) -> Unit, onRoleSelected: (UserRole) -> Unit = chooseRole, submitSupport: (String) -> Unit = sendSupport, clearWorkflow: (String) -> Unit = {}) {
+@Composable fun AccountScreen(state: AppUiState, nav: NavHostController, chooseRole: (UserRole) -> Unit, logout: () -> Unit, updateSettings: (Boolean?, Boolean?) -> Unit, sendSupport: (String) -> Unit, onRoleSelected: (UserRole) -> Unit = chooseRole, submitSupport: (String) -> Unit = sendSupport, clearWorkflow: (String) -> Unit = {}, saveDraft: (String, String) -> Unit = { _, _ -> }, clearDraft: (String) -> Unit = {}) {
     var settingsOpen by remember { mutableStateOf(false) }
     var accountInfo by remember { mutableStateOf<String?>(null) }
     ParentTabScaffold(nav, Destinations.Account) {
@@ -429,7 +429,7 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
         OutlinedButton(onClick = { logout(); nav.navigate(Destinations.Login) { popUpTo(nav.graph.id) { inclusive = true } } }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red)) { Text("切换账号") }
     }
     if (settingsOpen) SettingsDialog(state.local.settings.notificationsEnabled, state.local.settings.reduceMotion, state.pendingSyncCount, updateSettings, clearLocalData = { logout(); nav.navigate(Destinations.Login) { popUpTo(nav.graph.id) { inclusive = true } } }) { settingsOpen = false }
-    accountInfo?.let { title -> AccountInfoDialog(title, state, submitSupport) { accountInfo = null } }
+    accountInfo?.let { title -> AccountInfoDialog(title, state, submitSupport, saveDraft, clearDraft) { accountInfo = null } }
 }
 
 @Composable fun SettingsDialog(notifications: Boolean, reduceMotion: Boolean, pendingSyncCount: Int, update: (Boolean?, Boolean?) -> Unit, clearLocalData: () -> Unit = {}, dismiss: () -> Unit) {
@@ -475,11 +475,17 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
 }
 
 @Composable
-private fun AccountInfoDialog(title: String, state: AppUiState, submitSupport: (String) -> Unit, dismiss: () -> Unit) {
-    var feedback by rememberSaveable(title) { mutableStateOf("") }
+private fun AccountInfoDialog(title: String, state: AppUiState, submitSupport: (String) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit, dismiss: () -> Unit) {
+    val feedbackDraftKey = "account-feedback"
+    var feedback by rememberSaveable(title) { mutableStateOf(state.local.drafts[feedbackDraftKey].orEmpty()) }
     var submitted by rememberSaveable(title) { mutableStateOf(false) }
     val command = if (title == "帮助与反馈") state.workflowStates["support"] ?: WorkflowCommandState() else WorkflowCommandState()
-    LaunchedEffect(command.status) { if (command.status == WorkflowCommandStatus.Succeeded) submitted = true }
+    LaunchedEffect(command.status) {
+        if (command.status == WorkflowCommandStatus.Succeeded) {
+            submitted = true
+            clearDraft(feedbackDraftKey)
+        }
+    }
     AlertDialog(
         onDismissRequest = dismiss,
         title = { Text(title) },
@@ -487,7 +493,7 @@ private fun AccountInfoDialog(title: String, state: AppUiState, submitSupport: (
             if (title == "帮助与反馈") {
                 if (submitted) Text("反馈已保存到本机，后端联调后发送；客服会在工作时间内回复。", color = Green)
                 else Column {
-                    OutlinedTextField(value = feedback, onValueChange = { feedback = it }, label = { Text("问题描述") }, minLines = 3)
+                    OutlinedTextField(value = feedback, onValueChange = { feedback = it; saveDraft(feedbackDraftKey, it) }, label = { Text("问题描述") }, minLines = 3)
                     if (command.status == WorkflowCommandStatus.Failed) Text(command.message ?: "提交失败，请重试。", color = Color.Red, fontSize = 10.sp, modifier = Modifier.padding(top = 6.dp))
                     if (command.isSubmitting) Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) { CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp); Spacer(Modifier.width(7.dp)); Text("正在提交反馈…", color = Blue, fontSize = 10.sp) }
                     Text("绑定码由学校或班主任提供；报告生成后会在消息中心通知。", color = Color.Gray, fontSize = 10.sp, modifier = Modifier.padding(top = 7.dp))

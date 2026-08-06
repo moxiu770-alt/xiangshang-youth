@@ -56,7 +56,8 @@ class LocalFeatureStateTest {
             sessionActive = true,
             sessionPhone = "13800138000",
             sessionRoleName = "Teacher",
-            selectedChildId = "s02"
+            selectedChildId = "s02",
+            drafts = mapOf("account-feedback" to "希望增加课程提醒")
         )
 
         assertTrue(state.activityRegistered && state.checkedInToday)
@@ -74,6 +75,8 @@ class LocalFeatureStateTest {
         assertTrue(state.sessionActive)
         assertEquals("Teacher", state.sessionRoleName)
         assertEquals("s02", state.selectedChildId)
+        assertEquals("希望增加课程提醒", state.drafts["account-feedback"])
+        assertTrue("account-feedback" !in state.copy(drafts = state.drafts - "account-feedback").drafts)
     }
 
     @Test

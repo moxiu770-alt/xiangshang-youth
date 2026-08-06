@@ -479,7 +479,7 @@ fun TeacherTaskDetailScreen(state: AppUiState, nav: NavHostController, updateSta
 }
 
 @Composable
-fun ReviewListScreen(state: AppUiState, nav: NavHostController, submitDecision: (String, com.xiangshang.youth.core.model.TaskStatus, String) -> Unit) = AppScaffold("预警中心", onBack = { nav.popBackStack() }) {
+fun ReviewListScreen(state: AppUiState, nav: NavHostController, submitDecision: (String, com.xiangshang.youth.core.model.TaskStatus, String) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit) = AppScaffold("预警中心", onBack = { nav.popBackStack() }) {
     var selectedStudent by remember { mutableStateOf<com.xiangshang.youth.core.model.Student?>(null) }
     val data = state.data
     if (state.loading || data == null) { LoadingState(); return@AppScaffold }
@@ -498,7 +498,8 @@ fun ReviewListScreen(state: AppUiState, nav: NavHostController, submitDecision: 
     if (students.isEmpty()) EmptyState("当前没有待复核、待补测或缺席学生。")
     selectedStudent?.let { student ->
         val current = state.local.studentTaskStatuses[student.id] ?: student.taskStatus
-        ReviewDecisionDialog(student.name, current, state.local.reviewNotes[student.id].orEmpty(), onSubmit = { status, note -> submitDecision(student.id, status, note); selectedStudent = null }, dismiss = { selectedStudent = null })
+        val draftKey = "review-note-${student.id}"
+        ReviewDecisionDialog(student.name, current, state.local.drafts[draftKey] ?: state.local.reviewNotes[student.id].orEmpty(), onDraftChanged = { saveDraft(draftKey, it) }, onSubmit = { status, note -> clearDraft(draftKey); submitDecision(student.id, status, note); selectedStudent = null }, dismiss = { selectedStudent = null })
     }
 }
 
@@ -545,6 +546,7 @@ private fun ReviewDecisionDialog(
     studentName: String,
     current: com.xiangshang.youth.core.model.TaskStatus,
     initialNote: String,
+    onDraftChanged: (String) -> Unit,
     onSubmit: (com.xiangshang.youth.core.model.TaskStatus, String) -> Unit,
     dismiss: () -> Unit
 ) {
@@ -557,7 +559,7 @@ private fun ReviewDecisionDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
                 Text("记录证据核验结果、是否需要补测及后续处理。", color = Color.Gray, fontSize = 11.sp)
-                OutlinedTextField(value = note, onValueChange = { note = it; validation = null }, label = { Text("复核 / 补测处理意见") }, minLines = 3, isError = validation != null)
+                OutlinedTextField(value = note, onValueChange = { note = it; onDraftChanged(it); validation = null }, label = { Text("复核 / 补测处理意见") }, minLines = 3, isError = validation != null)
                 validation?.let { Text(it, color = Color.Red, fontSize = 10.sp) }
                 Text("处理结论", color = Navy, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 com.xiangshang.youth.core.model.TaskStatus.values().forEach { status ->

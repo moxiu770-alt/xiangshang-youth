@@ -179,7 +179,7 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
         composable(Destinations.StudentsRoute) { entry -> StudentListScreen(state, nav, entry.arguments?.getString("className")) { student -> viewModel.chooseChild(student); nav.navigate(Destinations.Report) } }
         composable(Destinations.Tasks) { TeacherTasksScreen(state, nav, viewModel::saveCourseUpload) }
         composable(Destinations.TaskDetailRoute) { entry -> TeacherTaskDetailScreen(state, nav, viewModel::updateStudentTaskStatus, entry.arguments?.getString("taskId")) }
-        composable(Destinations.Review) { ReviewListScreen(state, nav, viewModel::submitReviewDecision) }
+        composable(Destinations.Review) { ReviewListScreen(state, nav, viewModel::submitReviewDecision, viewModel::saveDraft, viewModel::clearDraft) }
         composable(Destinations.Principal) { PrincipalHomeScreen(state, nav, viewModel::clearRoleSelection, viewModel::refreshDashboard) }
         composable(Destinations.PrincipalGrades) { GradeStatsScreen(state, nav, rootTab = true) }
         composable(Destinations.PrincipalClassStats) { ClassStatsScreen(state, nav, null, rootTab = true) }

@@ -847,6 +847,7 @@ private struct TaskStatusSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var reviewNote = ""
     @State private var validationMessage: String?
+    private var draftKey: String { "review-note-\(student.id)" }
     var body: some View {
         NavigationStack {
             List {
@@ -866,6 +867,7 @@ private struct TaskStatusSheet: View {
                                 return
                             }
                             state.updateTaskStatus(for: student, status: item, reviewNote: reviewNote)
+                            state.clearDraft(draftKey)
                             dismiss()
                         } label: {
                             HStack { Text(item.rawValue); Spacer(); if item == status { Image(systemName: "checkmark").foregroundStyle(ReferenceColor.blue) } }
@@ -874,7 +876,8 @@ private struct TaskStatusSheet: View {
                 }
             }
             .navigationTitle("处理\(student.name)预警")
-            .task { reviewNote = state.localFeatures.reviewNotes[student.id] ?? "" }
+            .task { reviewNote = state.localFeatures.drafts[draftKey] ?? state.localFeatures.reviewNotes[student.id] ?? "" }
+            .onChange(of: reviewNote) { _, value in state.saveDraft(value, key: draftKey) }
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("取消") { dismiss() } } }
         }
     }

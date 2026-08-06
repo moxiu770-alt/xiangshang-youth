@@ -63,11 +63,11 @@ struct TeacherClassCircleDashboard: View {
     @State private var editingPost: ClassPostDraft?
     var body: some View { ScrollView { VStack(spacing: 10) {
         ParentPageNavigation(title: "三年级2班 · 班级圈")
-        ReferenceCard { VStack(alignment: .leading, spacing: 7) { HStack { Image(systemName: "megaphone.fill").foregroundStyle(ReferenceColor.blue); Text("班级公告").font(.system(size: 13, weight: .bold)); Spacer(); Button("全部公告 ›") { selectedNotice = "全部班级公告" }.font(.system(size: 9)).foregroundStyle(ReferenceColor.blue).buttonStyle(.plain) }; Button { selectedNotice = "秋季综合测评通知" } label: { VStack(alignment: .leading, spacing: 4) { Text("秋季综合测评通知").font(.system(size: 12, weight: .bold)); Text("请家长于 9 月 12 日前完成孩子健康信息确认。") .font(.system(size: 9)).foregroundStyle(.secondary) }.frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.plain) } }.padding(.horizontal, 12)
+        ReferenceCard { VStack(alignment: .leading, spacing: 7) { HStack { Image(systemName: "megaphone.fill").foregroundStyle(ReferenceColor.blue); Text("班级公告").font(.system(size: 13, weight: .bold)); Spacer(); Button("全部公告 ›") { selectedNotice = "全部班级公告\n请家长于 9 月 12 日前完成孩子健康信息确认，并留意测评时间与场地安排。" }.font(.system(size: 9)).foregroundStyle(ReferenceColor.blue).buttonStyle(.plain) }; Button { selectedNotice = "秋季综合测评通知\n请家长于 9 月 12 日前完成孩子健康信息确认。测评当天请为孩子准备舒适运动服和饮水。" } label: { VStack(alignment: .leading, spacing: 4) { Text("秋季综合测评通知").font(.system(size: 12, weight: .bold)); Text("请家长于 9 月 12 日前完成孩子健康信息确认。") .font(.system(size: 9)).foregroundStyle(.secondary) }.frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.plain) } }.padding(.horizontal, 12)
         Button { composerShown = true } label: { Label("发布公告或班级动态", systemImage: "square.and.pencil").font(.system(size: 12, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 10).foregroundStyle(.white).background(ReferenceColor.blue, in: RoundedRectangle(cornerRadius: 10)) }.buttonStyle(.plain).padding(.horizontal, 12)
         ForEach(state.localFeatures.classPosts) { post in ReferenceCard { VStack(alignment: .leading, spacing: 5) { HStack { Text(post.author).font(.system(size: 10, weight: .bold)).foregroundStyle(ReferenceColor.blue); Spacer(); if post.author == "李老师" { Button("编辑") { editingPost = post }.font(.system(size: 9, weight: .semibold)).foregroundStyle(ReferenceColor.blue) } }; Text(post.content).font(.system(size: 12)); Text("刚刚发布").font(.system(size: 8)).foregroundStyle(.secondary) } }.padding(.horizontal, 12) }
         ReferenceSectionTitle(title: "班级动态", trailing: "本班最新").padding(.horizontal, 12)
-        ForEach([("今日体能活动", "孩子们完成了侧向滑步与障碍跳练习，表现很棒！"), ("家校共育小贴士", "建议每天安排 20 分钟亲子运动时间。")], id: \.0) { item in ReferenceCard { VStack(alignment: .leading, spacing: 5) { Text(item.0).font(.system(size: 12, weight: .bold)); Text(item.1).font(.system(size: 9)).foregroundStyle(.secondary); Text("李老师 · 今天").font(.system(size: 8)).foregroundStyle(ReferenceColor.green) } }.padding(.horizontal, 12) }
+        ForEach([("今日体能活动", "孩子们完成了侧向滑步与障碍跳练习，表现很棒！"), ("家校共育小贴士", "建议每天安排 20 分钟亲子运动时间。")], id: \.0) { item in Button { selectedNotice = "\(item.0)\n\(item.1)" } label: { ReferenceCard { HStack { VStack(alignment: .leading, spacing: 5) { Text(item.0).font(.system(size: 12, weight: .bold)); Text(item.1).font(.system(size: 9)).foregroundStyle(.secondary); Text("李老师 · 今天").font(.system(size: 8)).foregroundStyle(ReferenceColor.green) }; Spacer(); Image(systemName: "chevron.right").font(.system(size: 9)).foregroundStyle(.secondary) } }.padding(.horizontal, 12) }.buttonStyle(.plain).accessibilityLabel("查看\(item.0)") }
     }.padding(.bottom, 10) }
         .background(ReferenceColor.canvas)
         .overlay {
@@ -85,7 +85,36 @@ struct TeacherClassCircleDashboard: View {
         }
         .sheet(isPresented: $composerShown) { PublishClassPostSheet(author: "李老师") }
         .sheet(item: $editingPost) { post in PublishClassPostSheet(author: post.author, editingPost: post) }
-        .sheet(item: Binding(get: { selectedNotice.map(CourseSheetItem.init) }, set: { selectedNotice = $0?.name })) { item in CourseDetailSheet(title: item.name) }
+        .sheet(item: Binding(get: { selectedNotice.map(TeacherNoticeSheetItem.init) }, set: { selectedNotice = $0?.value })) { item in TeacherNoticeDetailSheet(value: item.value) }
+    }
+}
+
+private struct TeacherNoticeSheetItem: Identifiable {
+    let value: String
+    var id: String { value }
+}
+
+private struct TeacherNoticeDetailSheet: View {
+    let value: String
+    @Environment(\.dismiss) private var dismiss
+    private var title: String { value.components(separatedBy: "\n").first ?? "班级动态" }
+    private var detail: String { value.components(separatedBy: "\n").dropFirst().joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines) }
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    Label("李老师 · 今天", systemImage: "person.crop.circle.fill")
+                        .font(.footnote).foregroundStyle(ReferenceColor.blue)
+                    Text(detail.isEmpty ? "暂无补充说明。" : detail)
+                        .font(.body).foregroundStyle(ReferenceColor.navy)
+                    Label("本班可见", systemImage: "lock.fill")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading).padding(20)
+            }
+            .navigationTitle(title)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
+        }
     }
 }
 

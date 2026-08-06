@@ -46,6 +46,14 @@ class MainActivityFlowTest {
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("班级健康概览").fetchSemanticsNodes().isNotEmpty()
         }
+        composeRule.onNodeWithContentDescription("消息通知").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("消息中心").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription("返回").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("班级健康概览").fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithContentDescription("我的").performClick()
         composeRule.onNodeWithText("切换使用角色").performClick()
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {

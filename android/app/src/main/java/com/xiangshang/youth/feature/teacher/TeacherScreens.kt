@@ -1,5 +1,7 @@
 package com.xiangshang.youth.feature.teacher
 
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -39,6 +41,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
 import com.xiangshang.youth.R
 import com.xiangshang.youth.app.*
@@ -412,6 +415,7 @@ fun TeacherTasksScreen(state: AppUiState, nav: NavHostController, saveUpload: (S
 
 @Composable
 private fun UploadDialog(taskId: String, state: AppUiState, save: (String, Int, String, String, Boolean) -> Unit, dismiss: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val existing = state.local.courseUploads.firstOrNull { it.taskId == taskId }
     var attendance by remember { mutableStateOf(existing?.attendanceCount?.toString() ?: "26") }
     var notes by remember { mutableStateOf(existing?.notes ?: "完成侧向滑步与障碍跳训练，学生整体表现良好。") }
@@ -419,6 +423,12 @@ private fun UploadDialog(taskId: String, state: AppUiState, save: (String, Int, 
     var error by remember { mutableStateOf<String?>(null) }
     var result by remember { mutableStateOf<String?>(null) }
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> if (uri != null) attachment = uri.lastPathSegment?.substringAfterLast('/') ?: "课堂活动照片.jpg" }
+    val cameraPicker = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap -> if (bitmap != null) attachment = "课堂照片-${System.currentTimeMillis()}.jpg" else error = "没有获得照片，请重试或使用文件选择。" }
+    val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> if (granted) cameraPicker.launch(null) else error = "相机权限未开启，请在系统设置中允许相机，或使用文件选择。" }
+    fun openCamera() {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) cameraPicker.launch(null)
+        else cameraPermission.launch(Manifest.permission.CAMERA)
+    }
     AlertDialog(
         onDismissRequest = dismiss,
         title = { Text("延时课程上传") },
@@ -432,6 +442,7 @@ private fun UploadDialog(taskId: String, state: AppUiState, save: (String, Int, 
                 OutlinedTextField(value = attendance, onValueChange = { attendance = it; error = null }, label = { Text("出勤人数") }, isError = error != null)
                 OutlinedTextField(value = notes, onValueChange = { notes = it; error = null }, label = { Text("课堂记录") }, minLines = 2, isError = error != null)
                 Text("附件：$attachment", color = Color.Gray, fontSize = 10.sp, modifier = Modifier.padding(top = 6.dp))
+                OutlinedButton(onClick = { openCamera() }, modifier = Modifier.padding(top = 4.dp)) { Icon(Icons.Filled.PhotoCamera, null); Spacer(Modifier.width(5.dp)); Text("拍摄课堂照片") }
                 OutlinedButton(onClick = { imagePicker.launch("image/*") }, modifier = Modifier.padding(top = 4.dp)) { Icon(Icons.Filled.Photo, null); Spacer(Modifier.width(5.dp)); Text("选择课堂照片") }
                 error?.let { Text(it, color = Color.Red, fontSize = 10.sp) }
             }

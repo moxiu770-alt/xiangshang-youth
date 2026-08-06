@@ -1,5 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import AVFoundation
+import UIKit
 
 struct TeacherHomeView: View {
     @State private var selectedTab = 0
@@ -94,10 +96,49 @@ struct CourseUploadSheet: View {
     @State private var attachment = "课堂活动照片.jpg"
     @State private var error: String?
     @State private var isImporterShown = false
+    @State private var isCameraShown = false
     private var draftKey: String { "course-upload-\(taskID)" }
-    var body: some View { NavigationStack { Form { Section("课程记录") { TextField("出勤人数", text: $attendance).keyboardType(.numberPad); TextField("课堂记录", text: $notes, axis: .vertical).lineLimit(3...5); LabeledContent("课堂附件", value: attachment); Button("从文件选择照片") { isImporterShown = true } }; Section { Button("保存草稿") { save(submit: false) }; Button("提交审核") { save(submit: true) }.disabled(notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || attachment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }; if let error { Section { Text(error).foregroundStyle(.red) } } }.navigationTitle("延时课程上传").toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }.task { if let record = state.localFeatures.courseUploads.first(where: { $0.taskID == taskID }) { attendance = String(record.attendanceCount); notes = record.notes; attachment = record.attachmentName } else if let draft = state.localFeatures.drafts[draftKey]?.split(separator: "|", maxSplits: 2).map(String.init), draft.count == 3 { attendance = draft[0]; notes = draft[1]; attachment = draft[2] } }.onChange(of: attendance) { _, _ in saveDraft() }.onChange(of: notes) { _, _ in saveDraft() }.onChange(of: attachment) { _, _ in saveDraft() }.fileImporter(isPresented: $isImporterShown, allowedContentTypes: [.image]) { result in if case let .success(url) = result { attachment = url.lastPathComponent } } } }
+    var body: some View { NavigationStack { Form { Section("课程记录") { TextField("出勤人数", text: $attendance).keyboardType(.numberPad); TextField("课堂记录", text: $notes, axis: .vertical).lineLimit(3...5); LabeledContent("课堂附件", value: attachment); Button("拍摄课堂照片") { openCamera() }.accessibilityHint("需要相机权限；模拟器或无相机设备可使用文件选择"); Button("从文件选择照片") { isImporterShown = true } }; Section { Button("保存草稿") { save(submit: false) }; Button("提交审核") { save(submit: true) }.disabled(notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || attachment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }; if let error { Section { Text(error).foregroundStyle(.red) } } }.navigationTitle("延时课程上传").toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }.task { if let record = state.localFeatures.courseUploads.first(where: { $0.taskID == taskID }) { attendance = String(record.attendanceCount); notes = record.notes; attachment = record.attachmentName } else if let draft = state.localFeatures.drafts[draftKey]?.split(separator: "|", maxSplits: 2).map(String.init), draft.count == 3 { attendance = draft[0]; notes = draft[1]; attachment = draft[2] } }.onChange(of: attendance) { _, _ in saveDraft() }.onChange(of: notes) { _, _ in saveDraft() }.onChange(of: attachment) { _, _ in saveDraft() }.fileImporter(isPresented: $isImporterShown, allowedContentTypes: [.image]) { result in if case let .success(url) = result { attachment = url.lastPathComponent } }.sheet(isPresented: $isCameraShown) { CameraPicker(onImage: { _ in attachment = "课堂照片-\(Self.fileStamp()).jpg"; isCameraShown = false }, onCancel: { isCameraShown = false }) } } }
     private func saveDraft() { state.saveDraft("\(attendance)|\(notes)|\(attachment)", key: draftKey) }
     private func save(submit: Bool) { guard let count = Int(attendance), count >= 0 else { error = "请填写有效的出勤人数。"; return }; if submit && (notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || attachment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) { error = "提交前请补齐课堂记录和附件。"; return }; state.saveCourseUpload(taskID: taskID, attendanceCount: count, notes: notes, attachmentName: attachment, submit: submit); if submit { state.clearDraft(draftKey); dismiss() } else { error = "草稿已保存，可稍后继续编辑。" } }
+    private func openCamera() {
+        guard UIImagePickerController.isSourceTypeAvailable(.camera) else { error = "当前设备没有可用相机，请使用文件选择照片。"; return }
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized: isCameraShown = true
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                Task { @MainActor in
+                    if granted { isCameraShown = true } else { error = "相机权限未开启，请在系统设置中允许相机，或使用文件选择。" }
+                }
+            }
+        case .denied, .restricted: error = "相机权限未开启，请在系统设置中允许相机，或使用文件选择。"
+        @unknown default: error = "暂时无法使用相机，请使用文件选择照片。"
+        }
+    }
+    private static func fileStamp() -> String { let formatter = DateFormatter(); formatter.dateFormat = "yyyyMMdd-HHmmss"; return formatter.string(from: .now) }
+}
+
+private struct CameraPicker: UIViewControllerRepresentable {
+    let onImage: (UIImage) -> Void
+    let onCancel: () -> Void
+    func makeCoordinator() -> Coordinator { Coordinator(onImage: onImage, onCancel: onCancel) }
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.mediaTypes = ["public.image"]
+        picker.delegate = context.coordinator
+        return picker
+    }
+    func updateUIViewController(_ controller: UIImagePickerController, context: Context) {}
+    final class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+        let onImage: (UIImage) -> Void
+        let onCancel: () -> Void
+        init(onImage: @escaping (UIImage) -> Void, onCancel: @escaping () -> Void) { self.onImage = onImage; self.onCancel = onCancel }
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            if let image = info[.originalImage] as? UIImage { onImage(image) } else { onCancel() }
+        }
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { onCancel() }
+    }
 }
 
 struct TeacherMessageDetail: Identifiable { let id = UUID(); let title: String; let detail: String; let time: String }
@@ -221,7 +262,7 @@ struct TeacherDashboard: View {
                 .background(.white, in: Capsule()).overlay(Capsule().stroke(ReferenceColor.navy.opacity(0.10), lineWidth: 1)) }.buttonStyle(.plain)
             Button { router.push(.teacherMessages) } label: { Image(systemName: "bell").font(.system(size: 16, weight: .medium)).foregroundStyle(ReferenceColor.navy)
                 .overlay(alignment: .topTrailing) { if state.unreadMessageCount > 0 { Circle().fill(.red).frame(width: 5, height: 5).offset(x: 2, y: -2) } }
-            }.buttonStyle(.plain)
+            }.buttonStyle(.plain).accessibilityLabel("消息通知").accessibilityHint("打开消息中心")
         }
         .padding(.horizontal, 13).padding(.vertical, 8)
         .background(.white)
@@ -744,7 +785,13 @@ struct TeacherClassesView: View {
                 } else if let data = state.data {
                     ForEach(Array(data.classes.prefix(2))) { item in
                         let classStudents = data.students.filter { $0.className == item.name }
-                        let completionRate = classStudents.isEmpty ? item.completionRate : Int((Double(classStudents.filter { state.taskStatus(for: $0) == .completed }.count) / Double(classStudents.count) * 100).rounded())
+                        let completedCount = classStudents.filter { student in
+                            state.taskStatus(for: student) == .completed
+                        }.count
+                        let completionRate: Int = {
+                            guard !classStudents.isEmpty else { return item.completionRate }
+                            return Int((Double(completedCount) / Double(classStudents.count) * 100).rounded())
+                        }()
                         Button { router.push(.studentList(item)) } label: {
                             HStack {
                                 VStack(alignment: .leading) {

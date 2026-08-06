@@ -80,7 +80,7 @@ fun ParentHomeScreen(state: AppUiState, nav: NavHostController, registerActivity
     if (state.loading || state.data == null) { LoadingState(); return@Scaffold }
     if (state.selectedChild == null) {
         Column(Modifier.fillMaxSize().padding(contentPadding).padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            ParentHeader("请先绑定孩子", { nav.navigate(Destinations.Children) }, { nav.navigate(Destinations.Notifications) }, state.unreadMessageCount)
+            ParentHeader("请先绑定孩子", { nav.navigate(Destinations.Children) }, { nav.navigateSingleTop(Destinations.Notifications) }, state.unreadMessageCount)
             EmptyState("绑定孩子后才能查看测评、报告和课程。")
             Button(onClick = { nav.navigate(Destinations.Children) }) { Text("去绑定孩子") }
         }
@@ -88,7 +88,7 @@ fun ParentHomeScreen(state: AppUiState, nav: NavHostController, registerActivity
     }
     val selectedChild = state.selectedChild
     Column(Modifier.fillMaxSize().padding(contentPadding).background(Canvas).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-        ParentHeader(selectedChild.name, { nav.navigate(Destinations.Children) }, { nav.navigate(Destinations.Notifications) }, state.unreadMessageCount, refreshDashboard, state.loading)
+        ParentHeader(selectedChild.name, { nav.navigate(Destinations.Children) }, { nav.navigateSingleTop(Destinations.Notifications) }, state.unreadMessageCount, refreshDashboard, state.loading)
         Surface(Modifier.padding(horizontal = 10.dp).fillMaxWidth().semantics { role = Role.Button; contentDescription = "打开健康成长季活动报名" }.clickable { state.local.drafts[activityDraftKey]?.split("|", limit = 2)?.takeIf { it.size == 2 }?.let { (name, phone) -> activityName = name; activityPhone = phone }; activityDetail = true }, color = Color.White, shape = RoundedCornerShape(12.dp), shadowElevation = 1.dp) {
             Box(Modifier.height(108.dp)) {
                 Image(painterResource(R.drawable.parent_campaign), null, Modifier.fillMaxSize().scale(campaignScale), contentScale = ContentScale.Crop)

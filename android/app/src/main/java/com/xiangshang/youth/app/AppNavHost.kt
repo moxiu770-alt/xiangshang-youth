@@ -177,21 +177,21 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
                 clearDraft = viewModel::clearDraft
             )
         }
-        composable(Destinations.TeacherBoard) { TeacherClassBoardScreen(state, nav) { student -> viewModel.chooseChild(student); nav.navigate(Destinations.Report) } }
-        composable(Destinations.Students) { StudentListScreen(state, nav, null) { student -> viewModel.chooseChild(student); nav.navigate(Destinations.Report) } }
-        composable(Destinations.StudentsRoute) { entry -> StudentListScreen(state, nav, entry.arguments?.getString("className")) { student -> viewModel.chooseChild(student); nav.navigate(Destinations.Report) } }
+        composable(Destinations.TeacherBoard) { TeacherClassBoardScreen(state, nav) { student -> viewModel.chooseChild(student); nav.navigateSingleTop(Destinations.Report) } }
+        composable(Destinations.Students) { StudentListScreen(state, nav, null) { student -> viewModel.chooseChild(student); nav.navigateSingleTop(Destinations.Report) } }
+        composable(Destinations.StudentsRoute) { entry -> StudentListScreen(state, nav, entry.arguments?.getString("className")) { student -> viewModel.chooseChild(student); nav.navigateSingleTop(Destinations.Report) } }
         composable(Destinations.Tasks) { TeacherTasksScreen(state, nav, viewModel::saveCourseUpload) }
         composable(Destinations.TaskDetailRoute) { entry -> TeacherTaskDetailScreen(state, nav, viewModel::updateStudentTaskStatus, entry.arguments?.getString("taskId")) }
         composable(Destinations.Review) { ReviewListScreen(state, nav, viewModel::submitReviewDecision, viewModel::saveDraft, viewModel::clearDraft) }
         composable(Destinations.Principal) { PrincipalHomeScreen(state, nav, viewModel::clearRoleSelection, viewModel::refreshDashboard) }
         composable(Destinations.PrincipalGrades) { GradeStatsScreen(state, nav, rootTab = true) }
         composable(Destinations.PrincipalClassStats) { ClassStatsScreen(state, nav, null, rootTab = true) }
-        composable(Destinations.PrincipalRisk) { RiskStudentsScreen(state, nav, null, rootTab = true) { student -> viewModel.chooseChild(student); nav.navigate(Destinations.Report) } }
+        composable(Destinations.PrincipalRisk) { RiskStudentsScreen(state, nav, null, rootTab = true) { student -> viewModel.chooseChild(student); nav.navigateSingleTop(Destinations.Report) } }
         composable(Destinations.Grades) { GradeStatsScreen(state, nav) }
         composable(Destinations.ClassStats) { ClassStatsScreen(state, nav, null) }
         composable(Destinations.ClassStatsRoute) { entry -> ClassStatsScreen(state, nav, entry.arguments?.getString("grade")) }
         composable(Destinations.Risk) {
-            RiskStudentsScreen(state, nav, null) { student -> viewModel.chooseChild(student); nav.navigate(Destinations.Report) }
+            RiskStudentsScreen(state, nav, null) { student -> viewModel.chooseChild(student); nav.navigateSingleTop(Destinations.Report) }
         }
         composable(Destinations.RiskRoute) { entry ->
             RiskStudentsScreen(state, nav, entry.arguments?.getString("className")) { student ->

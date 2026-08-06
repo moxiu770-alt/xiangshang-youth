@@ -106,7 +106,62 @@ struct TeacherMessagesView: View {
     @EnvironmentObject private var state: AppState
     private let items = [("m1", "exclamationmark.triangle.fill", "学生预警通知", "王小明体质指标需关注，请及时跟进。", Color.red), ("m2", "building.2.fill", "学校通知", "秋季综合测评工作安排已发布。", ReferenceColor.blue), ("teacher-course", "calendar.badge.clock", "课程通知", "三年级2班延时课程将在明日 16:30 开始。", ReferenceColor.green), ("teacher-system", "gearshape.fill", "系统消息", "测评数据已完成同步。", ReferenceColor.purple)]
     @State private var selectedMessage: TeacherMessageDetail?
-    var body: some View { ScrollView { VStack(spacing: 8) { ParentPageNavigation(title: "消息中心", showsBack: true); ForEach(items.indices, id: \.self) { index in let item = items[index]; let unread = ["m1", "m2"].contains(item.0) && !state.localFeatures.readMessageIDs.contains(item.0) && state.data?.messages.first(where: { $0.id == item.0 })?.isRead == false; Button { state.markMessageRead(item.0); selectedMessage = TeacherMessageDetail(title: item.2, detail: item.3, time: index == 0 ? "刚刚" : "今天") } label: { HStack(spacing: 10) { Image(systemName: item.1).foregroundStyle(item.4).frame(width: 36, height: 36).background(item.4.opacity(0.10), in: RoundedRectangle(cornerRadius: 10)); VStack(alignment: .leading, spacing: 4) { HStack(spacing: 5) { Text(item.2).font(.system(size: 12, weight: .bold)); if unread { Circle().fill(.red).frame(width: 5, height: 5) } }; Text(item.3).font(.system(size: 9)).foregroundStyle(.secondary) }; Spacer(); Text(index == 0 ? "刚刚" : "今天").font(.system(size: 8)).foregroundStyle(.secondary); Image(systemName: "chevron.right").font(.system(size: 8)).foregroundStyle(.secondary) }.foregroundStyle(ReferenceColor.navy).padding(11).background(.white, in: RoundedRectangle(cornerRadius: 10)) }.buttonStyle(.plain).padding(.horizontal, 12) } }.padding(.bottom, 10) }.background(ReferenceColor.canvas).sheet(item: $selectedMessage) { message in NavigationStack { VStack(alignment: .leading, spacing: 14) { Text(message.title).font(.title3.bold()); Text(message.time).font(.caption).foregroundStyle(.secondary); Divider(); Text(message.detail).font(.body); Spacer() }.padding().navigationTitle("消息详情").toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { selectedMessage = nil } } } } } }
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 8) {
+                ParentPageNavigation(title: "消息中心", showsBack: true)
+                if let error = state.error, state.data == nil {
+                    ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
+                } else if state.loading || state.data == nil {
+                    LoadingStateView()
+                } else if items.isEmpty {
+                    EmptyStateView(title: "暂无消息通知", detail: "新的测评、补测和班级通知会显示在这里。")
+                } else {
+                    ForEach(items.indices, id: \.self) { index in
+                        let item = items[index]
+                        let unread = ["m1", "m2"].contains(item.0) && !state.localFeatures.readMessageIDs.contains(item.0) && state.data?.messages.first(where: { $0.id == item.0 })?.isRead == false
+                        Button {
+                            state.markMessageRead(item.0)
+                            selectedMessage = TeacherMessageDetail(title: item.2, detail: item.3, time: index == 0 ? "刚刚" : "今天")
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: item.1).foregroundStyle(item.4).frame(width: 36, height: 36).background(item.4.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack(spacing: 5) { Text(item.2).font(.system(size: 12, weight: .bold)); if unread { Circle().fill(.red).frame(width: 5, height: 5) } }
+                                    Text(item.3).font(.system(size: 9)).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Text(index == 0 ? "刚刚" : "今天").font(.system(size: 8)).foregroundStyle(.secondary)
+                                Image(systemName: "chevron.right").font(.system(size: 8)).foregroundStyle(.secondary)
+                            }
+                            .foregroundStyle(ReferenceColor.navy)
+                            .padding(11)
+                            .background(.white, in: RoundedRectangle(cornerRadius: 10))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 12)
+                    }
+                }
+            }
+            .padding(.bottom, 10)
+        }
+        .background(ReferenceColor.canvas)
+        .refreshable { await state.refreshDashboard() }
+        .sheet(item: $selectedMessage) { message in
+            NavigationStack {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text(message.title).font(.title3.bold())
+                    Text(message.time).font(.caption).foregroundStyle(.secondary)
+                    Divider()
+                    Text(message.detail).font(.body)
+                    Spacer()
+                }
+                .padding()
+                .navigationTitle("消息详情")
+                .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { selectedMessage = nil } } }
+            }
+        }
+    }
 }
 
 struct TeacherDashboard: View {
@@ -133,7 +188,11 @@ struct TeacherDashboard: View {
         .background(ReferenceColor.canvas)
         .refreshable { await state.refreshDashboard() }
         .overlay {
-            if state.loading || state.data == nil {
+            if let error = state.error, state.data == nil {
+                ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(ReferenceColor.canvas)
+            } else if state.loading || state.data == nil {
                 LoadingStateView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(ReferenceColor.canvas.opacity(0.96))
@@ -450,7 +509,12 @@ struct TeacherClassBoardView: View {
         }
         .background(ReferenceColor.canvas)
         .overlay {
-            if state.loading || state.data == nil {
+            if let error = state.error, state.data == nil {
+                ZStack {
+                    ReferenceColor.canvas.ignoresSafeArea()
+                    ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
+                }
+            } else if state.loading || state.data == nil {
                 ZStack {
                     ReferenceColor.canvas.ignoresSafeArea()
                     LoadingStateView()
@@ -671,7 +735,9 @@ struct TeacherClassesView: View {
                 ParentPageNavigation(title: "我管理的班级", showsBack: true)
                 ReferenceHeader(name: "李老师", school: "向上实验小学 · 三年级2班", initial: "李", avatarAsset: "TeacherAvatar")
                 ReferenceSectionTitle(title: "我管理的班级", trailing: "负责 2 个班级").padding(.horizontal, 12)
-                if state.loading || state.data == nil {
+                if let error = state.error, state.data == nil {
+                    ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
+                } else if state.loading || state.data == nil {
                     LoadingStateView()
                 } else if let data = state.data, data.classes.isEmpty {
                     EmptyStateView(title: "暂无管理班级", detail: "学校分班后会自动同步到这里。")
@@ -711,7 +777,9 @@ struct StudentListView: View {
     var body: some View {
         AppScaffold(title: classInfo?.name ?? "学生列表") {
             VStack(spacing: 8) {
-                if state.loading || state.data == nil {
+                if let error = state.error, state.data == nil {
+                    ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
+                } else if state.loading || state.data == nil {
                     LoadingStateView()
                 } else {
                     let students = state.data?.students.filter { classInfo == nil || $0.className == classInfo?.name } ?? []
@@ -737,7 +805,9 @@ struct TeacherTasksView: View {
                 ParentPageNavigation(title: "延时课程上传", showsBack: true)
                 ReferenceHeader(name: "李老师", school: "向上实验小学 · 体育组", initial: "李", avatarAsset: "TeacherAvatar")
                 ReferenceSectionTitle(title: "近日测评任务", trailing: "共 3 项任务").padding(.horizontal, 12)
-                if state.loading || state.data == nil {
+                if let error = state.error, state.data == nil {
+                    ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
+                } else if state.loading || state.data == nil {
                     LoadingStateView()
                 } else {
                     let tasks = state.data?.tasks ?? []
@@ -768,7 +838,9 @@ struct TeacherTaskDetailView: View {
                 TestTaskCard(task: currentTask, action: nil)
                 Text("点击学生更新签到、测试、复核或补测状态；状态将保存在本机，等待场地端同步。")
                     .font(.system(size: 9)).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
-                if state.loading || state.data == nil {
+                if let error = state.error, state.data == nil {
+                    ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
+                } else if state.loading || state.data == nil {
                     LoadingStateView()
                 } else if let data = state.data, data.students.isEmpty {
                     EmptyStateView(title: "暂无任务学生", detail: "学生名单同步后可更新测评状态。")
@@ -798,7 +870,9 @@ struct ReviewListView: View {
                 ParentPageNavigation(title: "预警中心", showsBack: true)
                 ReferenceHeader(name: "李老师", school: "向上实验小学 · 三年级2班", initial: "李", avatarAsset: "TeacherAvatar")
                 ReferenceSectionTitle(title: "预警中心", trailing: "待处理列表").padding(.horizontal, 12)
-                if state.loading || state.data == nil {
+                if let error = state.error, state.data == nil {
+                    ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
+                } else if state.loading || state.data == nil {
                     LoadingStateView()
                 } else {
                     let students = state.data?.students.filter { [.review, .retest, .absent].contains(state.taskStatus(for: $0)) } ?? []

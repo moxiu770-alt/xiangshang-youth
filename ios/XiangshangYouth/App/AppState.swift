@@ -7,6 +7,10 @@ import SwiftUI
     @Published var data: DashboardData?
     @Published var selectedChild: Student?
     @Published var loading = false
+    /// Session restoration happens behind the launch artwork. Keeping this separate
+    /// from `loading` prevents the retry overlay from flashing before login/role
+    /// selection is ready.
+    @Published private(set) var restoringSession = false
     @Published var error: String?
     @Published private(set) var localFeatures: LocalFeatureState
     let repository: YouthRepository
@@ -29,8 +33,12 @@ import SwiftUI
             selectedRole = nil
             Task { [weak self] in
                 guard let self else { return }
+                self.restoringSession = true
                 self.loading = true
-                defer { self.loading = false }
+                defer {
+                    self.loading = false
+                    self.restoringSession = false
+                }
                 do {
                     self.data = try await repository.loadDashboard()
                     self.selectedChild = self.data?.students.first(where: { $0.id == self.localFeatures.selectedChildID && self.localFeatures.boundChildIDs.contains($0.id) })

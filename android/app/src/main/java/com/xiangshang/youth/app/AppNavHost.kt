@@ -165,7 +165,7 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
             }
         }
         composable(Destinations.Teacher) { TeacherHomeScreen(state, nav, viewModel::refreshDashboard) }
-        composable(Destinations.TeacherMessages) { TeacherMessagesScreen(state, nav, viewModel::markMessageRead) }
+        composable(Destinations.TeacherMessages) { TeacherMessagesScreen(state, nav, viewModel::markMessageRead, viewModel::refreshDashboard) }
         composable(Destinations.Classes) { TeacherClassesScreen(state, nav) }
         composable(Destinations.TeacherCircle) {
             TeacherClassCircleScreen(
@@ -204,7 +204,7 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
     // secondary pages that intentionally keep their last successful content.
     // Login remains inline so the small loading/error window never covers the
     // authentication form.
-    if (state.error != null && state.profile != null && state.data != null && !state.restoringSession) {
+    if (state.error != null && state.profile != null && !state.restoringSession) {
         androidx.compose.foundation.layout.Box(
             Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.16f)),
             contentAlignment = Alignment.Center

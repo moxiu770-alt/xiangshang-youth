@@ -12,7 +12,9 @@ struct NotificationsView: View {
     var body: some View {
         AppScaffold(title: "消息通知") {
             VStack(spacing: 9) {
-                if state.loading || state.data == nil {
+                if let error = state.error, state.data == nil {
+                    ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
+                } else if state.loading || state.data == nil {
                     LoadingStateView()
                 } else if messages.isEmpty {
                     EmptyStateView(title: "暂无消息通知", detail: "新的测评、补测和班级通知会显示在这里。")

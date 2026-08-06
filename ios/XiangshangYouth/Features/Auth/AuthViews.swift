@@ -555,7 +555,7 @@ struct RoleSelectView: View {
                     .offset(y: visible ? 0 : 20).opacity(visible ? 1 : 0)
                 Button {
                     state.switchAccount()
-                    router.path = NavigationPath()
+                    router.reset()
                 } label: {
                     Text("退出当前账号").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
                 }

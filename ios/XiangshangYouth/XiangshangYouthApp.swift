@@ -13,21 +13,14 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     var body: some View {
         ZStack {
+            navigationRoot
+            globalOverlay
+        }
+    }
+    private var navigationRoot: some View {
         NavigationStack(path: $router.path) {
-            Group {
-                if state.isShowingSplash {
-                    SplashView()
-                } else if state.profile == nil {
-                    LoginView()
-                } else if state.selectedRole == nil {
-                    RoleSelectView()
-                } else {
-                    homeForRole(state.selectedRole!)
-                }
-            }
+            rootContent
                 .navigationDestination(for: AppRoute.self) { route in destination(for: route) }
-                // The supplied visual system is mobile-first. On iPad retain a readable
-                // dashboard column instead of stretching cards across the whole canvas.
                 .frame(maxWidth: horizontalSizeClass == .regular ? 980 : .infinity)
                 .frame(maxWidth: .infinity)
         }
@@ -39,6 +32,7 @@ struct RootView: View {
         }
         .onChange(of: state.selectedRole) { _, _ in router.activatePendingDeepLink(using: state) }
         .onChange(of: state.data?.students.count ?? 0) { _, _ in router.activatePendingDeepLink(using: state) }
+        .onChange(of: router.path.count) { _, _ in router.syncStackToPathCount() }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active, state.profile != nil, state.data != nil else { return }
             Task { await state.refreshDashboard() }
@@ -49,19 +43,29 @@ struct RootView: View {
                 transaction.animation = nil
             }
         }
-        // Authentication loading is rendered inside the login button.  Keeping the
-        // global mask for dashboard refreshes avoids the small modal spinner window
-        // appearing over the login screen.
+    }
+    @ViewBuilder private var rootContent: some View {
+        if state.isShowingSplash {
+            SplashView()
+        } else if state.profile == nil {
+            LoginView()
+        } else if state.selectedRole == nil {
+            RoleSelectView()
+        } else if let role = state.selectedRole {
+            homeForRole(role)
+        }
+    }
+    @ViewBuilder private var globalOverlay: some View {
         if state.loading && !state.isShowingSplash && state.profile != nil && state.data != nil {
             Color.black.opacity(0.08).ignoresSafeArea()
             LoadingStateView().background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18)).padding(58)
         }
-        // Login errors are inline on LoginView; dashboard errors retain the retry card.
-        if let error = state.error, !state.isShowingSplash, state.profile != nil, state.data != nil {
+        if let error = state.error, !state.isShowingSplash, state.profile != nil, !state.restoringSession {
             Color.black.opacity(0.18).ignoresSafeArea()
-            ErrorStateView(message: error) { Task { if state.profile == nil { await state.login(phone: "13800138000") } else { await state.refreshDashboard() } } }
-                .background(.white, in: RoundedRectangle(cornerRadius: 20)).padding(32)
-        }
+            ErrorStateView(message: error) {
+                Task { if state.profile == nil { await state.login(phone: "13800138000") } else { await state.refreshDashboard() } }
+            }
+            .background(.white, in: RoundedRectangle(cornerRadius: 20)).padding(32)
         }
     }
     @ViewBuilder private func homeForRole(_ role: UserRole) -> some View { switch role { case .parent: ParentHomeView(); case .teacher: TeacherHomeView(); case .principal: PrincipalHomeView() } }

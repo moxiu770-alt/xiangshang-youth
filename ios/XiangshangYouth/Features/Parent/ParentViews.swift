@@ -105,7 +105,11 @@ struct ParentLandingView: View {
     }.padding(.bottom, 8) }.background(ReferenceColor.canvas)
         .refreshable { await state.refreshDashboard() }
         .overlay {
-            if state.loading || state.data == nil {
+            if let error = state.error, state.data == nil {
+                ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(ReferenceColor.canvas)
+            } else if state.loading || state.data == nil {
                 ZStack { ReferenceColor.canvas.ignoresSafeArea(); LoadingStateView() }
             } else if state.selectedChild == nil {
                 ParentBindingPrompt()
@@ -161,7 +165,9 @@ struct ChildrenView: View {
     var body: some View {
         AppScaffold(title: "孩子管理") {
             VStack(spacing: 8) {
-                if state.loading || state.data == nil {
+                if let error = state.error, state.data == nil {
+                    ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
+                } else if state.loading || state.data == nil {
                     LoadingStateView()
                 } else {
                     HStack {
@@ -232,7 +238,7 @@ struct ParentPageNavigation: View {
     var body: some View {
         ZStack {
             if showsBack {
-                Button { dismiss() } label: {
+                Button { if router.path.isEmpty { dismiss() } else { router.pop() } } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 14, weight: .bold))
                         .frame(width: 32, height: 32)
@@ -283,7 +289,11 @@ struct ParentEvaluationDashboard: View {
         .refreshable { await state.refreshDashboard() }
         .task { withAnimation(.easeOut(duration: 1.0)) { ringProgress = reportProgress } }
         .overlay {
-            if state.loading || state.data == nil {
+            if let error = state.error, state.data == nil {
+                ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(ReferenceColor.canvas)
+            } else if state.loading || state.data == nil {
                 ZStack { ReferenceColor.canvas.ignoresSafeArea(); LoadingStateView() }
             } else if state.selectedChild == nil {
                 ParentBindingPrompt()
@@ -309,7 +319,11 @@ struct HealthDashboard: View {
         UpcomingTrainingCard().padding(.horizontal, 12)
         }.padding(.bottom, 8) }.background(ReferenceColor.canvas)
             .overlay {
-                if state.loading || state.data == nil {
+                if let error = state.error, state.data == nil {
+                    ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(ReferenceColor.canvas)
+                } else if state.loading || state.data == nil {
                     ZStack { ReferenceColor.canvas.ignoresSafeArea(); LoadingStateView() }
                 } else if state.selectedChild == nil {
                     ParentBindingPrompt()
@@ -456,7 +470,11 @@ struct ParentMessagesDashboard: View {
         }
         .background(ReferenceColor.canvas)
         .overlay {
-            if state.loading || state.data == nil {
+            if let error = state.error, state.data == nil {
+                ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(ReferenceColor.canvas)
+            } else if state.loading || state.data == nil {
                 ZStack { ReferenceColor.canvas.ignoresSafeArea(); LoadingStateView() }
             } else if state.selectedChild == nil {
                 ParentBindingPrompt()

@@ -19,7 +19,8 @@ struct AssessmentFlowView: View {
         ReferenceCard { VStack(alignment: .leading, spacing: 10) { Text(completed ? "测评已保存" : steps[step]).font(.system(size: 15, weight: .bold)); Text(description).font(.system(size: 11)).foregroundStyle(.secondary); if !completed { TextField(inputPlaceholder, text: $answer).textFieldStyle(.roundedBorder).onChange(of: answer) { _, value in state.saveDraft(value, key: draftKey) }; Label("内容会自动保存为草稿，可稍后继续。", systemImage: "internaldrive").font(.system(size: 9)).foregroundStyle(.secondary) }; if let validationMessage { Text(validationMessage).font(.system(size: 10)).foregroundStyle(.red) }; if category == .fitness && step == 3 { Label("运动发展测试由学校场地端完成，结果将自动同步至本页。", systemImage: "building.2.crop.circle").font(.system(size: 10)).foregroundStyle(ReferenceColor.blue).padding(9).background(ReferenceColor.sky, in: RoundedRectangle(cornerRadius: 8)) }; if category == .mental && step == 0 { Label("将跳转至第三方心理系统授权登录。", systemImage: "checkmark.shield.fill").font(.system(size: 10)).foregroundStyle(ReferenceColor.purple).padding(9).background(ReferenceColor.purple.opacity(0.08), in: RoundedRectangle(cornerRadius: 8)) } }.padding(12) }.padding(.horizontal, 12)
         Button { submitCurrentStep() } label: { Text(completed ? "查看\(category.rawValue)报告" : step == steps.count - 1 ? "完成并保存" : "保存并下一步").font(.system(size: 14, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 12).foregroundStyle(.white).background(category.color, in: RoundedRectangle(cornerRadius: 12)) }.buttonStyle(.plain).padding(.horizontal, 16).onChange(of: completed) { _, done in if done, let child = state.selectedChild { DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { router.push(.report(child)) } } }
     }.padding(.bottom, 14) }.background(ReferenceColor.canvas).task { answer = state.localFeatures.drafts[draftKey] ?? ""; completed = state.localFeatures.completedAssessments.contains(completionKey) } .onChange(of: step) { _, _ in answer = state.localFeatures.drafts[draftKey] ?? ""; validationMessage = nil } .overlay {
-        if state.loading || state.data == nil { ZStack { ReferenceColor.canvas.ignoresSafeArea(); LoadingStateView() } }
+        if let error = state.error, state.data == nil { ErrorStateView(message: error) { Task { await state.refreshDashboard() } }.frame(maxWidth: .infinity, maxHeight: .infinity).background(ReferenceColor.canvas) }
+        else if state.loading || state.data == nil { ZStack { ReferenceColor.canvas.ignoresSafeArea(); LoadingStateView() } }
         else if state.selectedChild == nil { ParentBindingPrompt() }
     } }
     private var description: String { if completed { return "本次测评结果已经保存，并将刷新健康档案。" }; switch category { case .fitness: return ["确认孩子的出生日期、当前身高和体重。", "填写父母身高，系统会计算遗传身高区间。", "按引导上传或记录站立姿态筛查结果。", "选择学校测试完成情况，或暂时跳过等待场地端回传。"][step]; case .vision: return "填写用眼习惯并进行视力筛查结果确认。"; case .oral: return "填写刷牙习惯并确认近期口腔筛查结果。"; case .mental: return "完成授权后，第三方系统将回传测评报告。" } }
@@ -78,7 +79,8 @@ struct ParentCoursesDashboard: View {
             }.padding(.bottom, 10)
         }.background(ReferenceColor.canvas)
         .overlay {
-            if state.loading || state.data == nil { ZStack { ReferenceColor.canvas.ignoresSafeArea(); LoadingStateView() } }
+            if let error = state.error, state.data == nil { ErrorStateView(message: error) { Task { await state.refreshDashboard() } }.frame(maxWidth: .infinity, maxHeight: .infinity).background(ReferenceColor.canvas) }
+            else if state.loading || state.data == nil { ZStack { ReferenceColor.canvas.ignoresSafeArea(); LoadingStateView() } }
             else if state.selectedChild == nil { ParentBindingPrompt() }
         }
         .sheet(item: Binding(get: { selectedCourse.map(CourseSheetItem.init) }, set: { selectedCourse = $0?.name })) { item in
@@ -184,7 +186,8 @@ struct ParentClassCircleDashboard: View {
             }.padding(.bottom, 10)
         }.background(ReferenceColor.canvas)
         .overlay {
-            if state.loading || state.data == nil { ZStack { ReferenceColor.canvas.ignoresSafeArea(); LoadingStateView() } }
+            if let error = state.error, state.data == nil { ErrorStateView(message: error) { Task { await state.refreshDashboard() } }.frame(maxWidth: .infinity, maxHeight: .infinity).background(ReferenceColor.canvas) }
+            else if state.loading || state.data == nil { ZStack { ReferenceColor.canvas.ignoresSafeArea(); LoadingStateView() } }
             else if state.selectedChild == nil { ParentBindingPrompt() }
         }
         .sheet(isPresented: $isComposerShown) { PublishClassPostSheet(author: "王女士") }
@@ -286,8 +289,8 @@ struct AccountDashboard: View {
                 accountRow("通知与显示设置", "gearshape.fill", .orange) { settingsShown = true }
                 accountRow("帮助与反馈", "questionmark.circle.fill", ReferenceColor.blue) { dialog = "帮助与反馈" }
                 accountRow("用户协议与隐私政策", "doc.text.fill", .secondary) { dialog = "用户协议与隐私政策" }
-                Button { state.chooseAnotherRole(); router.path = NavigationPath() } label: { Label("切换使用角色", systemImage: "arrow.left.arrow.right").font(.system(size: 12, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 11).foregroundStyle(ReferenceColor.blue).background(ReferenceColor.sky, in: RoundedRectangle(cornerRadius: 10)) }.buttonStyle(.plain).padding(.horizontal, 12)
-                Button { state.switchAccount(); router.path = NavigationPath() } label: { Text("切换账号").font(.system(size: 12, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 11).foregroundStyle(.red).background(.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 10)) }.buttonStyle(.plain).padding(.horizontal, 12)
+                Button { state.chooseAnotherRole(); router.reset() } label: { Label("切换使用角色", systemImage: "arrow.left.arrow.right").font(.system(size: 12, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 11).foregroundStyle(ReferenceColor.blue).background(ReferenceColor.sky, in: RoundedRectangle(cornerRadius: 10)) }.buttonStyle(.plain).padding(.horizontal, 12)
+                Button { state.switchAccount(); router.reset() } label: { Text("切换账号").font(.system(size: 12, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 11).foregroundStyle(.red).background(.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 10)) }.buttonStyle(.plain).padding(.horizontal, 12)
             }.padding(.bottom, 10)
         }.background(ReferenceColor.canvas)
         .sheet(item: Binding(get: { dialog.map(CourseSheetItem.init) }, set: { dialog = $0?.name })) { item in

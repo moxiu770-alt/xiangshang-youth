@@ -118,6 +118,19 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertEqual(router.path.count, 1)
     }
 
+    func testRouterDeduplicatesRepeatedDestinationAndKeepsBackStackRecoverable() {
+        let router = AppRouter()
+
+        router.push(.teacherMessages)
+        router.push(.teacherMessages)
+        XCTAssertEqual(router.path.count, 1)
+
+        router.pop()
+        XCTAssertTrue(router.path.isEmpty)
+        router.push(.teacherMessages)
+        XCTAssertEqual(router.path.count, 1)
+    }
+
     func testFeatureStoreMigratesStateSavedBeforeReviewNotes() throws {
         let suite = "xiangshang.youth.migration-tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!

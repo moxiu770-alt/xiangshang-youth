@@ -104,7 +104,7 @@ struct PrincipalDashboard: View {
                     Spacer()
                     Button("退出校长端") {
                         state.chooseAnotherRole()
-                        router.path = NavigationPath()
+                        router.reset()
                     }
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(ReferenceColor.blue)
@@ -323,7 +323,11 @@ struct GradeStatsView: View {
         }
         .background(ReferenceColor.canvas)
         .overlay {
-            if state.loading || state.data == nil {
+            if let error = state.error, state.data == nil {
+                ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(ReferenceColor.canvas)
+            } else if state.loading || state.data == nil {
                 ZStack {
                     ReferenceColor.canvas.ignoresSafeArea()
                     LoadingStateView()
@@ -397,7 +401,11 @@ struct ClassStatsView: View {
         }
         .background(ReferenceColor.canvas)
         .overlay {
-            if state.loading || state.data == nil {
+            if let error = state.error, state.data == nil {
+                ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(ReferenceColor.canvas)
+            } else if state.loading || state.data == nil {
                 ZStack {
                     ReferenceColor.canvas.ignoresSafeArea()
                     LoadingStateView()
@@ -447,7 +455,11 @@ struct RiskStudentsView: View {
         }
         .background(ReferenceColor.canvas)
         .overlay {
-            if state.loading || state.data == nil {
+            if let error = state.error, state.data == nil {
+                ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(ReferenceColor.canvas)
+            } else if state.loading || state.data == nil {
                 ZStack {
                     ReferenceColor.canvas.ignoresSafeArea()
                     LoadingStateView()

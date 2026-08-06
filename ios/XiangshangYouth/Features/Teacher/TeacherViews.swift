@@ -346,6 +346,7 @@ struct TeacherClassBoardView: View {
             VStack(spacing: 7) {
                 HStack {
                     Button { router.pop() } label: { Image(systemName: "chevron.left") }
+                        .accessibilityLabel("返回")
                     Spacer()
                     VStack(spacing: 1) {
                         Text("三年级2班 · 班级数据看板").font(.system(size: 14, weight: .bold))
@@ -372,19 +373,19 @@ struct TeacherClassBoardView: View {
 
                 boardCard(title: "班级健康概览", trailing: "查看明细", action: { router.push(.studentList(classInfo)) }) {
                     HStack {
-                        boardStat("班级人数", "\(classStudents.count)", "person.3.fill", ReferenceColor.blue)
-                        boardStat("已测评", "\(measuredCount)", "checkmark.circle.fill", ReferenceColor.green)
-                        boardStat("测评率", "\(Int(completion * 100))%", "circle", ReferenceColor.green)
-                        boardStat("待处理预警", "\(riskCount)", "exclamationmark.shield.fill", .red)
+                        boardStat("班级人数", "\(classStudents.count)", "person.3.fill", ReferenceColor.blue) { router.push(.studentList(classInfo)) }
+                        boardStat("已测评", "\(measuredCount)", "checkmark.circle.fill", ReferenceColor.green) { router.push(.teacherTasks) }
+                        boardStat("测评率", "\(Int(completion * 100))%", "circle", ReferenceColor.green) { router.push(.teacherTasks) }
+                        boardStat("待处理预警", "\(riskCount)", "exclamationmark.shield.fill", .red) { router.push(.reviewList) }
                     }
                 }
 
                 boardCard(title: "四维测评健康度", trailing: "健康明细", action: { router.push(.reviewList) }) {
                     HStack(spacing: 6) {
-                        healthGauge("体质", ReferenceColor.blue, completion: completion)
-                        healthGauge("心理", ReferenceColor.pink, completion: completion)
-                        healthGauge("视力", ReferenceColor.green, completion: completion)
-                        healthGauge("口腔", ReferenceColor.purple, completion: completion)
+                        healthGauge("体质", ReferenceColor.blue, completion: completion) { router.push(.reviewList) }
+                        healthGauge("心理", ReferenceColor.pink, completion: completion) { router.push(.reviewList) }
+                        healthGauge("视力", ReferenceColor.green, completion: completion) { router.push(.reviewList) }
+                        healthGauge("口腔", ReferenceColor.purple, completion: completion) { router.push(.reviewList) }
                     }
                 }
 
@@ -485,15 +486,12 @@ struct TeacherClassBoardView: View {
     }
 
     private func boardCard<Content: View>(title: String, trailing: String, action: @escaping () -> Void, @ViewBuilder content: () -> Content) -> some View {
-        Button(action: action) {
-            ReferenceCard {
-                VStack(alignment: .leading, spacing: 7) {
-                    ReferenceSectionTitle(title: title, trailing: trailing)
-                    content()
-                }
+        ReferenceCard {
+            VStack(alignment: .leading, spacing: 7) {
+                ReferenceSectionTitle(title: title, trailing: trailing, action: action)
+                content()
             }
         }
-        .buttonStyle(.plain)
         .padding(.horizontal, 12)
     }
 
@@ -509,33 +507,41 @@ struct TeacherClassBoardView: View {
         .buttonStyle(.plain)
     }
 
-    private func boardStat(_ title: String, _ value: String, _ icon: String, _ color: Color) -> some View {
-        VStack(spacing: 3) {
-            Text(title).font(.system(size: 8)).foregroundStyle(.secondary)
-            HStack(spacing: 2) {
-                Text(value).font(.system(size: 18, weight: .bold)).foregroundStyle(color)
-                Image(systemName: icon).font(.system(size: 10)).foregroundStyle(color)
+    private func boardStat(_ title: String, _ value: String, _ icon: String, _ color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 3) {
+                Text(title).font(.system(size: 8)).foregroundStyle(.secondary)
+                HStack(spacing: 2) {
+                    Text(value).font(.system(size: 18, weight: .bold)).foregroundStyle(color)
+                    Image(systemName: icon).font(.system(size: 10)).foregroundStyle(color)
+                }
             }
+            .frame(maxWidth: .infinity)
         }
-        .frame(maxWidth: .infinity)
+        .buttonStyle(.plain)
+        .accessibilityLabel("查看\(title)：\(value)")
     }
 
-    private func healthGauge(_ title: String, _ color: Color, completion: Double) -> some View {
-        VStack(spacing: 2) {
-            Text(title).font(.system(size: 9, weight: .bold))
-            ZStack {
-                Circle().stroke(color.opacity(0.18), lineWidth: 5)
-                Circle().trim(from: 0, to: dashboardAppeared ? completion : 0)
-                    .stroke(color, style: StrokeStyle(lineWidth: 5, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                Text("\(Int(completion * 100))%").font(.system(size: 12, weight: .bold)).foregroundStyle(color)
+    private func healthGauge(_ title: String, _ color: Color, completion: Double, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 2) {
+                Text(title).font(.system(size: 9, weight: .bold))
+                ZStack {
+                    Circle().stroke(color.opacity(0.18), lineWidth: 5)
+                    Circle().trim(from: 0, to: dashboardAppeared ? completion : 0)
+                        .stroke(color, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                    Text("\(Int(completion * 100))%").font(.system(size: 12, weight: .bold)).foregroundStyle(color)
+                }
+                .frame(width: 40, height: 40)
+                Text("\(Int((1 - completion) * 100))%未完成").font(.system(size: 7)).foregroundStyle(.secondary)
             }
-            .frame(width: 40, height: 40)
-            Text("\(Int((1 - completion) * 100))%未完成").font(.system(size: 7)).foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 3)
+            .background(color.opacity(0.04), in: RoundedRectangle(cornerRadius: 7))
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 3)
-        .background(color.opacity(0.04), in: RoundedRectangle(cornerRadius: 7))
+        .buttonStyle(.plain)
+        .accessibilityLabel("查看\(title)测评健康度")
     }
 
     private func smallBar(_ label: String, _ value: Double, _ color: Color, _ count: String) -> some View {

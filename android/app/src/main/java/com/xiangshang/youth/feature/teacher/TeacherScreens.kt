@@ -300,7 +300,7 @@ private fun TeacherPostEditorDialog(
 }
 
 @Composable
-fun TeacherAccountScreen(state: AppUiState, nav: NavHostController, chooseRole: (com.xiangshang.youth.core.model.UserRole) -> Unit, logout: () -> Unit, updateSettings: (Boolean?, Boolean?) -> Unit) {
+fun TeacherAccountScreen(state: AppUiState, nav: NavHostController, logout: () -> Unit, updateSettings: (Boolean?, Boolean?) -> Unit) {
     var detail by remember { mutableStateOf<String?>(null) }; var settingsOpen by remember { mutableStateOf(false) }
     Scaffold(containerColor = Canvas, bottomBar = { TeacherBottomBar(nav, Destinations.Account) }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 12.dp).verticalScroll(rememberScrollState())) {
@@ -308,7 +308,14 @@ fun TeacherAccountScreen(state: AppUiState, nav: NavHostController, chooseRole: 
             Surface(Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "查看教师个人资料" }.clickable { detail = "个人信息" }, color = Color.White, shape = RoundedCornerShape(12.dp)) { Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Image(painterResource(R.drawable.teacher_avatar), null, Modifier.size(52.dp).clip(CircleShape), contentScale = ContentScale.Crop); Spacer(Modifier.width(11.dp)); Column(Modifier.weight(1f)) { Text(state.profile?.name ?: "李老师", color = Navy, fontWeight = FontWeight.Bold); Text("向上实验小学 · 三年级2班", color = Color.Gray, fontSize = 9.sp); Text("班主任 / 体育老师", color = Green, fontSize = 9.sp) }; Icon(Icons.Filled.ChevronRight, "查看个人资料", tint = Color.Gray) } }
             Spacer(Modifier.height(10.dp))
             listOf("个人信息" to Icons.Filled.Person, "我的权限" to Icons.Filled.AdminPanelSettings, "工作数据" to Icons.Filled.BarChart, "设置" to Icons.Filled.Settings, "消息" to Icons.Filled.Notifications).forEach { (title, icon) -> Surface(Modifier.fillMaxWidth().padding(vertical = 4.dp).semantics { role = Role.Button; contentDescription = "打开$title" }.clickable { when (title) { "工作数据" -> nav.navigate(Destinations.TeacherBoard); "设置" -> settingsOpen = true; "消息" -> nav.navigate(Destinations.TeacherMessages); else -> detail = title } }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = Blue); Spacer(Modifier.width(10.dp)); Text(title, color = Navy, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f)); Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray) } } }
-            Spacer(Modifier.height(9.dp)); OutlinedButton(onClick = { chooseRole(com.xiangshang.youth.core.model.UserRole.Parent); nav.navigate(Destinations.Role) { popUpTo(Destinations.Teacher) { inclusive = true }; launchSingleTop = true } }, modifier = Modifier.fillMaxWidth()) { Text("切换使用角色") }
+            Spacer(Modifier.height(9.dp)); OutlinedButton(onClick = {
+                // Keep the authenticated session, but let the user choose any
+                // authorized workbench instead of silently forcing Parent.
+                nav.navigate(Destinations.Role) {
+                    popUpTo(Destinations.Account) { inclusive = true }
+                    launchSingleTop = true
+                }
+            }, modifier = Modifier.fillMaxWidth().semantics { contentDescription = "重新选择使用角色" }) { Text("切换使用角色") }
             OutlinedButton(onClick = { logout(); nav.navigate(Destinations.Login) { popUpTo(nav.graph.id) { inclusive = true } } }, modifier = Modifier.fillMaxWidth().padding(top = 7.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red)) { Text("切换账号") }
         }
     }

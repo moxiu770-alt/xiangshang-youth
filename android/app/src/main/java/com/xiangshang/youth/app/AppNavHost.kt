@@ -149,7 +149,7 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
             )
         }
         composable(Destinations.Circle) { ParentClassCircleScreen(state, nav, viewModel::publishPost, viewModel::saveDraft, viewModel::clearDraft, viewModel::togglePostLike, viewModel::addPostComment) }
-        composable(Destinations.Account) { if (state.role?.name == "Teacher") TeacherAccountScreen(state, nav, viewModel::chooseRole, viewModel::logout, viewModel::updateSettings) else AccountScreen(state, nav, viewModel::chooseRole, viewModel::logout, viewModel::updateSettings, viewModel::sendSupport) }
+        composable(Destinations.Account) { if (state.role?.name == "Teacher") TeacherAccountScreen(state, nav, viewModel::logout, viewModel::updateSettings) else AccountScreen(state, nav, viewModel::chooseRole, viewModel::logout, viewModel::updateSettings, viewModel::sendSupport) }
         composable(Destinations.Messages) { ParentMessagesScreen(state, nav, viewModel::markMessageRead) }
         composable(Destinations.Notifications) { NotificationsScreen(state, nav, viewModel::markMessageRead) }
         composable(Destinations.Health) { HealthProfileScreen(state, nav) }

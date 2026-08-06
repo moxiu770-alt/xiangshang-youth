@@ -430,7 +430,7 @@ fun StudentListScreen(state: AppUiState, nav: NavHostController, className: Stri
 }
 
 @Composable
-fun TeacherTasksScreen(state: AppUiState, nav: NavHostController, saveUpload: (String, Int, String, String, Boolean) -> Unit, submitUpload: (String, Int, String, String) -> Unit = { taskId, attendance, notes, attachment -> saveUpload(taskId, attendance, notes, attachment, true) }) {
+fun TeacherTasksScreen(state: AppUiState, nav: NavHostController, saveUpload: (String, Int, String, String, Boolean) -> Unit, submitUpload: (String, Int, String, String) -> Unit = { taskId, attendance, notes, attachment -> saveUpload(taskId, attendance, notes, attachment, true) }, saveDraft: (String, String) -> Unit = { _, _ -> }, clearDraft: (String) -> Unit = {}) {
     val taskId = "after-class-upload"
     val uploaded = state.local.uploadedTaskIds.contains(taskId)
     var formOpen by remember { mutableStateOf(false) }
@@ -461,21 +461,35 @@ fun TeacherTasksScreen(state: AppUiState, nav: NavHostController, saveUpload: (S
             }
         }
     }
-    if (formOpen) UploadDialog(taskId, state, saveUpload, submitUpload) { formOpen = false }
+    if (formOpen) UploadDialog(taskId, state, saveUpload, submitUpload, saveDraft, clearDraft) { formOpen = false }
 }
 
 @Composable
-private fun UploadDialog(taskId: String, state: AppUiState, save: (String, Int, String, String, Boolean) -> Unit, submit: (String, Int, String, String) -> Unit, dismiss: () -> Unit) {
+private fun UploadDialog(taskId: String, state: AppUiState, save: (String, Int, String, String, Boolean) -> Unit, submit: (String, Int, String, String) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit, dismiss: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val existing = state.local.courseUploads.firstOrNull { it.taskId == taskId }
-    var attendance by remember { mutableStateOf(existing?.attendanceCount?.toString() ?: "26") }
-    var notes by remember { mutableStateOf(existing?.notes ?: "完成侧向滑步与障碍跳训练，学生整体表现良好。") }
-    var attachment by remember { mutableStateOf(existing?.attachmentName ?: "课堂活动照片.jpg") }
+    val attendanceDraftKey = "course-upload-$taskId-attendance"
+    val notesDraftKey = "course-upload-$taskId-notes"
+    val attachmentDraftKey = "course-upload-$taskId-attachment"
+    var attendance by remember(taskId) { mutableStateOf(existing?.attendanceCount?.toString() ?: state.local.drafts[attendanceDraftKey] ?: "26") }
+    var notes by remember(taskId) { mutableStateOf(existing?.notes ?: state.local.drafts[notesDraftKey] ?: "完成侧向滑步与障碍跳训练，学生整体表现良好。") }
+    var attachment by remember(taskId) { mutableStateOf(existing?.attachmentName ?: state.local.drafts[attachmentDraftKey] ?: "课堂活动照片.jpg") }
     var error by remember { mutableStateOf<String?>(null) }
     var result by remember { mutableStateOf<String?>(null) }
     val command = state.workflowStates["course:$taskId"] ?: WorkflowCommandState()
-    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> if (uri != null) attachment = uri.lastPathSegment?.substringAfterLast('/') ?: "课堂活动照片.jpg" }
-    val cameraPicker = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap -> if (bitmap != null) attachment = "课堂照片-${System.currentTimeMillis()}.jpg" else error = "没有获得照片，请重试或使用文件选择。" }
+    fun persistDraft() {
+        saveDraft(attendanceDraftKey, attendance)
+        saveDraft(notesDraftKey, notes)
+        saveDraft(attachmentDraftKey, attachment)
+    }
+    fun clearFormDraft() {
+        clearDraft(attendanceDraftKey)
+        clearDraft(notesDraftKey)
+        clearDraft(attachmentDraftKey)
+    }
+    LaunchedEffect(command.status) { if (command.status == WorkflowCommandStatus.Succeeded) clearFormDraft() }
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> if (uri != null) { attachment = uri.lastPathSegment?.substringAfterLast('/') ?: "课堂活动照片.jpg"; persistDraft() } }
+    val cameraPicker = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap -> if (bitmap != null) { attachment = "课堂照片-${System.currentTimeMillis()}.jpg"; persistDraft() } else error = "没有获得照片，请重试或使用文件选择。" }
     val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> if (granted) cameraPicker.launch(null) else error = "相机权限未开启，请在系统设置中允许相机，或使用文件选择。" }
     fun openCamera() {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) cameraPicker.launch(null)
@@ -488,11 +502,11 @@ private fun UploadDialog(taskId: String, state: AppUiState, save: (String, Int, 
             if (result != null || command.status == WorkflowCommandStatus.Succeeded) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Filled.CheckCircle, null, tint = Green, modifier = Modifier.size(42.dp))
-                    Text(result!!, color = Navy, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
+                    Text(result ?: "课程记录已保存到本机，后端联调后同步审核。", color = Navy, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
                 }
             } else Column {
-                OutlinedTextField(value = attendance, onValueChange = { attendance = it; error = null }, label = { Text("出勤人数") }, isError = error != null)
-                OutlinedTextField(value = notes, onValueChange = { notes = it; error = null }, label = { Text("课堂记录") }, minLines = 2, isError = error != null)
+                OutlinedTextField(value = attendance, onValueChange = { attendance = it; error = null; persistDraft() }, label = { Text("出勤人数") }, isError = error != null)
+                OutlinedTextField(value = notes, onValueChange = { notes = it; error = null; persistDraft() }, label = { Text("课堂记录") }, minLines = 2, isError = error != null)
                 Text("附件：$attachment", color = Color.Gray, fontSize = 10.sp, modifier = Modifier.padding(top = 6.dp))
                 OutlinedButton(onClick = { openCamera() }, modifier = Modifier.padding(top = 4.dp)) { Icon(Icons.Filled.PhotoCamera, null); Spacer(Modifier.width(5.dp)); Text("拍摄课堂照片") }
                 OutlinedButton(onClick = { imagePicker.launch("image/*") }, modifier = Modifier.padding(top = 4.dp)) { Icon(Icons.Filled.Photo, null); Spacer(Modifier.width(5.dp)); Text("选择课堂照片") }
@@ -512,6 +526,7 @@ private fun UploadDialog(taskId: String, state: AppUiState, save: (String, Int, 
         dismissButton = if (result == null && command.status != WorkflowCommandStatus.Succeeded) ({ TextButton(onClick = {
             val count = attendance.toIntOrNull() ?: 0
             save(taskId, count, notes.trim(), attachment, false)
+            clearFormDraft()
             result = "草稿已保存，可稍后继续编辑。"
         }) { Text("保存草稿") } }) else null
     )

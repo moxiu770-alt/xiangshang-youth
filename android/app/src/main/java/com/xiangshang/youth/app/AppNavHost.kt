@@ -273,7 +273,7 @@ private fun NavHostController.replaceRoot(destination: String) {
         composable(Destinations.TeacherBoard) { TeacherClassBoardScreen(state, nav) { student -> viewModel.chooseChild(student); nav.navigateSingleTop(Destinations.Report) } }
         composable(Destinations.Students) { StudentListScreen(state, nav, null) { student -> viewModel.chooseChild(student); nav.navigateSingleTop(Destinations.Report) } }
         composable(Destinations.StudentsRoute) { entry -> StudentListScreen(state, nav, entry.arguments?.getString("className")) { student -> viewModel.chooseChild(student); nav.navigateSingleTop(Destinations.Report) } }
-        composable(Destinations.Tasks) { TeacherTasksScreen(state, nav, viewModel::saveCourseUpload, { taskId, attendance, notes, attachment -> viewModel.submitCourseUploadCommand(taskId, attendance, notes, attachment) }) }
+        composable(Destinations.Tasks) { TeacherTasksScreen(state, nav, viewModel::saveCourseUpload, { taskId, attendance, notes, attachment -> viewModel.submitCourseUploadCommand(taskId, attendance, notes, attachment) }, viewModel::saveDraft, viewModel::clearDraft) }
         composable(Destinations.TaskDetailRoute) { entry -> TeacherTaskDetailScreen(state, nav, viewModel::updateStudentTaskStatus, entry.arguments?.getString("taskId"), viewModel::submitTaskStatusCommand) }
         composable(Destinations.Review) { ReviewListScreen(state, nav, viewModel::submitReviewDecision, viewModel::saveDraft, viewModel::clearDraft, viewModel::submitTaskStatusCommand) }
         composable(Destinations.Principal) {

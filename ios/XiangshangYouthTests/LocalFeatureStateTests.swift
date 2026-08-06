@@ -228,6 +228,20 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertTrue(state.bindChild(name: "王小雨", code: "s02"))
         XCTAssertEqual(Set(state.boundChildren.map(\.id)), ["s01", "s02"])
     }
+
+    func testExpertBookingIsIdempotentUntilRemoteSync() async {
+        let suite = "xiangshang.youth.expert-idempotency-tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let state = AppState(featureStore: LocalFeatureStore(defaults: defaults))
+        await state.login(phone: "13800138000")
+
+        state.bookExpert(name: "张教授", preferredDate: "周五上午", note: "运动发展咨询")
+        state.bookExpert(name: "张教授", preferredDate: "周五上午", note: "运动发展咨询")
+
+        XCTAssertEqual(state.localFeatures.expertAppointments.count, 1)
+        XCTAssertEqual(state.localFeatures.expertAppointments.first?.status, .pendingSync)
+    }
 }
 
 private struct FailingRepository: YouthRepository {

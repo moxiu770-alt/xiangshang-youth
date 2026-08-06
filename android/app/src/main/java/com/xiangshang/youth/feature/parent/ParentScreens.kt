@@ -63,8 +63,14 @@ fun ParentHomeScreen(state: AppUiState, nav: NavHostController, registerActivity
     val activityDraftKey = "activity-registration-health-growth-season-2026"
     var expert by remember { mutableStateOf<String?>(null) }; var expertDate by remember { mutableStateOf("2026-09-12 上午") }; var expertNote by remember { mutableStateOf("想了解孩子的运动发展建议。") }; var expertSubmitted by remember { mutableStateOf(false) }
     val expertDraftKey = expert?.let { "expert-booking-$it" }
-    LaunchedEffect(expert) {
-        expertSubmitted = false
+    LaunchedEffect(expert, state.local.expertAppointments) {
+        expertSubmitted = expert?.let { selected ->
+            state.local.expertAppointments.any {
+                it.expertName == selected &&
+                    (it.status == com.xiangshang.youth.core.service.LocalSubmissionStatus.PendingSync ||
+                        it.status == com.xiangshang.youth.core.service.LocalSubmissionStatus.Submitted)
+            }
+        } ?: false
         val draft = expertDraftKey?.let { state.local.drafts[it] }
             ?.split("|", limit = 2)
             ?.takeIf { it.size == 2 }

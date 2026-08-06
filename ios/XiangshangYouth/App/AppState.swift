@@ -201,6 +201,12 @@ import Network
     func clearDrafts(prefix: String) { mutateLocal { values in let keys = values.drafts.keys.filter { $0.hasPrefix(prefix) }; keys.forEach { values.drafts.removeValue(forKey: $0) } } }
     func bookExpert(name: String, preferredDate: String, note: String) {
         guard !preferredDate.isEmpty, !note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        // A family can reopen the same expert card after process restoration.
+        // Keep the local command idempotent until the remote appointment API is
+        // connected; otherwise repeated taps would create duplicate bookings.
+        guard !localFeatures.expertAppointments.contains(where: {
+            $0.expertName == name && ($0.status == .pendingSync || $0.status == .submitted)
+        }) else { return }
         mutateLocal { $0.expertAppointments.insert(ExpertAppointment(id: UUID(), expertName: name, preferredDate: preferredDate, note: note, status: .pendingSync, createdAt: .now), at: 0) }
     }
     func saveCourseUpload(taskID: String, attendanceCount: Int, notes: String, attachmentName: String, submit: Bool) {

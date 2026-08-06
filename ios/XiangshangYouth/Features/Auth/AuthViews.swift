@@ -16,35 +16,96 @@ struct SplashView: View {
         // This hides the transient Home indicator while the native poster is
         // visible; the login/dashboard screens restore the system overlay.
         .persistentSystemOverlays(.hidden)
-        .background(HomeIndicatorAutoHideView())
+        .background(SystemOverlayAutoHideView())
+        .onAppear { LaunchArtworkWindow.show() }
         .task {
             try? await Task.sleep(for: .seconds(2.0))
+            LaunchArtworkWindow.hide()
             withAnimation(.easeOut(duration: 0.28)) {
                 state.dismissSplash()
             }
         }
+        .onDisappear { LaunchArtworkWindow.hide() }
+    }
+}
+
+/// A short-lived native window is used for the artwork so the launch frame can
+/// control the system overlays independently from SwiftUI's root hosting
+/// controller. This keeps the reference poster free of status-bar and Home
+/// indicator content while the login page restores normal system chrome.
+private enum LaunchArtworkWindow {
+    private static var window: UIWindow?
+    private static weak var hostWindow: UIWindow?
+
+    static func show() {
+        guard window == nil,
+              let scene = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .first(where: { $0.activationState == .foregroundActive }),
+              let host = scene.windows.first(where: { $0.isKeyWindow }) else { return }
+        hostWindow = host
+        let overlay = UIWindow(windowScene: scene)
+        overlay.windowLevel = .normal + 1
+        overlay.rootViewController = LaunchArtworkViewController()
+        overlay.isHidden = false
+        overlay.makeKeyAndVisible()
+        window = overlay
+    }
+
+    static func hide() {
+        guard let overlay = window else { return }
+        overlay.isHidden = true
+        window = nil
+        hostWindow?.makeKeyAndVisible()
+    }
+}
+
+private final class LaunchArtworkViewController: UIViewController {
+    override var prefersStatusBarHidden: Bool { true }
+    override var prefersHomeIndicatorAutoHidden: Bool { true }
+    override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge { .all }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = UIColor(red: 0.455, green: 0.322, blue: 0.647, alpha: 1)
+        let imageView = UIImageView(image: UIImage(named: "LaunchPoster"))
+        imageView.contentMode = .scaleAspectFill
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(imageView)
+        NSLayoutConstraint.activate([
+            imageView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            imageView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            imageView.topAnchor.constraint(equalTo: view.topAnchor),
+            imageView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
     }
 }
 
 /// UIKit bridge used only by the launch artwork. SwiftUI's
 /// `persistentSystemOverlays` does not reliably propagate the Home-indicator
 /// preference through the app's hosting controller on every iOS simulator.
-private struct HomeIndicatorAutoHideView: UIViewControllerRepresentable {
-    func makeUIViewController(context: Context) -> HomeIndicatorViewController {
-        HomeIndicatorViewController()
+private struct SystemOverlayAutoHideView: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> SystemOverlayViewController {
+        SystemOverlayViewController()
     }
 
-    func updateUIViewController(_ viewController: HomeIndicatorViewController, context: Context) {
+    func updateUIViewController(_ viewController: SystemOverlayViewController, context: Context) {
+        viewController.setNeedsStatusBarAppearanceUpdate()
         viewController.setNeedsUpdateOfHomeIndicatorAutoHidden()
+        viewController.parent?.setNeedsStatusBarAppearanceUpdate()
+        viewController.parent?.setNeedsUpdateOfHomeIndicatorAutoHidden()
     }
 }
 
-private final class HomeIndicatorViewController: UIViewController {
+private final class SystemOverlayViewController: UIViewController {
+    override var prefersStatusBarHidden: Bool { true }
     override var prefersHomeIndicatorAutoHidden: Bool { true }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        parent?.setNeedsStatusBarAppearanceUpdate()
         parent?.setNeedsUpdateOfHomeIndicatorAutoHidden()
+        view.window?.rootViewController?.setNeedsStatusBarAppearanceUpdate()
         view.window?.rootViewController?.setNeedsUpdateOfHomeIndicatorAutoHidden()
     }
 }

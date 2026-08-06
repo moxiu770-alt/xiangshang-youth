@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -97,7 +98,7 @@ private fun TeacherRoleSwitch(sports: Boolean, onSelect: (Boolean) -> Unit) = Ro
     Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)
 ) {
     TeacherRoleChip("班主任", Icons.Filled.Groups, !sports, Blue, Modifier.weight(1f)) { onSelect(false) }
-    TeacherRoleChip("体育老师", Icons.Filled.DirectionsRun, sports, Green, Modifier.weight(1f)) { onSelect(true) }
+    TeacherRoleChip("体育老师", Icons.AutoMirrored.Filled.DirectionsRun, sports, Green, Modifier.weight(1f)) { onSelect(true) }
 }
 
 @Composable
@@ -163,7 +164,7 @@ private fun TeacherActionGrid(nav: NavHostController) {
     val actions = listOf(
         Triple("班级看板", Icons.Filled.Dashboard, Blue), Triple("预警中心", Icons.Filled.Warning, Color(0xFFFF4444)),
         Triple("学生列表", Icons.Filled.Groups, Green), Triple("待分班学生", Icons.Filled.PersonAdd, Color(0xFFFF9E24)),
-        Triple("查看延时课", Icons.Filled.DirectionsRun, Color(0xFF10C9B7)), Triple("优秀学生评选", Icons.Filled.WorkspacePremium, Color(0xFF8755F4)),
+        Triple("查看延时课", Icons.AutoMirrored.Filled.DirectionsRun, Color(0xFF10C9B7)), Triple("优秀学生评选", Icons.Filled.WorkspacePremium, Color(0xFF8755F4)),
         Triple("学生名单", Icons.Filled.Badge, Color(0xFFFF9E24))
     )
     Column(Modifier.padding(horizontal = 12.dp).fillMaxWidth().background(Color.White, RoundedCornerShape(10.dp)).padding(9.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -203,7 +204,7 @@ private fun SportsTeacherPanel(state: AppUiState, nav: NavHostController, pulse:
 }
 
 @Composable private fun SportsShortcut(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier, onClick: () -> Unit) = Surface(modifier.height(66.dp).semantics { role = Role.Button; contentDescription = "查看$label" }.clickable(onClick = onClick), color = color.copy(alpha = .065f), shape = RoundedCornerShape(10.dp)) { Row(Modifier.fillMaxSize().padding(10.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = color, modifier = Modifier.size(27.dp)); Spacer(Modifier.width(9.dp)); Column { Text(label, color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text("查看详情 ›", color = color, fontSize = 9.sp) } } }
-@Composable private fun SportsTask(time: String, duration: String, title: String, color: Color, onClick: (() -> Unit)? = null) = Row(Modifier.padding(horizontal = 13.dp, vertical = 6.dp).then(if (onClick == null) Modifier else Modifier.clickable(onClick = onClick).semantics { role = Role.Button; contentDescription = "查看任务：$title，$duration" }), verticalAlignment = Alignment.CenterVertically) { Surface(color = color.copy(alpha = .13f), shape = CircleShape, modifier = Modifier.size(28.dp)) { Icon(Icons.Filled.DirectionsRun, null, tint = color, modifier = Modifier.padding(6.dp)) }; Spacer(Modifier.width(8.dp)); Column(Modifier.weight(1f)) { Text(duration, color = Color(0xFF778497), fontSize = 8.sp); Text(title, color = Navy, fontWeight = FontWeight.SemiBold, fontSize = 11.sp) }; Text(time, color = color, fontWeight = FontWeight.Bold, fontSize = 10.sp); if (onClick != null) { Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray, modifier = Modifier.size(15.dp)) } }
+@Composable private fun SportsTask(time: String, duration: String, title: String, color: Color, onClick: (() -> Unit)? = null) = Row(Modifier.padding(horizontal = 13.dp, vertical = 6.dp).then(if (onClick == null) Modifier else Modifier.clickable(onClick = onClick).semantics { role = Role.Button; contentDescription = "查看任务：$title，$duration" }), verticalAlignment = Alignment.CenterVertically) { Surface(color = color.copy(alpha = .13f), shape = CircleShape, modifier = Modifier.size(28.dp)) { Icon(Icons.AutoMirrored.Filled.DirectionsRun, null, tint = color, modifier = Modifier.padding(6.dp)) }; Spacer(Modifier.width(8.dp)); Column(Modifier.weight(1f)) { Text(duration, color = Color(0xFF778497), fontSize = 8.sp); Text(title, color = Navy, fontWeight = FontWeight.SemiBold, fontSize = 11.sp) }; Text(time, color = color, fontWeight = FontWeight.Bold, fontSize = 10.sp); if (onClick != null) { Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray, modifier = Modifier.size(15.dp)) } }
 @Composable private fun SectionHeader(title: String, action: String, onClick: () -> Unit) = Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) { Text(title, color = Blue, fontWeight = FontWeight.Bold, fontSize = 13.sp); Spacer(Modifier.weight(1f)); Text(action + "  ›", color = Blue, fontSize = 9.sp, modifier = Modifier.semantics { role = Role.Button; contentDescription = "$title：$action" }.clickable(onClick = onClick)) }
 
 @Composable
@@ -329,7 +330,7 @@ fun TeacherClassBoardScreen(state: AppUiState, nav: NavHostController, onOpenRep
         LoadingState()
         return@AppScaffold
     }
-    val classStudents = state.data?.students?.filter { it.className == "三年级2班" }.orEmpty()
+    val classStudents = state.data.students.filter { it.className == "三年级2班" }
     if (classStudents.isEmpty()) {
         EmptyState("暂无三年级2班数据，学生名单同步后会显示在这里。")
         return@AppScaffold
@@ -345,8 +346,8 @@ fun TeacherClassBoardScreen(state: AppUiState, nav: NavHostController, onOpenRep
     }
     Spacer(Modifier.height(7.dp))
     BoardCard("班级健康概览", "查看明细", onClick = { nav.navigate("${Destinations.Students}?className=${android.net.Uri.encode("三年级2班")}") }) { Row { TeacherMetric("班级人数", "${classStudents.size}", Icons.Filled.Groups, Blue) { nav.navigate("${Destinations.Students}?className=${android.net.Uri.encode("三年级2班")}") }; TeacherMetric("已测评", "$completed", Icons.Filled.Visibility, Green) { nav.navigate(Destinations.Tasks) }; TeacherMetric("测评率", "$completionRate%", Icons.Filled.Refresh, Green) { nav.navigate(Destinations.Tasks) }; TeacherMetric("待处理预警", "$risk", Icons.Filled.WarningAmber, Color.Red) { nav.navigate(Destinations.Review) } } }
-    Spacer(Modifier.height(7.dp)); BoardCard("四维测评健康度", "健康明细", onClick = { nav.navigate(Destinations.Review) }) { Row { listOf("体质" to Blue, "心理" to Color(0xFFFF638E), "视力" to Green, "口腔" to Color(0xFF8A5AF5)).forEach { (label, color) -> Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) { Text(label, fontSize = 9.sp); CircularProgressIndicator(completionRate / 100f, Modifier.size(42.dp).padding(3.dp), color = color, strokeWidth = 4.dp); Text("$completed", color = color, fontWeight = FontWeight.Bold, fontSize = 11.sp) } } } }
-    Spacer(Modifier.height(7.dp)); BoardCard("测评平均完成趋势", "查看详情", onClick = { nav.navigate(Destinations.Tasks) }) { LinearProgressIndicator(completionRate / 100f, Modifier.fillMaxWidth().height(8.dp).clip(CircleShape), color = Green, trackColor = Sky); Text("当前班级完成率 $completionRate%", color = Color.Gray, fontSize = 8.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) }
+    Spacer(Modifier.height(7.dp)); BoardCard("四维测评健康度", "健康明细", onClick = { nav.navigate(Destinations.Review) }) { Row { listOf("体质" to Blue, "心理" to Color(0xFFFF638E), "视力" to Green, "口腔" to Color(0xFF8A5AF5)).forEach { (label, color) -> Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) { Text(label, fontSize = 9.sp); CircularProgressIndicator(progress = { completionRate / 100f }, modifier = Modifier.size(42.dp).padding(3.dp), color = color, strokeWidth = 4.dp); Text("$completed", color = color, fontWeight = FontWeight.Bold, fontSize = 11.sp) } } } }
+    Spacer(Modifier.height(7.dp)); BoardCard("测评平均完成趋势", "查看详情", onClick = { nav.navigate(Destinations.Tasks) }) { LinearProgressIndicator(progress = { completionRate / 100f }, modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape), color = Green, trackColor = Sky); Text("当前班级完成率 $completionRate%", color = Color.Gray, fontSize = 8.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) }
     Spacer(Modifier.height(7.dp)); BoardCard("重点关注学生", "查看全部", onClick = { nav.navigate(Destinations.Review) }) { classStudents.filter { student -> val status = state.local.studentTaskStatuses[student.id] ?: student.taskStatus; (student.totalScore ?: 35.0) < 25 || status.name == "Review" || status.name == "Retest" }.take(3).forEach { student -> val status = state.local.studentTaskStatuses[student.id] ?: student.taskStatus; Row(Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "查看${student.name}报告，状态${status.label}" }.clickable { onOpenReport(student) }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) { Text("${student.name}   ${student.className}   ${status.label}", color = Navy, fontSize = 10.sp, modifier = Modifier.weight(1f)); Icon(Icons.Filled.ChevronRight, contentDescription = "查看${student.name}报告", tint = Color.Gray, modifier = Modifier.size(14.dp)) } }; if (risk == 0) Text("当前班级暂无重点风险学生", color = Color.Gray, fontSize = 10.sp) }
 }
 

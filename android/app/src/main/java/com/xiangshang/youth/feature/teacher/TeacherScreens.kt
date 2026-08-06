@@ -340,7 +340,7 @@ private fun TeacherPostEditorDialog(
             if (success) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = Green, modifier = Modifier.size(42.dp))
-                    Text("动态已保存到本机，后端联调后同步到班级圈。", color = Navy, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
+                    Text("动态已保存，网络可用时将同步到班级圈。", color = Navy, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
                 }
             } else Column {
                 OutlinedTextField(
@@ -471,7 +471,7 @@ fun TeacherTasksScreen(state: AppUiState, nav: NavHostController, saveUpload: (S
             }
         }
         state.local.courseUploads.firstOrNull { it.taskId == taskId }?.let {
-            Text("${if (it.status.name == "PendingSync" || it.status.name == "Submitted") "本机已保存 · 待同步" else "草稿"} · 出勤 ${it.attendanceCount} 人 · ${it.attachmentName}", color = Green, fontSize = 10.sp, modifier = Modifier.padding(top = 7.dp))
+            Text("${if (it.status.name == "PendingSync" || it.status.name == "Submitted") "已保存 · 待同步" else "草稿"} · 出勤 ${it.attendanceCount} 人 · ${it.attachmentName}", color = Green, fontSize = 10.sp, modifier = Modifier.padding(top = 7.dp))
         }
         Spacer(Modifier.height(9.dp))
         when {
@@ -523,7 +523,7 @@ private fun UploadDialog(taskId: String, state: AppUiState, save: (String, Int, 
             if (result != null || command.status == WorkflowCommandStatus.Succeeded) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Filled.CheckCircle, null, tint = Green, modifier = Modifier.size(42.dp))
-                    Text(result ?: "课程记录已保存到本机，后端联调后同步审核。", color = Navy, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
+                    Text(result ?: "课程记录已保存，网络可用时将同步审核。", color = Navy, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
                 }
             } else Column {
                 OutlinedTextField(value = attendance, onValueChange = { attendance = it; error = null; persistDraft() }, label = { Text("出勤人数") }, isError = error != null)
@@ -563,7 +563,7 @@ fun TeacherTaskDetailScreen(state: AppUiState, nav: NavHostController, updateSta
     if (task == null) { EmptyState("暂无体测任务，学校发布任务后会显示在这里。"); return@AppScaffold }
     TestTaskCard(task)
     Text("学生测评状态", color = Navy, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
-    Text("点击学生更新签到、测试、复核或补测状态；状态将保存在本机，等待场地端同步。", color = Color.Gray, fontSize = 9.sp, modifier = Modifier.padding(vertical = 5.dp))
+    Text("点击学生更新签到、测试、复核或补测状态；状态会自动保存并在同步后刷新。", color = Color.Gray, fontSize = 9.sp, modifier = Modifier.padding(vertical = 5.dp))
     when {
         data.students.isEmpty() -> EmptyState("暂无任务学生，学生名单同步后可更新测评状态。")
         else -> data.students.filter { student ->

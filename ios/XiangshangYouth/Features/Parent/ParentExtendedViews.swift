@@ -334,7 +334,7 @@ struct AppSettingsSheet: View {
                             state.updateSettings(notificationsEnabled: false)
                             permissionMessage = nil
                         }
-                    })); Toggle("减少动态效果", isOn: Binding(get: { state.localFeatures.settings.reduceMotion }, set: { state.updateSettings(reduceMotion: $0) })); if let permissionMessage { Text(permissionMessage).font(.footnote).foregroundStyle(.orange) }; Text("设置已自动保存，并将在下次启动后保留。").font(.footnote).foregroundStyle(.secondary) }; Section("本机同步") { LabeledContent("待同步记录", value: "\(state.pendingSyncCount) 条"); Text(state.pendingSyncCount == 0 ? "当前没有等待同步的本地操作。" : "记录已安全保存在本机，后端联调后会由同步任务提交并更新状态。" ).font(.footnote).foregroundStyle(.secondary) }; Section("账号安全") { Text("退出登录会清除本机保存的绑定孩子、草稿和通知状态；不会删除学校侧的测评记录。").font(.footnote).foregroundStyle(.secondary); Button("清除本机数据并退出登录", role: .destructive) { showingClearDataConfirmation = true } } }.navigationTitle("设置").toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }.confirmationDialog("清除本机数据？", isPresented: $showingClearDataConfirmation, titleVisibility: .visible) { Button("清除并退出", role: .destructive) { state.switchAccount(); dismiss() }; Button("取消", role: .cancel) {} } message: { Text("此操作会移除本设备上的登录态、孩子绑定和本地草稿，后续可重新登录。") } } }
+                    })); Toggle("减少动态效果", isOn: Binding(get: { state.localFeatures.settings.reduceMotion }, set: { state.updateSettings(reduceMotion: $0) })); if let permissionMessage { Text(permissionMessage).font(.footnote).foregroundStyle(.orange) }; Text("设置已自动保存，并将在下次启动后保留。").font(.footnote).foregroundStyle(.secondary) }; Section("本机同步") { LabeledContent("待同步记录", value: "\(state.pendingSyncCount) 条"); Text(state.pendingSyncCount == 0 ? "当前没有等待同步的本地操作。" : "记录已安全保存在本设备，将在网络可用时自动同步并更新状态。" ).font(.footnote).foregroundStyle(.secondary) }; Section("账号安全") { Text("退出登录会清除本机保存的绑定孩子、草稿和通知状态；不会删除学校侧的测评记录。").font(.footnote).foregroundStyle(.secondary); Button("清除本机数据并退出登录", role: .destructive) { showingClearDataConfirmation = true } } }.navigationTitle("设置").toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }.confirmationDialog("清除本机数据？", isPresented: $showingClearDataConfirmation, titleVisibility: .visible) { Button("清除并退出", role: .destructive) { state.switchAccount(); dismiss() }; Button("取消", role: .cancel) {} } message: { Text("此操作会移除本设备上的登录态、孩子绑定和本地草稿，后续可重新登录。") } } }
 }
 
 struct AccountInfoSheet: View {
@@ -360,7 +360,7 @@ struct AccountInfoSheet: View {
                 } else if title == "帮助与反馈" {
                     Section("问题反馈") {
                         if feedbackSubmitted {
-                            Label("反馈已保存到本机，后端联调后发送；客服会在工作时间内回复。", systemImage: "checkmark.circle.fill").foregroundStyle(ReferenceColor.green)
+                            Label("反馈已保存，客服会在工作时间内回复。", systemImage: "checkmark.circle.fill").foregroundStyle(ReferenceColor.green)
                         } else {
                             TextEditor(text: $feedback).frame(minHeight: 110).onChange(of: feedback) { _, value in state.saveDraft(value, key: feedbackDraftKey) }
                             if case let .failed(message) = commandState { Text(message).font(.caption).foregroundStyle(.red) }
@@ -417,13 +417,13 @@ struct PublishClassPostSheet: View {
                     VStack(spacing: 12) {
                         Image(systemName: "checkmark.circle.fill").font(.system(size: 48)).foregroundStyle(ReferenceColor.green)
                         Text(editingPost == nil ? "动态已保存" : "修改已保存").font(.title3.bold())
-                        Text("内容已保存到本机，后端联调后同步到本班家校圈。").font(.system(size: 12)).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                        Text("内容已保存，网络可用时将同步到本班家校圈。").font(.system(size: 12)).foregroundStyle(.secondary).multilineTextAlignment(.center)
                         Spacer()
                         Button("完成") { dismiss() }.font(.system(size: 14, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 12).foregroundStyle(.white).background(ReferenceColor.blue, in: RoundedRectangle(cornerRadius: 11))
                     }
                 } else {
                     Text(editingPost == nil ? "发布班级动态" : "编辑班级动态").font(.title3.bold())
-                    Text("内容会先保存在本机，后端联调后同步到本班家校圈。请勿发布学生隐私信息。").font(.system(size: 12)).foregroundStyle(.secondary)
+                    Text("内容会先安全保存在本设备，并在网络可用时同步到本班家校圈。请勿发布学生隐私信息。").font(.system(size: 12)).foregroundStyle(.secondary)
                     TextEditor(text: $content).frame(minHeight: 160).padding(8).overlay(RoundedRectangle(cornerRadius: 10).stroke(validationMessage == nil ? ReferenceColor.navy.opacity(0.15) : .red, lineWidth: 1)).onChange(of: content) { _, value in state.saveDraft(value, key: draftKey) }
                     if let validationMessage { Text(validationMessage).font(.system(size: 10)).foregroundStyle(.red) }
                     if case let .failed(message) = commandState { Text(message).font(.system(size: 10)).foregroundStyle(.red) }
@@ -493,7 +493,7 @@ struct ActivityDetailSheet: View {
             Text("完成综合健康测评，了解孩子的运动发展与健康成长情况。提交后将同步至孩子成长档案。") .font(.system(size: 13)).foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 7) { Text("活动说明").font(.system(size: 15, weight: .bold)); Text("• 完成四项健康测评\n• 查看个性化成长报告\n• 可预约学校体测场地") .font(.system(size: 12)).foregroundStyle(ReferenceColor.navy) }.padding(12).background(ReferenceColor.sky, in: RoundedRectangle(cornerRadius: 12))
             if registered && !hasFailure {
-                Label("报名信息已保存到本机，后端联调后提交；活动开始前将通过消息中心通知您。", systemImage: "checkmark.circle.fill").font(.system(size: 12, weight: .medium)).foregroundStyle(ReferenceColor.green)
+                Label("报名信息已保存；活动开始前将通过消息中心通知您。", systemImage: "checkmark.circle.fill").font(.system(size: 12, weight: .medium)).foregroundStyle(ReferenceColor.green)
             } else {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("报名信息").font(.system(size: 15, weight: .bold))
@@ -548,7 +548,7 @@ struct CourseDetailSheet: View {
             if let replyError { Text(replyError).font(.system(size: 10)).foregroundStyle(.red) }
             if case let .failed(message) = commandState { Text(message).font(.system(size: 10)).foregroundStyle(.red) }
         } else {
-            Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill").font(.system(size: 48)).foregroundStyle(ReferenceColor.blue); Text(title).font(.title3.bold()); Text("已为您加载课程视频。播放进度会先保存在本机，后端联调后同步到孩子的学习记录。").font(.system(size: 13)).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal, 28); ProgressView(value: progress).tint(ReferenceColor.green).padding(.horizontal, 30); Button { isPlaying.toggle(); if isPlaying { withAnimation(.linear(duration: 2.5)) { progress = 0.8 }; state.updateCourseProgress(title, progress: 0.8) } } label: { Label(isPlaying ? "暂停学习" : "播放课程", systemImage: isPlaying ? "pause.fill" : "play.fill") }.buttonStyle(.borderedProminent)
+            Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill").font(.system(size: 48)).foregroundStyle(ReferenceColor.blue); Text(title).font(.title3.bold()); Text("已为您加载课程视频。播放进度会自动保存并同步到孩子的学习记录。").font(.system(size: 13)).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal, 28); ProgressView(value: progress).tint(ReferenceColor.green).padding(.horizontal, 30); Button { isPlaying.toggle(); if isPlaying { withAnimation(.linear(duration: 2.5)) { progress = 0.8 }; state.updateCourseProgress(title, progress: 0.8) } } label: { Label(isPlaying ? "暂停学习" : "播放课程", systemImage: isPlaying ? "pause.fill" : "play.fill") }.buttonStyle(.borderedProminent)
         }
     }.frame(maxWidth: .infinity, maxHeight: .infinity).navigationTitle(title).navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }.task { if title == "客服咨询" { state.clearWorkflowState("support") }; progress = state.localFeatures.courseProgress[title] ?? progress; draft = state.localFeatures.drafts[supportDraftKey] ?? "" } } }
     private var supportDraftKey: String { "support-\(title)" }
@@ -571,7 +571,7 @@ struct ExpertDetailSheet: View {
             .font(.system(size: 13)).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal, 28)
         let commandState = state.workflowState(for: commandKey)
         let failed: Bool = { if case .failed = commandState { return true }; return false }()
-        if submitted && !failed { Label("预约信息已保存到本机，后端联调后提交给专家团队。", systemImage: "checkmark.circle.fill").font(.system(size: 12)).foregroundStyle(ReferenceColor.green) } else { VStack(spacing: 8) { TextField("期望咨询时间", text: $date).textFieldStyle(.roundedBorder); TextField("咨询说明", text: $note, axis: .vertical).lineLimit(3...5).textFieldStyle(.roundedBorder) }.padding(.horizontal, 20).onChange(of: date) { _, _ in state.saveDraft("\(date)|\(note)", key: draftKey) }.onChange(of: note) { _, _ in state.saveDraft("\(date)|\(note)", key: draftKey) }; if case let .failed(message) = commandState { Text(message).font(.caption).foregroundStyle(.red) }; Button { if submitted && !failed { dismiss() } else { Task { if await state.submitExpertCommand(name: name, preferredDate: date, note: note) { state.clearDraft(draftKey); submitted = true } } } } label: { HStack { if commandState.isSubmitting { ProgressView() }; Text(commandState.isSubmitting ? "正在提交…" : submitted && !failed ? "完成" : failed ? "重新提交" : "提交预约") } }.buttonStyle(.borderedProminent).disabled(commandState.isSubmitting || (!submitted && (date.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))) }
+        if submitted && !failed { Label("预约信息已保存，专家团队将尽快与您联系。", systemImage: "checkmark.circle.fill").font(.system(size: 12)).foregroundStyle(ReferenceColor.green) } else { VStack(spacing: 8) { TextField("期望咨询时间", text: $date).textFieldStyle(.roundedBorder); TextField("咨询说明", text: $note, axis: .vertical).lineLimit(3...5).textFieldStyle(.roundedBorder) }.padding(.horizontal, 20).onChange(of: date) { _, _ in state.saveDraft("\(date)|\(note)", key: draftKey) }.onChange(of: note) { _, _ in state.saveDraft("\(date)|\(note)", key: draftKey) }; if case let .failed(message) = commandState { Text(message).font(.caption).foregroundStyle(.red) }; Button { if submitted && !failed { dismiss() } else { Task { if await state.submitExpertCommand(name: name, preferredDate: date, note: note) { state.clearDraft(draftKey); submitted = true } } } } label: { HStack { if commandState.isSubmitting { ProgressView() }; Text(commandState.isSubmitting ? "正在提交…" : submitted && !failed ? "完成" : failed ? "重新提交" : "提交预约") } }.buttonStyle(.borderedProminent).disabled(commandState.isSubmitting || (!submitted && (date.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))) }
     }.frame(maxWidth: .infinity, maxHeight: .infinity).navigationTitle("专家详情").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }.task { if let saved = state.localFeatures.drafts[draftKey]?.split(separator: "|", maxSplits: 1).map(String.init), saved.count == 2 { date = saved[0]; note = saved[1] }; submitted = state.localFeatures.expertAppointments.contains { $0.expertName == name && ($0.status == .pendingSync || $0.status == .submitted) } } } }
 }
 

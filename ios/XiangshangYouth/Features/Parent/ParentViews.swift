@@ -342,7 +342,7 @@ struct HealthDashboard: View {
                 VStack(spacing: 12) {
                     Image(systemName: "checkmark.seal.fill").font(.system(size: 44)).foregroundStyle(ReferenceColor.green)
                     Text("本月已保存 \(state.localFeatures.checkInDates.count) 次运动打卡").font(.headline)
-                    Text("打卡记录会先保存在本机，后端联调后同步到成长档案。")
+                    Text("打卡记录会自动保存并同步到成长档案。")
                         .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
                     Spacer()
                 }.padding(24)

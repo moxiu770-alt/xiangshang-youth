@@ -273,7 +273,9 @@ fun ParentEvaluationsScreen(state: AppUiState, nav: NavHostController, report: D
     selectedTitle?.let { title -> AlertDialog(onDismissRequest = { selectedTitle = null }, title = { Text(title) }, text = { Column { Text(selectedContent); Text(selectedTime, color = Color.Gray, fontSize = 11.sp, modifier = Modifier.padding(top = 10.dp)) } }, confirmButton = { TextButton(onClick = { selectedTitle = null }) { Text("关闭") } }) }
 }
 @Composable
-fun HealthProfileScreen(state: AppUiState, nav: NavHostController) = ParentTabScaffold(nav, Destinations.Health) {
+fun HealthProfileScreen(state: AppUiState, nav: NavHostController) {
+    var checkInDetail by rememberSaveable { mutableStateOf(false) }
+    ParentTabScaffold(nav, Destinations.Health) {
     if (state.loading || state.data == null) { LoadingState(); return@ParentTabScaffold }
     if (state.selectedChild == null) { EmptyState("暂无健康档案，请先完成孩子绑定。"); Button(onClick = { nav.navigate(Destinations.Children) }, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("去绑定孩子") }; return@ParentTabScaffold }
     ParentSection("健康报告", "查看全部报告") { nav.navigate(Destinations.Report) }
@@ -281,13 +283,24 @@ fun HealthProfileScreen(state: AppUiState, nav: NavHostController) = ParentTabSc
     Spacer(Modifier.height(9.dp))
     Surface(Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(11.dp)) {
         Column(Modifier.padding(11.dp)) {
-            ParentSection("本月打卡", "记录自动同步")
+            // Keep the calendar header actionable; a static label here made
+            // the Android health page diverge from the iOS interaction model.
+            ParentSection("本月打卡", "查看记录") { checkInDetail = true }
             Text("日    一    二    三    四    五    六", color = Color.Gray, fontSize = 9.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
             Text("7     8     9    10    11    12    13\n14   15   16   17   18   19   20\n21   22   23   24   25   26   27", color = Green, fontSize = 10.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
         }
     }
     Spacer(Modifier.height(9.dp))
     ParentActivities(nav)
+    }
+    if (checkInDetail) {
+        AlertDialog(
+            onDismissRequest = { checkInDetail = false },
+            title = { Text("本月运动打卡记录") },
+            text = { Text(if (state.local.checkedInToday) "本月已完成 15 次运动打卡，今天已打卡。" else "本月已完成 15 次运动打卡，今天还可以继续记录。", color = Color.Gray) },
+            confirmButton = { TextButton(onClick = { checkInDetail = false }) { Text("知道了") } }
+        )
+    }
 }
 
 @Composable

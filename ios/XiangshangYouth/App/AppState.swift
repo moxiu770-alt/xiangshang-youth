@@ -1,4 +1,23 @@
 import SwiftUI
+import Network
+
+@MainActor final class NetworkMonitor: ObservableObject {
+    @Published private(set) var isOffline = false
+    private let monitor = NWPathMonitor()
+    private let queue = DispatchQueue(label: "com.xiangshang.youth.network-monitor")
+    private var started = false
+
+    func start() {
+        guard !started else { return }
+        started = true
+        monitor.pathUpdateHandler = { [weak self] path in
+            Task { @MainActor in self?.isOffline = path.status != .satisfied }
+        }
+        monitor.start(queue: queue)
+    }
+
+    deinit { monitor.cancel() }
+}
 
 @MainActor final class AppState: ObservableObject {
     @Published var isShowingSplash = true

@@ -36,6 +36,7 @@ import com.xiangshang.youth.core.model.UserRole
 import com.xiangshang.youth.core.util.DeepLinkResolver
 import com.xiangshang.youth.core.util.DeepLinkTarget
 import com.xiangshang.youth.shared.component.ErrorState
+import com.xiangshang.youth.shared.component.OfflineBanner
 
 object Destinations { const val Splash="splash"; const val Login="login"; const val Register="register"; const val PasswordReset="passwordReset"; const val Role="role"; const val Parent="parent"; const val Children="children"; const val ParentEvaluations="parentEvaluations"; const val Assessment="assessment"; const val Courses="courses"; const val CoursesRoute="courses?openSupport={openSupport}"; const val Circle="circle"; const val Account="account"; const val Messages="messages"; const val Notifications="notifications"; const val Health="health"; const val Report="report"; const val Teacher="teacher"; const val TeacherMessages="teacherMessages"; const val Classes="classes"; const val TeacherCircle="teacherCircle"; const val TeacherBoard="teacherBoard"; const val Students="students"; const val StudentsRoute="students?className={className}"; const val Tasks="tasks"; const val TaskDetail="taskDetail"; const val TaskDetailRoute="taskDetail/{taskId}"; const val Review="review"; const val Principal="principal"; const val PrincipalGrades="principalGrades"; const val PrincipalClassStats="principalClassStats"; const val PrincipalRisk="principalRisk"; const val Grades="grades"; const val ClassStats="classStats"; const val ClassStatsRoute="classStats?grade={grade}"; const val Risk="risk"; const val RiskRoute="risk?className={className}" }
 @Composable fun AppNavHost(viewModel: AppViewModel, incomingDeepLink: Uri? = null, nav: NavHostController = rememberNavController()) {
@@ -218,6 +219,9 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
                 ErrorState(state.error ?: "数据加载失败", retry = { viewModel.refreshDashboard() })
             }
         }
+    }
+    if (state.isOffline && !isSplash) {
+        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Top) { OfflineBanner() }
     }
     // Login renders its loading/error state inside the form.  The global mask/dialog
     // is reserved for authenticated dashboard refreshes, so no modal spinner window

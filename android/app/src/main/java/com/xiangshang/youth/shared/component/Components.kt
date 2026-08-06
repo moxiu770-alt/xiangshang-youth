@@ -65,6 +65,14 @@ import com.xiangshang.youth.core.model.*
         }
     }
 }
+@Composable fun OfflineBanner(message: String = "当前处于离线模式，本地数据仍可查看；联网后可刷新最新数据。") {
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).semantics { contentDescription = message },
+        color = Color(0xFFFFF0D6),
+        shape = RoundedCornerShape(10.dp),
+        shadowElevation = 1.dp
+    ) { Text(message, color = Color(0xFF7A4B00), fontSize = 10.sp, modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center) }
+}
 @Composable fun RoleBadge(role: UserRole) { Text(role.label, color = Blue, fontSize = 12.sp, modifier = Modifier.background(Sky, RoundedCornerShape(14.dp)).padding(horizontal = 9.dp, vertical = 4.dp)) }
 @Composable fun StudentCard(student: Student, onClick: () -> Unit) { Card(Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "查看学生${student.name}，${student.grade}${student.className}，${if (student.isPovertyArea) "贫困地区学生" else student.region}" }.clickable(onClick = onClick), shape = RoundedCornerShape(12.dp)) { Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Text(student.name.take(1), color = Color.White, modifier = Modifier.background(Blue, RoundedCornerShape(22.dp)).padding(12.dp)); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text(student.name, color = Navy); Text(student.grade + " · " + student.className, fontSize = 11.sp, color = Color.Gray); Text(if (student.isPovertyArea) "贫困地区学生" else student.region, fontSize = 10.sp, color = if (student.isPovertyArea) Color.Red else Color.Gray) }; Text((student.totalScore ?: 0.0).toString(), color = Blue) } } }
 @Composable fun TestTaskCard(task: TestTask, onClick: (() -> Unit)? = null) {

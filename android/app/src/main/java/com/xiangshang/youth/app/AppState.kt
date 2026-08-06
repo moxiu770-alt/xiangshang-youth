@@ -1,6 +1,9 @@
 package com.xiangshang.youth.app
 
 import android.app.Application
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.xiangshang.youth.core.model.*
@@ -25,16 +28,26 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-data class AppUiState(val profile: UserProfile? = null, val role: UserRole? = null, val data: DashboardData? = null, val selectedChild: Student? = null, val loading: Boolean = false, val error: String? = null, val local: LocalFeatureState = LocalFeatureState(), val restoringSession: Boolean = false) {
+data class AppUiState(val profile: UserProfile? = null, val role: UserRole? = null, val data: DashboardData? = null, val selectedChild: Student? = null, val loading: Boolean = false, val error: String? = null, val local: LocalFeatureState = LocalFeatureState(), val restoringSession: Boolean = false, val isOffline: Boolean = false) {
     val unreadMessageCount: Int get() = data?.messages?.count { !it.isRead && it.id !in local.readMessageIds } ?: 0
 }
 class AppViewModel(application: Application) : AndroidViewModel(application) {
+    private val connectivityManager = application.getSystemService(ConnectivityManager::class.java)
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) { setOffline(false) }
+        override fun onLost(network: Network) { setOffline(!hasValidatedNetwork()) }
+        override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) { setOffline(!capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) }
+    }
     private val repository: YouthRepository = RepositoryProvider.create()
     private val featureStore = LocalFeatureStore(application)
     private val initialLocal = featureStore.load()
     private val _state = MutableStateFlow(AppUiState(local = initialLocal, restoringSession = initialLocal.sessionActive))
     val state: StateFlow<AppUiState> = _state.asStateFlow()
-    init { if (_state.value.local.sessionActive) restoreSession() }
+    init {
+        setOffline(!hasValidatedNetwork())
+        runCatching { connectivityManager.registerDefaultNetworkCallback(networkCallback) }
+        if (_state.value.local.sessionActive) restoreSession()
+    }
     fun login(identifier: String = "", onSuccess: () -> Unit = {}) = viewModelScope.launch {
         _state.value = _state.value.copy(loading = true, restoringSession = false)
         runCatching { repository.dashboard() }.onSuccess { data ->
@@ -111,6 +124,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         mutate { it.copy(checkedInToday = true, checkedInDate = today) }
     }
     fun clearError() { _state.value = _state.value.copy(error = null) }
+    override fun onCleared() {
+        runCatching { connectivityManager.unregisterNetworkCallback(networkCallback) }
+        super.onCleared()
+    }
+    private fun hasValidatedNetwork(): Boolean = connectivityManager.activeNetwork?.let { network ->
+        connectivityManager.getNetworkCapabilities(network)?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
+    } ?: false
+    private fun setOffline(value: Boolean) { _state.value = _state.value.copy(isOffline = value) }
     private fun restoreSession() = viewModelScope.launch {
         val local = _state.value.local
         _state.value = _state.value.copy(loading = true, restoringSession = true)

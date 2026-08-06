@@ -17,6 +17,27 @@ struct AppScaffold<Content: View>: View {
         .toolbar(.hidden, for: .navigationBar)
     }
 }
+struct OfflineBanner: View {
+    let message: String
+    var body: some View {
+        VStack {
+            Text(message)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(AppTheme.ink)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity)
+                .background(Color.orange.opacity(0.16), in: RoundedRectangle(cornerRadius: 10))
+                .padding(.horizontal, 12)
+                .padding(.top, 4)
+            Spacer()
+        }
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(message)
+    }
+}
 struct RoleBadge: View { let role: UserRole; var body: some View { Label(role.rawValue, systemImage: role.icon).font(.caption.weight(.semibold)).foregroundStyle(AppTheme.primary).padding(.horizontal, 10).padding(.vertical, 6).background(AppTheme.primary.opacity(0.1), in: Capsule()).accessibilityLabel("当前角色：\(role.rawValue)") } }
 struct StudentCard: View {
     let student: Student; let action: (() -> Void)?

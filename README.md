@@ -28,7 +28,7 @@ cd android
 ./run-android-checks.sh
 ```
 
-脚本会构建 Debug APK、运行 JVM 单元测试并执行 `lintDebug`。APK 输出在 `android/app/build/outputs/apk/debug/app-debug.apk`；Compose 仪器测试需要连接真机或可用模拟器：
+脚本会构建 Debug APK、AndroidTest APK、运行 JVM 单元测试并执行 `lintDebug`；如果检测到 Android 真机/模拟器，还会自动执行 Compose 仪器测试。APK 输出在 `android/app/build/outputs/apk/debug/app-debug.apk`；
 
 ```bash
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
@@ -47,7 +47,7 @@ export ANDROID_HOME="/Users/luyanpeng/Library/Android/sdk"
 ## 当前工程约定
 
 - Token 使用 iOS Keychain / Android Keystore；本地草稿、绑定关系和测评交互状态默认使用 iOS Keychain / Android Keystore 加密保存。Android Keystore 暂时不可用时会降级，不阻塞 Mock 启动。
-- 本地草稿、绑定关系、测评状态、班级动态和课程进度会保存，登录失败、恢复失败、空数据和重试状态均由页面处理；双端根工作台支持主动刷新，Android 提供刷新按钮与全局错误重试，iOS 支持系统下拉刷新；登录页可打开协议/隐私说明。
+- 本地草稿、绑定关系、测评状态、班级动态和课程进度会保存，登录失败、恢复失败、空数据和重试状态均由页面处理；双端根工作台支持主动刷新，Android 提供刷新按钮与全局错误重试，iOS 支持系统下拉刷新；登录页可打开协议/隐私说明。双端会监听网络状态，在断网时显示“离线模式”提示，明确当前内容可能是本地 Mock/缓存数据。
 - 深链格式：`xiangshang-youth://open?target=report&studentId=s01`，支持报告、复核、任务和风险入口。
 - Android 页面和关键卡片已补充 TalkBack 语义；iOS 使用 VoiceOver accessibility label。
 - 启动海报已统一为清理系统状态栏和底部 Home 指示条后的清晰视觉资源：iOS 1x/2x/3x 与 Android `drawable-nodpi` 使用同一画面比例；iOS 包含 `PrivacyInfo.xcprivacy`，Android 禁止明文流量和自动备份。

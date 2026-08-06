@@ -11,11 +11,13 @@ struct RootView: View {
     @EnvironmentObject private var router: AppRouter
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.scenePhase) private var scenePhase
+    @StateObject private var networkMonitor = NetworkMonitor()
     var body: some View {
         ZStack {
             navigationRoot
             globalOverlay
         }
+        .onAppear { networkMonitor.start() }
     }
     private var navigationRoot: some View {
         NavigationStack(path: $router.path) {
@@ -56,6 +58,11 @@ struct RootView: View {
         }
     }
     @ViewBuilder private var globalOverlay: some View {
+        if networkMonitor.isOffline && !state.isShowingSplash {
+            OfflineBanner(message: "当前处于离线模式，本地数据仍可查看；联网后可刷新最新数据。")
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .zIndex(10)
+        }
         if state.loading && !state.isShowingSplash && state.profile != nil && state.data != nil {
             Color.black.opacity(0.08).ignoresSafeArea()
             LoadingStateView().background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18)).padding(58)

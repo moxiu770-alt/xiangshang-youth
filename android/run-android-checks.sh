@@ -37,5 +37,16 @@ export PATH="$JAVA_HOME/bin:$sdk_dir/platform-tools:$sdk_dir/emulator:$PATH"
 cd "$project_dir"
 print "JAVA_HOME=$JAVA_HOME"
 print "ANDROID_HOME=$ANDROID_HOME"
-./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --no-daemon "$@"
+./gradlew :app:assembleDebug :app:assembleAndroidTest :app:testDebugUnitTest :app:lintDebug --no-daemon "$@"
+if (( $+commands[adb] )); then
+  connected_devices=$(adb devices | awk 'NR > 1 && $2 == "device" { count++ } END { print count + 0 }')
+  if (( connected_devices > 0 )); then
+    print "检测到 $connected_devices 台 Android 设备，运行 Compose 仪器测试。"
+    ./gradlew :app:connectedDebugAndroidTest --no-daemon "$@"
+  else
+    print "未检测到 Android 真机/模拟器：已完成 APK、AndroidTest APK、JVM 单测和 lint；仪器测试待设备连接后执行。"
+  fi
+else
+  print "未找到 adb：已完成 APK、AndroidTest APK、JVM 单测和 lint；仪器测试待 Android SDK 连接后执行。"
+fi
 print "APK: $project_dir/app/build/outputs/apk/debug/app-debug.apk"

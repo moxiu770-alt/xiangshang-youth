@@ -196,7 +196,7 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
         composable(Destinations.RiskRoute) { entry ->
             RiskStudentsScreen(state, nav, entry.arguments?.getString("className")) { student ->
                 viewModel.chooseChild(student)
-                nav.navigate(Destinations.Report)
+                nav.navigateSingleTop(Destinations.Report)
         }
     }
     }

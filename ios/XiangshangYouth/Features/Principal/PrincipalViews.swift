@@ -287,7 +287,15 @@ struct GradeStatsView: View {
                     let totalStudents = gradeStudents.isEmpty ? gradeClasses.reduce(0) { $0 + $1.studentCount } : gradeStudents.count
                     let completedStudents = gradeStudents.isEmpty ? Int((Double(totalStudents) * Double(rate) / 100).rounded()) : gradeStudents.filter { state.taskStatus(for: $0) == .completed }.count
                     let gradeRisk = gradeStudents.filter { ($0.totalScore ?? 35) < 25 || [.review, .retest].contains(state.taskStatus(for: $0)) }.count
-                    let metric = selectedMetric == "完成率" ? "\(rate)%" : selectedMetric == "平均总分" ? String(format: "%.1f", 24.8 + Double(index)) : "\(gradeRisk)人"
+                    let gradeScores = gradeStudents.compactMap(\.totalScore)
+                    let averageScore = gradeScores.isEmpty ? 0 : gradeScores.reduce(0, +) / Double(gradeScores.count)
+                    let metric = selectedMetric == "完成率" ? "\(rate)%" : selectedMetric == "平均总分" ? String(format: "%.1f", averageScore) : "\(gradeRisk)人"
+                    let metricProgress: Double = switch selectedMetric {
+                    case "平均总分": min(1, averageScore / 35)
+                    case "风险人数": totalStudents > 0 ? min(1, Double(gradeRisk) / Double(totalStudents)) : 0
+                    default: Double(rate) / 100
+                    }
+                    let metricCaption = selectedMetric == "平均总分" ? "满分 35 分" : selectedMetric == "风险人数" ? "风险占比" : "完成率"
                     Button { router.pendingGradeFilter = grade.name; router.push(.classStats) } label: {
                         ReferenceCard {
                             VStack(spacing: 8) {
@@ -298,13 +306,13 @@ struct GradeStatsView: View {
                                     }
                                     Spacer()
                                     VStack(alignment: .trailing, spacing: 2) {
-                                        Text(metric).font(.system(size: 18, weight: .bold)).foregroundStyle(selectedMetric == "风险人数" ? .red : ReferenceColor.green)
-                                        Text(selectedMetric).font(.system(size: 9)).foregroundStyle(.secondary)
+                                    Text(metric).font(.system(size: 18, weight: .bold)).foregroundStyle(selectedMetric == "风险人数" ? .red : ReferenceColor.green)
+                                    Text(selectedMetric).font(.system(size: 9)).foregroundStyle(.secondary)
                                     }
                                     Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold)).foregroundStyle(.secondary)
                                 }
-                                AnimatedProgressLine(value: Double(rate) / 100, colors: [index == 0 ? .orange : ReferenceColor.green, ReferenceColor.blue], height: 6)
-                                HStack { Text("已完成 \(completedStudents) 人"); Spacer(); Text("7项平均分 \(String(format: "%.1f", 3.5 + Double(index) * 0.1))") }
+                                AnimatedProgressLine(value: metricProgress, colors: [selectedMetric == "风险人数" ? .red : (index == 0 ? .orange : ReferenceColor.green), ReferenceColor.blue], height: 6)
+                                HStack { Text("已完成 \(completedStudents) 人"); Spacer(); Text("\(metricCaption) · \(selectedMetric == "风险人数" ? "\(gradeRisk) 人" : selectedMetric == "平均总分" ? String(format: "%.1f 分", averageScore) : "\(rate)%")") }
                                     .font(.system(size: 8)).foregroundStyle(.secondary)
                             }
                         }

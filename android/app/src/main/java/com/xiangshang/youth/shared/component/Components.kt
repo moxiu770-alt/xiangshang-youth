@@ -57,11 +57,22 @@ import com.xiangshang.youth.core.model.*
             }
         )
     }, bottomBar = bottomBar) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize().padding(horizontal = 12.dp).verticalScroll(rememberScrollState())) {
-            if (errorMessage != null) {
-                ErrorState(errorMessage, retry = onRetry ?: {})
+        // Preserve the mobile composition while preventing reports and forms from
+        // becoming unreadably wide on tablets or in landscape.
+        Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            Column(
+                Modifier
+                    .widthIn(max = 720.dp)
+                    .fillMaxWidth()
+                    .fillMaxHeight()
+                    .padding(horizontal = 12.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                if (errorMessage != null) {
+                    ErrorState(errorMessage, retry = onRetry ?: {})
+                }
+                content()
             }
-            content()
         }
     }
 }

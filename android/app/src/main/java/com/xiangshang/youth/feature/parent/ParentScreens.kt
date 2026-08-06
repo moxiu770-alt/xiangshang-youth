@@ -379,7 +379,7 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
     var commentPost by remember { mutableStateOf<String?>(null) }
     var comment by remember { mutableStateOf("") }
     var commentSubmitted by remember { mutableStateOf(false) }
-    var mockPostLiked by rememberSaveable { mutableStateOf(false) }
+    var pinnedAnnouncementLiked by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     ParentTabScaffold(nav, Destinations.Circle) {
         val dashboardError = state.error
@@ -394,7 +394,7 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
         Button(onClick = { clearWorkflow("post:王女士"); detail = "发布班级动态" }, modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) { Icon(Icons.Filled.Edit, null); Spacer(Modifier.width(7.dp)); Text("发布班级动态") }
         val posts = state.local.classPosts.filter { filter == 0 || (filter == 1 && it.author.contains("老师")) || (filter == 2 && !it.author.contains("老师")) }
         if (posts.isEmpty()) {
-            Surface(Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(10.dp)) { Column(Modifier.padding(12.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.School, null, tint = Blue); Spacer(Modifier.width(8.dp)); Column { Text("李老师", color = Blue, fontWeight = FontWeight.Bold, fontSize = 11.sp); Text("今天 08:30 · 置顶通知", color = Color.Gray, fontSize = 8.sp) } }; Text("本周运动打卡已开启，欢迎家长分享孩子的练习瞬间。", color = Navy, fontSize = 11.sp, modifier = Modifier.padding(top = 7.dp)); Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) { Text(if (mockPostLiked) "已赞 13" else "♡ 12", color = if (mockPostLiked) Blue else Color.Gray, fontSize = 9.sp, modifier = Modifier.semantics { role = Role.Button; contentDescription = if (mockPostLiked) "取消点赞" else "点赞" }.clickable { mockPostLiked = !mockPostLiked }); Text("评论 ${3 + state.local.postComments["teacher-announcement"].orEmpty().size}", color = Color.Gray, fontSize = 9.sp, modifier = Modifier.semantics { role = Role.Button; contentDescription = "评论置顶通知" }.clickable { commentSubmitted = false; comment = ""; commentPost = "teacher-announcement" }); Spacer(Modifier.weight(1f)); Text("班级通知", color = Blue, fontSize = 9.sp) } } }
+            Surface(Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(10.dp)) { Column(Modifier.padding(12.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.School, null, tint = Blue); Spacer(Modifier.width(8.dp)); Column { Text("李老师", color = Blue, fontWeight = FontWeight.Bold, fontSize = 11.sp); Text("今天 08:30 · 置顶通知", color = Color.Gray, fontSize = 8.sp) } }; Text("本周运动打卡已开启，欢迎家长分享孩子的练习瞬间。", color = Navy, fontSize = 11.sp, modifier = Modifier.padding(top = 7.dp)); Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) { Text(if (pinnedAnnouncementLiked) "已赞 13" else "♡ 12", color = if (pinnedAnnouncementLiked) Blue else Color.Gray, fontSize = 9.sp, modifier = Modifier.semantics { role = Role.Button; contentDescription = if (pinnedAnnouncementLiked) "取消点赞" else "点赞" }.clickable { pinnedAnnouncementLiked = !pinnedAnnouncementLiked }); Text("评论 ${3 + state.local.postComments["teacher-announcement"].orEmpty().size}", color = Color.Gray, fontSize = 9.sp, modifier = Modifier.semantics { role = Role.Button; contentDescription = "评论置顶通知" }.clickable { commentSubmitted = false; comment = ""; commentPost = "teacher-announcement" }); Spacer(Modifier.weight(1f)); Text("班级通知", color = Blue, fontSize = 9.sp) } } }
         }
         posts.forEach { post ->
             Surface(Modifier.padding(vertical = 4.dp).fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(10.dp), shadowElevation = 1.dp) { Column(Modifier.padding(11.dp)) {
@@ -582,7 +582,7 @@ private fun SimpleDialog(
                 }
                 success != null -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = Green, modifier = Modifier.size(42.dp))
-                    Text(success!!, color = Navy, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
+                    Text(success.orEmpty(), color = Navy, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
                 }
                 title == "客服咨询" -> Column {
                     Text("客服老师：您好，请问想咨询哪一类课程？")

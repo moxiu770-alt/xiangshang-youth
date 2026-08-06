@@ -76,6 +76,12 @@ class MainActivityFlowTest {
             composeRule.onAllNodesWithText("去绑定孩子").fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithText("去绑定孩子").assertIsDisplayed()
+        // Secondary parent tabs must preserve the same actionable binding guard;
+        // an empty report/health page must never strand a family account.
+        composeRule.onNodeWithContentDescription("我的评测").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("去绑定孩子").fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithText("去绑定孩子").performClick()
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("绑定孩子").fetchSemanticsNodes().isNotEmpty()

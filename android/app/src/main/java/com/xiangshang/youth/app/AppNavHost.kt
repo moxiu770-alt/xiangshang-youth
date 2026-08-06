@@ -157,7 +157,10 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
             val child = state.selectedChild
             when {
                 state.loading || state.data == null -> com.xiangshang.youth.shared.component.LoadingState()
-                child == null -> com.xiangshang.youth.shared.component.EmptyState("暂无孩子报告，请先完成孩子绑定。")
+                child == null -> Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    com.xiangshang.youth.shared.component.EmptyState("暂无孩子报告，请先完成孩子绑定。")
+                    androidx.compose.material3.Button(onClick = { nav.navigate(Destinations.Children) }) { Text("去绑定孩子") }
+                }
                 else -> ReportDetailScreen(viewModel.report(child), state.loading, viewModel::refreshDashboard, nav)
             }
         }

@@ -191,7 +191,7 @@ fun ChildrenScreen(state: AppUiState, nav: NavHostController, bindChild: (String
 @Composable
 fun ParentEvaluationsScreen(state: AppUiState, nav: NavHostController, report: DiagnosisReport?) = ParentTabScaffold(nav, Destinations.ParentEvaluations) {
     if (state.loading || state.data == null) { LoadingState(); return@ParentTabScaffold }
-    if (state.selectedChild == null) { EmptyState("暂无孩子档案，请先完成孩子绑定。"); return@ParentTabScaffold }
+    if (state.selectedChild == null) { EmptyState("暂无孩子档案，请先完成孩子绑定。"); Button(onClick = { nav.navigate(Destinations.Children) }, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("去绑定孩子") }; return@ParentTabScaffold }
     val selectedChild = state.selectedChild
     ParentHeader(selectedChild.name, onClick = { nav.navigate(Destinations.Children) })
     Spacer(Modifier.height(8.dp))
@@ -269,7 +269,7 @@ fun ParentEvaluationsScreen(state: AppUiState, nav: NavHostController, report: D
 @Composable
 fun HealthProfileScreen(state: AppUiState, nav: NavHostController) = ParentTabScaffold(nav, Destinations.Health) {
     if (state.loading || state.data == null) { LoadingState(); return@ParentTabScaffold }
-    if (state.selectedChild == null) { EmptyState("暂无健康档案，请先完成孩子绑定。"); return@ParentTabScaffold }
+    if (state.selectedChild == null) { EmptyState("暂无健康档案，请先完成孩子绑定。"); Button(onClick = { nav.navigate(Destinations.Children) }, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("去绑定孩子") }; return@ParentTabScaffold }
     ParentSection("健康报告", "查看全部报告") { nav.navigate(Destinations.Report) }
     Row { ScoreSummaryCard("体质", "良好", "本月", onClick = { nav.navigate(Destinations.Report) }); Spacer(Modifier.width(6.dp)); ScoreSummaryCard("视力", "正常", "本月", onClick = { nav.navigate(Destinations.Report) }); Spacer(Modifier.width(6.dp)); ScoreSummaryCard("口腔", "良好", "本月", onClick = { nav.navigate(Destinations.Report) }) }
     Spacer(Modifier.height(9.dp))

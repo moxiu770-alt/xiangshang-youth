@@ -85,14 +85,14 @@ private fun PrincipalBottomBar(nav: NavHostController) {
     val route = nav.currentBackStackEntryAsState().value?.destination?.route
     val items = listOf(
         Destinations.Principal to ("总览" to Icons.Filled.BarChart),
-        Destinations.Grades to ("年级" to Icons.Filled.School),
-        Destinations.ClassStats to ("班级" to Icons.Filled.Groups),
-        Destinations.Risk to ("风险" to Icons.Filled.WarningAmber)
+        Destinations.PrincipalGrades to ("年级" to Icons.Filled.School),
+        Destinations.PrincipalClassStats to ("班级" to Icons.Filled.Groups),
+        Destinations.PrincipalRisk to ("风险" to Icons.Filled.WarningAmber)
     )
     NavigationBar(containerColor = Color.White, tonalElevation = 1.dp) {
         items.forEach { (destination, item) ->
             NavigationBarItem(
-                selected = route == destination || (destination == Destinations.ClassStats && route == Destinations.ClassStatsRoute) || (destination == Destinations.Risk && route == Destinations.RiskRoute),
+                selected = route == destination,
                 onClick = {
                     nav.navigate(destination) {
                         popUpTo(Destinations.Principal) { saveState = true }
@@ -110,7 +110,7 @@ private fun PrincipalBottomBar(nav: NavHostController) {
 @Composable private fun PrincipalMetric(title: String, value: String, note: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier, onClick: () -> Unit) = Surface(onClick = onClick, modifier = modifier.semantics { role = Role.Button; contentDescription = "$title：$value，$note" }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Column(Modifier.padding(9.dp)) { Icon(icon, null, tint = color, modifier = Modifier.size(17.dp)); Text(value, color = Navy, fontWeight = FontWeight.Bold, fontSize = 19.sp, modifier = Modifier.padding(top = 4.dp)); Text(title, color = Navy, fontSize = 10.sp); Text(note, color = Color.Gray, fontSize = 8.sp) } }
 @Composable private fun PrincipalEntry(title: String, note: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier, onClick: () -> Unit) = Surface(onClick = onClick, modifier = modifier.semantics { role = Role.Button; contentDescription = "$title：$note" }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(9.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = color); Spacer(Modifier.width(7.dp)); Column { Text(title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 10.sp); Text(note, color = Color.Gray, fontSize = 8.sp) } } }
 @Composable
-fun GradeStatsScreen(state: AppUiState, nav: NavHostController) = AppScaffold("不同年级对比", onBack = { nav.popBackStack() }) {
+fun GradeStatsScreen(state: AppUiState, nav: NavHostController, rootTab: Boolean = false) = AppScaffold("不同年级对比", onBack = if (rootTab) null else ({ nav.popBackStack() }), bottomBar = if (rootTab) ({ PrincipalBottomBar(nav) }) else ({})) {
     if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }
     if (state.data.grades.isEmpty()) { EmptyState("暂无年级统计数据。"); return@AppScaffold }
     var metric by rememberSaveable { mutableStateOf("完成率") }
@@ -154,7 +154,7 @@ fun GradeStatsScreen(state: AppUiState, nav: NavHostController) = AppScaffold("�
 }
 
 @Composable
-fun ClassStatsScreen(state: AppUiState, nav: NavHostController, initialGrade: String?) = AppScaffold("班级完成率", onBack = { nav.popBackStack() }) {
+fun ClassStatsScreen(state: AppUiState, nav: NavHostController, initialGrade: String?, rootTab: Boolean = false) = AppScaffold("班级完成率", onBack = if (rootTab) null else ({ nav.popBackStack() }), bottomBar = if (rootTab) ({ PrincipalBottomBar(nav) }) else ({})) {
     if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }
     var selectedGrade by rememberSaveable { mutableStateOf(initialGrade ?: "全部年级") }
     val allClasses = state.data.classes
@@ -178,7 +178,7 @@ fun ClassStatsScreen(state: AppUiState, nav: NavHostController, initialGrade: St
 }
 
 @Composable
-fun RiskStudentsScreen(state: AppUiState, nav: NavHostController, className: String?, onOpenReport: (com.xiangshang.youth.core.model.Student) -> Unit) = AppScaffold("重点风险学生", onBack = { nav.popBackStack() }) {
+fun RiskStudentsScreen(state: AppUiState, nav: NavHostController, className: String?, rootTab: Boolean = false, onOpenReport: (com.xiangshang.youth.core.model.Student) -> Unit) = AppScaffold("重点风险学生", onBack = if (rootTab) null else ({ nav.popBackStack() }), bottomBar = if (rootTab) ({ PrincipalBottomBar(nav) }) else ({})) {
     if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }
     var riskFilter by rememberSaveable { mutableStateOf("全部") }
     val students = state.data.students.filter { student ->

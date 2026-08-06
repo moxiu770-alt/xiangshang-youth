@@ -117,7 +117,7 @@ private fun TeacherRoleSwitch(sports: Boolean, onSelect: (Boolean) -> Unit) = Ro
 
 @Composable
 private fun TeacherRoleChip(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean, color: Color, modifier: Modifier, onClick: () -> Unit) {
-    Surface(modifier = modifier.height(42.dp).semantics { role = Role.Button; contentDescription = "切换为$label" }.clickable(onClick = onClick), color = if (selected) color else color.copy(alpha = .14f), shape = RoundedCornerShape(9.dp)) {
+    Surface(modifier = modifier.heightIn(min = 48.dp).semantics { role = Role.Button; contentDescription = "切换为$label" }.clickable(onClick = onClick), color = if (selected) color else color.copy(alpha = .14f), shape = RoundedCornerShape(9.dp)) {
         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, tint = if (selected) Color.White else color, modifier = Modifier.size(21.dp))
             Spacer(Modifier.width(9.dp)); Text(label, color = if (selected) Color.White else color, fontWeight = FontWeight.Bold, fontSize = 14.sp)

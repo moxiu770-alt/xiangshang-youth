@@ -42,7 +42,11 @@ object Destinations { const val Splash="splash"; const val Login="login"; const 
     val state by viewModel.state.collectAsState()
     val view = LocalView.current
     val currentEntry by nav.currentBackStackEntryAsState()
-    val isSplash = currentEntry?.destination?.route == Destinations.Splash
+    // NavHost exposes a null entry for a short interval during the first frame.
+    // Treat that interval as splash as well, otherwise the offline banner and
+    // dashboard chrome can flash over the launch artwork before the route is
+    // established.
+    val isSplash = currentEntry?.destination?.route?.let { it == Destinations.Splash } ?: true
     var handledDeepLink by rememberSaveable { mutableStateOf<String?>(null) }
 
     // System-bar mutations are expensive IPC calls. Running them from a

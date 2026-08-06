@@ -10,6 +10,7 @@ import com.xiangshang.youth.core.model.*
 import com.xiangshang.youth.core.repository.DashboardData
 import com.xiangshang.youth.core.repository.RepositoryProvider
 import com.xiangshang.youth.core.repository.YouthRepository
+import com.xiangshang.youth.core.util.AuthIdentity
 import com.xiangshang.youth.core.service.ClassPost
 import com.xiangshang.youth.core.service.LocalFeatureState
 import com.xiangshang.youth.core.service.LocalFeatureStore
@@ -75,8 +76,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun login(identifier: String = "", onSuccess: () -> Unit = {}) = viewModelScope.launch {
         _state.value = _state.value.copy(loading = true, restoringSession = false)
         runCatching { repository.dashboard() }.onSuccess { data ->
-            val normalizedIdentifier = identifier.trim().ifBlank { "13800138000" }
-            val profilePhone = normalizedIdentifier.takeUnless { it == "wechat_authorization" } ?: "13800138000"
+            val profilePhone = AuthIdentity.displayPhone(identifier)
             val profile = UserProfile("u1", "王女士", profilePhone, UserRole.Parent, data.school.name)
             val selected = data.students.firstOrNull { it.id == _state.value.local.selectedChildId && it.id in _state.value.local.boundChildIds }
             val local = _state.value.local.copy(sessionActive = true, sessionPhone = profile.phone, sessionRoleName = null, selectedChildId = selected?.id)

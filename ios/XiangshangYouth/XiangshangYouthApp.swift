@@ -17,6 +17,10 @@ struct RootView: View {
             navigationRoot
             globalOverlay
         }
+        // Splash artwork is a pure poster: do not let the root NavigationStack
+        // reintroduce time, signal or the Home indicator while it is visible.
+        .statusBarHidden(state.isShowingSplash)
+        .persistentSystemOverlays(state.isShowingSplash ? .hidden : .visible)
         .onAppear { networkMonitor.start(); state.setOffline(networkMonitor.isOffline) }
         .onChange(of: networkMonitor.isOffline) { _, value in state.setOffline(value) }
     }

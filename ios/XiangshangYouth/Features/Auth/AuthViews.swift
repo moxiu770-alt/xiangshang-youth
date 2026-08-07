@@ -553,6 +553,8 @@ struct RoleSelectView: View {
                 Image("CampusFooter")
                     .resizable()
                     .scaledToFit()
+                    .frame(maxWidth: 560)
+                    .frame(maxWidth: .infinity)
                     .frame(height: 132)
                     .padding(.bottom, 4)
                     .scaleEffect(landscapeDrifts ? 1.035 : 1)
@@ -560,6 +562,10 @@ struct RoleSelectView: View {
                     .clipped()
             }
             .padding(.horizontal, 19)
+            // Keep role cards at the same readable portrait width as LoginView
+            // when the app is presented on iPad.
+            .frame(maxWidth: 620)
+            .frame(maxWidth: .infinity)
         }
         .task {
             withAnimation(.spring(response: 0.55, dampingFraction: 0.8)) { visible = true }

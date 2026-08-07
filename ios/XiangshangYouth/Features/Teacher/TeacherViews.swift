@@ -8,6 +8,8 @@ struct TeacherHomeView: View {
     @State private var isSportsTeacher = false
 
     var body: some View {
+        ZStack {
+            ReferenceColor.canvas.ignoresSafeArea()
         VStack(spacing: 0) {
             Group {
                 switch selectedTab {
@@ -27,6 +29,9 @@ struct TeacherHomeView: View {
         }
         .background(ReferenceColor.canvas)
         .animation(.easeInOut(duration: 0.22), value: selectedTab)
+        .frame(maxWidth: 720)
+        .frame(maxWidth: .infinity)
+        }
     }
 
     private var teacherBottomBar: some View {

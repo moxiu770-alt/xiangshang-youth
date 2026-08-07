@@ -4,6 +4,8 @@ struct PrincipalHomeView: View {
     @State private var selectedTab = 0
 
     var body: some View {
+        ZStack {
+            ReferenceColor.canvas.ignoresSafeArea()
         VStack(spacing: 0) {
             Group {
                 switch selectedTab {
@@ -27,6 +29,9 @@ struct PrincipalHomeView: View {
         }
         .background(ReferenceColor.canvas)
         .animation(.easeInOut(duration: 0.22), value: selectedTab)
+        .frame(maxWidth: 720)
+        .frame(maxWidth: .infinity)
+        }
     }
 
     private func tab(_ index: Int, _ icon: String, _ title: String) -> some View {

@@ -4,6 +4,8 @@ struct ParentHomeView: View {
     @State private var selectedTab = 0
 
     var body: some View {
+        ZStack {
+            ReferenceColor.canvas.ignoresSafeArea()
         VStack(spacing: 0) {
             Group {
                 switch selectedTab {
@@ -20,6 +22,9 @@ struct ParentHomeView: View {
         }
         .background(ReferenceColor.canvas)
         .animation(.easeInOut(duration: 0.22), value: selectedTab)
+        .frame(maxWidth: 720)
+        .frame(maxWidth: .infinity)
+        }
     }
 
     private var parentBottomBar: some View {

@@ -148,6 +148,7 @@ final class LocalFeatureStateTests: XCTestCase {
         defaults.removePersistentDomain(forName: suite)
         let state = AppState(featureStore: LocalFeatureStore(defaults: defaults))
         await state.login(phone: "13800138000")
+        XCTAssertTrue(state.bindChild(name: "王小雨", code: "XS-S02"))
         let router = AppRouter()
 
         router.receiveDeepLink(URL(string: "xiangshang-youth://open?target=report&studentId=s02")!)
@@ -156,6 +157,22 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertEqual(state.selectedRole, .parent)
         XCTAssertEqual(state.selectedChild?.id, "s02")
         XCTAssertEqual(router.path.count, 1)
+    }
+
+    func testPendingReportDeepLinkCannotSelectUnboundStudent() async {
+        let suite = "xiangshang.youth.deep-link-access-tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let state = AppState(featureStore: LocalFeatureStore(defaults: defaults))
+        await state.login(phone: "13800138000")
+        let router = AppRouter()
+
+        router.receiveDeepLink(URL(string: "xiangshang-youth://open?target=report&studentId=s03")!)
+        router.activatePendingDeepLink(using: state)
+
+        XCTAssertEqual(state.selectedRole, .parent)
+        XCTAssertNil(state.selectedChild, "An unbound deep-link student must not become a family child selection.")
+        XCTAssertEqual(router.path.count, 1, "An unbound report link should route to child binding instead of a report.")
     }
 
     func testRouterDeduplicatesRepeatedDestinationAndKeepsBackStackRecoverable() {

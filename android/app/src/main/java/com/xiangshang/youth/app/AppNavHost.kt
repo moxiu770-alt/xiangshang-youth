@@ -117,8 +117,18 @@ private fun NavHostController.replaceRoot(destination: String) {
         when (deepLink.target) {
             DeepLinkTarget.Report -> {
                 navigateRoleRoot(UserRole.Parent)
-                deepLink.studentId?.let { studentId -> state.data?.students?.firstOrNull { it.id == studentId }?.let(viewModel::chooseChild) }
-                nav.navigate(Destinations.Report) { launchSingleTop = true }
+                val requestedStudent = deepLink.studentId?.let { studentId ->
+                    state.data?.students?.firstOrNull { it.id == studentId }
+                }
+                // Never treat a deep-link student id as an implicit family
+                // binding. A parent can open a report only for an already bound
+                // child; all other links resolve to the explicit binding flow.
+                if (requestedStudent != null && DeepLinkResolver.isBoundFamilyStudent(requestedStudent.id, state.local.boundChildIds)) {
+                    viewModel.chooseChild(requestedStudent)
+                    nav.navigate(Destinations.Report) { launchSingleTop = true }
+                } else {
+                    nav.navigate(Destinations.Children) { launchSingleTop = true }
+                }
             }
             DeepLinkTarget.Review -> {
                 navigateRoleRoot(UserRole.Teacher)

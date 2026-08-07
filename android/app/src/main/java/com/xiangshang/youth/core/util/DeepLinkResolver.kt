@@ -13,6 +13,10 @@ enum class DeepLinkTarget { Report, Review, Tasks, Risk }
 data class AppDeepLink(val target: DeepLinkTarget, val studentId: String? = null)
 
 object DeepLinkResolver {
+    /** A link is not permission: a parent may open only an already bound child. */
+    fun isBoundFamilyStudent(studentId: String?, boundChildIds: Set<String>): Boolean =
+        studentId != null && studentId in boundChildIds
+
     fun parse(value: String): AppDeepLink? = runCatching {
         val uri = URI(value)
         if (uri.scheme != "xiangshang-youth" || uri.host != "open") return null

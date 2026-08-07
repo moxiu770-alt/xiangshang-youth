@@ -28,4 +28,12 @@ class DeepLinkResolverTest {
             assertEquals(expected, DeepLinkResolver.parse("xiangshang-youth://open?target=$target")?.target)
         }
     }
+
+    @Test fun reportAccessRequiresAnExistingFamilyBinding() {
+        val boundChildren = setOf("s01", "s02")
+
+        assertEquals(true, DeepLinkResolver.isBoundFamilyStudent("s02", boundChildren))
+        assertEquals(false, DeepLinkResolver.isBoundFamilyStudent("s03", boundChildren))
+        assertEquals(false, DeepLinkResolver.isBoundFamilyStudent(null, boundChildren))
+    }
 }

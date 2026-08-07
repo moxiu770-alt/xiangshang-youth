@@ -64,11 +64,19 @@ enum AppRoute: Hashable { case roleSelect; case parentHome; case parentCourses; 
         switch target {
         case "report":
             state.selectRole(.parent)
-            if let studentID, let student = state.data?.students.first(where: { $0.id == studentID }) { state.selectChild(student) }
-            if let student = state.selectedChild {
+            // A family deep link must never turn an arbitrary student id into a
+            // selected child.  Only a child already bound to this account can
+            // open a report; otherwise take the family to the binding surface.
+            if let studentID,
+               let student = state.data?.students.first(where: { $0.id == studentID }),
+               state.localFeatures.boundChildIDs.contains(student.id) {
+                state.selectChild(student)
                 let route = AppRoute.report(student)
                 path.append(route)
                 routeStack.append(route)
+            } else {
+                path.append(AppRoute.children)
+                routeStack.append(.children)
             }
         case "review":
             state.selectRole(.teacher)

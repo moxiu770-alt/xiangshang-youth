@@ -371,7 +371,12 @@ struct TeacherDashboard: View {
             }.buttonStyle(.plain).accessibilityLabel("消息通知").accessibilityHint("打开消息中心")
         }
         .padding(.horizontal, 13).padding(.vertical, 8)
-        .background(.white)
+        // Keep the role workbench consistent with the rest of the iOS chrome:
+        // this is a root header, not a white content card.  Native material
+        // gives it the requested Apple glass treatment while preserving the
+        // reference layout over the light dashboard canvas.
+        .background { Rectangle().fill(.ultraThinMaterial).ignoresSafeArea(edges: .top) }
+        .overlay(alignment: .bottom) { Rectangle().fill(ReferenceColor.navy.opacity(0.08)).frame(height: 0.5) }
     }
 
     private var teacherSwitch: some View {

@@ -240,6 +240,8 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertNil(state.selectedRole)
         XCTAssertNil(state.data)
         XCTAssertNotNil(state.error)
+        state.clearError()
+        XCTAssertNil(state.error)
         XCTAssertNil(LocalFeatureStore(defaults: defaults).state.sessionProfile)
     }
 

@@ -39,6 +39,11 @@
     <string>LaunchScreen</string>
 	<key>UIUserInterfaceStyle</key>
 	<string>Light</string>
+	<!-- The launch poster is approved as full-bleed artwork. SwiftUI restores
+	     the status bar after SplashView dismisses, but this initial value also
+	     covers the storyboard-owned first frame before SwiftUI is running. -->
+	<key>UIStatusBarHidden</key>
+	<true/>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 	<key>UISupportedInterfaceOrientations</key>

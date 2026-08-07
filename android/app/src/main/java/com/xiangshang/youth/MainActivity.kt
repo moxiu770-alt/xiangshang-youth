@@ -3,6 +3,7 @@ package com.xiangshang.youth
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.view.WindowCompat
@@ -18,6 +19,7 @@ import com.xiangshang.youth.core.service.ApiClient
 
 class MainActivity : ComponentActivity() {
     private var incomingDeepLink: Uri? by mutableStateOf(null)
+    private var privacyShielded: Boolean by mutableStateOf(false)
     private lateinit var appViewModel: AppViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,12 +35,23 @@ class MainActivity : ComponentActivity() {
         incomingDeepLink = intent?.data
         appViewModel = ViewModelProvider(this)[AppViewModel::class.java]
         setContent {
-            XiangshangYouthTheme { AppNavHost(appViewModel, incomingDeepLink) }
+            XiangshangYouthTheme { AppNavHost(appViewModel, incomingDeepLink, privacyShielded = privacyShielded) }
         }
+    }
+
+    override fun onPause() {
+        // The Android recent-apps thumbnail must not expose a student's health
+        // report. Compose draws the same shield in the foreground, while this
+        // temporary secure flag covers the system-owned task snapshot.
+        privacyShielded = true
+        window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
+        super.onPause()
     }
 
     override fun onResume() {
         super.onResume()
+        window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        privacyShielded = false
         // Refresh only when an authenticated session exists; AppViewModel safely
         // no-ops during the splash/login flow. This keeps dashboards current after
         // returning from Settings, WeChat, file pickers, or another app.

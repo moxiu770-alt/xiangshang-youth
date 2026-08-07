@@ -7,6 +7,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -61,7 +63,7 @@ private fun NavHostController.replaceRoot(destination: String) {
     }
 }
 
-@Composable fun AppNavHost(viewModel: AppViewModel, incomingDeepLink: Uri? = null, nav: NavHostController = rememberNavController()) {
+@Composable fun AppNavHost(viewModel: AppViewModel, incomingDeepLink: Uri? = null, nav: NavHostController = rememberNavController(), privacyShielded: Boolean = false) {
     val state by viewModel.state.collectAsState()
     val view = LocalView.current
     val currentEntry by nav.currentBackStackEntryAsState()
@@ -362,6 +364,15 @@ private fun NavHostController.replaceRoot(destination: String) {
     // is reserved for authenticated dashboard refreshes, so no modal spinner window
     // flashes over the login page.
     if (state.loading && !state.restoringSession && state.profile != null) Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = .72f)), contentAlignment = Alignment.Center) { com.xiangshang.youth.shared.component.LoadingState() }
+    if (privacyShielded && !isSplash) {
+        Box(Modifier.fillMaxSize().background(Canvas), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                androidx.compose.material3.Icon(Icons.Filled.Security, contentDescription = null, tint = Blue, modifier = Modifier.size(34.dp))
+                Text("向上少年", color = Navy, style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+                Text("已保护学生健康数据", color = Color.Gray, style = androidx.compose.material3.MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
     }
     }
 }

@@ -1,7 +1,12 @@
 package com.xiangshang.youth.app
 
 import android.app.Activity
+import android.animation.ValueAnimator
+import android.database.ContentObserver
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -16,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.mutableStateOf
@@ -73,6 +79,24 @@ private fun NavHostController.replaceRoot(destination: String) {
     // established.
     val isSplash = currentEntry?.destination?.route?.let { it == Destinations.Splash } ?: true
     var handledDeepLink by rememberSaveable { mutableStateOf<String?>(null) }
+    // Android's “移除动画” setting changes the global animator duration
+    // scale. Observe it while the app is foregrounded so the product setting
+    // and the system accessibility preference both control the same motion.
+    var systemAnimationsEnabled by remember { mutableStateOf(ValueAnimator.areAnimatorsEnabled()) }
+    DisposableEffect(view.context) {
+        val resolver = view.context.contentResolver
+        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                systemAnimationsEnabled = ValueAnimator.areAnimatorsEnabled()
+            }
+        }
+        resolver.registerContentObserver(
+            Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE),
+            false,
+            observer
+        )
+        onDispose { resolver.unregisterContentObserver(observer) }
+    }
 
     // System-bar mutations are expensive IPC calls. Running them from a
     // SideEffect on every Compose recomposition can overwhelm Android System UI
@@ -148,7 +172,7 @@ private fun NavHostController.replaceRoot(destination: String) {
         handledDeepLink = value
     }
     CompositionLocalProvider(
-        LocalReduceMotion provides state.local.settings.reduceMotion,
+        LocalReduceMotion provides (state.local.settings.reduceMotion || !systemAnimationsEnabled),
         LocalDashboardRetry provides { viewModel.refreshDashboard() },
         LocalDashboardClearError provides viewModel::clearError
     ) {

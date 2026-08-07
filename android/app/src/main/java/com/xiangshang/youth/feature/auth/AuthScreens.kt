@@ -93,7 +93,9 @@ fun LoginScreen(
         }
     }
     Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF76B8F7), Color(0xFFEFF8FF))))) {
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
+        // Preserve the portrait login composition on tablets instead of turning
+        // the reference card into a very wide desktop form.
+        Column(Modifier.widthIn(max = 620.dp).fillMaxWidth().align(Alignment.TopCenter).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             Column(Modifier.padding(top = 34.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text("向上少年", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Black)
                 Text("身心健康智慧平台", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black)
@@ -142,7 +144,7 @@ fun LoginScreen(
                 }
             }
             Spacer(Modifier.height(18.dp))
-            Image(painterResource(R.drawable.campus_footer), null, Modifier.fillMaxWidth().height(112.dp).scale(landscapeScale), contentScale = ContentScale.Fit)
+            Image(painterResource(R.drawable.campus_footer), null, Modifier.widthIn(max = 560.dp).fillMaxWidth().height(112.dp).scale(landscapeScale), contentScale = ContentScale.Fit)
             Spacer(Modifier.height(3.dp))
         }
     }

@@ -65,27 +65,31 @@ struct LoginView: View {
             Circle().fill(.white.opacity(0.13)).frame(width: 420).offset(x: 175, y: -290)
 
             ScrollView(.vertical, showsIndicators: false) {
-            VStack(spacing: 0) {
-                VStack(spacing: 7) {
-                    Text("向上少年")
-                        .font(.system(size: 31, weight: .heavy))
-                    Text("身心健康智慧平台")
-                        .font(.system(size: 25, weight: .heavy))
-                    Text("科学评估 · 精准干预 · 守护3-18岁青少年身心健康")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(ReferenceColor.yellow)
-                        .padding(.horizontal, 12).padding(.vertical, 4)
-                        .background(.white.opacity(0.18), in: Capsule())
-                }
-                .foregroundStyle(.white)
-                .padding(.top, 30)
-                .padding(.bottom, 12)
+                // A phone reference layout should not stretch into a desktop-width
+                // form on iPad.  Keep the readable mobile composition centered.
+                VStack(spacing: 0) {
+                    VStack(spacing: 7) {
+                        Text("向上少年")
+                            .font(.system(size: 31, weight: .heavy))
+                        Text("身心健康智慧平台")
+                            .font(.system(size: 25, weight: .heavy))
+                        Text("科学评估 · 精准干预 · 守护3-18岁青少年身心健康")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(ReferenceColor.yellow)
+                            .padding(.horizontal, 12).padding(.vertical, 4)
+                            .background(.white.opacity(0.18), in: Capsule())
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.top, 30)
+                    .padding(.bottom, 12)
 
-                loginPanel
-                Spacer(minLength: 12)
-                landscape
-            }
-            .padding(.bottom, 8)
+                    loginPanel
+                    Spacer(minLength: 12)
+                    landscape
+                }
+                .frame(maxWidth: 620)
+                .frame(maxWidth: .infinity)
+                .padding(.bottom, 8)
             }
             .scrollDismissesKeyboard(.interactively)
         }
@@ -215,6 +219,7 @@ struct LoginView: View {
         Image("CampusFooter")
             .resizable()
             .scaledToFit()
+            .frame(maxWidth: 560)
             .frame(maxWidth: .infinity)
             .frame(height: 112)
             .padding(.horizontal, 3)

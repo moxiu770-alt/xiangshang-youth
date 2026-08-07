@@ -37,6 +37,16 @@ export ANDROID_HOME="$sdk_dir"
 export ANDROID_SDK_ROOT="$sdk_dir"
 export PATH="$JAVA_HOME/bin:$sdk_dir/platform-tools:$sdk_dir/emulator:$PATH"
 
+# Assemble, JVM tests and lint share Kotlin/Android compiler workers.  A small
+# default keeps the one-command verification reliable on developer laptops and
+# CI runners; powerful agents can opt in to more with GRADLE_MAX_WORKERS=4.
+gradle_max_workers="${GRADLE_MAX_WORKERS:-2}"
+if [[ ! "$gradle_max_workers" =~ '^[1-9][0-9]*$' ]]; then
+  print -u2 "GRADLE_MAX_WORKERS 必须是正整数，当前值：$gradle_max_workers"
+  exit 1
+fi
+gradle_args=(--no-daemon "--max-workers=$gradle_max_workers")
+
 function device_finished_booting() {
   local serial="$1"
   local boot_file query_pid attempts boot_value
@@ -65,7 +75,8 @@ function device_finished_booting() {
 cd "$project_dir"
 print "JAVA_HOME=$JAVA_HOME"
 print "ANDROID_HOME=$ANDROID_HOME"
-./gradlew :app:assembleDebug :app:assembleAndroidTest :app:testDebugUnitTest :app:lintDebug --no-daemon "$@"
+print "GRADLE_MAX_WORKERS=$gradle_max_workers"
+./gradlew :app:assembleDebug :app:assembleAndroidTest :app:testDebugUnitTest :app:lintDebug "${gradle_args[@]}" "$@"
 if (( $+commands[adb] )); then
   ready_devices=()
   # `status` is a readonly special parameter in zsh.  Naming this column
@@ -81,7 +92,7 @@ if (( $+commands[adb] )); then
   done < <(adb devices | awk 'NR > 1 && NF >= 2 { print $1, $2 }')
   if (( ${#ready_devices} > 0 )); then
     print "检测到 ${#ready_devices} 台已启动的 Android 设备，运行 Compose 仪器测试。"
-    ./gradlew :app:connectedDebugAndroidTest --no-daemon "$@"
+    ./gradlew :app:connectedDebugAndroidTest "${gradle_args[@]}" "$@"
   else
     print "未检测到已完成启动的 Android 真机/模拟器：已完成 APK、AndroidTest APK、JVM 单测和 lint；仪器测试待设备启动完成后执行。"
   fi

@@ -53,22 +53,13 @@ struct PrincipalDashboard: View {
     private var students: [Student] { state.data?.students ?? [] }
     private var classes: [ClassInfo] { state.data?.classes ?? [] }
     private var activeTask: TestTask? { state.data?.tasks.first }
-    private var activeTaskStudents: [Student] {
-        guard let activeTask else { return [] }
-        return students.filter { student in
-            student.grade == activeTask.gradeName && activeTask.className.split(separator: "、").map(String.init).contains(student.className)
-        }
-    }
-    private var activeCompletedCount: Int {
-        activeTaskStudents.isEmpty ? (activeTask?.completedCount ?? 0) : activeTaskStudents.filter { state.taskStatus(for: $0) == .completed }.count
-    }
-    private var activeTotalCount: Int { activeTaskStudents.isEmpty ? (activeTask?.totalCount ?? 0) : activeTaskStudents.count }
+    // `TestTask` is the school-level aggregate published by the assessment service.
+    // The local student list is intentionally only a representative Mock sample, so it
+    // must not replace the task aggregate and turn 15/20 into the misleading 2/4.
+    private var activeCompletedCount: Int { activeTask?.completedCount ?? 0 }
+    private var activeTotalCount: Int { activeTask?.totalCount ?? 0 }
     private var completionRate: Double { guard activeTotalCount > 0 else { return 0 }; return Double(activeCompletedCount) / Double(activeTotalCount) }
     private func completionRate(for grade: Grade) -> Double {
-        let gradeStudents = students.filter { $0.grade == grade.name }
-        if !gradeStudents.isEmpty {
-            return Double(gradeStudents.filter { state.taskStatus(for: $0) == .completed }.count) / Double(gradeStudents.count)
-        }
         let gradeClasses = classes.filter { $0.gradeId == grade.id }
         guard !gradeClasses.isEmpty else { return 0 }
         return Double(gradeClasses.map(\.completionRate).reduce(0, +)) / Double(gradeClasses.count) / 100
@@ -257,10 +248,6 @@ struct GradeStatsView: View {
     @State private var selectedMetric = "完成率"
     init(showsBack: Bool = false) { self.showsBack = showsBack }
     private func completionRate(for grade: Grade) -> Int {
-        let gradeStudents = (state.data?.students ?? []).filter { $0.grade == grade.name }
-        if !gradeStudents.isEmpty {
-            return Int((Double(gradeStudents.filter { state.taskStatus(for: $0) == .completed }.count) / Double(gradeStudents.count) * 100).rounded())
-        }
         let gradeClasses = (state.data?.classes ?? []).filter { $0.gradeId == grade.id }
         guard !gradeClasses.isEmpty else { return 0 }
         return Int((Double(gradeClasses.map(\.completionRate).reduce(0, +)) / Double(gradeClasses.count)).rounded())
@@ -288,8 +275,10 @@ struct GradeStatsView: View {
                     let rate = completionRates[index]
                     let gradeClasses = (state.data?.classes ?? []).filter { $0.gradeId == grade.id }
                     let gradeStudents = (state.data?.students ?? []).filter { $0.grade == grade.name }
+                    // Class completion rates are the authoritative aggregate. The local
+                    // students are a UI sample rather than the full school roster.
                     let totalStudents = gradeStudents.isEmpty ? gradeClasses.reduce(0) { $0 + $1.studentCount } : gradeStudents.count
-                    let completedStudents = gradeStudents.isEmpty ? Int((Double(totalStudents) * Double(rate) / 100).rounded()) : gradeStudents.filter { state.taskStatus(for: $0) == .completed }.count
+                    let completedStudents = Int((Double(totalStudents) * Double(rate) / 100).rounded())
                     let gradeRisk = gradeStudents.filter { ($0.totalScore ?? 35) < 25 || [.review, .retest].contains(state.taskStatus(for: $0)) }.count
                     let gradeScores = gradeStudents.compactMap(\.totalScore)
                     let averageScore = gradeScores.isEmpty ? 0 : gradeScores.reduce(0, +) / Double(gradeScores.count)
@@ -365,9 +354,9 @@ struct ClassStatsView: View {
         }
     }
     private func completionRate(for item: ClassInfo) -> Int {
-        let classStudents = (state.data?.students ?? []).filter { $0.className == item.name }
-        guard !classStudents.isEmpty else { return item.completionRate }
-        return Int((Double(classStudents.filter { state.taskStatus(for: $0) == .completed }.count) / Double(classStudents.count) * 100).rounded())
+        // This is the class aggregate from the dashboard payload. A representative
+        // local roster must not silently change a published completion percentage.
+        item.completionRate
     }
 
     var body: some View {

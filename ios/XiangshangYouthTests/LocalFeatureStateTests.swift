@@ -360,9 +360,48 @@ final class LocalFeatureStateTests: XCTestCase {
 
         XCTAssertEqual(state.pendingSyncCount, 3)
     }
+
+    func testUnauthorizedReportRefreshExpiresTheLocalSession() async throws {
+        let suite = "xiangshang.youth.unauthorized-report-tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let state = AppState(repository: UnauthorizedRepository(), featureStore: LocalFeatureStore(defaults: defaults))
+        await state.login(phone: "13800138000")
+        let student = try XCTUnwrap(state.data?.students.first)
+
+        await state.refreshReport(for: student)
+
+        XCTAssertNil(state.profile)
+        XCTAssertNil(state.data)
+        XCTAssertNotNil(state.error)
+        XCTAssertNil(LocalFeatureStore(defaults: defaults).state.sessionProfile)
+    }
+
+    func testUnauthorizedWorkflowExpiresTheLocalSession() async {
+        let suite = "xiangshang.youth.unauthorized-workflow-tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let state = AppState(repository: UnauthorizedRepository(), featureStore: LocalFeatureStore(defaults: defaults))
+        await state.login(phone: "13800138000")
+
+        let submitted = await state.submitActivityCommand("health-growth-season-2026", contactName: "王女士", phone: "13800138000")
+
+        XCTAssertFalse(submitted)
+        XCTAssertNil(state.profile)
+        XCTAssertNil(state.data)
+        XCTAssertNotNil(state.error)
+        XCTAssertNil(LocalFeatureStore(defaults: defaults).state.sessionProfile)
+    }
 }
 
 private struct FailingRepository: YouthRepository {
     func loadDashboard() async throws -> DashboardData { throw ApiError.network }
     func report(for student: Student) -> DiagnosisReport { MockRepository.shared.report(for: student) }
+}
+
+private struct UnauthorizedRepository: YouthRepository {
+    func loadDashboard() async throws -> DashboardData { try await MockRepository.shared.loadDashboard() }
+    func report(for student: Student) -> DiagnosisReport { MockRepository.shared.report(for: student) }
+    func loadReport(for student: Student) async throws -> DiagnosisReport { throw ApiError.unauthorized }
+    func submitActivity(_ value: ActivityRegistration) async throws { throw ApiError.unauthorized }
 }

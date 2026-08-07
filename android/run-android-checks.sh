@@ -6,7 +6,10 @@
 set -euo pipefail
 
 project_dir="${0:A:h}"
-sdk_dir="${ANDROID_HOME:-/Users/luyanpeng/Library/Android/sdk}"
+# Prefer an explicitly configured SDK, then fall back to the standard macOS
+# location for the current user.  Do not bake one developer's account path
+# into the verification workflow.
+sdk_dir="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-${HOME}/Library/Android/sdk}}"
 
 if [[ -z "${JAVA_HOME:-}" || ! -x "$JAVA_HOME/bin/java" ]]; then
   for candidate in \

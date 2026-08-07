@@ -169,6 +169,10 @@ enum WorkflowCommandState: Equatable {
             refreshedReports[student.id] = loadedReport
         } catch {
             if case ApiError.cancelled = error { return }
+            if case ApiError.unauthorized = error {
+                handleDashboardError(error)
+                return
+            }
             reportError = error.localizedDescription
         }
     }
@@ -190,6 +194,10 @@ enum WorkflowCommandState: Equatable {
         } catch {
             if error is CancellationError || (error as? ApiError).map({ if case .cancelled = $0 { true } else { false } }) == true {
                 workflowStates[key] = .idle
+                return false
+            }
+            if case ApiError.unauthorized = error {
+                handleDashboardError(error)
                 return false
             }
             workflowStates[key] = .failed(error.localizedDescription)
@@ -334,17 +342,26 @@ enum WorkflowCommandState: Equatable {
         for record in activities {
             updateActivitySyncStatus(record.id, to: .submitting)
             do { try await repository.submitActivity(record); updateActivitySyncStatus(record.id, to: .submitted); synchronized += 1 }
-            catch { updateActivitySyncStatus(record.id, to: .failed); failed += 1 }
+            catch {
+                if case ApiError.unauthorized = error { handleDashboardError(error); return }
+                updateActivitySyncStatus(record.id, to: .failed); failed += 1
+            }
         }
         for record in experts {
             updateExpertSyncStatus(record.id, to: .submitting)
             do { try await repository.bookExpert(record); updateExpertSyncStatus(record.id, to: .submitted); synchronized += 1 }
-            catch { updateExpertSyncStatus(record.id, to: .failed); failed += 1 }
+            catch {
+                if case ApiError.unauthorized = error { handleDashboardError(error); return }
+                updateExpertSyncStatus(record.id, to: .failed); failed += 1
+            }
         }
         for record in uploads {
             updateCourseSyncStatus(record.id, to: .submitting)
             do { try await repository.uploadCourse(record); updateCourseSyncStatus(record.id, to: .submitted); synchronized += 1 }
-            catch { updateCourseSyncStatus(record.id, to: .failed); failed += 1 }
+            catch {
+                if case ApiError.unauthorized = error { handleDashboardError(error); return }
+                updateCourseSyncStatus(record.id, to: .failed); failed += 1
+            }
         }
         workflowStates["sync-pending"] = failed == 0
             ? .succeeded("已同步 \(synchronized) 条本机记录。")

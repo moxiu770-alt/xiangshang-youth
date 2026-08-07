@@ -134,7 +134,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             _state.value = _state.value.copy(reportLoadingStudentId = null)
             throw error
         } catch (error: Throwable) {
-            _state.value = _state.value.copy(reportLoadingStudentId = null, reportError = error.message ?: "报告刷新失败")
+            if (error is ApiError.Unauthorized) {
+                handleDashboardFailure(error)
+            } else {
+                _state.value = _state.value.copy(reportLoadingStudentId = null, reportError = error.message ?: "报告刷新失败")
+            }
         }
     }
     fun clearReportError() { _state.value = _state.value.copy(reportError = null) }
@@ -153,6 +157,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             _state.value = _state.value.copy(workflowStates = _state.value.workflowStates + (key to WorkflowCommandState()))
             throw error
         } catch (error: Throwable) {
+            if (error is ApiError.Unauthorized) {
+                handleDashboardFailure(error)
+                return@launch
+            }
             onFailure?.invoke()
             _state.value = _state.value.copy(workflowStates = _state.value.workflowStates + (key to WorkflowCommandState(WorkflowCommandStatus.Failed, error.message ?: "提交失败，请重试")))
         }
@@ -185,15 +193,33 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         var failed = 0
         _state.value.local.activityRegistrations.filter { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed }.forEach { record ->
             markActivitySyncSubmitting(record.activityId)
-            runCatching { repository.submitActivity(record) }.onSuccess { markActivitySynced(record.activityId) }.onFailure { markActivitySyncFailed(record.activityId); failed += 1 }
+            try {
+                repository.submitActivity(record)
+                markActivitySynced(record.activityId)
+            } catch (error: Throwable) {
+                if (error is ApiError.Unauthorized) throw error
+                markActivitySyncFailed(record.activityId); failed += 1
+            }
         }
         _state.value.local.expertAppointments.filter { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed }.forEach { record ->
             markExpertSyncSubmitting(record.expertName)
-            runCatching { repository.bookExpert(record) }.onSuccess { markExpertSynced(record.expertName) }.onFailure { markExpertSyncFailed(record.expertName); failed += 1 }
+            try {
+                repository.bookExpert(record)
+                markExpertSynced(record.expertName)
+            } catch (error: Throwable) {
+                if (error is ApiError.Unauthorized) throw error
+                markExpertSyncFailed(record.expertName); failed += 1
+            }
         }
         _state.value.local.courseUploads.filter { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed }.forEach { record ->
             markCourseSyncSubmitting(record.taskId)
-            runCatching { repository.uploadCourse(record) }.onSuccess { markCourseSynced(record.taskId) }.onFailure { markCourseSyncFailed(record.taskId); failed += 1 }
+            try {
+                repository.uploadCourse(record)
+                markCourseSynced(record.taskId)
+            } catch (error: Throwable) {
+                if (error is ApiError.Unauthorized) throw error
+                markCourseSyncFailed(record.taskId); failed += 1
+            }
         }
         if (failed > 0) throw IllegalStateException("仍有 $failed 条记录等待网络恢复后重试。")
     })

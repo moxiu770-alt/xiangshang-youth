@@ -425,7 +425,7 @@ struct TeacherDashboard: View {
                 action("person.3.fill", "学生列表", ReferenceColor.green, .studentList(nil))
                 action("person.2.fill", "待分班学生", .orange, .teacherClasses)
                 action("figure.run", "查看延时课", .teal, .teacherTasks)
-                action("medal.fill", "优秀学生评选", ReferenceColor.purple, .studentList(nil))
+                action("medal.fill", "优秀学生评选", ReferenceColor.purple, .outstandingStudents)
                 action("person.badge.plus", "学生名单", .orange, .studentList(nil))
             }
             .padding(.horizontal, 12)
@@ -945,23 +945,33 @@ struct TeacherClassesView: View {
     }
 }
 
+enum StudentListMode {
+    case all, outstanding
+    var title: String { self == .outstanding ? "优秀学生评选" : "学生列表" }
+    var emptyDetail: String { self == .outstanding ? "完成测评后，总分达到 30 分的学生会显示在这里。" : "当前班级暂未同步学生名单。" }
+}
+
 struct StudentListView: View {
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var router: AppRouter
     let classInfo: ClassInfo?
+    var mode: StudentListMode = .all
     var body: some View {
-        AppScaffold(title: classInfo?.name ?? "学生列表") {
+        AppScaffold(title: classInfo?.name ?? mode.title) {
             VStack(spacing: 8) {
                 if let error = state.error, state.data == nil {
                     ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
                 } else if state.loading || state.data == nil {
                     LoadingStateView()
                 } else {
-                    let students = state.data?.students.filter { classInfo == nil || $0.className == classInfo?.name } ?? []
+                    let students = (state.data?.students ?? []).filter {
+                        (classInfo == nil || $0.className == classInfo?.name)
+                        && (mode != .outstanding || (($0.totalScore ?? 0) >= 30 && state.taskStatus(for: $0) == .completed))
+                    }
                     if students.isEmpty {
-                        EmptyStateView(title: "暂无学生数据", detail: "当前班级暂未同步学生名单。")
+                        EmptyStateView(title: mode == .outstanding ? "暂无符合条件的学生" : "暂无学生数据", detail: mode.emptyDetail)
                     } else {
-                        ForEach(students) { student in
+                        ForEach(students.sorted { ($0.totalScore ?? 0) > ($1.totalScore ?? 0) }) { student in
                             StudentCard(student: student) { router.push(.report(student)) }
                         }
                     }

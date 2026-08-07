@@ -525,6 +525,7 @@ struct ActivityDetailSheet: View {
                 }
                 .onChange(of: contactName) { _, _ in saveDraft() }
                 .onChange(of: phone) { _, _ in saveDraft() }
+                .onChange(of: consented) { _, _ in saveDraft() }
                 if let validationMessage { Text(validationMessage).font(.system(size: 10)).foregroundStyle(.red) }
                 if case let .failed(message) = commandState { Text(message).font(.system(size: 10)).foregroundStyle(.red) }
             }
@@ -546,11 +547,17 @@ struct ActivityDetailSheet: View {
             }
             .buttonStyle(.plain).disabled(commandState.isSubmitting || (registered && !hasFailure))
         }.padding(16) }.navigationTitle("活动详情").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }
-        .task { if let values = state.localFeatures.drafts[draftKey]?.split(separator: "|", maxSplits: 1).map(String.init), values.count == 2 { contactName = values[0]; phone = values[1] } }
+        .task {
+            if let values = state.localFeatures.drafts[draftKey]?.split(separator: "|", maxSplits: 2).map(String.init), values.count >= 2 {
+                contactName = values[0]
+                phone = values[1]
+                consented = values.count == 3 && values[2] == "1"
+            }
+        }
         }
     }
 
-    private func saveDraft() { state.saveDraft("\(contactName)|\(phone)", key: draftKey) }
+    private func saveDraft() { state.saveDraft("\(contactName)|\(phone)|\(consented ? "1" : "0")", key: draftKey) }
 }
 
 struct CourseDetailSheet: View {

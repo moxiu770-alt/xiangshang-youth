@@ -107,7 +107,10 @@ struct LoginView: View {
                 Spacer()
             }
             VStack(spacing: 8) {
-                loginMethodButton("微信登录", icon: "message.fill", color: ReferenceColor.blue, selected: method == .wechat) { method = .wechat; clearLoginError() }
+                loginMethodButton("微信登录", icon: "message.fill", color: ReferenceColor.blue, selected: method == .wechat) {
+                    if method == .wechat { submitLogin() }
+                    else { method = .wechat; clearLoginError() }
+                }
                 loginMethodButton("手机号登录", icon: "iphone", color: ReferenceColor.blue, selected: method == .phone) { method = .phone; clearLoginError() }
                 loginMethodButton("账号密码登录", icon: "person.crop.circle", color: ReferenceColor.yellow, selected: method == .account) { method = .account; clearLoginError() }
             }
@@ -153,22 +156,21 @@ struct LoginView: View {
                     .textFieldStyle(.roundedBorder)
                     .onChange(of: password) { _, _ in clearLoginError() }
             }
-            Button(action: submitLogin) {
-                Group {
-                    if state.loading {
-                        HStack(spacing: 8) { ProgressView().tint(.white); Text("正在登录…") }
-                    } else {
-                        Label(method == .wechat ? "微信授权登录" : "登录", systemImage: method == .wechat ? "checkmark.shield.fill" : "arrow.right.circle.fill")
+            if method != .wechat {
+                Button(action: submitLogin) {
+                    Group {
+                        if state.loading { HStack(spacing: 8) { ProgressView().tint(.white); Text("正在登录…") } }
+                        else { Label("登录", systemImage: "arrow.right.circle.fill") }
                     }
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 42)
+                    .background(ReferenceColor.blue, in: Capsule())
                 }
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 42)
-                .background(ReferenceColor.blue, in: Capsule())
+                .buttonStyle(.plain)
+                .disabled(state.loading)
             }
-            .buttonStyle(.plain)
-            .disabled(state.loading)
             if let message = validationMessage ?? state.error {
                 Text(message).font(.system(size: 10)).foregroundStyle(.red)
             }

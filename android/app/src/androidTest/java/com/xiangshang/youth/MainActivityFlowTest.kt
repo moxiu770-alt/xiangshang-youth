@@ -31,9 +31,8 @@ class MainActivityFlowTest {
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("微信登录").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithText("微信登录").performClick()
         composeRule.onNodeWithText("请阅读并同意相关协议").performClick()
-        composeRule.onNodeWithText("微信授权登录").performClick()
+        composeRule.onNodeWithText("微信登录").performClick()
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("请选择进入方式").fetchSemanticsNodes().isNotEmpty()
         }

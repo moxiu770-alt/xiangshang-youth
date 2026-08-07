@@ -80,6 +80,18 @@ fun LoginScreen(
             codeCountdown -= 1
         }
     }
+    fun submitLogin() {
+        when {
+            !agreement -> error = "请先阅读并同意用户协议和儿童隐私政策。"
+            method == 0 -> onLogin(AuthIdentity.wechatAuthorizationIdentifier)
+            method == 1 && phone.filter(Char::isDigit).length != 11 -> error = "请输入有效的 11 位手机号。"
+            method == 1 && !codeSent -> error = "请先获取短信验证码。"
+            method == 1 && code.length < 4 -> error = "请输入短信验证码。"
+            method == 2 && account.isBlank() -> error = "请输入账号或手机号。"
+            method == 2 && password.length < 6 -> error = "密码至少需要 6 位。"
+            else -> onLogin(if (method == 1) phone else account)
+        }
+    }
     Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF76B8F7), Color(0xFFEFF8FF))))) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             Column(Modifier.padding(top = 34.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -92,7 +104,7 @@ fun LoginScreen(
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) { Text("登录开启成长之旅", color = Navy, fontSize = 14.sp, fontWeight = FontWeight.Bold); Spacer(Modifier.width(7.dp)); Icon(Icons.Filled.WbSunny, null, tint = Color(0xFFFFBD2E), modifier = Modifier.size(20.dp)) }
                     Column(verticalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth()) {
-                        LoginButton("微信登录", Icons.Filled.ChatBubble, Blue, Color.White, { method = 0; error = null; onClearError() })
+                        LoginButton("微信登录", Icons.Filled.ChatBubble, Blue, Color.White, { if (method == 0) submitLogin() else { method = 0; error = null; onClearError() } })
                         LoginButton("手机号登录", Icons.Filled.PhoneIphone, Blue, Color.White, { method = 1; error = null; onClearError() }, outlined = method != 1)
                         LoginButton("账号密码登录", Icons.Filled.Person, Color(0xFFFFB92E), Color(0xFF765522), { method = 2; error = null; onClearError() }, outlined = method != 2)
                     }
@@ -106,20 +118,9 @@ fun LoginScreen(
                         OutlinedTextField(value = account, onValueChange = { account = it; error = null; onClearError() }, label = { Text("账号 / 手机号") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(value = password, onValueChange = { password = it; error = null; onClearError() }, label = { Text("登录密码（至少 6 位）") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), singleLine = true, modifier = Modifier.fillMaxWidth())
                     }
-                    Button(onClick = {
-                        when {
-                            !agreement -> error = "请先阅读并同意用户协议和儿童隐私政策。"
-                            method == 0 -> onLogin(AuthIdentity.wechatAuthorizationIdentifier)
-                            method == 1 && phone.filter(Char::isDigit).length != 11 -> error = "请输入有效的 11 位手机号。"
-                            method == 1 && !codeSent -> error = "请先获取短信验证码。"
-                            method == 1 && code.length < 4 -> error = "请输入短信验证码。"
-                            method == 2 && account.isBlank() -> error = "请输入账号或手机号。"
-                            method == 2 && password.length < 6 -> error = "密码至少需要 6 位。"
-                            else -> onLogin(if (method == 1) phone else account)
-                        }
-                    }, enabled = !loading, modifier = Modifier.fillMaxWidth().height(44.dp), shape = CircleShape) {
-                        if (loading) CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(18.dp)) else Icon(if (method == 0) Icons.Filled.VerifiedUser else Icons.AutoMirrored.Filled.ArrowForward, null)
-                        Spacer(Modifier.width(7.dp)); Text(if (loading) "正在登录…" else if (method == 0) "微信授权登录" else "登录", fontWeight = FontWeight.Bold)
+                    if (method != 0) Button(onClick = ::submitLogin, enabled = !loading, modifier = Modifier.fillMaxWidth().height(44.dp), shape = CircleShape) {
+                        if (loading) CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(18.dp)) else Icon(Icons.AutoMirrored.Filled.ArrowForward, null)
+                        Spacer(Modifier.width(7.dp)); Text(if (loading) "正在登录…" else "登录", fontWeight = FontWeight.Bold)
                     }
                     (error ?: serverError)?.let { Text(it, color = Color.Red, fontSize = 10.sp) }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

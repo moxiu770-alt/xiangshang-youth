@@ -98,7 +98,7 @@ final class LaunchAndRoleFlowTests: XCTestCase {
         XCTAssertTrue(consent.exists)
         consent.tap()
 
-        let login = button(containing: "微信授权登录")
+        let login = button(containing: "微信登录")
         XCTAssertTrue(login.waitForExistence(timeout: 2))
         login.tap()
         XCTAssertTrue(button(containing: "家庭端").waitForExistence(timeout: 10))

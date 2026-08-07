@@ -23,6 +23,19 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+    buildTypes {
+        release {
+            // Exercise the same optimized/obfuscated artifact that will be
+            // handed to a school pilot or store review, rather than treating a
+            // debug-like release APK as production-ready.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
 }
 
 dependencies {

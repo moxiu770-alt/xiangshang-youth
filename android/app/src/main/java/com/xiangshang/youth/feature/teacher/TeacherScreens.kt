@@ -6,6 +6,11 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -79,7 +84,20 @@ fun TeacherHomeScreen(state: AppUiState, nav: NavHostController, refreshDashboar
             item { TeacherIdentity(sportsTeacher, nav, state.unreadMessageCount, state.loading, refreshDashboard) { sportsTeacher = !sportsTeacher } }
             item { TeacherRoleSwitch(sportsTeacher) { sportsTeacher = it } }
             item {
-                AnimatedContent(targetState = sportsTeacher, label = "teacher-role-content") { isSports ->
+                // The application-level accessibility setting must affect the
+                // role-panel swap too.  Leaving AnimatedContent's default
+                // transform here made “减少动态效果” incomplete on Android.
+                AnimatedContent(
+                    targetState = sportsTeacher,
+                    transitionSpec = {
+                        if (reduceMotion) {
+                            EnterTransition.None togetherWith ExitTransition.None
+                        } else {
+                            fadeIn(animationSpec = tween(180)) togetherWith fadeOut(animationSpec = tween(120))
+                        }
+                    },
+                    label = "teacher-role-content"
+                ) { isSports ->
                     if (isSports) SportsTeacherPanel(state, nav, pulse) else ClassTeacherPanel(state, nav, pulse)
                 }
             }

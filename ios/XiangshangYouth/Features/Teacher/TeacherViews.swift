@@ -4,8 +4,12 @@ import AVFoundation
 import UIKit
 
 struct TeacherHomeView: View {
+    @EnvironmentObject private var state: AppState
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var selectedTab = 0
     @State private var isSportsTeacher = false
+
+    private var reduceMotion: Bool { state.localFeatures.settings.reduceMotion || systemReduceMotion }
 
     var body: some View {
         ZStack {
@@ -28,7 +32,7 @@ struct TeacherHomeView: View {
             teacherBottomBar
         }
         .background(ReferenceColor.canvas)
-        .animation(.easeInOut(duration: 0.22), value: selectedTab)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: selectedTab)
         .frame(maxWidth: 720)
         .frame(maxWidth: .infinity)
         }
@@ -47,7 +51,15 @@ struct TeacherHomeView: View {
     }
 
     private func tabButton(index: Int, icon: String, title: String) -> some View {
-        Button { withAnimation { selectedTab = index } } label: {
+        Button {
+            if reduceMotion {
+                var transaction = Transaction()
+                transaction.animation = nil
+                withTransaction(transaction) { selectedTab = index }
+            } else {
+                withAnimation { selectedTab = index }
+            }
+        } label: {
             VStack(spacing: 3) {
                 Image(systemName: icon).font(.system(size: 15, weight: .semibold))
                 Text(title).font(.system(size: 9, weight: .medium))

@@ -1,7 +1,11 @@
 import SwiftUI
 
 struct ParentHomeView: View {
+    @EnvironmentObject private var state: AppState
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var selectedTab = 0
+
+    private var reduceMotion: Bool { state.localFeatures.settings.reduceMotion || systemReduceMotion }
 
     var body: some View {
         ZStack {
@@ -21,7 +25,7 @@ struct ParentHomeView: View {
             parentBottomBar
         }
         .background(ReferenceColor.canvas)
-        .animation(.easeInOut(duration: 0.22), value: selectedTab)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: selectedTab)
         .frame(maxWidth: 720)
         .frame(maxWidth: .infinity)
         }
@@ -41,7 +45,15 @@ struct ParentHomeView: View {
     }
 
     private func tab(index: Int, icon: String, title: String) -> some View {
-        Button { withAnimation { selectedTab = index } } label: {
+        Button {
+            if reduceMotion {
+                var transaction = Transaction()
+                transaction.animation = nil
+                withTransaction(transaction) { selectedTab = index }
+            } else {
+                withAnimation { selectedTab = index }
+            }
+        } label: {
             VStack(spacing: 3) {
                 Image(systemName: icon).font(.system(size: 14, weight: .semibold))
                 Text(title).font(.system(size: 8, weight: .medium))

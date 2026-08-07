@@ -141,6 +141,19 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertTrue(restored.likedClassPostIDs.contains(UUID(uuidString: "00000000-0000-0000-0000-000000000001")!))
     }
 
+    func testSuccessfulWorkflowAcknowledgesTheLocalPendingRecord() async {
+        let suite = "xiangshang.youth.sync-tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let state = AppState(featureStore: LocalFeatureStore(defaults: defaults))
+
+        await state.login(phone: "13800138000")
+        let succeeded = await state.submitActivityCommand("health-growth-season-2026", contactName: "王女士", phone: "13800138000")
+        XCTAssertTrue(succeeded)
+        XCTAssertEqual(state.localFeatures.activityRegistrations.first?.status, .submitted)
+        XCTAssertEqual(state.pendingSyncCount, 0)
+    }
+
     func testRemoteRepositoryKeepsReportRouteRenderableDuringEndpointRollout() async throws {
         let student = try await MockRepository.shared.loadDashboard().students.first
         XCTAssertNotNil(student)

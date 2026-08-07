@@ -215,10 +215,10 @@ private fun NavHostController.replaceRoot(destination: String) {
         composable(Destinations.Circle) { ParentClassCircleScreen(state, nav, viewModel::publishPost, viewModel::saveDraft, viewModel::clearDraft, viewModel::togglePostLike, viewModel::addPostComment, viewModel::submitClassPostCommand, viewModel::clearWorkflowState) }
         composable(Destinations.Account) {
             if (state.role?.name == "Teacher") {
-                TeacherAccountScreen(state, nav, viewModel::logout, viewModel::updateSettings) {
+                TeacherAccountScreen(state, nav, viewModel::logout, viewModel::updateSettings, {
                     viewModel.clearRoleSelection()
                     nav.replaceRoot(Destinations.Role)
-                }
+                }, viewModel::syncPendingRecords)
             } else {
                 AccountScreen(
                     state, nav, viewModel::chooseRole, viewModel::logout, viewModel::updateSettings,
@@ -230,7 +230,8 @@ private fun NavHostController.replaceRoot(destination: String) {
                     submitSupport = viewModel::submitSupportCommand,
                     clearWorkflow = viewModel::clearWorkflowState,
                     saveDraft = viewModel::saveDraft,
-                    clearDraft = viewModel::clearDraft
+                    clearDraft = viewModel::clearDraft,
+                    syncPending = viewModel::syncPendingRecords
                 )
             }
         }

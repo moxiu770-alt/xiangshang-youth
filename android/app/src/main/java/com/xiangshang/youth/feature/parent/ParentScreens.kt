@@ -425,7 +425,7 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
     commentPost?.let { postId -> AlertDialog(onDismissRequest = { commentPost = null }, title = { Text(if (commentSubmitted) "评论已发布" else "给这条动态留言") }, text = { if (commentSubmitted) Text("班级成员可以看到你的留言。", color = Green) else OutlinedTextField(value = comment, onValueChange = { comment = it; saveDraft("class-comment-$postId", it) }, label = { Text("评论内容") }, minLines = 2) }, confirmButton = { TextButton(enabled = commentSubmitted || comment.trim().isNotBlank(), onClick = { if (commentSubmitted) commentPost = null else { addComment(postId, comment); clearDraft("class-comment-$postId"); commentSubmitted = true } }) { Text(if (commentSubmitted) "完成" else "发布评论") } }, dismissButton = if (commentSubmitted) null else ({ TextButton(onClick = { commentPost = null }) { Text("取消") } })) }
 }
 
-@Composable fun AccountScreen(state: AppUiState, nav: NavHostController, chooseRole: (UserRole) -> Unit, logout: () -> Unit, updateSettings: (Boolean?, Boolean?) -> Unit, sendSupport: (String) -> Unit, onRoleSelected: (UserRole) -> Unit = chooseRole, submitSupport: (String) -> Unit = sendSupport, clearWorkflow: (String) -> Unit = {}, saveDraft: (String, String) -> Unit = { _, _ -> }, clearDraft: (String) -> Unit = {}) {
+@Composable fun AccountScreen(state: AppUiState, nav: NavHostController, chooseRole: (UserRole) -> Unit, logout: () -> Unit, updateSettings: (Boolean?, Boolean?) -> Unit, sendSupport: (String) -> Unit, onRoleSelected: (UserRole) -> Unit = chooseRole, submitSupport: (String) -> Unit = sendSupport, clearWorkflow: (String) -> Unit = {}, saveDraft: (String, String) -> Unit = { _, _ -> }, clearDraft: (String) -> Unit = {}, syncPending: () -> Unit = {}) {
     var settingsOpen by remember { mutableStateOf(false) }
     var accountInfo by remember { mutableStateOf<String?>(null) }
     ParentTabScaffold(nav, Destinations.Account) {
@@ -446,11 +446,11 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
         Spacer(Modifier.height(8.dp)); Text("切换使用角色", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) { listOf(UserRole.Parent, UserRole.Teacher, UserRole.Principal).forEach { role -> OutlinedButton(onClick = { onRoleSelected(role) }, modifier = Modifier.weight(1f)) { Text(role.label, fontSize = 9.sp) } } }
         OutlinedButton(onClick = { logout(); nav.navigate(Destinations.Login) { popUpTo(nav.graph.id) { inclusive = true } } }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red)) { Text("切换账号") }
     }
-    if (settingsOpen) SettingsDialog(state.local.settings.notificationsEnabled, state.local.settings.reduceMotion, state.pendingSyncCount, updateSettings, clearLocalData = { logout(); nav.navigate(Destinations.Login) { popUpTo(nav.graph.id) { inclusive = true } } }) { settingsOpen = false }
+    if (settingsOpen) SettingsDialog(state.local.settings.notificationsEnabled, state.local.settings.reduceMotion, state.pendingSyncCount, state.workflowStates["sync-pending"] ?: WorkflowCommandState(), updateSettings, syncPending, clearLocalData = { logout(); nav.navigate(Destinations.Login) { popUpTo(nav.graph.id) { inclusive = true } } }) { settingsOpen = false }
     accountInfo?.let { title -> AccountInfoDialog(title, state, submitSupport, saveDraft, clearDraft) { accountInfo = null } }
 }
 
-@Composable fun SettingsDialog(notifications: Boolean, reduceMotion: Boolean, pendingSyncCount: Int, update: (Boolean?, Boolean?) -> Unit, clearLocalData: () -> Unit = {}, dismiss: () -> Unit) {
+@Composable fun SettingsDialog(notifications: Boolean, reduceMotion: Boolean, pendingSyncCount: Int, syncState: WorkflowCommandState, update: (Boolean?, Boolean?) -> Unit, syncNow: () -> Unit = {}, clearLocalData: () -> Unit = {}, dismiss: () -> Unit) {
     var notify by remember { mutableStateOf(notifications) }
     var reduce by remember { mutableStateOf(reduceMotion) }
     var permissionMessage by remember { mutableStateOf<String?>(null) }
@@ -475,7 +475,10 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
             Text("设置会自动保存并在下次启动后保留。", color = Color.Gray, fontSize = 10.sp, modifier = Modifier.padding(top = 9.dp))
             Text("本机同步", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp))
             Text("待同步记录：$pendingSyncCount 条", color = if (pendingSyncCount == 0) Green else Color(0xFFFF8B1F), fontSize = 11.sp)
-            Text(if (pendingSyncCount == 0) "当前没有等待同步的本地操作。" else "记录已安全保存在本设备，将在网络可用时自动同步并更新状态。", color = Color.Gray, fontSize = 10.sp, modifier = Modifier.padding(top = 3.dp))
+            Text(if (pendingSyncCount == 0) "当前没有等待同步的本地操作。" else "记录已安全保存在本设备；联网后会自动重试，也可以立即同步。", color = Color.Gray, fontSize = 10.sp, modifier = Modifier.padding(top = 3.dp))
+            TextButton(onClick = syncNow, enabled = pendingSyncCount > 0 && !syncState.isSubmitting, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 2.dp)) { if (syncState.isSubmitting) CircularProgressIndicator(Modifier.size(15.dp), strokeWidth = 2.dp) else Text("立即同步", color = Blue, fontSize = 11.sp) }
+            if (syncState.status == WorkflowCommandStatus.Succeeded) Text(syncState.message ?: "同步完成。", color = Green, fontSize = 10.sp)
+            if (syncState.status == WorkflowCommandStatus.Failed) Text(syncState.message ?: "同步失败，请重试。", color = Color.Red, fontSize = 10.sp)
             Spacer(Modifier.height(8.dp))
             Text("退出登录会清除本机保存的绑定孩子、草稿和通知状态；不会删除学校侧的测评记录。", color = Color.Gray, fontSize = 10.sp)
             TextButton(onClick = { clearConfirmation = true }, colors = ButtonDefaults.textButtonColors(contentColor = Color.Red), modifier = Modifier.align(Alignment.Start)) { Text("清除本机数据并退出登录") }

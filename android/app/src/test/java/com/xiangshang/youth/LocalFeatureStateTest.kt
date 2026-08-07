@@ -191,6 +191,17 @@ class LocalFeatureStateTest {
     }
 
     @Test
+    fun acknowledgedWorkflowRecordsAreNotStillShownAsPendingSync() {
+        val local = LocalFeatureState(
+            activityRegistrations = listOf(ActivityRegistration(activityId = "health-growth-season-2026", contactName = "王女士", phone = "13800138000", status = LocalSubmissionStatus.Submitted)),
+            expertAppointments = listOf(ExpertAppointment(expertName = "张教授", preferredDate = "周五上午", note = "运动发展咨询", status = LocalSubmissionStatus.Submitted)),
+            courseUploads = listOf(CourseUploadRecord(taskId = "after-class-upload", attendanceCount = 20, notes = "课堂记录", attachmentName = "课堂.jpg", status = LocalSubmissionStatus.Submitted))
+        )
+
+        assertEquals(0, AppUiState(local = local).pendingSyncCount)
+    }
+
+    @Test
     fun childBindingRequiresMatchingNameAndSchoolCode() = runBlocking {
         val students = MockRepository().dashboard().students
         assertEquals(null, ChildBindingValidator.findMatch(students, "王小明", "wrong-code"))

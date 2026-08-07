@@ -208,7 +208,9 @@ enum WorkflowCommandState: Equatable {
             workflowStates["activity:\(activityID)"] = .failed("报名信息不完整，请检查姓名和手机号。")
             return false
         }
-        return await executeWorkflow("activity:\(activityID)") { try await self.repository.submitActivity(record) }
+        let succeeded = await executeWorkflow("activity:\(activityID)") { try await self.repository.submitActivity(record) }
+        if succeeded { updateActivitySyncStatus(record.id, to: .submitted) }
+        return succeeded
     }
 
     func submitExpertCommand(name: String, preferredDate: String, note: String) async -> Bool {
@@ -222,7 +224,9 @@ enum WorkflowCommandState: Equatable {
             workflowStates["expert:\(name)"] = .failed("预约信息不完整，请填写时间和咨询说明。")
             return false
         }
-        return await executeWorkflow("expert:\(name)") { try await self.repository.bookExpert(record) }
+        let succeeded = await executeWorkflow("expert:\(name)") { try await self.repository.bookExpert(record) }
+        if succeeded { updateExpertSyncStatus(record.id, to: .submitted) }
+        return succeeded
     }
 
     func submitCourseUploadCommand(taskID: String, attendanceCount: Int, notes: String, attachmentName: String) async -> Bool {
@@ -237,7 +241,9 @@ enum WorkflowCommandState: Equatable {
             workflowStates["course:\(taskID)"] = .failed("提交前请补齐出勤人数、课堂记录和附件。")
             return false
         }
-        return await executeWorkflow("course:\(taskID)") { try await self.repository.uploadCourse(record) }
+        let succeeded = await executeWorkflow("course:\(taskID)") { try await self.repository.uploadCourse(record) }
+        if succeeded { updateCourseSyncStatus(record.id, to: .submitted) }
+        return succeeded
     }
 
     func submitTaskStatusCommand(studentID: String, status: TaskStatus, note: String?) async -> Bool {
@@ -297,6 +303,46 @@ enum WorkflowCommandState: Equatable {
         let experts = localFeatures.expertAppointments.count(where: { $0.status == .pendingSync })
         let uploads = localFeatures.courseUploads.count(where: { $0.status == .pendingSync })
         return activity + experts + uploads
+    }
+
+    /// Replays safely persisted writes after connectivity returns or when the
+    /// user taps “立即同步”. Each successful record is acknowledged locally;
+    /// failed ones remain pending for a later retry.
+    func syncPendingRecords() async {
+        guard profile != nil else {
+            workflowStates["sync-pending"] = .failed("请登录后再同步本机记录。")
+            return
+        }
+        guard !isOffline else {
+            workflowStates["sync-pending"] = .failed("当前网络不可用，记录会继续保存在本机。")
+            return
+        }
+        guard !workflowState(for: "sync-pending").isSubmitting else { return }
+        let activities = localFeatures.activityRegistrations.filter { $0.status == .pendingSync }
+        let experts = localFeatures.expertAppointments.filter { $0.status == .pendingSync }
+        let uploads = localFeatures.courseUploads.filter { $0.status == .pendingSync }
+        guard !(activities.isEmpty && experts.isEmpty && uploads.isEmpty) else {
+            workflowStates["sync-pending"] = .succeeded("当前没有等待同步的本机记录。")
+            return
+        }
+        workflowStates["sync-pending"] = .submitting
+        var synchronized = 0
+        var failed = 0
+        for record in activities {
+            do { try await repository.submitActivity(record); updateActivitySyncStatus(record.id, to: .submitted); synchronized += 1 }
+            catch { failed += 1 }
+        }
+        for record in experts {
+            do { try await repository.bookExpert(record); updateExpertSyncStatus(record.id, to: .submitted); synchronized += 1 }
+            catch { failed += 1 }
+        }
+        for record in uploads {
+            do { try await repository.uploadCourse(record); updateCourseSyncStatus(record.id, to: .submitted); synchronized += 1 }
+            catch { failed += 1 }
+        }
+        workflowStates["sync-pending"] = failed == 0
+            ? .succeeded("已同步 \(synchronized) 条本机记录。")
+            : .failed("已同步 \(synchronized) 条，仍有 \(failed) 条等待网络恢复后重试。")
     }
     func markMessageRead(_ id: String) { mutateLocal { $0.readMessageIDs.insert(id) } }
     @discardableResult
@@ -378,6 +424,24 @@ enum WorkflowCommandState: Equatable {
             if submit { values.uploadedTaskIDs.insert(taskID) }
         }
     }
+    private func updateActivitySyncStatus(_ id: UUID, to status: LocalSubmissionStatus) {
+        mutateLocal { values in
+            guard let index = values.activityRegistrations.firstIndex(where: { $0.id == id }) else { return }
+            values.activityRegistrations[index].status = status
+        }
+    }
+    private func updateExpertSyncStatus(_ id: UUID, to status: LocalSubmissionStatus) {
+        mutateLocal { values in
+            guard let index = values.expertAppointments.firstIndex(where: { $0.id == id }) else { return }
+            values.expertAppointments[index].status = status
+        }
+    }
+    private func updateCourseSyncStatus(_ id: UUID, to status: LocalSubmissionStatus) {
+        mutateLocal { values in
+            guard let index = values.courseUploads.firstIndex(where: { $0.id == id }) else { return }
+            values.courseUploads[index].status = status
+        }
+    }
     func taskStatus(for student: Student) -> TaskStatus { localFeatures.studentTaskStatuses[student.id] ?? student.taskStatus }
     func updateTaskStatus(for student: Student, status: TaskStatus, reviewNote: String? = nil) {
         guard taskStatus(for: student).allowsTransition(to: status) else { return }
@@ -393,7 +457,13 @@ enum WorkflowCommandState: Equatable {
             if let reduceMotion { values.settings.reduceMotion = reduceMotion }
         }
     }
-    func setOffline(_ value: Bool) { isOffline = value }
+    func setOffline(_ value: Bool) {
+        let wasOffline = isOffline
+        isOffline = value
+        if wasOffline && !value && profile != nil && pendingSyncCount > 0 {
+            Task { await syncPendingRecords() }
+        }
+    }
     func submitUpload(taskID: String) { saveCourseUpload(taskID: taskID, attendanceCount: 0, notes: "已确认课后测评记录", attachmentName: "课堂记录.jpg", submit: true) }
     func checkInToday() { mutateLocal { $0.checkInDates.insert(Self.dayFormatter.string(from: .now)) } }
     private func persistSession() { mutateLocal { values in values.sessionProfile = profile; values.sessionRole = selectedRole } }

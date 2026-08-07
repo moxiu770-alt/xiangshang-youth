@@ -47,6 +47,7 @@ import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
 import com.xiangshang.youth.R
 import com.xiangshang.youth.app.*
+import com.xiangshang.youth.core.service.LocalSubmissionStatus
 import com.xiangshang.youth.feature.parent.SettingsDialog
 import com.xiangshang.youth.shared.component.*
 
@@ -368,7 +369,7 @@ private fun TeacherPostEditorDialog(
 }
 
 @Composable
-fun TeacherAccountScreen(state: AppUiState, nav: NavHostController, logout: () -> Unit, updateSettings: (Boolean?, Boolean?) -> Unit, onChooseAnotherRole: () -> Unit) {
+fun TeacherAccountScreen(state: AppUiState, nav: NavHostController, logout: () -> Unit, updateSettings: (Boolean?, Boolean?) -> Unit, onChooseAnotherRole: () -> Unit, syncPending: () -> Unit = {}) {
     var detail by remember { mutableStateOf<String?>(null) }; var settingsOpen by remember { mutableStateOf(false) }
     Scaffold(containerColor = Canvas, bottomBar = { TeacherBottomBar(nav, Destinations.Account) }) { padding ->
         Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.TopCenter) {
@@ -383,7 +384,7 @@ fun TeacherAccountScreen(state: AppUiState, nav: NavHostController, logout: () -
         }
     }
     detail?.let { title -> AlertDialog(onDismissRequest = { detail = null }, confirmButton = { TextButton(onClick = { detail = null }) { Text("我知道了") } }, title = { Text(title) }, text = { Text(if (title == "个人信息") "${state.profile?.name ?: "李老师"} · 三年级2班班主任。个人资料将在学校统一账户管理后同步更新。" else "当前账户已获得三年级2班的测评、预警与课程管理权限。") }) }
-    if (settingsOpen) SettingsDialog(state.local.settings.notificationsEnabled, state.local.settings.reduceMotion, state.pendingSyncCount, updateSettings, clearLocalData = { logout(); nav.navigate(Destinations.Login) { popUpTo(nav.graph.id) { inclusive = true } } }) { settingsOpen = false }
+    if (settingsOpen) SettingsDialog(state.local.settings.notificationsEnabled, state.local.settings.reduceMotion, state.pendingSyncCount, state.workflowStates["sync-pending"] ?: WorkflowCommandState(), updateSettings, syncPending, clearLocalData = { logout(); nav.navigate(Destinations.Login) { popUpTo(nav.graph.id) { inclusive = true } } }) { settingsOpen = false }
 }
 
 @Composable
@@ -477,7 +478,8 @@ fun TeacherTasksScreen(state: AppUiState, nav: NavHostController, saveUpload: (S
             }
         }
         state.local.courseUploads.firstOrNull { it.taskId == taskId }?.let {
-            Text("${if (it.status.name == "PendingSync" || it.status.name == "Submitted") "已保存 · 待同步" else "草稿"} · 出勤 ${it.attendanceCount} 人 · ${it.attachmentName}", color = Green, fontSize = 10.sp, modifier = Modifier.padding(top = 7.dp))
+            val label = when (it.status) { LocalSubmissionStatus.PendingSync -> "已保存 · 待同步"; LocalSubmissionStatus.Submitted -> "已同步"; else -> "草稿" }
+            Text("$label · 出勤 ${it.attendanceCount} 人 · ${it.attachmentName}", color = Green, fontSize = 10.sp, modifier = Modifier.padding(top = 7.dp))
         }
         Spacer(Modifier.height(9.dp))
         when {

@@ -245,6 +245,15 @@ enum WorkflowCommandState: Equatable {
             workflowStates["task-status:\(studentID)"] = .failed("学生信息缺失，无法提交状态。")
             return false
         }
+        guard let student = data?.students.first(where: { $0.id == studentID }) else {
+            workflowStates["task-status:\(studentID)"] = .failed("未找到学生档案，请刷新名单后重试。")
+            return false
+        }
+        let current = taskStatus(for: student)
+        guard current.allowsTransition(to: status) else {
+            workflowStates["task-status:\(studentID)"] = .failed("当前为\(current.rawValue)，不能直接变更为\(status.rawValue)。请按现场队列流程操作。")
+            return false
+        }
         mutateLocal { values in
             values.studentTaskStatuses[studentID] = status
             if let note, !note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { values.reviewNotes[studentID] = note.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -371,6 +380,7 @@ enum WorkflowCommandState: Equatable {
     }
     func taskStatus(for student: Student) -> TaskStatus { localFeatures.studentTaskStatuses[student.id] ?? student.taskStatus }
     func updateTaskStatus(for student: Student, status: TaskStatus, reviewNote: String? = nil) {
+        guard taskStatus(for: student).allowsTransition(to: status) else { return }
         let trimmedNote = reviewNote?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         mutateLocal {
             $0.studentTaskStatuses[student.id] = status

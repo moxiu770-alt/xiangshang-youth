@@ -47,6 +47,15 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertEqual(report.totalScore, 28.5, accuracy: 0.001)
     }
 
+    func testTaskStatusStateMachineRejectsImpossibleQueueJumps() {
+        XCTAssertEqual(TaskStatus.notCheckedIn.allowedNextStatuses, [.checkedIn, .absent])
+        XCTAssertTrue(TaskStatus.notCheckedIn.allowsTransition(to: .checkedIn))
+        XCTAssertFalse(TaskStatus.notCheckedIn.allowsTransition(to: .completed))
+        XCTAssertTrue(TaskStatus.testing.allowsTransition(to: .review))
+        XCTAssertTrue(TaskStatus.review.allowsTransition(to: .retest))
+        XCTAssertFalse(TaskStatus.completed.allowsTransition(to: .waiting))
+    }
+
     func testAsyncReportSeamKeepsMockReportRenderable() async throws {
         let dashboard = try await MockRepository.shared.loadDashboard()
         let student = try XCTUnwrap(dashboard.students.first)

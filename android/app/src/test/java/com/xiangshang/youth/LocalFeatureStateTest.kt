@@ -131,6 +131,16 @@ class LocalFeatureStateTest {
     }
 
     @Test
+    fun taskStatusStateMachineRejectsImpossibleQueueJumps() {
+        assertEquals(listOf(TaskStatus.CheckedIn, TaskStatus.Absent), TaskStatus.NotCheckedIn.allowedNextStatuses())
+        assertTrue(TaskStatus.NotCheckedIn.allowsTransitionTo(TaskStatus.CheckedIn))
+        assertTrue(!TaskStatus.NotCheckedIn.allowsTransitionTo(TaskStatus.Completed))
+        assertTrue(TaskStatus.Testing.allowsTransitionTo(TaskStatus.Review))
+        assertTrue(TaskStatus.Review.allowsTransitionTo(TaskStatus.Retest))
+        assertTrue(!TaskStatus.Completed.allowsTransitionTo(TaskStatus.Waiting))
+    }
+
+    @Test
     fun mockReportExposesSevenItemTotalScore() = runBlocking {
         val student = MockRepository().dashboard().students.first()
         val report = MockRepository().report(student)

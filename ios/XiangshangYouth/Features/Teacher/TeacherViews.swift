@@ -1029,7 +1029,7 @@ struct TeacherTaskDetailView: View {
         AppScaffold(title: "任务详情") {
             VStack(spacing: 10) {
                 TestTaskCard(task: currentTask, action: nil)
-                Text("点击学生更新签到、测试、复核或补测状态；状态将保存在本机，等待场地端同步。")
+                Text("点击学生按现场队列更新签到、候测、测试、复核或补测状态；不支持跨步骤直接完成。")
                     .font(.system(size: 9)).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
                 if let error = state.error, state.data == nil {
                     ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
@@ -1126,8 +1126,8 @@ private struct TaskStatusSheet: View {
                         if let validationMessage { Text(validationMessage).font(.caption).foregroundStyle(.red) }
                     }
                 }
-                    Section("处理结论") {
-                        ForEach(TaskStatus.allCases, id: \.self) { item in
+                    Section("可执行的下一步") {
+                        ForEach(status.allowedNextStatuses, id: \.self) { item in
                         Button {
                             if requiresReviewNote && reviewNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                 validationMessage = "请先填写复核或补测处理意见。"

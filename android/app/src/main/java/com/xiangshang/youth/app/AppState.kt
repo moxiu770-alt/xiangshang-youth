@@ -179,6 +179,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun submitTaskStatusCommand(studentId: String, status: TaskStatus, note: String?) = executeWorkflow("task-status:$studentId") {
         if (studentId.isBlank()) throw IllegalArgumentException("学生信息缺失。")
+        val student = _state.value.data?.students?.firstOrNull { it.id == studentId }
+            ?: throw IllegalArgumentException("未找到学生档案，请刷新名单后重试。")
+        val current = _state.value.local.studentTaskStatuses[studentId] ?: student.taskStatus
+        if (!current.allowsTransitionTo(status)) throw IllegalArgumentException("当前为${current.label}，不能直接变更为${status.label}。请按现场队列流程操作。")
         submitReviewDecision(studentId, status, note.orEmpty().ifBlank { "已完成状态处理" })
         repository.updateTaskStatus(studentId, status, note)
     }
@@ -221,10 +225,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         mutate { it.copy(expertAppointments = listOf(ExpertAppointment(expertName = name, preferredDate = date, note = note, status = LocalSubmissionStatus.PendingSync)) + it.expertAppointments) }
     }
     fun saveCourseUpload(taskId: String, attendance: Int, notes: String, attachment: String, submit: Boolean) { if (attendance < 0 || (submit && (notes.isBlank() || attachment.isBlank()))) return; mutate { local -> val record=CourseUploadRecord(taskId=taskId, attendanceCount=attendance, notes=notes.trim(), attachmentName=attachment, status=if (submit) LocalSubmissionStatus.PendingSync else LocalSubmissionStatus.Draft); local.copy(courseUploads=listOf(record)+local.courseUploads.filterNot { it.taskId==taskId }, uploadedTaskIds=if (submit) local.uploadedTaskIds+taskId else local.uploadedTaskIds) } }
-    fun updateStudentTaskStatus(studentId: String, status: TaskStatus) = mutate { local -> local.copy(studentTaskStatuses = local.studentTaskStatuses + (studentId to status)) }
+    fun updateStudentTaskStatus(studentId: String, status: TaskStatus) {
+        val current = _state.value.local.studentTaskStatuses[studentId]
+            ?: _state.value.data?.students?.firstOrNull { it.id == studentId }?.taskStatus
+            ?: return
+        if (!current.allowsTransitionTo(status)) return
+        mutate { local -> local.copy(studentTaskStatuses = local.studentTaskStatuses + (studentId to status)) }
+    }
     fun submitReviewDecision(studentId: String, status: TaskStatus, note: String) {
         val trimmed = note.trim()
         if (trimmed.isBlank()) return
+        val current = _state.value.local.studentTaskStatuses[studentId]
+            ?: _state.value.data?.students?.firstOrNull { it.id == studentId }?.taskStatus
+            ?: return
+        if (!current.allowsTransitionTo(status)) return
         mutate { local -> local.copy(studentTaskStatuses = local.studentTaskStatuses + (studentId to status), reviewNotes = local.reviewNotes + (studentId to trimmed)) }
     }
     fun updateSettings(notificationsEnabled: Boolean? = null, reduceMotion: Boolean? = null) = mutate { local -> local.copy(settings = local.settings.copy(notificationsEnabled = notificationsEnabled ?: local.settings.notificationsEnabled, reduceMotion = reduceMotion ?: local.settings.reduceMotion)) }

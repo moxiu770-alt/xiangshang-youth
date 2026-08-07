@@ -569,7 +569,7 @@ fun TeacherTaskDetailScreen(state: AppUiState, nav: NavHostController, updateSta
     if (task == null) { EmptyState("暂无体测任务，学校发布任务后会显示在这里。"); return@AppScaffold }
     TestTaskCard(task)
     Text("学生测评状态", color = Navy, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
-    Text("点击学生更新签到、测试、复核或补测状态；状态会自动保存并在同步后刷新。", color = Color.Gray, fontSize = 9.sp, modifier = Modifier.padding(vertical = 5.dp))
+    Text("点击学生按现场队列更新签到、候测、测试、复核或补测状态；不支持跨步骤直接完成。", color = Color.Gray, fontSize = 9.sp, modifier = Modifier.padding(vertical = 5.dp))
     when {
         data.students.isEmpty() -> EmptyState("暂无任务学生，学生名单同步后可更新测评状态。")
         else -> data.students.filter { student ->
@@ -658,7 +658,7 @@ private fun StatusSelectorDialog(
                     WorkflowCommandStatus.Failed -> Text(command.message ?: "提交失败，请重试。", color = Color.Red, fontSize = 10.sp)
                     WorkflowCommandStatus.Idle -> Unit
                 }
-                com.xiangshang.youth.core.model.TaskStatus.values().forEach { status ->
+                current.allowedNextStatuses().forEach { status ->
                     TextButton(onClick = { onSelect(status) }, enabled = !command.isSubmitting, modifier = Modifier.fillMaxWidth()) {
                         Text(
                             status.label,
@@ -702,7 +702,7 @@ private fun ReviewDecisionDialog(
                     else -> Unit
                 }
                 Text("处理结论", color = Navy, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                com.xiangshang.youth.core.model.TaskStatus.values().forEach { status ->
+                current.allowedNextStatuses().forEach { status ->
                     FilterChip(selected = selectedStatus == status, onClick = { selectedStatus = status }, label = { Text(status.label, fontSize = 10.sp) })
                 }
             }

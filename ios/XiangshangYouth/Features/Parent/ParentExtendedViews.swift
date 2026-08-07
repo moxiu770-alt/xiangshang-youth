@@ -283,7 +283,7 @@ struct AccountDashboard: View {
                 if state.selectedRole == .parent {
                     HStack(spacing: 8) {
                         accountMetric(title: "已绑定孩子", value: "\(state.boundChildren.count)", action: { router.push(.children) })
-                        accountMetric(title: "成长报告", value: state.selectedChild == nil ? "0" : "1", action: { if let child = state.selectedChild { router.push(.report(child)) } })
+                        accountMetric(title: "成长报告", value: state.selectedChild == nil ? "0" : "1", action: { if let child = state.selectedChild { router.push(.report(child)) } else { router.push(.children) } })
                         accountMetric(title: "未读消息", value: "\(state.unreadMessageCount)", action: { router.push(.parentMessages) })
                     }.padding(.horizontal, 12)
                     ReferenceSectionTitle(title: "家庭服务", trailing: "孩子管理", action: { router.push(.children) }).padding(.horizontal, 12)

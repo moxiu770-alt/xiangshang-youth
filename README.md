@@ -21,6 +21,19 @@ xcodebuild test \
 
 该 scheme 已包含 `XiangshangYouthUITests`：会从启动海报等待登录页，完成协议确认、Mock 微信登录、校长端进入/退出、家庭端进入；如只需运行这条冒烟链路，可追加 `-only-testing:XiangshangYouthUITests/LaunchAndRoleFlowTests`。
 
+Release 编译校验（不签名的模拟器产物）可使用：
+
+```bash
+xcodebuild build \
+  -project ios/XiangshangYouth/XiangshangYouth.xcodeproj \
+  -scheme XiangshangYouth \
+  -configuration Release \
+  -sdk iphonesimulator \
+  CODE_SIGNING_ALLOWED=NO
+```
+
+该命令验证 Release 编译与资源打包；真机 TestFlight / App Store 发布仍需由发行团队配置 Apple 开发者签名、Provisioning Profile 和 Archive 导出。
+
 ### Android
 
 ```bash

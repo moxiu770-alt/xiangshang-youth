@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
@@ -32,7 +33,15 @@ import com.xiangshang.youth.core.model.*
 @Composable fun AppScaffold(title: String, onBack: (() -> Unit)? = null, onSwitchRole: (() -> Unit)? = null, onNotifications: (() -> Unit)? = null, notificationCount: Int = 0, onRefresh: (() -> Unit)? = null, isRefreshing: Boolean = false, errorMessage: String? = null, onRetry: (() -> Unit)? = null, bottomBar: @Composable () -> Unit = {}, content: @Composable ColumnScope.() -> Unit) {
     Scaffold(containerColor = Canvas, topBar = {
         CenterAlignedTopAppBar(
-            title = { Text(title, color = Navy, fontSize = 16.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) },
+            title = {
+                Text(
+                    title,
+                    color = Navy,
+                    fontSize = 16.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    modifier = Modifier.semantics { heading() }
+                )
+            },
             navigationIcon = {
                 onBack?.let { action ->
                     IconButton(onClick = action) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回") }

@@ -45,7 +45,10 @@ struct ReferenceSectionTitle: View {
     var action: (() -> Void)? = nil
     var body: some View {
         HStack {
-            Text(title).font(.system(size: 14, weight: .bold)).foregroundStyle(ReferenceColor.navy)
+            Text(title)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(ReferenceColor.navy)
+                .accessibilityAddTraits(.isHeader)
             Spacer()
             if let action {
                 Button(action: action) {

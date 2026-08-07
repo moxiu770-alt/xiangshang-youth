@@ -75,7 +75,7 @@ struct ParentLandingView: View {
         Button { activityDetail = "向上少年健康成长季" } label: { ParentCampaignCard() }.buttonStyle(.plain).padding(.horizontal, 9)
         ReferenceCard { VStack(spacing: 8) { HStack { VStack(alignment: .leading) { Text("综合测评").font(.system(size: 17, weight: .bold)).foregroundStyle(ReferenceColor.blue); Text("运动表现、心理健康、口腔健康状况").font(.system(size: 9)).foregroundStyle(.secondary) }; Spacer(); Image(systemName: "sun.max.fill").foregroundStyle(ReferenceColor.yellow) }; LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 7) { assessmentMetric(.fitness); assessmentMetric(.mental); assessmentMetric(.vision); assessmentMetric(.oral) }; Button("继续测评") { router.push(.assessment(.fitness)) }.font(.system(size: 12, weight: .bold)).frame(maxWidth: 150).padding(.vertical, 6).background(ReferenceColor.blue, in: Capsule()).foregroundStyle(.white) }.padding(2) }.padding(.horizontal, 9)
         HStack {
-            Button { if let child = state.selectedChild { router.push(.report(child)) } } label: { ReferenceAction(icon: "calendar", title: "测评报告", color: ReferenceColor.blue) }.buttonStyle(.plain)
+            Button { if let child = state.selectedChild { router.push(.report(child)) } else { router.push(.children) } } label: { ReferenceAction(icon: "calendar", title: "测评报告", color: ReferenceColor.blue) }.buttonStyle(.plain)
             Button { router.push(.parentMessages) } label: { ReferenceAction(icon: "exclamationmark.circle.fill", title: "健康提醒", color: .red) }.buttonStyle(.plain)
             Button { state.checkInToday(); router.push(.healthProfile) } label: { ReferenceAction(icon: "checkmark.seal.fill", title: "打卡记录", color: ReferenceColor.green) }.buttonStyle(.plain)
             Button { router.push(.parentCourses) } label: { ReferenceAction(icon: "play.rectangle.fill", title: "推荐课程", color: .orange) }.buttonStyle(.plain)
@@ -120,7 +120,7 @@ struct ParentLandingView: View {
         .sheet(item: Binding(get: { healthChannelDetail.map(CourseSheetItem.init) }, set: { healthChannelDetail = $0?.name })) { item in HealthArticleSheet(title: item.name) }
     }
     private func metric(_ icon: String, _ title: String, _ subtitle: String, _ color: Color) -> some View {
-        Button { if let child = state.selectedChild { router.push(.report(child)) } } label: {
+        Button { if let child = state.selectedChild { router.push(.report(child)) } else { router.push(.children) } } label: {
             ReferenceMetric(icon: icon, title: title, value: subtitle, color: color)
         }.buttonStyle(.plain).accessibilityLabel("查看\(title)报告")
     }
@@ -329,7 +329,7 @@ struct ParentEvaluationDashboard: View {
             }
         } }
     private func metric(_ icon: String, _ title: String, _ subtitle: String, _ color: Color) -> some View {
-        Button { if let child = state.selectedChild { router.push(.report(child)) } } label: {
+        Button { if let child = state.selectedChild { router.push(.report(child)) } else { router.push(.children) } } label: {
             ReferenceMetric(icon: icon, title: title, value: subtitle, color: color)
         }.buttonStyle(.plain).accessibilityLabel("查看\(title)报告")
     }
@@ -375,7 +375,7 @@ struct HealthDashboard: View {
     }
     private var reportSummary: String { "\(report?.assessmentDate ?? "待测评") · \(((report?.student.totalScore ?? 0) >= 25) ? "良好" : "需关注")" }
     private func healthMetric(_ icon: String, _ title: String, _ subtitle: String, _ color: Color) -> some View {
-        Button { if let child = state.selectedChild { router.push(.report(child)) } } label: {
+        Button { if let child = state.selectedChild { router.push(.report(child)) } else { router.push(.children) } } label: {
             ReferenceMetric(icon: icon, title: title, value: subtitle, color: color)
         }.buttonStyle(.plain).accessibilityLabel("查看\(title)报告")
     }

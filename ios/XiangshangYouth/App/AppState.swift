@@ -210,6 +210,7 @@ enum WorkflowCommandState: Equatable {
         }
         let succeeded = await executeWorkflow("activity:\(activityID)") { try await self.repository.submitActivity(record) }
         if succeeded { updateActivitySyncStatus(record.id, to: .submitted) }
+        else if case .failed = workflowState(for: "activity:\(activityID)") { updateActivitySyncStatus(record.id, to: .failed) }
         return succeeded
     }
 
@@ -226,6 +227,7 @@ enum WorkflowCommandState: Equatable {
         }
         let succeeded = await executeWorkflow("expert:\(name)") { try await self.repository.bookExpert(record) }
         if succeeded { updateExpertSyncStatus(record.id, to: .submitted) }
+        else if case .failed = workflowState(for: "expert:\(name)") { updateExpertSyncStatus(record.id, to: .failed) }
         return succeeded
     }
 
@@ -243,6 +245,7 @@ enum WorkflowCommandState: Equatable {
         }
         let succeeded = await executeWorkflow("course:\(taskID)") { try await self.repository.uploadCourse(record) }
         if succeeded { updateCourseSyncStatus(record.id, to: .submitted) }
+        else if case .failed = workflowState(for: "course:\(taskID)") { updateCourseSyncStatus(record.id, to: .failed) }
         return succeeded
     }
 
@@ -299,9 +302,9 @@ enum WorkflowCommandState: Equatable {
     }
     /// Local writes that have not been acknowledged by a remote service yet.
     var pendingSyncCount: Int {
-        let activity = localFeatures.activityRegistrations.count(where: { $0.status == .pendingSync })
-        let experts = localFeatures.expertAppointments.count(where: { $0.status == .pendingSync })
-        let uploads = localFeatures.courseUploads.count(where: { $0.status == .pendingSync })
+        let activity = localFeatures.activityRegistrations.count(where: { $0.status == .pendingSync || $0.status == .failed })
+        let experts = localFeatures.expertAppointments.count(where: { $0.status == .pendingSync || $0.status == .failed })
+        let uploads = localFeatures.courseUploads.count(where: { $0.status == .pendingSync || $0.status == .failed })
         return activity + experts + uploads
     }
 
@@ -318,9 +321,9 @@ enum WorkflowCommandState: Equatable {
             return
         }
         guard !workflowState(for: "sync-pending").isSubmitting else { return }
-        let activities = localFeatures.activityRegistrations.filter { $0.status == .pendingSync }
-        let experts = localFeatures.expertAppointments.filter { $0.status == .pendingSync }
-        let uploads = localFeatures.courseUploads.filter { $0.status == .pendingSync }
+        let activities = localFeatures.activityRegistrations.filter { $0.status == .pendingSync || $0.status == .failed }
+        let experts = localFeatures.expertAppointments.filter { $0.status == .pendingSync || $0.status == .failed }
+        let uploads = localFeatures.courseUploads.filter { $0.status == .pendingSync || $0.status == .failed }
         guard !(activities.isEmpty && experts.isEmpty && uploads.isEmpty) else {
             workflowStates["sync-pending"] = .succeeded("当前没有等待同步的本机记录。")
             return
@@ -329,16 +332,19 @@ enum WorkflowCommandState: Equatable {
         var synchronized = 0
         var failed = 0
         for record in activities {
+            updateActivitySyncStatus(record.id, to: .submitting)
             do { try await repository.submitActivity(record); updateActivitySyncStatus(record.id, to: .submitted); synchronized += 1 }
-            catch { failed += 1 }
+            catch { updateActivitySyncStatus(record.id, to: .failed); failed += 1 }
         }
         for record in experts {
+            updateExpertSyncStatus(record.id, to: .submitting)
             do { try await repository.bookExpert(record); updateExpertSyncStatus(record.id, to: .submitted); synchronized += 1 }
-            catch { failed += 1 }
+            catch { updateExpertSyncStatus(record.id, to: .failed); failed += 1 }
         }
         for record in uploads {
+            updateCourseSyncStatus(record.id, to: .submitting)
             do { try await repository.uploadCourse(record); updateCourseSyncStatus(record.id, to: .submitted); synchronized += 1 }
-            catch { failed += 1 }
+            catch { updateCourseSyncStatus(record.id, to: .failed); failed += 1 }
         }
         workflowStates["sync-pending"] = failed == 0
             ? .succeeded("已同步 \(synchronized) 条本机记录。")

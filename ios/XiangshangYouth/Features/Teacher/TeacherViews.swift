@@ -128,7 +128,7 @@ struct SportsUploadDashboard: View {
         ReferenceCard { VStack(alignment: .leading, spacing: 7) { Text("今日待上传课程").font(.system(size: 13, weight: .bold)); uploadTask("16:30 · 一（6）班测评任务", "已完成，待上传"); uploadTask("17:20 · 体能提升班", "课程进行中") } }.padding(.horizontal, 12)
         let submitted = state.localFeatures.uploadedTaskIDs.contains(taskID)
         Button { isUploadFormShown = true } label: { Text(submitted ? "查看本机课程记录" : "填写并保存课程记录").font(.system(size: 13, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 11).foregroundStyle(.white).background(submitted ? ReferenceColor.green : .orange, in: RoundedRectangle(cornerRadius: 10)) }.buttonStyle(.plain).padding(.horizontal, 12)
-        if let record = state.localFeatures.courseUploads.first(where: { $0.taskID == taskID }) { Text(record.status == .pendingSync ? "已保存 · 待同步：\(record.attachmentName) · 出勤 \(record.attendanceCount) 人" : record.status == .submitted ? "已同步：\(record.attachmentName) · 出勤 \(record.attendanceCount) 人" : "已保存草稿：\(record.notes)").font(.system(size: 9)).foregroundStyle(.secondary).padding(.horizontal, 14) }
+        if let record = state.localFeatures.courseUploads.first(where: { $0.taskID == taskID }) { Text(record.status == .pendingSync ? "已保存 · 待同步：\(record.attachmentName) · 出勤 \(record.attendanceCount) 人" : record.status == .submitted ? "已同步：\(record.attachmentName) · 出勤 \(record.attendanceCount) 人" : record.status == .failed ? "同步失败，稍后可在设置中重试：\(record.attachmentName)" : "已保存草稿：\(record.notes)").font(.system(size: 9)).foregroundStyle(record.status == .failed ? .red : .secondary).padding(.horizontal, 14) }
     }.padding(.bottom, 10) }
         .background(ReferenceColor.canvas)
         .overlay {

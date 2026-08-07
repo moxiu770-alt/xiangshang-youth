@@ -202,6 +202,16 @@ class LocalFeatureStateTest {
     }
 
     @Test
+    fun failedWorkflowRecordsRemainVisibleForRetry() {
+        val local = LocalFeatureState(
+            activityRegistrations = listOf(ActivityRegistration(activityId = "health-growth-season-2026", contactName = "王女士", phone = "13800138000", status = LocalSubmissionStatus.Failed)),
+            courseUploads = listOf(CourseUploadRecord(taskId = "after-class-upload", attendanceCount = 20, notes = "课堂记录", attachmentName = "课堂.jpg", status = LocalSubmissionStatus.Failed))
+        )
+
+        assertEquals(2, AppUiState(local = local).pendingSyncCount)
+    }
+
+    @Test
     fun childBindingRequiresMatchingNameAndSchoolCode() = runBlocking {
         val students = MockRepository().dashboard().students
         assertEquals(null, ChildBindingValidator.findMatch(students, "王小明", "wrong-code"))

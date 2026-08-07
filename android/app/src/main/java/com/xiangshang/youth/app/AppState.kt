@@ -53,8 +53,8 @@ data class AppUiState(
     val workflowStates: Map<String, WorkflowCommandState> = emptyMap()
 ) {
     val unreadMessageCount: Int get() = if (!local.settings.notificationsEnabled) 0 else data?.messages?.count { !it.isRead && it.id !in local.readMessageIds } ?: 0
-    /** Local writes waiting for the future remote sync worker. */
-    val pendingSyncCount: Int get() = local.activityRegistrations.count { it.status == LocalSubmissionStatus.PendingSync } + local.expertAppointments.count { it.status == LocalSubmissionStatus.PendingSync } + local.courseUploads.count { it.status == LocalSubmissionStatus.PendingSync }
+    /** Local writes that still need acknowledgement or a retry. */
+    val pendingSyncCount: Int get() = local.activityRegistrations.count { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed } + local.expertAppointments.count { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed } + local.courseUploads.count { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed }
 }
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val connectivityManager = application.getSystemService(ConnectivityManager::class.java)
@@ -141,7 +141,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun workflowState(key: String): WorkflowCommandState = _state.value.workflowStates[key] ?: WorkflowCommandState()
     fun clearWorkflowState(key: String) { _state.value = _state.value.copy(workflowStates = _state.value.workflowStates + (key to WorkflowCommandState())) }
 
-    private fun executeWorkflow(key: String, operation: suspend () -> Unit, onSuccess: (() -> Unit)? = null) = viewModelScope.launch {
+    private fun executeWorkflow(key: String, operation: suspend () -> Unit, onSuccess: (() -> Unit)? = null, onFailure: (() -> Unit)? = null) = viewModelScope.launch {
         val current = workflowState(key)
         if (current.isSubmitting) return@launch
         _state.value = _state.value.copy(workflowStates = _state.value.workflowStates + (key to WorkflowCommandState(WorkflowCommandStatus.Submitting)))
@@ -153,6 +153,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             _state.value = _state.value.copy(workflowStates = _state.value.workflowStates + (key to WorkflowCommandState()))
             throw error
         } catch (error: Throwable) {
+            onFailure?.invoke()
             _state.value = _state.value.copy(workflowStates = _state.value.workflowStates + (key to WorkflowCommandState(WorkflowCommandStatus.Failed, error.message ?: "提交失败，请重试")))
         }
     }
@@ -162,34 +163,37 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         registerActivity(contactName.trim(), phone.trim())
         val record = _state.value.local.activityRegistrations.firstOrNull { it.activityId == "health-growth-season-2026" } ?: throw IllegalArgumentException("报名信息不完整。")
         repository.submitActivity(record)
-    }, onSuccess = { markActivitySynced("health-growth-season-2026") })
+    }, onSuccess = { markActivitySynced("health-growth-season-2026") }, onFailure = { markActivitySyncFailed("health-growth-season-2026") })
 
     fun submitExpertCommand(name: String, date: String, note: String) = executeWorkflow("expert:$name", {
         if (date.isBlank() || note.trim().isBlank()) throw IllegalArgumentException("请填写咨询时间和说明。")
         bookExpert(name, date.trim(), note.trim())
         val record = _state.value.local.expertAppointments.firstOrNull { it.expertName == name } ?: throw IllegalArgumentException("预约信息不完整。")
         repository.bookExpert(record)
-    }, onSuccess = { markExpertSynced(name) })
+    }, onSuccess = { markExpertSynced(name) }, onFailure = { markExpertSyncFailed(name) })
 
     fun submitCourseUploadCommand(taskId: String, attendance: Int, notes: String, attachment: String) = executeWorkflow("course:$taskId", {
         if (attendance <= 0 || notes.trim().isBlank() || attachment.trim().isBlank()) throw IllegalArgumentException("提交前请补齐出勤人数、课堂记录和附件。")
         saveCourseUpload(taskId, attendance, notes, attachment, true)
         val record = _state.value.local.courseUploads.firstOrNull { it.taskId == taskId } ?: throw IllegalArgumentException("课程记录不完整。")
         repository.uploadCourse(record)
-    }, onSuccess = { markCourseSynced(taskId) })
+    }, onSuccess = { markCourseSynced(taskId) }, onFailure = { markCourseSyncFailed(taskId) })
 
     fun syncPendingRecords() = executeWorkflow("sync-pending", {
         if (_state.value.profile == null) throw IllegalStateException("请登录后再同步本机记录。")
         if (_state.value.isOffline) throw IllegalStateException("当前网络不可用，记录会继续保存在本机。")
         var failed = 0
-        _state.value.local.activityRegistrations.filter { it.status == LocalSubmissionStatus.PendingSync }.forEach { record ->
-            runCatching { repository.submitActivity(record) }.onSuccess { markActivitySynced(record.activityId) }.onFailure { failed += 1 }
+        _state.value.local.activityRegistrations.filter { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed }.forEach { record ->
+            markActivitySyncSubmitting(record.activityId)
+            runCatching { repository.submitActivity(record) }.onSuccess { markActivitySynced(record.activityId) }.onFailure { markActivitySyncFailed(record.activityId); failed += 1 }
         }
-        _state.value.local.expertAppointments.filter { it.status == LocalSubmissionStatus.PendingSync }.forEach { record ->
-            runCatching { repository.bookExpert(record) }.onSuccess { markExpertSynced(record.expertName) }.onFailure { failed += 1 }
+        _state.value.local.expertAppointments.filter { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed }.forEach { record ->
+            markExpertSyncSubmitting(record.expertName)
+            runCatching { repository.bookExpert(record) }.onSuccess { markExpertSynced(record.expertName) }.onFailure { markExpertSyncFailed(record.expertName); failed += 1 }
         }
-        _state.value.local.courseUploads.filter { it.status == LocalSubmissionStatus.PendingSync }.forEach { record ->
-            runCatching { repository.uploadCourse(record) }.onSuccess { markCourseSynced(record.taskId) }.onFailure { failed += 1 }
+        _state.value.local.courseUploads.filter { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed }.forEach { record ->
+            markCourseSyncSubmitting(record.taskId)
+            runCatching { repository.uploadCourse(record) }.onSuccess { markCourseSynced(record.taskId) }.onFailure { markCourseSyncFailed(record.taskId); failed += 1 }
         }
         if (failed > 0) throw IllegalStateException("仍有 $failed 条记录等待网络恢复后重试。")
     })
@@ -242,9 +246,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         mutate { it.copy(expertAppointments = listOf(ExpertAppointment(expertName = name, preferredDate = date, note = note, status = LocalSubmissionStatus.PendingSync)) + it.expertAppointments) }
     }
     fun saveCourseUpload(taskId: String, attendance: Int, notes: String, attachment: String, submit: Boolean) { if (attendance < 0 || (submit && (notes.isBlank() || attachment.isBlank()))) return; mutate { local -> val record=CourseUploadRecord(taskId=taskId, attendanceCount=attendance, notes=notes.trim(), attachmentName=attachment, status=if (submit) LocalSubmissionStatus.PendingSync else LocalSubmissionStatus.Draft); local.copy(courseUploads=listOf(record)+local.courseUploads.filterNot { it.taskId==taskId }, uploadedTaskIds=if (submit) local.uploadedTaskIds+taskId else local.uploadedTaskIds) } }
-    private fun markActivitySynced(activityId: String) = mutate { local -> local.copy(activityRegistrations = local.activityRegistrations.map { if (it.activityId == activityId) it.copy(status = LocalSubmissionStatus.Submitted) else it }) }
-    private fun markExpertSynced(name: String) = mutate { local -> local.copy(expertAppointments = local.expertAppointments.map { if (it.expertName == name) it.copy(status = LocalSubmissionStatus.Submitted) else it }) }
-    private fun markCourseSynced(taskId: String) = mutate { local -> local.copy(courseUploads = local.courseUploads.map { if (it.taskId == taskId) it.copy(status = LocalSubmissionStatus.Submitted) else it }) }
+    private fun markActivitySynced(activityId: String) = updateActivitySyncStatus(activityId, LocalSubmissionStatus.Submitted)
+    private fun markActivitySyncSubmitting(activityId: String) = updateActivitySyncStatus(activityId, LocalSubmissionStatus.Submitting)
+    private fun markActivitySyncFailed(activityId: String) = updateActivitySyncStatus(activityId, LocalSubmissionStatus.Failed)
+    private fun updateActivitySyncStatus(activityId: String, status: LocalSubmissionStatus) = mutate { local -> local.copy(activityRegistrations = local.activityRegistrations.map { if (it.activityId == activityId) it.copy(status = status) else it }) }
+    private fun markExpertSynced(name: String) = updateExpertSyncStatus(name, LocalSubmissionStatus.Submitted)
+    private fun markExpertSyncSubmitting(name: String) = updateExpertSyncStatus(name, LocalSubmissionStatus.Submitting)
+    private fun markExpertSyncFailed(name: String) = updateExpertSyncStatus(name, LocalSubmissionStatus.Failed)
+    private fun updateExpertSyncStatus(name: String, status: LocalSubmissionStatus) = mutate { local -> local.copy(expertAppointments = local.expertAppointments.map { if (it.expertName == name) it.copy(status = status) else it }) }
+    private fun markCourseSynced(taskId: String) = updateCourseSyncStatus(taskId, LocalSubmissionStatus.Submitted)
+    private fun markCourseSyncSubmitting(taskId: String) = updateCourseSyncStatus(taskId, LocalSubmissionStatus.Submitting)
+    private fun markCourseSyncFailed(taskId: String) = updateCourseSyncStatus(taskId, LocalSubmissionStatus.Failed)
+    private fun updateCourseSyncStatus(taskId: String, status: LocalSubmissionStatus) = mutate { local -> local.copy(courseUploads = local.courseUploads.map { if (it.taskId == taskId) it.copy(status = status) else it }) }
     fun updateStudentTaskStatus(studentId: String, status: TaskStatus) {
         val current = _state.value.local.studentTaskStatuses[studentId]
             ?: _state.value.data?.students?.firstOrNull { it.id == studentId }?.taskStatus

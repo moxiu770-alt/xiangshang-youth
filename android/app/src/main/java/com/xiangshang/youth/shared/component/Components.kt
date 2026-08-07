@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -84,7 +85,7 @@ import com.xiangshang.youth.core.model.*
         shadowElevation = 1.dp
     ) { Text(message, color = Color(0xFF7A4B00), fontSize = 10.sp, modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center) }
 }
-@Composable fun RoleBadge(role: UserRole) { Text(role.label, color = Blue, fontSize = 12.sp, modifier = Modifier.background(Sky, RoundedCornerShape(14.dp)).padding(horizontal = 9.dp, vertical = 4.dp)) }
+@Composable fun RoleBadge(role: UserRole) { Text(role.label, color = Blue, fontSize = 12.sp, modifier = Modifier.semantics { contentDescription = "当前角色：${role.label}" }.background(Sky, RoundedCornerShape(14.dp)).padding(horizontal = 9.dp, vertical = 4.dp)) }
 @Composable fun StudentCard(student: Student, onClick: () -> Unit) { Card(Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "查看学生${student.name}，${student.grade}${student.className}，${if (student.isPovertyArea) "贫困地区学生" else student.region}" }.clickable(onClick = onClick), shape = RoundedCornerShape(12.dp)) { Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Text(student.name.take(1), color = Color.White, modifier = Modifier.background(Blue, RoundedCornerShape(22.dp)).padding(12.dp)); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text(student.name, color = Navy); Text(student.grade + " · " + student.className, fontSize = 11.sp, color = Color.Gray); Text(if (student.isPovertyArea) "贫困地区学生" else student.region, fontSize = 10.sp, color = if (student.isPovertyArea) Color.Red else Color.Gray) }; Text((student.totalScore ?: 0.0).toString(), color = Blue) } } }
 @Composable fun TestTaskCard(task: TestTask, onClick: (() -> Unit)? = null) {
     val description = "查看体测任务${task.title}，状态${task.status.label}，已完成${task.completedCount}人，共${task.totalCount}人"
@@ -106,7 +107,7 @@ import com.xiangshang.youth.core.model.*
     }.let { base -> if (onClick != null) base.clickable(onClick = onClick) else base }
     Card(cardModifier) { Column(Modifier.padding(10.dp)) { Text(title, fontSize = 11.sp, color = Color.Gray); Text(value, color = Navy, fontSize = 20.sp); Text(note, fontSize = 10.sp, color = Green) } }
 }
-@Composable fun ReportMetricCard(score: ScoreResult) { Card(Modifier.fillMaxWidth().semantics { contentDescription = "${score.item.label}，${score.score}分，满分5分" }) { Column(Modifier.padding(10.dp)) { Text(score.item.label, fontSize = 11.sp); Text(score.score.toString(), color = Blue, fontSize = 18.sp); Text("满分5分", fontSize = 10.sp, color = Color.Gray) } } }
+@Composable fun ReportMetricCard(score: ScoreResult) { Card(Modifier.fillMaxWidth().semantics { contentDescription = "${score.item.label}，${score.score}分，满分5分，置信度${(score.confidence * 100).toInt()}%，${score.reviewStatus.label}" }) { Column(Modifier.padding(10.dp)) { Text(score.item.label, fontSize = 11.sp); Text(score.score.toString(), color = Blue, fontSize = 18.sp); Text("满分5分", fontSize = 10.sp, color = Color.Gray) } } }
 @Composable fun EmptyState(text: String = "暂无数据") { Box(Modifier.fillMaxWidth().padding(32.dp).semantics { contentDescription = text }, contentAlignment = Alignment.Center) { Text(text, color = Color.Gray) } }
 @Composable fun LoadingState() { Box(Modifier.fillMaxWidth().padding(32.dp).semantics { contentDescription = "正在加载" }, contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
 @Composable fun ErrorState(text: String, retry: () -> Unit = {}, dismiss: (() -> Unit)? = null) {
@@ -126,7 +127,7 @@ import com.xiangshang.youth.core.model.*
 @Composable fun FilterBar(options: List<String> = listOf("本轮综合测评", "2026秋季"), selected: String = options.firstOrNull().orEmpty(), onSelected: (String) -> Unit = {}) {
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         options.forEach { option ->
-            FilterChip(selected = option == selected, onClick = { onSelected(option) }, label = { Text(option, fontSize = 10.sp) }, modifier = Modifier.semantics { contentDescription = "筛选：$option" })
+            FilterChip(selected = option == selected, onClick = { onSelected(option) }, label = { Text(option, fontSize = 10.sp) }, modifier = Modifier.semantics { contentDescription = "筛选：$option"; stateDescription = if (option == selected) "已选中" else "未选中" })
         }
     }
 }
@@ -140,7 +141,7 @@ import com.xiangshang.youth.core.model.*
 @Composable private fun DropdownSelector(selected: String, options: List<String>, onSelected: (String) -> Unit, description: String) {
     var expanded by androidx.compose.runtime.remember { mutableStateOf(false) }
     Box {
-        TextButton(onClick = { expanded = true }, modifier = Modifier.semantics { contentDescription = description }) { Text(selected, color = Navy, fontSize = 11.sp) }
+        TextButton(onClick = { expanded = true }, modifier = Modifier.semantics { contentDescription = description; stateDescription = "当前为$selected" }) { Text(selected, color = Navy, fontSize = 11.sp) }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) { options.forEach { option -> DropdownMenuItem(text = { Text(option) }, onClick = { onSelected(option); expanded = false }) } }
     }
 }

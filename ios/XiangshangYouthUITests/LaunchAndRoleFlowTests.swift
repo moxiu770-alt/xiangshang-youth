@@ -57,6 +57,39 @@ final class LaunchAndRoleFlowTests: XCTestCase {
         XCTAssertTrue(staticText(containing: "综合测评").waitForExistence(timeout: 5))
     }
 
+    func testParentBindingUnlocksReportAndKeepsReturnPath() {
+        loginAndWaitForRoleSelection()
+
+        button(containing: "家庭端").tap()
+        let bindPrompt = button(containing: "去绑定孩子")
+        XCTAssertTrue(bindPrompt.waitForExistence(timeout: 5))
+        bindPrompt.tap()
+
+        let beginBinding = button(containing: "绑定孩子")
+        XCTAssertTrue(beginBinding.waitForExistence(timeout: 3))
+        beginBinding.tap()
+        XCTAssertTrue(app.textFields["child-name-field"].waitForExistence(timeout: 3))
+        app.textFields["child-name-field"].tap()
+        app.textFields["child-name-field"].typeText("王小明")
+        app.textFields["child-binding-code-field"].tap()
+        app.textFields["child-binding-code-field"].typeText("XS-S01")
+        button(containing: "确认绑定").tap()
+
+        // Binding is a family-scoped action.  It returns to the page that
+        // requested it and unlocks the selected child's report rather than
+        // stranding the user on an empty management screen.
+        XCTAssertTrue(staticText(containing: "综合测评").waitForExistence(timeout: 4))
+        button(containing: "我的测评").tap()
+        let report = button(containing: "查看详细报告")
+        XCTAssertTrue(report.waitForExistence(timeout: 3))
+        report.tap()
+        XCTAssertTrue(staticText(containing: "7项能力得分").waitForExistence(timeout: 5))
+        let back = button(containing: "返回")
+        XCTAssertTrue(back.waitForExistence(timeout: 2))
+        back.tap()
+        XCTAssertTrue(staticText(containing: "综合测评").waitForExistence(timeout: 3))
+    }
+
     private func loginAndWaitForRoleSelection() {
         XCTAssertTrue(button(containing: "微信登录").waitForExistence(timeout: 10))
         XCTAssertTrue(button(containing: "注册新账号").exists)

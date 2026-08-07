@@ -37,7 +37,7 @@ import com.xiangshang.youth.core.util.DeepLinkResolver
 import com.xiangshang.youth.core.util.DeepLinkTarget
 import com.xiangshang.youth.shared.component.*
 
-object Destinations { const val Splash="splash"; const val Login="login"; const val Register="register"; const val PasswordReset="passwordReset"; const val Role="role"; const val Parent="parent"; const val Children="children"; const val ParentEvaluations="parentEvaluations"; const val Assessment="assessment"; const val Courses="courses"; const val CoursesRoute="courses?openSupport={openSupport}"; const val Circle="circle"; const val Account="account"; const val Messages="messages"; const val Notifications="notifications"; const val Health="health"; const val Report="report"; const val Teacher="teacher"; const val TeacherMessages="teacherMessages"; const val Classes="classes"; const val TeacherCircle="teacherCircle"; const val TeacherBoard="teacherBoard"; const val Students="students"; const val StudentsRoute="students?className={className}"; const val OutstandingStudents="outstandingStudents"; const val Tasks="tasks"; const val TaskDetail="taskDetail"; const val TaskDetailRoute="taskDetail/{taskId}"; const val Review="review"; const val Principal="principal"; const val PrincipalGrades="principalGrades"; const val PrincipalClassStats="principalClassStats"; const val PrincipalRisk="principalRisk"; const val Grades="grades"; const val ClassStats="classStats"; const val ClassStatsRoute="classStats?grade={grade}"; const val Risk="risk"; const val RiskRoute="risk?className={className}" }
+object Destinations { const val Splash="splash"; const val Login="login"; const val Register="register"; const val PasswordReset="passwordReset"; const val Role="role"; const val Parent="parent"; const val Children="children"; const val ParentEvaluations="parentEvaluations"; const val Assessment="assessment"; const val Courses="courses"; const val CoursesRoute="courses?openSupport={openSupport}"; const val Circle="circle"; const val Account="account"; const val Messages="messages"; const val Notifications="notifications"; const val Health="health"; const val Report="report"; const val ReportRoute="report/{studentId}"; const val Teacher="teacher"; const val TeacherMessages="teacherMessages"; const val Classes="classes"; const val TeacherCircle="teacherCircle"; const val TeacherBoard="teacherBoard"; const val Students="students"; const val StudentsRoute="students?className={className}"; const val OutstandingStudents="outstandingStudents"; const val Tasks="tasks"; const val TaskDetail="taskDetail"; const val TaskDetailRoute="taskDetail/{taskId}"; const val Review="review"; const val Principal="principal"; const val PrincipalGrades="principalGrades"; const val PrincipalClassStats="principalClassStats"; const val PrincipalRisk="principalRisk"; const val Grades="grades"; const val ClassStats="classStats"; const val ClassStatsRoute="classStats?grade={grade}"; const val Risk="risk"; const val RiskRoute="risk?className={className}" }
 
 /** Shared retry actions keep page-level failures actionable without threading
  * the same callbacks through every feature screen. */
@@ -254,6 +254,29 @@ private fun NavHostController.replaceRoot(destination: String) {
                 )
             }
         }
+        // Teachers and principals can inspect a student report without changing
+        // the family's persisted child selection. This route intentionally keeps
+        // the student identity in navigation state rather than AppViewModel.
+        composable(Destinations.ReportRoute) { entry ->
+            val student = state.data?.students?.firstOrNull { it.id == entry.arguments?.getString("studentId") }
+            when {
+                state.error != null && state.data == null -> AppScaffold("体测报告", onBack = { nav.popBackStack() }) {
+                    ErrorState(state.error ?: "数据加载失败", retry = { viewModel.refreshDashboard() }, dismiss = viewModel::clearError)
+                }
+                state.loading || state.data == null -> AppScaffold("体测报告", onBack = { nav.popBackStack() }) { LoadingState() }
+                student == null -> AppScaffold("体测报告", onBack = { nav.popBackStack() }) {
+                    EmptyState("未找到该学生档案，返回后可刷新学生列表。")
+                }
+                else -> ReportDetailScreen(
+                    report = viewModel.report(student),
+                    isRefreshing = state.reportLoadingStudentId == student.id,
+                    onRefresh = { viewModel.refreshReport(student) },
+                    reportError = state.reportError,
+                    onDismissReportError = viewModel::clearReportError,
+                    nav = nav
+                )
+            }
+        }
         composable(Destinations.Teacher) { TeacherHomeScreen(state, nav, viewModel::refreshDashboard) }
         composable(Destinations.TeacherMessages) { TeacherMessagesScreen(state, nav, viewModel::markMessageRead, viewModel::refreshDashboard) }
         composable(Destinations.Classes) { TeacherClassesScreen(state, nav) }
@@ -270,10 +293,10 @@ private fun NavHostController.replaceRoot(destination: String) {
                 clearWorkflow = viewModel::clearWorkflowState
             )
         }
-        composable(Destinations.TeacherBoard) { TeacherClassBoardScreen(state, nav) { student -> viewModel.chooseChild(student); nav.navigateSingleTop(Destinations.Report) } }
-        composable(Destinations.Students) { StudentListScreen(state, nav, null) { student -> viewModel.chooseChild(student); nav.navigateSingleTop(Destinations.Report) } }
-        composable(Destinations.StudentsRoute) { entry -> StudentListScreen(state, nav, entry.arguments?.getString("className")) { student -> viewModel.chooseChild(student); nav.navigateSingleTop(Destinations.Report) } }
-        composable(Destinations.OutstandingStudents) { StudentListScreen(state, nav, null, outstandingOnly = true) { student -> viewModel.chooseChild(student); nav.navigateSingleTop(Destinations.Report) } }
+        composable(Destinations.TeacherBoard) { TeacherClassBoardScreen(state, nav) { student -> nav.navigateSingleTop("report/${student.id}") } }
+        composable(Destinations.Students) { StudentListScreen(state, nav, null) { student -> nav.navigateSingleTop("report/${student.id}") } }
+        composable(Destinations.StudentsRoute) { entry -> StudentListScreen(state, nav, entry.arguments?.getString("className")) { student -> nav.navigateSingleTop("report/${student.id}") } }
+        composable(Destinations.OutstandingStudents) { StudentListScreen(state, nav, null, outstandingOnly = true) { student -> nav.navigateSingleTop("report/${student.id}") } }
         composable(Destinations.Tasks) { TeacherTasksScreen(state, nav, viewModel::saveCourseUpload, { taskId, attendance, notes, attachment -> viewModel.submitCourseUploadCommand(taskId, attendance, notes, attachment) }, viewModel::saveDraft, viewModel::clearDraft) }
         composable(Destinations.TaskDetailRoute) { entry -> TeacherTaskDetailScreen(state, nav, viewModel::updateStudentTaskStatus, entry.arguments?.getString("taskId"), viewModel::submitTaskStatusCommand) }
         composable(Destinations.Review) { ReviewListScreen(state, nav, viewModel::submitReviewDecision, viewModel::saveDraft, viewModel::clearDraft, viewModel::submitTaskStatusCommand) }
@@ -285,17 +308,16 @@ private fun NavHostController.replaceRoot(destination: String) {
         }
         composable(Destinations.PrincipalGrades) { GradeStatsScreen(state, nav, rootTab = true) }
         composable(Destinations.PrincipalClassStats) { ClassStatsScreen(state, nav, null, rootTab = true) }
-        composable(Destinations.PrincipalRisk) { RiskStudentsScreen(state, nav, null, rootTab = true) { student -> viewModel.chooseChild(student); nav.navigateSingleTop(Destinations.Report) } }
+        composable(Destinations.PrincipalRisk) { RiskStudentsScreen(state, nav, null, rootTab = true) { student -> nav.navigateSingleTop("report/${student.id}") } }
         composable(Destinations.Grades) { GradeStatsScreen(state, nav) }
         composable(Destinations.ClassStats) { ClassStatsScreen(state, nav, null) }
         composable(Destinations.ClassStatsRoute) { entry -> ClassStatsScreen(state, nav, entry.arguments?.getString("grade")) }
         composable(Destinations.Risk) {
-            RiskStudentsScreen(state, nav, null) { student -> viewModel.chooseChild(student); nav.navigateSingleTop(Destinations.Report) }
+            RiskStudentsScreen(state, nav, null) { student -> nav.navigateSingleTop("report/${student.id}") }
         }
         composable(Destinations.RiskRoute) { entry ->
             RiskStudentsScreen(state, nav, entry.arguments?.getString("className")) { student ->
-                viewModel.chooseChild(student)
-                nav.navigateSingleTop(Destinations.Report)
+                nav.navigateSingleTop("report/${student.id}")
         }
     }
     }

@@ -140,7 +140,6 @@ struct ParentClassCircleDashboard: View {
     @State private var commentDraft = ""
     @State private var commentSubmitted = false
     @State private var selectedFilter = "全部"
-    @State private var pinnedAnnouncementLiked = false
     private let pinnedNoticeID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
     var body: some View {
         ScrollView {
@@ -165,7 +164,20 @@ struct ParentClassCircleDashboard: View {
                     selectedFilter == "全部" || (selectedFilter == "老师动态" && post.author.contains("老师")) || (selectedFilter == "家长分享" && !post.author.contains("老师"))
                 }
                 if visiblePosts.isEmpty {
-                    pinnedAnnouncementPost(author: "李老师", content: "本周运动打卡已开启，欢迎家长分享孩子的练习瞬间。", isTeacher: true, isLiked: $pinnedAnnouncementLiked, commentCount: state.localFeatures.classPostComments.filter { $0.postID == pinnedNoticeID }.count, onComment: { openComment(for: pinnedNoticeID) })
+                    pinnedAnnouncementPost(
+                        author: "李老师",
+                        content: "本周运动打卡已开启，欢迎家长分享孩子的练习瞬间。",
+                        isTeacher: true,
+                        isLiked: Binding(
+                            get: { state.localFeatures.likedClassPostIDs.contains(pinnedNoticeID) },
+                            set: { desired in
+                                let current = state.localFeatures.likedClassPostIDs.contains(pinnedNoticeID)
+                                if desired != current { state.toggleClassPostLike(pinnedNoticeID) }
+                            }
+                        ),
+                        commentCount: state.localFeatures.classPostComments.filter { $0.postID == pinnedNoticeID }.count,
+                        onComment: { openComment(for: pinnedNoticeID) }
+                    )
                 }
                 ForEach(visiblePosts) { post in
                     ReferenceCard {

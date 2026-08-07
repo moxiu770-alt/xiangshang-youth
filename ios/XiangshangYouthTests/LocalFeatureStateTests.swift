@@ -114,6 +114,7 @@ final class LocalFeatureStateTests: XCTestCase {
             value.settings.reduceMotion = true
             let postID = UUID()
             value.likedClassPostIDs.insert(postID)
+            value.likedClassPostIDs.insert(UUID(uuidString: "00000000-0000-0000-0000-000000000001")!)
             value.classPostComments.append(ClassPostComment(id: UUID(), postID: postID, author: "王女士", text: "继续加油", createdAt: .now))
         }
 
@@ -127,7 +128,8 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertEqual(restored.reviewNotes["s01"], "核验视频后建议周五补测。")
         XCTAssertTrue(restored.settings.reduceMotion)
         XCTAssertEqual(restored.classPostComments.first?.text, "继续加油")
-        XCTAssertEqual(restored.likedClassPostIDs.count, 1)
+        XCTAssertEqual(restored.likedClassPostIDs.count, 2)
+        XCTAssertTrue(restored.likedClassPostIDs.contains(UUID(uuidString: "00000000-0000-0000-0000-000000000001")!))
     }
 
     func testRemoteRepositoryKeepsReportRouteRenderableDuringEndpointRollout() async throws {

@@ -53,7 +53,7 @@ class LocalFeatureStateTest {
             courseProgress = mapOf("体姿改善课程" to .8f),
             supportMessages = listOf(SupportMessage("想了解课程", true)),
             classPosts = listOf(ClassPost(author = "王女士", content = "今天完成运动打卡")),
-            likedPostIds = setOf("post-1"),
+            likedPostIds = setOf("post-1", "teacher-announcement"),
             postComments = mapOf("post-1" to listOf("继续加油")),
             expertAppointments = listOf(ExpertAppointment(expertName = "张教授", preferredDate = "周五上午", note = "运动发展咨询")),
             courseUploads = listOf(CourseUploadRecord(taskId = "after-class-upload", attendanceCount = 26, notes = "已完成课程", attachmentName = "课堂.jpg", status = LocalSubmissionStatus.PendingSync)),
@@ -77,6 +77,7 @@ class LocalFeatureStateTest {
         assertEquals(.8f, state.courseProgress["体姿改善课程"])
         assertEquals("王女士", state.classPosts.single().author)
         assertTrue("post-1" in state.likedPostIds)
+        assertTrue("teacher-announcement" in state.likedPostIds)
         assertEquals("继续加油", state.postComments["post-1"]?.single())
         assertEquals("张教授", state.expertAppointments.single().expertName)
         assertEquals(LocalSubmissionStatus.PendingSync, state.courseUploads.single().status)

@@ -945,7 +945,7 @@ struct TeacherClassesView: View {
     }
 }
 
-enum StudentListMode {
+enum StudentListMode: Equatable {
     case all, outstanding
     var title: String { self == .outstanding ? "优秀学生评选" : "学生列表" }
     var emptyDetail: String { self == .outstanding ? "完成测评后，总分达到 30 分的学生会显示在这里。" : "当前班级暂未同步学生名单。" }

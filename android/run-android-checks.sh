@@ -34,17 +34,50 @@ export ANDROID_HOME="$sdk_dir"
 export ANDROID_SDK_ROOT="$sdk_dir"
 export PATH="$JAVA_HOME/bin:$sdk_dir/platform-tools:$sdk_dir/emulator:$PATH"
 
+function device_finished_booting() {
+  local serial="$1"
+  local boot_file query_pid attempts boot_value
+  boot_file="$(mktemp -t xiangshang-adb-boot)"
+  adb -s "$serial" shell getprop sys.boot_completed >"$boot_file" 2>/dev/null &
+  query_pid=$!
+  attempts=0
+  # A device may be visible to `adb devices` while its framework is frozen or
+  # still starting. Bound the probe so local/CI checks never wait forever.
+  while kill -0 "$query_pid" 2>/dev/null && (( attempts < 15 )); do
+    sleep 1
+    attempts=$((attempts + 1))
+  done
+  if kill -0 "$query_pid" 2>/dev/null; then
+    kill "$query_pid" 2>/dev/null || true
+    wait "$query_pid" 2>/dev/null || true
+    rm -f "$boot_file"
+    return 1
+  fi
+  wait "$query_pid" 2>/dev/null || true
+  boot_value="$(tr -d '\r\n' <"$boot_file")"
+  rm -f "$boot_file"
+  [[ "$boot_value" == "1" ]]
+}
+
 cd "$project_dir"
 print "JAVA_HOME=$JAVA_HOME"
 print "ANDROID_HOME=$ANDROID_HOME"
 ./gradlew :app:assembleDebug :app:assembleAndroidTest :app:testDebugUnitTest :app:lintDebug --no-daemon "$@"
 if (( $+commands[adb] )); then
-  connected_devices=$(adb devices | awk 'NR > 1 && $2 == "device" { count++ } END { print count + 0 }')
-  if (( connected_devices > 0 )); then
-    print "检测到 $connected_devices 台 Android 设备，运行 Compose 仪器测试。"
+  ready_devices=()
+  while read -r serial status _; do
+    [[ "$status" == "device" ]] || continue
+    if device_finished_booting "$serial"; then
+      ready_devices+=("$serial")
+    else
+      print -u2 "设备 $serial 尚未完成系统启动或 ADB 无响应，跳过仪器测试。"
+    fi
+  done < <(adb devices | awk 'NR > 1 && NF >= 2 { print $1, $2 }')
+  if (( ${#ready_devices} > 0 )); then
+    print "检测到 ${#ready_devices} 台已启动的 Android 设备，运行 Compose 仪器测试。"
     ./gradlew :app:connectedDebugAndroidTest --no-daemon "$@"
   else
-    print "未检测到 Android 真机/模拟器：已完成 APK、AndroidTest APK、JVM 单测和 lint；仪器测试待设备连接后执行。"
+    print "未检测到已完成启动的 Android 真机/模拟器：已完成 APK、AndroidTest APK、JVM 单测和 lint；仪器测试待设备启动完成后执行。"
   fi
 else
   print "未找到 adb：已完成 APK、AndroidTest APK、JVM 单测和 lint；仪器测试待 Android SDK 连接后执行。"

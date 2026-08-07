@@ -1,6 +1,7 @@
 package com.xiangshang.youth
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -65,6 +66,9 @@ class MainActivityFlowTest {
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("学校运动健康总览").fetchSemanticsNodes().isNotEmpty()
         }
+        // Role dashboards are application roots.  A back affordance here used
+        // to expose the previous workbench instead of the role picker.
+        composeRule.onNodeWithContentDescription("返回").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("风险").performClick()
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("重点风险学生").fetchSemanticsNodes().isNotEmpty()

@@ -59,6 +59,10 @@ final class LaunchAndRoleFlowTests: XCTestCase {
 
         button(containing: "校长端").tap()
         XCTAssertTrue(staticText(containing: "学校运动健康总览").waitForExistence(timeout: 5))
+        // A role workbench is a root state, never a pushed secondary page.
+        // Keeping this assertion here prevents the old stray top-left back
+        // affordance (and its blank-host dismissal path) from returning.
+        XCTAssertFalse(button(containing: "返回").exists)
 
         // A role dashboard is a root state, so exiting it must return to role
         // selection instead of exposing a stale NavigationStack back route.

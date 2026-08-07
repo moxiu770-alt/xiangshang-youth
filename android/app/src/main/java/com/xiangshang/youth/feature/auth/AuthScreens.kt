@@ -49,7 +49,16 @@ fun SplashScreen(onFinished: () -> Unit, canFinish: () -> Boolean = { true }) {
         while (!canFinish()) delay(120)
         onFinished()
     }
-    Image(painter = painterResource(R.drawable.launch_poster), contentDescription = "向上少年启动页", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+    // The approved splash is a portrait poster. Preserve its complete artwork
+    // on every aspect ratio rather than cropping the headline or children.
+    Box(Modifier.fillMaxSize().background(Color(0xFF7452A5)), contentAlignment = Alignment.Center) {
+        Image(
+            painter = painterResource(R.drawable.launch_poster),
+            contentDescription = "向上少年启动页",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Fit
+        )
+    }
 }
 
 @Composable

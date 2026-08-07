@@ -11,6 +11,11 @@ struct RootView: View {
     @EnvironmentObject private var router: AppRouter
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.scenePhase) private var scenePhase
+    // Respect both the in-app preference and the system accessibility setting.
+    // The latter matters before a user has reached "我的 > 设置", and prevents
+    // the launch/login artwork from drifting for people who reduce motion at
+    // the OS level.
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @StateObject private var networkMonitor = NetworkMonitor()
     var body: some View {
         ZStack {
@@ -50,7 +55,7 @@ struct RootView: View {
             Task { await state.refreshDashboard() }
         }
         .transaction { transaction in
-            if state.localFeatures.settings.reduceMotion {
+            if state.localFeatures.settings.reduceMotion || systemReduceMotion {
                 transaction.disablesAnimations = true
                 transaction.animation = nil
             }

@@ -69,6 +69,7 @@ struct ReferenceSectionTitle: View {
 struct ReferenceMetric: View {
     let icon: String; let title: String; let value: String; let color: Color
     @EnvironmentObject private var state: AppState
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var breathes = false
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -83,8 +84,8 @@ struct ReferenceMetric: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(9)
         .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: 9))
-        .task(id: state.localFeatures.settings.reduceMotion) {
-            guard !state.localFeatures.settings.reduceMotion else { breathes = false; return }
+        .task(id: state.localFeatures.settings.reduceMotion || systemReduceMotion) {
+            guard !(state.localFeatures.settings.reduceMotion || systemReduceMotion) else { breathes = false; return }
             withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) { breathes = true }
         }
     }
@@ -100,6 +101,7 @@ struct AnimatedProgressLine: View {
     var colors: [Color] = [ReferenceColor.blue, ReferenceColor.green]
     var height: CGFloat = 7
     @EnvironmentObject private var state: AppState
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var displayed = 0.0
 
     var body: some View {
@@ -113,9 +115,9 @@ struct AnimatedProgressLine: View {
                 }
         }
         .frame(height: height)
-        .task(id: state.localFeatures.settings.reduceMotion) {
+        .task(id: state.localFeatures.settings.reduceMotion || systemReduceMotion) {
             let target = min(max(value, 0), 1)
-            guard !state.localFeatures.settings.reduceMotion else { displayed = target; return }
+            guard !(state.localFeatures.settings.reduceMotion || systemReduceMotion) else { displayed = target; return }
             displayed = 0
             withAnimation(.spring(response: 0.9, dampingFraction: 0.82).delay(0.18)) { displayed = target }
         }

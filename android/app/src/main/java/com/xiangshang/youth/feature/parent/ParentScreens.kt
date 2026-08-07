@@ -604,23 +604,31 @@ private fun SimpleDialog(
 
 @Composable fun AssessmentFlowScreen(state: AppUiState, nav: NavHostController, category: String, completeAssessment: (String) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit) {
     val childKey = state.selectedChild?.id ?: "anonymous"
-    var step by rememberSaveable(childKey, category) { mutableIntStateOf(0) }
-    var done by rememberSaveable(childKey, category) { mutableStateOf("$childKey-$category" in state.local.completedAssessments) }
-    var answer by rememberSaveable(childKey, category, step) { mutableStateOf("") }
-    var validation by rememberSaveable(childKey, category, step) { mutableStateOf<String?>(null) }
     if (state.selectedChild == null) { AppScaffold("绑定孩子", onBack = { nav.popBackStack() }) { EmptyState("请先绑定孩子，再开始健康测评。"); Button(onClick = { nav.navigate(Destinations.Children) }) { Text("去绑定孩子") } }; return }
     val selectedChild = state.selectedChild
     val title = when (category) { "vision" -> "视力"; "oral" -> "口腔"; "mental" -> "心理"; else -> "体质" }
     val icon = when (category) { "vision" -> Icons.Filled.RemoveRedEye; "oral" -> Icons.Filled.MedicalServices; "mental" -> Icons.Filled.Favorite; else -> Icons.AutoMirrored.Filled.DirectionsRun }
     val tint = when (category) { "vision" -> Green; "oral" -> Color(0xFFFFBD2E); "mental" -> Color(0xFFFF6D9B); else -> Blue }
     val steps = when (category) { "fitness" -> listOf("基础信息", "遗传身高", "脊柱姿态", "运动表现"); "vision" -> listOf("基础信息", "用眼习惯", "视力筛查"); "oral" -> listOf("基础信息", "口腔习惯", "口腔筛查"); else -> listOf("授权登录", "心理问卷", "结果回传") }
+    val progressKey = "assessment-progress-${selectedChild.id}-$category"
+    var step by rememberSaveable(childKey, category) {
+        mutableIntStateOf(state.local.drafts[progressKey]?.toIntOrNull()?.coerceIn(0, steps.lastIndex) ?: 0)
+    }
+    var done by rememberSaveable(childKey, category) { mutableStateOf("$childKey-$category" in state.local.completedAssessments) }
+    var answer by rememberSaveable(childKey, category, step) { mutableStateOf("") }
+    var validation by rememberSaveable(childKey, category, step) { mutableStateOf<String?>(null) }
     val draftKey = "assessment-${selectedChild.id}-$category-$step"
     LaunchedEffect(draftKey) { answer = state.local.drafts[draftKey].orEmpty() }
+    // `rememberSaveable` covers rotations only.  Persist the step independently
+    // so an assessment remains resumable after Android reclaims the process.
+    LaunchedEffect(progressKey, step, done) {
+        if (!done) saveDraft(progressKey, step.toString())
+    }
     Scaffold(containerColor = Canvas) { padding -> Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
         Row(Modifier.fillMaxWidth().background(Color.White).padding(14.dp), verticalAlignment = Alignment.CenterVertically) { IconButton(onClick = { nav.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回") }; Text("${title}测评", color = Navy, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center); Spacer(Modifier.width(48.dp)) }
         Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) { Icon(icon, null, tint = tint, modifier = Modifier.size(52.dp)); Text("${selectedChild.name}的${title}测评", color = Navy, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 7.dp)); Text(if (category == "fitness") "完成身高、体态与学校运动表现记录" else "请根据孩子最近情况完成本次测评", color = Color.Gray, fontSize = 10.sp) }
         Row(Modifier.padding(horizontal = 16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { steps.forEachIndexed { index, item -> Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) { Surface(Modifier.size(25.dp), color = if (index <= step) tint else Color.LightGray, shape = CircleShape) { Text("${index + 1}", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 5.dp)) }; Text(item, color = if (index <= step) tint else Color.Gray, fontSize = 8.sp, maxLines = 1) }; if (index < steps.lastIndex) Spacer(Modifier.width(2.dp)) } }
         Surface(Modifier.padding(16.dp).fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(12.dp)) { Column(Modifier.padding(14.dp)) { Text(if (done) "测评已保存" else steps[step], color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp); Spacer(Modifier.height(8.dp)); Text(if (done) "结果已保存，将同步到健康档案。" else if (category == "mental") "将跳转至第三方心理系统授权登录，完成后自动回传结果。" else if (category == "fitness") when(step) { 0 -> "确认孩子的出生日期、当前身高和体重。"; 1 -> "填写父母身高，系统会计算遗传身高区间。"; 2 -> "按引导上传或记录站立姿态筛查结果。"; else -> "学校场地端完成运动发展测试后，结果将自动同步至本页。" } else "填写健康习惯并确认本次${title}筛查结果。", color = Color.Gray, fontSize = 11.sp); if (!done) { OutlinedTextField(value = answer, onValueChange = { answer = it; saveDraft(draftKey, it); validation = null }, label = { Text("本步骤记录") }, placeholder = { Text("填写后自动保存草稿") }, modifier = Modifier.fillMaxWidth().padding(top = 10.dp)); Text("可退出后继续填写。", color = Color.Gray, fontSize = 9.sp, modifier = Modifier.padding(top = 4.dp)) }; validation?.let { Text(it, color = Color.Red, fontSize = 10.sp, modifier = Modifier.padding(top = 5.dp)) } } }
-        Button(onClick = { if (done) { nav.navigate(Destinations.Report) } else if (answer.isBlank()) { validation = "请填写本步骤信息后再继续。" } else if (step < steps.lastIndex) { step += 1; answer = state.local.drafts["assessment-${selectedChild.id}-$category-$step"] ?: "" } else { steps.indices.forEach { index -> clearDraft("assessment-${selectedChild.id}-$category-$index") }; completeAssessment(category); done = true } }, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth().height(48.dp)) { Text(if (done) "查看报告" else if (step == steps.lastIndex) "完成并保存" else "保存并下一步") }
+        Button(onClick = { if (done) { nav.navigate(Destinations.Report) } else if (answer.isBlank()) { validation = "请填写本步骤信息后再继续。" } else if (step < steps.lastIndex) { step += 1; answer = state.local.drafts["assessment-${selectedChild.id}-$category-$step"] ?: "" } else { steps.indices.forEach { index -> clearDraft("assessment-${selectedChild.id}-$category-$index") }; clearDraft(progressKey); completeAssessment(category); done = true } }, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth().height(48.dp)) { Text(if (done) "查看报告" else if (step == steps.lastIndex) "完成并保存" else "保存并下一步") }
     } }
 }

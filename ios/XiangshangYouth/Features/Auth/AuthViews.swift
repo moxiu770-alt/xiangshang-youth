@@ -8,7 +8,11 @@ struct SplashView: View {
             Color(hex: "7452A5").ignoresSafeArea()
             Image("LaunchPoster")
                 .resizable()
-                .scaledToFill()
+                // The approved poster is a portrait composition. Preserve the
+                // whole artwork on iPad instead of cropping its headline; the
+                // purple canvas provides intentional side letterboxing there.
+                .scaledToFit()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .ignoresSafeArea()
         }
         .statusBarHidden(true)

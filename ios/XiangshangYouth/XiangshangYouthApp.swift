@@ -33,6 +33,11 @@ struct RootView: View {
         }
         .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
+        // NavigationStack owns the hosting controller's status-bar preference.
+        // Apply the splash rule here (not only on the outer ZStack) so the
+        // transition out of LaunchScreen cannot briefly show time/signal text.
+        .statusBarHidden(state.isShowingSplash)
+        .persistentSystemOverlays(state.isShowingSplash ? .hidden : .visible)
         .onOpenURL { url in
             router.receiveDeepLink(url)
             router.activatePendingDeepLink(using: state)

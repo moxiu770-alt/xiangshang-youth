@@ -8,7 +8,7 @@
                         <rect key="frame" x="0.0" y="0.0" width="390" height="844"/>
                         <color key="backgroundColor" red="0.353" green="0.235" blue="0.604" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         <subviews>
-                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFill" image="LaunchPoster" translatesAutoresizingMaskIntoConstraints="NO" id="launch-poster"/>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" image="LaunchPoster" translatesAutoresizingMaskIntoConstraints="NO" id="launch-poster"/>
                         </subviews>
                         <viewLayoutGuide key="safeArea" id="safe"/>
                         <constraints>

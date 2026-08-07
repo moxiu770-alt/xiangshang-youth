@@ -115,7 +115,11 @@ struct LoginView: View {
                     Button(codeCountdown > 0 ? "\(codeCountdown)s 后重试" : codeSent ? "重新获取" : "获取验证码") {
                         guard phone.filter(\.isNumber).count == 11 else { validationMessage = "请先填写 11 位手机号。"; return }
                         codeSent = true
+                        #if DEBUG
+                        // Preserve quick local/UI-test entry without shipping a
+                        // reusable verification value in a Release build.
                         verificationCode = "1234"
+                        #endif
                         codeCountdown = 60
                         countdownTask?.cancel()
                         countdownTask = Task { @MainActor in
@@ -315,7 +319,9 @@ struct RegisterView: View {
                             Button(codeCountdown > 0 ? "\(codeCountdown)s" : codeSent ? "重新获取" : "获取验证码") {
                                 guard phone.filter(\.isNumber).count == 11 else { error = "请先填写 11 位手机号。"; return }
                                 codeSent = true
+                                #if DEBUG
                                 code = "1234"
+                                #endif
                                 codeCountdown = 60
                                 countdownTask?.cancel()
                                 countdownTask = Task { @MainActor in
@@ -472,7 +478,9 @@ struct ResetPasswordView: View {
         }
         error = nil
         codeSent = true
+        #if DEBUG
         code = "1234"
+        #endif
         codeCountdown = 60
         countdownTask?.cancel()
         countdownTask = Task { @MainActor in

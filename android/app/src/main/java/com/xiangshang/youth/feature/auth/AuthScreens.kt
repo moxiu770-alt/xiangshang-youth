@@ -100,7 +100,7 @@ fun LoginScreen(
                         OutlinedTextField(value = phone, onValueChange = { phone = it; error = null; onClearError() }, label = { Text("手机号") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), singleLine = true, modifier = Modifier.fillMaxWidth())
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             OutlinedTextField(value = code, onValueChange = { code = it; error = null; onClearError() }, label = { Text("短信验证码") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.weight(1f))
-                            TextButton(onClick = { if (phone.filter(Char::isDigit).length != 11) error = "请先填写 11 位手机号。" else { codeSent = true; codeCountdown = 60; code = "1234" } }, enabled = codeCountdown == 0) { Text(if (codeCountdown > 0) "${codeCountdown}s 后重试" else if (codeSent) "重新获取" else "获取验证码", fontSize = 11.sp) }
+                            TextButton(onClick = { if (phone.filter(Char::isDigit).length != 11) error = "请先填写 11 位手机号。" else { codeSent = true; codeCountdown = 60; if (BuildConfig.DEBUG) code = "1234" } }, enabled = codeCountdown == 0) { Text(if (codeCountdown > 0) "${codeCountdown}s 后重试" else if (codeSent) "重新获取" else "获取验证码", fontSize = 11.sp) }
                         }
                     } else if (method == 2) {
                         OutlinedTextField(value = account, onValueChange = { account = it; error = null; onClearError() }, label = { Text("账号 / 手机号") }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -193,7 +193,7 @@ fun RegisterScreen(
         OutlinedTextField(value = phone, onValueChange = { phone = it; error = null }, label = { Text("手机号") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 9.dp))
         Row(Modifier.fillMaxWidth().padding(top = 9.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(value = code, onValueChange = { code = it; error = null }, label = { Text("短信验证码") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.weight(1f))
-            TextButton(onClick = { if (phone.filter(Char::isDigit).length != 11) error = "请先填写 11 位手机号。" else { codeSent = true; code = "1234"; codeCountdown = 60 } }, enabled = codeCountdown == 0) { Text(if (codeCountdown > 0) "${codeCountdown}s" else if (codeSent) "重新获取" else "获取验证码", fontSize = 11.sp) }
+            TextButton(onClick = { if (phone.filter(Char::isDigit).length != 11) error = "请先填写 11 位手机号。" else { codeSent = true; if (BuildConfig.DEBUG) code = "1234"; codeCountdown = 60 } }, enabled = codeCountdown == 0) { Text(if (codeCountdown > 0) "${codeCountdown}s" else if (codeSent) "重新获取" else "获取验证码", fontSize = 11.sp) }
         }
         OutlinedTextField(value = password, onValueChange = { password = it; error = null }, label = { Text("设置密码（至少 6 位）") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 9.dp))
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp).semantics { role = Role.Checkbox; contentDescription = if (agreement) "已同意用户协议、隐私政策和儿童隐私政策" else "同意用户协议、隐私政策和儿童隐私政策" }.clickable { agreement = !agreement }) { Checkbox(checked = agreement, onCheckedChange = { agreement = it }); Text("我已阅读并同意用户协议、隐私政策和儿童隐私政策", color = Navy, fontSize = 10.sp) }
@@ -274,7 +274,7 @@ fun PasswordResetScreen(onBack: () -> Unit) {
             TextButton(
                 onClick = {
                     if (phone.filter(Char::isDigit).length != 11) error = "请输入有效的 11 位手机号。"
-                    else { codeSent = true; code = "1234"; codeCountdown = 60; error = null }
+                    else { codeSent = true; if (BuildConfig.DEBUG) code = "1234"; codeCountdown = 60; error = null }
                 },
                 enabled = codeCountdown == 0
             ) { Text(if (codeCountdown > 0) "${codeCountdown}s" else if (codeSent) "重新获取" else "获取验证码", fontSize = 11.sp) }

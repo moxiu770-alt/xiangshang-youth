@@ -169,10 +169,10 @@ private fun ParentSection(title: String, action: String, onAction: (() -> Unit)?
     }
 
 @Composable
-fun ChildrenScreen(state: AppUiState, nav: NavHostController, bindChild: (String, String) -> Boolean, choose: (Student) -> Unit, onBound: () -> Unit = {}) = AppScaffold("孩子管理", onBack = { nav.popBackStack() }) {
+fun ChildrenScreen(state: AppUiState, nav: NavHostController, bindChild: (String, String) -> Boolean, choose: (Student) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit, onBound: () -> Unit = {}) = AppScaffold("孩子管理", onBack = { nav.popBackStack() }) {
     var bindingOpen by rememberSaveable { mutableStateOf(false) }
-    var childName by rememberSaveable { mutableStateOf("") }
-    var bindingCode by rememberSaveable { mutableStateOf("") }
+    var childName by rememberSaveable { mutableStateOf(state.local.drafts["child-binding-name"].orEmpty()) }
+    var bindingCode by rememberSaveable { mutableStateOf(state.local.drafts["child-binding-code"].orEmpty()) }
     var bindingError by remember { mutableStateOf<String?>(null) }
     var bindingHelpOpen by rememberSaveable { mutableStateOf(false) }
     val data = state.data
@@ -193,8 +193,8 @@ fun ChildrenScreen(state: AppUiState, nav: NavHostController, bindChild: (String
     if (bindingOpen) AlertDialog(
         onDismissRequest = { bindingOpen = false },
         title = { Text("绑定孩子") },
-        text = { Column { OutlinedTextField(value = childName, onValueChange = { childName = it; bindingError = null }, label = { Text("孩子姓名") }, modifier = Modifier.fillMaxWidth()); OutlinedTextField(value = bindingCode, onValueChange = { bindingCode = it; bindingError = null }, label = { Text("学校绑定码") }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)); Text("绑定码由学校或班主任提供，用于确认家庭与孩子关系。", color = Color.Gray, fontSize = 9.sp, modifier = Modifier.padding(top = 7.dp)); TextButton(onClick = { bindingHelpOpen = true }, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp), modifier = Modifier.semantics { contentDescription = "查看绑定码获取说明" }) { Text("绑定码在哪找？", color = Blue, fontSize = 10.sp) }; bindingError?.let { Text(it, color = Color.Red, fontSize = 10.sp, modifier = Modifier.padding(top = 5.dp)) } } },
-        confirmButton = { TextButton(onClick = { if (bindChild(childName, bindingCode)) { childName = ""; bindingCode = ""; bindingError = null; bindingOpen = false; onBound() } else bindingError = "姓名或绑定码不匹配，请核对后重试。" }) { Text("确认绑定") } },
+        text = { Column { OutlinedTextField(value = childName, onValueChange = { childName = it; saveDraft("child-binding-name", it); bindingError = null }, label = { Text("孩子姓名") }, modifier = Modifier.fillMaxWidth()); OutlinedTextField(value = bindingCode, onValueChange = { bindingCode = it; saveDraft("child-binding-code", it); bindingError = null }, label = { Text("学校绑定码") }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)); Text("绑定码由学校或班主任提供，用于确认家庭与孩子关系。", color = Color.Gray, fontSize = 9.sp, modifier = Modifier.padding(top = 7.dp)); TextButton(onClick = { bindingHelpOpen = true }, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp), modifier = Modifier.semantics { contentDescription = "查看绑定码获取说明" }) { Text("绑定码在哪找？", color = Blue, fontSize = 10.sp) }; bindingError?.let { Text(it, color = Color.Red, fontSize = 10.sp, modifier = Modifier.padding(top = 5.dp)) } } },
+        confirmButton = { TextButton(onClick = { if (bindChild(childName, bindingCode)) { childName = ""; bindingCode = ""; clearDraft("child-binding-name"); clearDraft("child-binding-code"); bindingError = null; bindingOpen = false; onBound() } else bindingError = "姓名或绑定码不匹配，请核对后重试。" }) { Text("确认绑定") } },
         dismissButton = { TextButton(onClick = { bindingOpen = false }) { Text("取消") } }
     )
     if (bindingHelpOpen) AlertDialog(

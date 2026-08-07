@@ -214,7 +214,10 @@ struct ChildrenView: View {
                     }
                     Section { Button("确认绑定") {
                         guard state.bindChild(name: childName, code: bindingCode) else { bindingError = "姓名或绑定码不匹配，请核对后重试。"; return }
-                        bindingError = nil; childName = ""; bindingCode = ""; bindingPresented = false
+                        bindingError = nil; childName = ""; bindingCode = ""
+                        state.clearDraft("child-binding-name")
+                        state.clearDraft("child-binding-code")
+                        bindingPresented = false
                         // Return to the page that requested binding so the newly
                         // selected child immediately unlocks the report/task
                         // entry point instead of leaving the family in a dead-end
@@ -225,6 +228,20 @@ struct ChildrenView: View {
                 .navigationTitle("绑定孩子")
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("取消") { bindingPresented = false } } }
             }
+        }
+        .onChange(of: bindingPresented) { _, isPresented in
+            guard isPresented else { return }
+            childName = state.localFeatures.drafts["child-binding-name"] ?? ""
+            bindingCode = state.localFeatures.drafts["child-binding-code"] ?? ""
+            bindingError = nil
+        }
+        .onChange(of: childName) { _, value in
+            guard bindingPresented else { return }
+            state.saveDraft(value, key: "child-binding-name")
+        }
+        .onChange(of: bindingCode) { _, value in
+            guard bindingPresented else { return }
+            state.saveDraft(value, key: "child-binding-code")
         }
         .alert("绑定码获取说明", isPresented: $bindingHelpPresented) {
             Button("知道了", role: .cancel) { }

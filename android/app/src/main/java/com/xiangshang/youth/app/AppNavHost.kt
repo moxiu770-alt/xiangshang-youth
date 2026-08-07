@@ -199,7 +199,7 @@ private fun NavHostController.replaceRoot(destination: String) {
             nav.replaceRoot(destination)
         }, onLogout = { viewModel.logout(); nav.replaceRoot(Destinations.Login) }) }
         composable(Destinations.Parent) { ParentHomeScreen(state, nav, viewModel::registerActivity, viewModel::checkInToday, viewModel::bookExpert, viewModel::saveDraft, viewModel::clearDraft, { viewModel.refreshDashboard() }, { name, phone -> viewModel.submitActivityCommand(name, phone) }, { name, date, note -> viewModel.submitExpertCommand(name, date, note) }) }
-        composable(Destinations.Children) { ChildrenScreen(state, nav, viewModel::bindChild, choose = { viewModel.chooseChild(it); nav.popBackStack() }, onBound = { nav.popBackStack() }) }
+        composable(Destinations.Children) { ChildrenScreen(state, nav, viewModel::bindChild, choose = { viewModel.chooseChild(it); nav.popBackStack() }, saveDraft = viewModel::saveDraft, clearDraft = viewModel::clearDraft, onBound = { nav.popBackStack() }) }
         composable(Destinations.ParentEvaluations) { ParentEvaluationsScreen(state, nav, state.selectedChild?.let(viewModel::report)) }
         composable("${Destinations.Assessment}/{category}") { entry -> AssessmentFlowScreen(state, nav, entry.arguments?.getString("category") ?: "fitness", viewModel::completeAssessment, viewModel::saveDraft, viewModel::clearDraft) }
         composable(Destinations.Courses) { ParentCoursesScreen(state, nav, viewModel::updateCourseProgress, viewModel::sendSupport, viewModel::saveDraft, viewModel::clearDraft, submitSupport = viewModel::submitSupportCommand, clearWorkflow = viewModel::clearWorkflowState) }

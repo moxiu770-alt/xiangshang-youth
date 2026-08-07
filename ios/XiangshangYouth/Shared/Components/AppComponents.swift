@@ -1,14 +1,27 @@
 import SwiftUI
 
 struct AppScaffold<Content: View>: View {
-    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var state: AppState
     let title: String; @ViewBuilder var content: Content
     var body: some View {
         VStack(spacing: 0) {
             ZStack {
-                Button(action: { if router.path.isEmpty { dismiss() } else { router.pop() } }) { Image(systemName: "chevron.left").font(.system(size: 15, weight: .bold)).foregroundStyle(AppTheme.ink).frame(width: 34, height: 34).background(.ultraThinMaterial, in: Circle()).frame(width: 44, height: 44) }.accessibilityLabel("返回").frame(maxWidth: .infinity, alignment: .leading)
+                // A workbench/root page has no in-app route to return to.  Do
+                // not fall back to SwiftUI's dismiss there: that can expose a
+                // blank host controller after state restoration.  The leading
+                // slot remains reserved so every secondary-page title stays
+                // visually centred whether a back action is present or not.
+                Group {
+                    if !router.path.isEmpty {
+                        Button(action: { router.pop() }) { Image(systemName: "chevron.left").font(.system(size: 15, weight: .bold)).foregroundStyle(AppTheme.ink).frame(width: 34, height: 34).background(.ultraThinMaterial, in: Circle()).frame(width: 44, height: 44) }
+                            .accessibilityLabel("返回")
+                            .accessibilityHint("返回上一页")
+                    } else {
+                        Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 Text(title).font(.system(size: 16, weight: .bold)).foregroundStyle(AppTheme.ink)
             }.padding(.horizontal, 14).frame(height: 52).background { Rectangle().fill(.ultraThinMaterial).ignoresSafeArea(edges: .top) }
             if let error = state.error, state.data == nil {

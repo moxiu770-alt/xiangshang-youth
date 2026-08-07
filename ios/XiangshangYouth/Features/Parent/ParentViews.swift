@@ -256,13 +256,12 @@ struct ParentEvaluationsView: View { var body: some View { ParentEvaluationDashb
 struct ParentPageNavigation: View {
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var state: AppState
-    @Environment(\.dismiss) private var dismiss
     let title: String
     var showsBack = false
     var body: some View {
         ZStack {
-            if showsBack {
-                Button { if router.path.isEmpty { dismiss() } else { router.pop() } } label: {
+            if showsBack && !router.path.isEmpty {
+                Button { router.pop() } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 14, weight: .bold))
                         .frame(width: 32, height: 32)

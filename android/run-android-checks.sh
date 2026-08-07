@@ -65,8 +65,11 @@ print "ANDROID_HOME=$ANDROID_HOME"
 ./gradlew :app:assembleDebug :app:assembleAndroidTest :app:testDebugUnitTest :app:lintDebug --no-daemon "$@"
 if (( $+commands[adb] )); then
   ready_devices=()
-  while read -r serial status _; do
-    [[ "$status" == "device" ]] || continue
+  # `status` is a readonly special parameter in zsh.  Naming this column
+  # `device_state` keeps the script compatible with its declared zsh shebang
+  # after Gradle has successfully completed all checks.
+  while read -r serial device_state _; do
+    [[ "$device_state" == "device" ]] || continue
     if device_finished_booting "$serial"; then
       ready_devices+=("$serial")
     else

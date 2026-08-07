@@ -27,6 +27,20 @@ final class LaunchAndRoleFlowTests: XCTestCase {
         // duplicate dashboard back-stack entry.
         button(containing: "学校端").tap()
         XCTAssertTrue(staticText(containing: "班级健康概览").waitForExistence(timeout: 5))
+        // Teacher board drill-downs must remain in the teacher workbench.
+        // A former route opened the principal risk page from “问题分布”.
+        let classBoard = button(containing: "班级看板")
+        XCTAssertTrue(classBoard.waitForExistence(timeout: 2))
+        classBoard.tap()
+        XCTAssertTrue(staticText(containing: "班级数据看板").waitForExistence(timeout: 3))
+        let issueDistribution = button(containing: "问题分布")
+        XCTAssertTrue(issueDistribution.waitForExistence(timeout: 2))
+        issueDistribution.tap()
+        XCTAssertTrue(staticText(containing: "预警中心").waitForExistence(timeout: 3))
+        button(containing: "返回").tap()
+        XCTAssertTrue(staticText(containing: "班级数据看板").waitForExistence(timeout: 3))
+        button(containing: "返回").tap()
+        XCTAssertTrue(staticText(containing: "班级健康概览").waitForExistence(timeout: 3))
         let teacherMessages = button(containing: "消息通知")
         XCTAssertTrue(teacherMessages.waitForExistence(timeout: 3))
         teacherMessages.tap()

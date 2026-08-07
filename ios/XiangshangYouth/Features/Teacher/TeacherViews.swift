@@ -605,7 +605,10 @@ struct TeacherClassBoardView: View {
                 }
 
                 HStack(spacing: 7) {
-                    compactBoardCard(title: "问题分布", trailing: "", action: { router.push(.riskStudents) }) {
+                    // This is a teacher-scoped drill-down.  Routing to the
+                    // principal risk workbench leaked the wrong role header
+                    // and school-wide context into a class teacher's board.
+                    compactBoardCard(title: "问题分布", trailing: "", action: { router.push(.reviewList) }) {
                         VStack(spacing: 5) {
                             smallBar("低分", min(1, Double(lowScoreCount) / Double(max(1, classStudents.count))), ReferenceColor.blue, "\(lowScoreCount)人")
                             smallBar("待复核", min(1, Double(reviewCount) / Double(max(1, classStudents.count))), .orange, "\(reviewCount)人")

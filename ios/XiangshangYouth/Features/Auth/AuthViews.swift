@@ -21,7 +21,17 @@ struct SplashView: View {
         // visible; the login/dashboard screens restore the system overlay.
         .persistentSystemOverlays(.hidden)
         .task {
-            try? await Task.sleep(for: .seconds(2.0))
+            do {
+                try await Task.sleep(for: .seconds(2.0))
+                // A stored session refreshes behind the pure poster.  Wait for
+                // that result before exposing Login/RoleSelect, matching the
+                // Android root behavior and preventing a half-restored screen.
+                while state.restoringSession {
+                    try await Task.sleep(for: .milliseconds(100))
+                }
+            } catch {
+                return
+            }
             withAnimation(.easeOut(duration: 0.28)) {
                 state.dismissSplash()
             }

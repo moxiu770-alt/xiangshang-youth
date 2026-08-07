@@ -66,10 +66,13 @@ enum WorkflowCommandState: Equatable {
             // next launch so a previously selected principal account cannot lock
             // the user out of the parent or teacher workbench.
             selectedRole = nil
+            // Set this synchronously before scheduling the refresh.  Otherwise
+            // SplashView can observe a brief false value and transition into a
+            // half-restored role picker before the dashboard is ready.
+            restoringSession = true
+            loading = true
             Task { [weak self] in
                 guard let self else { return }
-                self.restoringSession = true
-                self.loading = true
                 defer {
                     self.loading = false
                     self.restoringSession = false

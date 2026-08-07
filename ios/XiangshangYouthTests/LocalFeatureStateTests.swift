@@ -200,6 +200,7 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertEqual(restored.profile?.name, "周校长")
         XCTAssertNil(restored.selectedRole, "A restored session must return to role selection instead of locking the last role.")
         XCTAssertEqual(restored.localFeatures.selectedChildID, "s02")
+        XCTAssertTrue(restored.restoringSession, "Session restoration must be visible synchronously so the launch poster cannot transition to a half-restored role screen.")
     }
 
     func testSessionRestoreFailureReturnsToLoginWithRetryableError() async throws {

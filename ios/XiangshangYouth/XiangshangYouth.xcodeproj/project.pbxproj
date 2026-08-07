@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		B2C3D4E5F600000000000003 /* ../XiangshangYouthTests/LocalFeatureStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F600000000000002 /* ../XiangshangYouthTests/LocalFeatureStateTests.swift */; };
 		C2C3D4E5F600000000000003 /* ../XiangshangYouthUITests/LaunchAndRoleFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2C3D4E5F600000000000002 /* ../XiangshangYouthUITests/LaunchAndRoleFlowTests.swift */; };
+		D2C3D4E5F600000000000003 /* ../XiangshangYouthUITests/SplashScreenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2C3D4E5F600000000000002 /* ../XiangshangYouthUITests/SplashScreenTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -36,6 +37,7 @@
 		B2C3D4E5F600000000000002 /* ../XiangshangYouthTests/LocalFeatureStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../XiangshangYouthTests/LocalFeatureStateTests.swift; sourceTree = SOURCE_ROOT; };
 		C2C3D4E5F600000000000001 /* XiangshangYouthUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = XiangshangYouthUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2C3D4E5F600000000000002 /* ../XiangshangYouthUITests/LaunchAndRoleFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../XiangshangYouthUITests/LaunchAndRoleFlowTests.swift; sourceTree = SOURCE_ROOT; };
+		D2C3D4E5F600000000000002 /* ../XiangshangYouthUITests/SplashScreenTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../XiangshangYouthUITests/SplashScreenTests.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -125,6 +127,7 @@
 			isa = PBXGroup;
 			children = (
 				C2C3D4E5F600000000000002 /* ../XiangshangYouthUITests/LaunchAndRoleFlowTests.swift */,
+				D2C3D4E5F600000000000002 /* ../XiangshangYouthUITests/SplashScreenTests.swift */,
 			);
 			path = XiangshangYouthUITests;
 			sourceTree = "<group>";
@@ -266,6 +269,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C2C3D4E5F600000000000003 /* ../XiangshangYouthUITests/LaunchAndRoleFlowTests.swift in Sources */,
+				D2C3D4E5F600000000000003 /* ../XiangshangYouthUITests/SplashScreenTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

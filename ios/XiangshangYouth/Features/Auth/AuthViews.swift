@@ -2,6 +2,11 @@ import SwiftUI
 
 struct SplashView: View {
     @EnvironmentObject private var state: AppState
+    private var displayDuration: Duration {
+        // UI automation needs a deterministic inspection window.  Production
+        // stays at the approved two-second poster transition.
+        ProcessInfo.processInfo.arguments.contains("-ui-testing-splash-hold") ? .seconds(6) : .seconds(2)
+    }
 
     var body: some View {
         ZStack {
@@ -14,6 +19,7 @@ struct SplashView: View {
                 .scaledToFit()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .ignoresSafeArea()
+                .accessibilityLabel("向上少年启动页")
         }
         .statusBarHidden(true)
         // Keep the launch artwork edge-to-edge for the full splash duration.
@@ -22,7 +28,7 @@ struct SplashView: View {
         .persistentSystemOverlays(.hidden)
         .task {
             do {
-                try await Task.sleep(for: .seconds(2.0))
+                try await Task.sleep(for: displayDuration)
                 // A stored session refreshes behind the pure poster.  Wait for
                 // that result before exposing Login/RoleSelect, matching the
                 // Android root behavior and preventing a half-restored screen.

@@ -354,6 +354,23 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertEqual(state.localFeatures.taskStatusSyncStates["s01"], .submitted)
     }
 
+    func testFailedTeacherStatusUpdateRemainsPersistedForRetry() async throws {
+        let suite = "xiangshang.youth.task-status-retry-tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let state = AppState(repository: TaskStatusFailingRepository(), featureStore: LocalFeatureStore(defaults: defaults))
+        await state.login(phone: "13800138000")
+        let student = try XCTUnwrap(state.data?.students.first(where: { $0.id == "s06" }))
+
+        let succeeded = await state.submitTaskStatusCommand(studentID: student.id, status: .checkedIn, note: "已到场")
+
+        XCTAssertFalse(succeeded)
+        XCTAssertEqual(state.taskStatus(for: student), .checkedIn)
+        XCTAssertEqual(state.localFeatures.taskStatusSyncStates[student.id], .failed)
+        XCTAssertEqual(state.pendingSyncCount, 1)
+        if case .failed = state.workflowState(for: "task-status:\(student.id)") {} else { XCTFail("Failed task updates must expose a retryable command state") }
+    }
+
     func testPendingSyncCountExposesUnacknowledgedLocalWrites() {
         let suite = "xiangshang.youth.pending-count-tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
@@ -413,4 +430,10 @@ private struct UnauthorizedRepository: YouthRepository {
     func report(for student: Student) -> DiagnosisReport { MockRepository.shared.report(for: student) }
     func loadReport(for student: Student) async throws -> DiagnosisReport { throw ApiError.unauthorized }
     func submitActivity(_ value: ActivityRegistration) async throws { throw ApiError.unauthorized }
+}
+
+private struct TaskStatusFailingRepository: YouthRepository {
+    func loadDashboard() async throws -> DashboardData { try await MockRepository.shared.loadDashboard() }
+    func report(for student: Student) -> DiagnosisReport { MockRepository.shared.report(for: student) }
+    func updateTaskStatus(studentID: String, status: TaskStatus, note: String?) async throws { throw ApiError.network }
 }

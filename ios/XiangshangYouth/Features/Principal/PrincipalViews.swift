@@ -64,6 +64,7 @@ struct PrincipalDashboard: View {
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var router: AppRouter
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var dashboardAppeared = false
     @State private var isRegionDetailShown = false
 
@@ -96,6 +97,9 @@ struct PrincipalDashboard: View {
     private var riskStudents: [Student] { activeTaskStudents.filter { ($0.totalScore ?? 35) < 25 || state.taskStatus(for: $0) == .review || state.taskStatus(for: $0) == .retest } }
     private var averageScore: Double { let scores = activeTaskStudents.compactMap(\.totalScore); return scores.isEmpty ? 0 : scores.reduce(0, +) / Double(scores.count) }
     private var reduceMotion: Bool { state.localFeatures.settings.reduceMotion || systemReduceMotion }
+    private var scoreGridColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 7), count: dynamicTypeSize.isAccessibilitySize ? 1 : 3)
+    }
 
     var body: some View {
         Group {
@@ -241,7 +245,7 @@ struct PrincipalDashboard: View {
     }
 
     private var scoreGrid: some View {
-        HStack(spacing: 7) {
+        LazyVGrid(columns: scoreGridColumns, spacing: 7) {
             dashboardMetric("平均总分", String(format: "%.1f", averageScore), "当前任务样本 · 35分制", "sportscourt.fill", ReferenceColor.blue) { router.push(.gradeStats) }
             dashboardMetric("风险学生", "\(riskStudents.count)", "待及时跟进", "exclamationmark.shield.fill", .red) { router.push(.riskStudents) }
             dashboardMetric("公益支持", "\(activeTaskStudents.filter(\.isPovertyArea).count)", "当前任务贫困地区学生", "heart.fill", ReferenceColor.pink) { isRegionDetailShown = true }

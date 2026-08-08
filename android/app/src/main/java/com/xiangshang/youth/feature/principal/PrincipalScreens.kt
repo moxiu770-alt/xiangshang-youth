@@ -12,6 +12,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -89,7 +90,7 @@ private fun com.xiangshang.youth.core.model.TestTask.selectorLabel(): String =
     val averageScore = scopedStudents.mapNotNull { it.totalScore }.average().takeIf { it.isFinite() } ?: 0.0
     val povertyCount = scopedStudents.count { it.isPovertyArea }
     Surface(onClick = { nav.navigateSingleTop(Destinations.Grades) }, modifier = Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(12.dp), shadowElevation = 1.dp) { Column(Modifier.padding(14.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.Assessment, null, tint = Blue); Spacer(Modifier.width(7.dp)); Text(activeTask?.title ?: "综合运动能力测评", color = Navy, fontWeight = FontWeight.Bold, fontSize = 13.sp); Spacer(Modifier.weight(1f)); Text(activeTask?.status?.label ?: "待开始", color = Blue, fontSize = 9.sp) }; Spacer(Modifier.height(10.dp)); Row(verticalAlignment = Alignment.Bottom) { Column(Modifier.weight(1f)) { Text("${(completion * 100).toInt()}%", color = Blue, fontWeight = FontWeight.Bold, fontSize = 30.sp); Text("当前任务完成率", color = Color.Gray, fontSize = 10.sp) }; Column(horizontalAlignment = Alignment.End) { Text("$activeCompleted / $activeTotal 人", color = Navy, fontWeight = FontWeight.Bold, fontSize = 14.sp); Text("已完成 · ${activeTask?.ruleVersion ?: "规则 v1.0"}", color = Color.Gray, fontSize = 8.sp) } }; Spacer(Modifier.height(8.dp)); LinearProgressIndicator({ completion }, Modifier.fillMaxWidth().height(8.dp), color = Green, trackColor = Sky) } }
-    Spacer(Modifier.height(9.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) { PrincipalMetric("平均总分", String.format(Locale.US, "%.1f", averageScore), "当前任务样本 · 35分制", Icons.Filled.SportsScore, Blue, Modifier.weight(1f)) { nav.navigateSingleTop(Destinations.Grades) }; PrincipalMetric("风险学生", "$risk", "待及时跟进", Icons.Filled.WarningAmber, Color.Red, Modifier.weight(1f)) { nav.navigateSingleTop(Destinations.Risk) }; PrincipalMetric("公益支持", "$povertyCount", "当前任务贫困地区学生", Icons.Filled.Favorite, Color(0xFFFF638E), Modifier.weight(1f)) { regionDetailShown = true } }
+    Spacer(Modifier.height(9.dp)); PrincipalMetricGrid(nav, averageScore, risk, povertyCount) { regionDetailShown = true }
     Spacer(Modifier.height(10.dp)); Surface(Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(12.dp)) { Column(Modifier.padding(12.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Text("年级完成率对比", color = Navy, fontWeight = FontWeight.Bold, fontSize = 14.sp); Spacer(Modifier.weight(1f)); TextButton(onClick = { nav.navigateSingleTop(Destinations.Grades) }) { Text("全部年级 ›", fontSize = 9.sp) } }; state.data.grades.forEach { grade -> val gradeClasses = state.data.classes.filter { it.gradeId == grade.id }; val value = if (gradeClasses.isEmpty()) 0f else gradeClasses.map { it.completionRate }.average().toFloat() / 100f; Row(Modifier.fillMaxWidth().padding(vertical = 5.dp).semantics { role = Role.Button; contentDescription = "查看${grade.name}班级统计" }.clickable { nav.navigateSingleTop("${Destinations.ClassStats}?grade=${android.net.Uri.encode(grade.name)}") }, verticalAlignment = Alignment.CenterVertically) { Text(grade.name, color = Navy, fontSize = 10.sp, modifier = Modifier.width(55.dp)); LinearProgressIndicator({ value }, Modifier.weight(1f).height(6.dp), color = if (value < .8f) Color(0xFFFF9D25) else Green, trackColor = Sky); Spacer(Modifier.width(7.dp)); Text("${(value * 100).toInt()}%", color = if (value < .8f) Color(0xFFFF9D25) else Green, fontWeight = FontWeight.Bold, fontSize = 10.sp) }; Text("7项平均分：跳跃 3.9 · 滑步 3.8 · 平衡 3.6", color = Color.Gray, fontSize = 8.sp) } } }
     Spacer(Modifier.height(9.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { PrincipalEntry("班级完成率", "6个班级实时进度", Icons.Filled.Groups, Color(0xFF8A5AF5), Modifier.weight(1f)) { nav.navigateSingleTop(Destinations.ClassStats) }; PrincipalEntry("重点风险学生", "$risk 人需要跟进", Icons.Filled.PersonSearch, Color.Red, Modifier.weight(1f)) { nav.navigateSingleTop(Destinations.Risk) } }
     Spacer(Modifier.height(9.dp)); Surface(Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "查看地区关怀明细" }.clickable { regionDetailShown = true }, color = Color.White, shape = RoundedCornerShape(12.dp)) { Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.Map, null, tint = Color(0xFFFF9D25), modifier = Modifier.size(28.dp)); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text("区域关怀统计", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text("粤北山区 · ${povertyCount}名当前任务贫困地区学生已纳入公益支持", color = Color.Gray, fontSize = 9.sp) }; Icon(Icons.Filled.ChevronRight, contentDescription = "查看地区关怀明细", tint = Color.Gray, modifier = Modifier.size(16.dp)) } }
@@ -130,6 +131,32 @@ private fun PrincipalBottomBar(nav: NavHostController) {
 }
 
 @Composable private fun PrincipalMetric(title: String, value: String, note: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier, onClick: () -> Unit) = Surface(onClick = onClick, modifier = modifier.semantics { role = Role.Button; contentDescription = "$title：$value，$note" }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Column(Modifier.padding(9.dp)) { Icon(icon, null, tint = color, modifier = Modifier.size(17.dp)); Text(value, color = Navy, fontWeight = FontWeight.Bold, fontSize = 19.sp, modifier = Modifier.padding(top = 4.dp)); Text(title, color = Navy, fontSize = 10.sp); Text(note, color = Color.Gray, fontSize = 8.sp) } }
+
+@Composable private fun PrincipalMetricGrid(nav: NavHostController, averageScore: Double, risk: Int, povertyCount: Int, onRegionDetail: () -> Unit) {
+    val metrics = listOf(
+        PrincipalMetricSpec("平均总分", String.format(Locale.US, "%.1f", averageScore), "当前任务样本 · 35分制", Icons.Filled.SportsScore, Blue) { nav.navigateSingleTop(Destinations.Grades) },
+        PrincipalMetricSpec("风险学生", "$risk", "待及时跟进", Icons.Filled.WarningAmber, Color.Red) { nav.navigateSingleTop(Destinations.Risk) },
+        PrincipalMetricSpec("公益支持", "$povertyCount", "当前任务贫困地区学生", Icons.Filled.Favorite, Color(0xFFFF638E), onRegionDetail)
+    )
+    if (LocalDensity.current.fontScale > 1.25f) {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            metrics.forEach { item -> PrincipalMetric(item.title, item.value, item.note, item.icon, item.color, Modifier.fillMaxWidth(), item.onClick) }
+        }
+    } else {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            metrics.forEach { item -> PrincipalMetric(item.title, item.value, item.note, item.icon, item.color, Modifier.weight(1f), item.onClick) }
+        }
+    }
+}
+
+private data class PrincipalMetricSpec(
+    val title: String,
+    val value: String,
+    val note: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val color: Color,
+    val onClick: () -> Unit
+)
 @Composable private fun PrincipalEntry(title: String, note: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier, onClick: () -> Unit) = Surface(onClick = onClick, modifier = modifier.semantics { role = Role.Button; contentDescription = "$title：$note" }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(9.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = color); Spacer(Modifier.width(7.dp)); Column { Text(title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 10.sp); Text(note, color = Color.Gray, fontSize = 8.sp) } } }
 @Composable
 fun GradeStatsScreen(state: AppUiState, nav: NavHostController, rootTab: Boolean = false) = AppScaffold("不同年级对比", onBack = if (rootTab) null else ({ nav.popBackStack() }), bottomBar = if (rootTab) ({ PrincipalBottomBar(nav) }) else ({})) {

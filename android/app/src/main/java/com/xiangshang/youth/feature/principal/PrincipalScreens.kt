@@ -16,6 +16,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -30,6 +31,9 @@ import java.util.Locale
     if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = { refreshDashboard() }, dismiss = LocalDashboardClearError.current); return@AppScaffold }
     if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }
     if (state.data.students.isEmpty()) { EmptyState("暂无学校测评数据，场地端上传后会显示在这里。"); return@AppScaffold }
+    var selectedTaskId by rememberSaveable { mutableStateOf("") }
+    var taskMenuExpanded by rememberSaveable { mutableStateOf(false) }
+    val activeTask = state.data.tasks.firstOrNull { it.id == selectedTaskId } ?: state.data.tasks.firstOrNull()
     Surface(Modifier.fillMaxWidth().padding(bottom = 8.dp), color = Color.White, shape = RoundedCornerShape(12.dp), shadowElevation = 1.dp) {
         Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Surface(Modifier.size(44.dp), color = Color(0xFF6EA7FF), shape = androidx.compose.foundation.shape.CircleShape) {
@@ -45,10 +49,27 @@ import java.util.Locale
                 contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                 modifier = Modifier.semantics { contentDescription = "退出校长端" }
             ) { Text("退出校长端", color = Blue, fontSize = 10.sp) }
-            Text("本轮测评", color = Blue, fontSize = 9.sp, modifier = Modifier.background(Sky, RoundedCornerShape(12.dp)).padding(horizontal = 9.dp, vertical = 5.dp))
+            Box {
+                TextButton(
+                    onClick = { taskMenuExpanded = true },
+                    contentPadding = PaddingValues(horizontal = 5.dp, vertical = 0.dp),
+                    modifier = Modifier.semantics { contentDescription = "选择统计任务"; stateDescription = activeTask?.title ?: "暂无任务" }
+                ) {
+                    Text("本轮测评", color = Blue, fontSize = 9.sp)
+                    Icon(Icons.Filled.UnfoldMore, contentDescription = null, tint = Blue, modifier = Modifier.size(13.dp))
+                }
+                DropdownMenu(expanded = taskMenuExpanded, onDismissRequest = { taskMenuExpanded = false }) {
+                    state.data.tasks.forEach { task ->
+                        DropdownMenuItem(
+                            text = { Text(task.title, fontSize = 12.sp) },
+                            leadingIcon = { if (task.id == activeTask?.id) Icon(Icons.Filled.Check, contentDescription = null, tint = Blue) },
+                            onClick = { selectedTaskId = task.id; taskMenuExpanded = false }
+                        )
+                    }
+                }
+            }
         }
     }
-    val activeTask = state.data.tasks.firstOrNull()
     // TestTask is the published school aggregate. The student list is only a
     // representative local Mock sample and must not overwrite 15/20 with 2/4.
     val activeCompleted = activeTask?.completedCount ?: 0

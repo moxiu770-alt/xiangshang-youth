@@ -63,13 +63,16 @@ struct PrincipalHomeView: View {
 struct PrincipalDashboard: View {
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var router: AppRouter
-    @State private var selectedPeriod = 0
+    @State private var selectedTaskID = ""
     @State private var dashboardAppeared = false
     @State private var isRegionDetailShown = false
 
     private var students: [Student] { state.data?.students ?? [] }
     private var classes: [ClassInfo] { state.data?.classes ?? [] }
-    private var activeTask: TestTask? { state.data?.tasks.first }
+    private var activeTask: TestTask? {
+        let tasks = state.data?.tasks ?? []
+        return tasks.first(where: { $0.id == selectedTaskID }) ?? tasks.first
+    }
     // `TestTask` is the school-level aggregate published by the assessment service.
     // The local student list is intentionally only a representative Mock sample, so it
     // must not replace the task aggregate and turn 15/20 into the misleading 2/4.
@@ -120,9 +123,25 @@ struct PrincipalDashboard: View {
                     }
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(ReferenceColor.blue)
-                    Picker("统计周期", selection: $selectedPeriod) {
-                        Text("本轮测评").tag(0); Text("2026秋季").tag(1)
-                    }.pickerStyle(.menu).tint(ReferenceColor.blue).font(.system(size: 11, weight: .semibold))
+                    Menu {
+                        ForEach(state.data?.tasks ?? []) { task in
+                            Button {
+                                selectedTaskID = task.id
+                            } label: {
+                                Label(task.title, systemImage: task.id == activeTask?.id ? "checkmark" : "circle")
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 3) {
+                            Text("本轮测评")
+                            Image(systemName: "chevron.up.chevron.down").font(.system(size: 8, weight: .bold))
+                        }
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(ReferenceColor.blue)
+                        .frame(minHeight: 30)
+                    }
+                    .accessibilityLabel("选择统计任务")
+                    .accessibilityValue(activeTask?.title ?? "暂无任务")
                 }.padding(.horizontal, 14).padding(.top, 3)
 
                 Button { router.push(.gradeStats) } label: { schoolHero }
@@ -159,7 +178,10 @@ struct PrincipalDashboard: View {
         }
         .background(ReferenceColor.canvas)
         .refreshable { await state.refreshDashboard() }
-        .task { withAnimation(.spring(response: 0.65, dampingFraction: 0.78)) { dashboardAppeared = true } }
+        .task {
+            if selectedTaskID.isEmpty { selectedTaskID = state.data?.tasks.first?.id ?? "" }
+            withAnimation(.spring(response: 0.65, dampingFraction: 0.78)) { dashboardAppeared = true }
+        }
         .sheet(isPresented: $isRegionDetailShown) {
             NavigationStack {
                 List {

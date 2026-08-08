@@ -581,6 +581,12 @@ struct ActivityDetailSheet: View {
                 contactName = values[0]
                 phone = values[1]
                 consented = values.count == 3 && values[2] == "1"
+            } else {
+                // A registration establishes a real family identity. Seed a
+                // fresh activity form from it rather than reverting to the
+                // mock default name, while always preserving an existing draft.
+                contactName = state.profile?.name ?? contactName
+                phone = state.profile?.phone ?? phone
             }
         }
         }

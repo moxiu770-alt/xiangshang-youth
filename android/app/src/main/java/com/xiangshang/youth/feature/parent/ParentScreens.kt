@@ -103,6 +103,11 @@ fun ParentHomeScreen(state: AppUiState, nav: NavHostController, registerActivity
                 activityName = values[0]
                 activityPhone = values[1]
                 activityConsented = values.getOrNull(2) == "1"
+            } ?: run {
+                // A fresh form should reflect the authenticated family
+                // account. Existing locally persisted input above always wins.
+                activityName = state.profile?.name ?: activityName
+                activityPhone = state.profile?.phone ?: activityPhone
             }
             activityDetail = true
         }, color = Color.White, shape = RoundedCornerShape(12.dp), shadowElevation = 1.dp) {

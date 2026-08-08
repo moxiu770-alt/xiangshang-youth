@@ -2,6 +2,9 @@
     <style name="Theme.XiangshangYouth" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowBackground">@drawable/launch_window_background</item>
+        <!-- Android 12+ displays a system splash before Compose is attached;
+             fullscreen here prevents a status-bar flash over the poster. -->
+        <item name="android:windowFullscreen">true</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:statusBarColor">#7AB7EF</item>
         <item name="android:navigationBarColor">#FFFFFF</item>

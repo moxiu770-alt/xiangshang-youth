@@ -24,6 +24,8 @@ data class LocalFeatureState(
     val expertAppointments: List<ExpertAppointment> = emptyList(),
     val courseUploads: List<CourseUploadRecord> = emptyList(),
     val studentTaskStatuses: Map<String, TaskStatus> = emptyMap(),
+    /** Remote acknowledgement state for locally applied teacher queue updates. */
+    val taskStatusSyncStates: Map<String, LocalSubmissionStatus> = emptyMap(),
     val reviewNotes: Map<String, String> = emptyMap(),
     val sessionActive: Boolean = false,
     val sessionPhone: String = "",
@@ -60,6 +62,7 @@ class LocalFeatureStore(context: Context) {
         expertAppointments = decodeAppointments(prefs.getString("expert_appointments", null)),
         courseUploads = decodeUploads(prefs.getString("course_uploads", null)),
         studentTaskStatuses = decodeTaskStatuses(prefs.getString("student_task_statuses", null)),
+        taskStatusSyncStates = decodeSubmissionStatuses(prefs.getString("task_status_sync_states", null)),
         reviewNotes = decodeStringMap(prefs.getString("review_notes", null)),
         sessionActive = prefs.getBoolean("session_active", false),
         sessionPhone = prefs.getString("session_phone", "").orEmpty(),
@@ -87,6 +90,7 @@ class LocalFeatureStore(context: Context) {
         .putString("expert_appointments", JSONArray().apply { value.expertAppointments.forEach { put(JSONObject().put("id", it.id).put("expertName", it.expertName).put("preferredDate", it.preferredDate).put("note", it.note).put("status", it.status.name)) } }.toString())
         .putString("course_uploads", JSONArray().apply { value.courseUploads.forEach { put(JSONObject().put("id", it.id).put("taskId", it.taskId).put("attendanceCount", it.attendanceCount).put("notes", it.notes).put("attachmentName", it.attachmentName).put("status", it.status.name)) } }.toString())
         .putString("student_task_statuses", JSONObject(value.studentTaskStatuses.mapValues { it.value.name }).toString())
+        .putString("task_status_sync_states", JSONObject(value.taskStatusSyncStates.mapValues { it.value.name }).toString())
         .putString("review_notes", JSONObject(value.reviewNotes).toString())
         .putBoolean("session_active", value.sessionActive)
         .putString("session_phone", value.sessionPhone)
@@ -107,5 +111,6 @@ class LocalFeatureStore(context: Context) {
     private fun decodeAppointments(raw: String?): List<ExpertAppointment> = runCatching { val a = JSONArray(raw ?: "[]"); List(a.length()) { val o=a.getJSONObject(it); ExpertAppointment(o.optString("id"), o.optString("expertName"), o.optString("preferredDate"), o.optString("note"), o.optString("status").let { runCatching { LocalSubmissionStatus.valueOf(it) }.getOrDefault(LocalSubmissionStatus.PendingSync) }) } }.getOrDefault(emptyList())
     private fun decodeUploads(raw: String?): List<CourseUploadRecord> = runCatching { val a = JSONArray(raw ?: "[]"); List(a.length()) { val o=a.getJSONObject(it); CourseUploadRecord(o.optString("id"), o.optString("taskId"), o.optInt("attendanceCount"), o.optString("notes"), o.optString("attachmentName"), o.optString("status").let { runCatching { LocalSubmissionStatus.valueOf(it) }.getOrDefault(LocalSubmissionStatus.Draft) }) } }.getOrDefault(emptyList())
     private fun decodeTaskStatuses(raw: String?): Map<String, TaskStatus> = runCatching { val value = JSONObject(raw ?: "{}"); value.keys().asSequence().mapNotNull { key -> runCatching { key to TaskStatus.valueOf(value.getString(key)) }.getOrNull() }.toMap() }.getOrDefault(emptyMap())
+    private fun decodeSubmissionStatuses(raw: String?): Map<String, LocalSubmissionStatus> = runCatching { val value = JSONObject(raw ?: "{}"); value.keys().asSequence().mapNotNull { key -> runCatching { key to LocalSubmissionStatus.valueOf(value.getString(key)) }.getOrNull() }.toMap() }.getOrDefault(emptyMap())
     private fun today(): String = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
 }

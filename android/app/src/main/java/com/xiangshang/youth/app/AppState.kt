@@ -54,7 +54,7 @@ data class AppUiState(
 ) {
     val unreadMessageCount: Int get() = if (!local.settings.notificationsEnabled) 0 else data?.messages?.count { !it.isRead && it.id !in local.readMessageIds } ?: 0
     /** Local writes that still need acknowledgement or a retry. */
-    val pendingSyncCount: Int get() = local.activityRegistrations.count { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed } + local.expertAppointments.count { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed } + local.courseUploads.count { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed }
+    val pendingSyncCount: Int get() = local.activityRegistrations.count { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed } + local.expertAppointments.count { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed } + local.courseUploads.count { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed } + local.taskStatusSyncStates.values.count { it == LocalSubmissionStatus.PendingSync || it == LocalSubmissionStatus.Failed }
 }
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val connectivityManager = application.getSystemService(ConnectivityManager::class.java)
@@ -221,6 +221,22 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 markCourseSyncFailed(record.taskId); failed += 1
             }
         }
+        _state.value.local.taskStatusSyncStates.filter { (_, syncStatus) -> syncStatus == LocalSubmissionStatus.PendingSync || syncStatus == LocalSubmissionStatus.Failed }.forEach { (studentId, _) ->
+            val status = _state.value.local.studentTaskStatuses[studentId]
+            if (status == null) {
+                markTaskStatusSyncFailed(studentId)
+                failed += 1
+            } else {
+                markTaskStatusSyncSubmitting(studentId)
+                try {
+                    repository.updateTaskStatus(studentId, status, _state.value.local.reviewNotes[studentId])
+                    markTaskStatusSynced(studentId)
+                } catch (error: Throwable) {
+                    if (error is ApiError.Unauthorized) throw error
+                    markTaskStatusSyncFailed(studentId); failed += 1
+                }
+            }
+        }
         if (failed > 0) throw IllegalStateException("仍有 $failed 条记录等待网络恢复后重试。")
     })
 
@@ -231,8 +247,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val current = _state.value.local.studentTaskStatuses[studentId] ?: student.taskStatus
         if (!current.allowsTransitionTo(status)) throw IllegalArgumentException("当前为${current.label}，不能直接变更为${status.label}。请按现场队列流程操作。")
         submitReviewDecision(studentId, status, note.orEmpty().ifBlank { "已完成状态处理" })
+        markTaskStatusSyncPending(studentId)
         repository.updateTaskStatus(studentId, status, note)
-    })
+    }, onSuccess = { markTaskStatusSynced(studentId) }, onFailure = { markTaskStatusSyncFailed(studentId) })
 
     fun submitClassPostCommand(author: String, content: String) = executeWorkflow("post:$author", operation = {
         if (content.trim().isBlank()) throw IllegalArgumentException("动态内容不能为空。")
@@ -284,6 +301,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private fun markCourseSyncSubmitting(taskId: String) = updateCourseSyncStatus(taskId, LocalSubmissionStatus.Submitting)
     private fun markCourseSyncFailed(taskId: String) = updateCourseSyncStatus(taskId, LocalSubmissionStatus.Failed)
     private fun updateCourseSyncStatus(taskId: String, status: LocalSubmissionStatus) = mutate { local -> local.copy(courseUploads = local.courseUploads.map { if (it.taskId == taskId) it.copy(status = status) else it }) }
+    private fun markTaskStatusSynced(studentId: String) = updateTaskStatusSyncStatus(studentId, LocalSubmissionStatus.Submitted)
+    private fun markTaskStatusSyncPending(studentId: String) = updateTaskStatusSyncStatus(studentId, LocalSubmissionStatus.PendingSync)
+    private fun markTaskStatusSyncSubmitting(studentId: String) = updateTaskStatusSyncStatus(studentId, LocalSubmissionStatus.Submitting)
+    private fun markTaskStatusSyncFailed(studentId: String) = updateTaskStatusSyncStatus(studentId, LocalSubmissionStatus.Failed)
+    private fun updateTaskStatusSyncStatus(studentId: String, status: LocalSubmissionStatus) = mutate { local -> local.copy(taskStatusSyncStates = local.taskStatusSyncStates + (studentId to status)) }
     fun updateStudentTaskStatus(studentId: String, status: TaskStatus) {
         val current = _state.value.local.studentTaskStatuses[studentId]
             ?: _state.value.data?.students?.firstOrNull { it.id == studentId }?.taskStatus

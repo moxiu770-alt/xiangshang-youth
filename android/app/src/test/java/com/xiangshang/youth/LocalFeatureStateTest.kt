@@ -60,6 +60,7 @@ class LocalFeatureStateTest {
             uploadedTaskIds = setOf("after-class-upload"),
             checkedInToday = true,
             studentTaskStatuses = mapOf("s01" to TaskStatus.Review),
+            taskStatusSyncStates = mapOf("s01" to LocalSubmissionStatus.PendingSync),
             reviewNotes = mapOf("s01" to "核验视频后建议周五补测。"),
             sessionActive = true,
             sessionPhone = "13800138000",
@@ -83,6 +84,7 @@ class LocalFeatureStateTest {
         assertEquals(LocalSubmissionStatus.PendingSync, state.courseUploads.single().status)
         assertTrue("after-class-upload" in state.uploadedTaskIds)
         assertEquals(TaskStatus.Review, state.studentTaskStatuses["s01"])
+        assertEquals(LocalSubmissionStatus.PendingSync, state.taskStatusSyncStates["s01"])
         assertEquals("核验视频后建议周五补测。", state.reviewNotes["s01"])
         assertTrue(state.sessionActive)
         assertEquals("Teacher", state.sessionRoleName)
@@ -184,10 +186,11 @@ class LocalFeatureStateTest {
         val local = LocalFeatureState(
             activityRegistrations = listOf(ActivityRegistration(activityId = "health-growth-season-2026", contactName = "王女士", phone = "13800138000")),
             expertAppointments = listOf(ExpertAppointment(expertName = "张教授", preferredDate = "周五上午", note = "运动发展咨询")),
-            courseUploads = listOf(CourseUploadRecord(taskId = "after-class-upload", attendanceCount = 20, notes = "课堂记录", attachmentName = "课堂.jpg", status = LocalSubmissionStatus.PendingSync))
+            courseUploads = listOf(CourseUploadRecord(taskId = "after-class-upload", attendanceCount = 20, notes = "课堂记录", attachmentName = "课堂.jpg", status = LocalSubmissionStatus.PendingSync)),
+            taskStatusSyncStates = mapOf("s01" to LocalSubmissionStatus.PendingSync)
         )
 
-        assertEquals(3, AppUiState(local = local).pendingSyncCount)
+        assertEquals(4, AppUiState(local = local).pendingSyncCount)
     }
 
     @Test

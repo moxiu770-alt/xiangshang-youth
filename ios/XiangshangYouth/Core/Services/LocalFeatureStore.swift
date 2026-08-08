@@ -19,6 +19,10 @@ struct LocalFeatureState: Codable, Equatable {
     var expertAppointments: [ExpertAppointment] = []
     var courseUploads: [CourseUploadRecord] = []
     var studentTaskStatuses: [String: TaskStatus] = [:]
+    /// Latest teacher-side queue update for each student.  The actual status
+    /// remains immediately usable offline; this map only tracks remote
+    /// acknowledgement and retry state.
+    var taskStatusSyncStates: [String: LocalSubmissionStatus] = [:]
     var reviewNotes: [String: String] = [:]
     var sessionProfile: UserProfile?
     var sessionRole: UserRole?
@@ -134,6 +138,7 @@ final class LocalFeatureStore: ObservableObject {
         if let current = try? decoder.decode(LocalFeatureState.self, from: data) { return current }
         guard var legacy = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
         if legacy["reviewNotes"] == nil { legacy["reviewNotes"] = [String: String]() }
+        if legacy["taskStatusSyncStates"] == nil { legacy["taskStatusSyncStates"] = [String: String]() }
         if legacy["selectedChildID"] == nil { legacy["selectedChildID"] = NSNull() }
         if legacy["boundChildIDs"] == nil { legacy["boundChildIDs"] = [String]() }
         if legacy["readMessageIDs"] == nil { legacy["readMessageIDs"] = [String]() }

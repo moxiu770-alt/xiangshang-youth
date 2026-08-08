@@ -273,9 +273,13 @@ enum WorkflowCommandState: Equatable {
         }
         mutateLocal { values in
             values.studentTaskStatuses[studentID] = status
+            values.taskStatusSyncStates[studentID] = .pendingSync
             if let note, !note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { values.reviewNotes[studentID] = note.trimmingCharacters(in: .whitespacesAndNewlines) }
         }
-        return await executeWorkflow("task-status:\(studentID)") { try await self.repository.updateTaskStatus(studentID: studentID, status: status, note: note) }
+        let succeeded = await executeWorkflow("task-status:\(studentID)") { try await self.repository.updateTaskStatus(studentID: studentID, status: status, note: note) }
+        if succeeded { updateTaskStatusSyncState(studentID, to: .submitted) }
+        else if case .failed = workflowState(for: "task-status:\(studentID)") { updateTaskStatusSyncState(studentID, to: .failed) }
+        return succeeded
     }
 
     func submitClassPostCommand(_ content: String, author: String) async -> Bool {
@@ -313,7 +317,8 @@ enum WorkflowCommandState: Equatable {
         let activity = localFeatures.activityRegistrations.count(where: { $0.status == .pendingSync || $0.status == .failed })
         let experts = localFeatures.expertAppointments.count(where: { $0.status == .pendingSync || $0.status == .failed })
         let uploads = localFeatures.courseUploads.count(where: { $0.status == .pendingSync || $0.status == .failed })
-        return activity + experts + uploads
+        let taskStatuses = localFeatures.taskStatusSyncStates.values.count(where: { $0 == .pendingSync || $0 == .failed })
+        return activity + experts + uploads + taskStatuses
     }
 
     /// Replays safely persisted writes after connectivity returns or when the
@@ -332,7 +337,8 @@ enum WorkflowCommandState: Equatable {
         let activities = localFeatures.activityRegistrations.filter { $0.status == .pendingSync || $0.status == .failed }
         let experts = localFeatures.expertAppointments.filter { $0.status == .pendingSync || $0.status == .failed }
         let uploads = localFeatures.courseUploads.filter { $0.status == .pendingSync || $0.status == .failed }
-        guard !(activities.isEmpty && experts.isEmpty && uploads.isEmpty) else {
+        let taskStatuses = localFeatures.taskStatusSyncStates.filter { $0.value == .pendingSync || $0.value == .failed }
+        guard !(activities.isEmpty && experts.isEmpty && uploads.isEmpty && taskStatuses.isEmpty) else {
             workflowStates["sync-pending"] = .succeeded("当前没有等待同步的本机记录。")
             return
         }
@@ -361,6 +367,23 @@ enum WorkflowCommandState: Equatable {
             catch {
                 if case ApiError.unauthorized = error { handleDashboardError(error); return }
                 updateCourseSyncStatus(record.id, to: .failed); failed += 1
+            }
+        }
+        for (studentID, _) in taskStatuses {
+            guard let status = localFeatures.studentTaskStatuses[studentID] else {
+                updateTaskStatusSyncState(studentID, to: .failed)
+                failed += 1
+                continue
+            }
+            updateTaskStatusSyncState(studentID, to: .submitting)
+            do {
+                try await repository.updateTaskStatus(studentID: studentID, status: status, note: localFeatures.reviewNotes[studentID])
+                updateTaskStatusSyncState(studentID, to: .submitted)
+                synchronized += 1
+            } catch {
+                if case ApiError.unauthorized = error { handleDashboardError(error); return }
+                updateTaskStatusSyncState(studentID, to: .failed)
+                failed += 1
             }
         }
         workflowStates["sync-pending"] = failed == 0
@@ -464,6 +487,9 @@ enum WorkflowCommandState: Equatable {
             guard let index = values.courseUploads.firstIndex(where: { $0.id == id }) else { return }
             values.courseUploads[index].status = status
         }
+    }
+    private func updateTaskStatusSyncState(_ studentID: String, to status: LocalSubmissionStatus) {
+        mutateLocal { $0.taskStatusSyncStates[studentID] = status }
     }
     func taskStatus(for student: Student) -> TaskStatus { localFeatures.studentTaskStatuses[student.id] ?? student.taskStatus }
     func updateTaskStatus(for student: Student, status: TaskStatus, reviewNote: String? = nil) {

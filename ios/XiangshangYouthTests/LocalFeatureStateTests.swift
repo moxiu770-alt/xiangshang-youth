@@ -68,7 +68,8 @@ final class LocalFeatureStateTests: XCTestCase {
         let suite = "xiangshang.youth.login-tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defaults.removePersistentDomain(forName: suite)
-        let state = AppState(featureStore: LocalFeatureStore(defaults: defaults))
+        let store = LocalFeatureStore(defaults: defaults)
+        let state = AppState(featureStore: store)
 
         await state.login(phone: "13800138000")
         XCTAssertEqual(state.profile?.role, .parent)
@@ -119,6 +120,7 @@ final class LocalFeatureStateTests: XCTestCase {
             value.expertAppointments.append(ExpertAppointment(id: UUID(), expertName: "张教授", preferredDate: "周五上午", note: "运动发展咨询", status: .pendingSync, createdAt: .now))
             value.courseUploads.append(CourseUploadRecord(id: UUID(), taskID: "after-class-upload", attendanceCount: 26, notes: "已完成课程", attachmentName: "课堂.jpg", status: .pendingSync, createdAt: .now))
             value.studentTaskStatuses["s01"] = .review
+            value.taskStatusSyncStates["s01"] = .pendingSync
             value.reviewNotes["s01"] = "核验视频后建议周五补测。"
             value.settings.reduceMotion = true
             let postID = UUID()
@@ -134,6 +136,7 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertEqual(restored.expertAppointments.first?.status, .pendingSync)
         XCTAssertEqual(restored.courseUploads.first?.attachmentName, "课堂.jpg")
         XCTAssertEqual(restored.studentTaskStatuses["s01"], .review)
+        XCTAssertEqual(restored.taskStatusSyncStates["s01"], .pendingSync)
         XCTAssertEqual(restored.reviewNotes["s01"], "核验视频后建议周五补测。")
         XCTAssertTrue(restored.settings.reduceMotion)
         XCTAssertEqual(restored.classPostComments.first?.text, "继续加油")
@@ -220,12 +223,14 @@ final class LocalFeatureStateTests: XCTestCase {
         let encoded = try JSONEncoder().encode(original)
         var legacy = try XCTUnwrap(try JSONSerialization.jsonObject(with: encoded) as? [String: Any])
         legacy.removeValue(forKey: "reviewNotes")
+        legacy.removeValue(forKey: "taskStatusSyncStates")
         defaults.set(try JSONSerialization.data(withJSONObject: legacy), forKey: "xiangshang.local-feature-state.v1")
 
         let restored = LocalFeatureStore(defaults: defaults).state
         XCTAssertEqual(restored.drafts["publish"], "已保存的班级动态")
         XCTAssertEqual(restored.studentTaskStatuses["s01"], .review)
         XCTAssertTrue(restored.reviewNotes.isEmpty)
+        XCTAssertTrue(restored.taskStatusSyncStates.isEmpty)
     }
 
     func testAppStateRestoresSavedSessionBeforeDashboardRefresh() async {
@@ -346,19 +351,23 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertTrue(statusResult)
         if case .succeeded = state.workflowState(for: "task-status:s01") {} else { XCTFail("Mock task status command should reach succeeded") }
         XCTAssertEqual(state.taskStatus(for: state.data!.students[0]), .review)
+        XCTAssertEqual(state.localFeatures.taskStatusSyncStates["s01"], .submitted)
     }
 
     func testPendingSyncCountExposesUnacknowledgedLocalWrites() {
         let suite = "xiangshang.youth.pending-count-tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defaults.removePersistentDomain(forName: suite)
-        let state = AppState(featureStore: LocalFeatureStore(defaults: defaults))
+        let store = LocalFeatureStore(defaults: defaults)
+        let state = AppState(featureStore: store)
 
         state.registerActivity("health-growth-season-2026", contactName: "王女士", phone: "13800138000")
         state.bookExpert(name: "张教授", preferredDate: "周五上午", note: "运动发展咨询")
         state.saveCourseUpload(taskID: "after-class-upload", attendanceCount: 20, notes: "课堂记录", attachmentName: "课堂.jpg", submit: true)
+        store.update { value in value.taskStatusSyncStates["s01"] = .pendingSync }
+        let reloaded = AppState(featureStore: store)
 
-        XCTAssertEqual(state.pendingSyncCount, 3)
+        XCTAssertEqual(reloaded.pendingSyncCount, 4)
     }
 
     func testUnauthorizedReportRefreshExpiresTheLocalSession() async throws {

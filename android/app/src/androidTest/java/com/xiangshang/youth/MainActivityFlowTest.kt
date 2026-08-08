@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import org.junit.Rule
 import org.junit.Test
@@ -173,8 +174,12 @@ class MainActivityFlowTest {
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("7项能力得分").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithText("规则依据与适用范围").assertIsDisplayed()
-        composeRule.onNodeWithText("规则生效日期").assertIsDisplayed()
+        // Policy metadata intentionally follows the seven score cards. It is
+        // below the fold on phone-sized devices, so scroll to it and verify
+        // reachability rather than treating a non-first-screen section as a
+        // missing report field.
+        composeRule.onNodeWithText("规则依据与适用范围").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("规则生效日期").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithContentDescription("返回").performClick()
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("查看详细报告", substring = true).fetchSemanticsNodes().isNotEmpty()

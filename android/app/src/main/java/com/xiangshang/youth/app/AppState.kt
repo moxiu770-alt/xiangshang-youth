@@ -24,6 +24,8 @@ import com.xiangshang.youth.core.util.ChildBindingValidator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -66,6 +68,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: YouthRepository = RepositoryProvider.create()
     private val featureStore = LocalFeatureStore(application)
     private val initialLocal = featureStore.load()
+    /** A logout may happen while a cold-start restore is awaiting the
+     * dashboard.  Keep a cancellable handle and a generation token so the
+     * old account can never repopulate state after the user chose to exit. */
+    private var sessionRestoreJob: Job? = null
+    private var sessionGeneration = 0L
     private val _state = MutableStateFlow(AppUiState(local = initialLocal, restoringSession = initialLocal.sessionActive))
     val state: StateFlow<AppUiState> = _state.asStateFlow()
     init {
@@ -135,7 +142,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (_state.value.selectedChild == null) chooseChild(child)
         return true
     }
-    fun logout() { ApiClient.clearToken(); featureStore.clear(); _state.value = AppUiState() }
+    fun logout() {
+        sessionGeneration += 1
+        sessionRestoreJob?.cancel()
+        sessionRestoreJob = null
+        ApiClient.clearToken()
+        featureStore.clear()
+        _state.value = AppUiState()
+    }
     fun report(student: Student): DiagnosisReport = _state.value.reportOverrides[student.id] ?: repository.report(student)
     fun refreshReport(student: Student) = viewModelScope.launch {
         if (_state.value.profile == null || _state.value.reportLoadingStudentId != null) return@launch
@@ -362,26 +376,36 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = _state.value.copy(isOffline = value)
         if (wasOffline && !value && _state.value.profile != null && _state.value.pendingSyncCount > 0) syncPendingRecords()
     }
-    private fun restoreSession() = viewModelScope.launch {
-        val local = _state.value.local
-        _state.value = _state.value.copy(loading = true, restoringSession = true)
-        runCatching { repository.dashboard() }.onSuccess { data ->
-            val selected = data.students.firstOrNull { it.id == local.selectedChildId && it.id in local.boundChildIds }
-            // Restore authentication/data, but do not restore the last workbench.
-            // The next launch must show RoleSelect so a stale principal session
-            // cannot prevent parent/teacher entry.
-            _state.value = _state.value.copy(profile = UserProfile("u1", local.parentAccountName ?: "王女士", local.sessionPhone.ifBlank { "13800138000" }, UserRole.Parent, data.school.name), role = null, data = data, selectedChild = selected, loading = false, restoringSession = false)
-        }.onFailure { error ->
-            if (error is ApiError.Unauthorized) {
-                featureStore.clear()
-                _state.value = AppUiState(error = error.message, restoringSession = false)
-            } else {
-                // A persisted session whose dashboard cannot be refreshed is not
-                // a usable authenticated state. Clear it before returning to the
-                // login screen so the next launch cannot loop through RoleSelect
-                // with a nil dashboard or keep retrying stale credentials.
-                featureStore.clear()
-                _state.value = AppUiState(error = error.message, restoringSession = false)
+    private fun restoreSession() {
+        sessionRestoreJob?.cancel()
+        val generation = ++sessionGeneration
+        sessionRestoreJob = viewModelScope.launch {
+            val local = _state.value.local
+            _state.value = _state.value.copy(loading = true, restoringSession = true)
+            try {
+                val data = repository.dashboard()
+                if (generation != sessionGeneration) return@launch
+                val selected = data.students.firstOrNull { it.id == local.selectedChildId && it.id in local.boundChildIds }
+                // Restore authentication/data, but do not restore the last workbench.
+                // The next launch must show RoleSelect so a stale principal session
+                // cannot prevent parent/teacher entry.
+                _state.value = _state.value.copy(profile = UserProfile("u1", local.parentAccountName ?: "王女士", local.sessionPhone.ifBlank { "13800138000" }, UserRole.Parent, data.school.name), role = null, data = data, selectedChild = selected, loading = false, restoringSession = false)
+            } catch (_: CancellationException) {
+                // logout or a newer restore owns the screen now.
+                return@launch
+            } catch (error: Throwable) {
+                if (generation != sessionGeneration) return@launch
+                if (error is ApiError.Unauthorized) {
+                    featureStore.clear()
+                    _state.value = AppUiState(error = error.message, restoringSession = false)
+                } else {
+                    // A persisted session whose dashboard cannot be refreshed is not
+                    // a usable authenticated state. Clear it before returning to the
+                    // login screen so the next launch cannot loop through RoleSelect
+                    // with a nil dashboard or keep retrying stale credentials.
+                    featureStore.clear()
+                    _state.value = AppUiState(error = error.message, restoringSession = false)
+                }
             }
         }
     }

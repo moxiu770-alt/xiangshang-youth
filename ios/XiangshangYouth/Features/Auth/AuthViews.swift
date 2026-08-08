@@ -150,6 +150,7 @@ struct LoginView: View {
                     TextField("短信验证码", text: $verificationCode)
                         .keyboardType(.numberPad)
                         .textFieldStyle(.roundedBorder)
+                        .onChange(of: verificationCode) { _, _ in clearLoginError() }
                     Button(codeCountdown > 0 ? "\(codeCountdown)s 后重试" : codeSent ? "重新获取" : "获取验证码") {
                         guard phone.filter(\.isNumber).count == 11 else { validationMessage = "请先填写 11 位手机号。"; return }
                         codeSent = true
@@ -430,6 +431,11 @@ struct RegisterView: View {
             .navigationTitle("注册账号")
             .scrollDismissesKeyboard(.interactively)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(submitted ? "完成" : "取消") { dismiss() } } }
+            .onChange(of: name) { _, _ in error = nil }
+            .onChange(of: phone) { _, _ in error = nil }
+            .onChange(of: code) { _, _ in error = nil }
+            .onChange(of: password) { _, _ in error = nil }
+            .onChange(of: confirmed) { _, _ in error = nil }
         }
         .sheet(item: $legalDocument) { document in LegalDocumentView(document: document) }
         .onChange(of: state.profile?.id) { _, profileID in
@@ -536,6 +542,10 @@ struct ResetPasswordView: View {
                     Button(submitted ? "完成" : "取消") { dismiss() }
                 }
             }
+            .onChange(of: phone) { _, _ in error = nil }
+            .onChange(of: code) { _, _ in error = nil }
+            .onChange(of: password) { _, _ in error = nil }
+            .onChange(of: confirmation) { _, _ in error = nil }
         }
         .onDisappear { countdownTask?.cancel() }
     }

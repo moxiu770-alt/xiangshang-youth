@@ -66,6 +66,20 @@ struct ReportDetailView: View {
                 section("风险提示", icon: "exclamationmark.shield.fill") { VStack(alignment: .leading, spacing: 7) { ForEach(report.riskAlerts, id: \.self) { alert in Button { selectedDetail = "风险提示\n\(alert)" } label: { Label(alert, systemImage: "circle.fill").font(.subheadline).foregroundStyle(alert == "暂无高风险提示" ? AppTheme.teal : AppTheme.danger).frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.plain) } } }
                 section("训练建议", icon: "figure.strengthtraining.traditional") { VStack(alignment: .leading, spacing: 8) { ForEach(report.trainingAdvice, id: \.self) { advice in Button { selectedDetail = "训练建议\n\(advice)" } label: { Text("• \(advice)").font(.subheadline).foregroundStyle(AppTheme.ink).frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.plain) } } }
                 section("课程建议", icon: "play.rectangle.fill") { VStack(spacing: 10) { ForEach(report.courseSuggestions) { course in Button { selectedDetail = "课程建议\n\(course.title)\n\(course.focus) · \(course.duration)\n\(course.isPublicBenefit ? "公益课程" : "推荐课程")" } label: { HStack { Image(systemName: "play.circle.fill").font(.title2).foregroundStyle(AppTheme.teal); VStack(alignment: .leading) { Text(course.title).font(.subheadline.weight(.semibold)); Text("\(course.focus) · \(course.duration)").font(.caption).foregroundStyle(AppTheme.muted) }; Spacer(); Text(course.isPublicBenefit ? "公益" : "推荐").font(.caption2.weight(.semibold)).foregroundStyle(AppTheme.primary) }.padding(10).background(AppTheme.surface, in: RoundedRectangle(cornerRadius: 10)).accessibilityElement(children: .combine).accessibilityLabel("课程建议：\(course.title)，\(course.focus)，\(course.duration)") }.buttonStyle(.plain) } } }
+                section("规则依据与适用范围", icon: "checkmark.seal.fill") {
+                    VStack(alignment: .leading, spacing: 7) {
+                        LabeledContent("年级标准", value: report.ruleVersion)
+                        LabeledContent("适用地区", value: report.regionPolicy.region)
+                        LabeledContent("地区政策", value: report.regionPolicy.povertyAreaLabel ?? "通用学生政策")
+                        LabeledContent("规则生效日期", value: report.regionPolicy.effectiveDate)
+                        Text("报告会保留本次测评使用的规则版本；场地端成绩或地区政策更新后，可同步刷新并保留新的依据。")
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.muted)
+                    }
+                    .font(.subheadline)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("规则依据：\(report.ruleVersion)，适用地区\(report.regionPolicy.region)，政策\(report.regionPolicy.povertyAreaLabel ?? "通用学生政策")，生效日期\(report.regionPolicy.effectiveDate)")
+                }
             }
         }
         .task(id: currentStudent.id) { await state.refreshReport(for: currentStudent) }

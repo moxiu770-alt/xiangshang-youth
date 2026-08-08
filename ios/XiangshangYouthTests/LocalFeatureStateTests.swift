@@ -48,6 +48,8 @@ final class LocalFeatureStateTests: XCTestCase {
         let report = MockRepository.shared.report(for: data.students[0])
         XCTAssertEqual(report.scores.count, 7)
         XCTAssertEqual(report.totalScore, 28.5, accuracy: 0.001)
+        XCTAssertEqual(report.regionPolicy.effectiveDate, "2026-09-01")
+        XCTAssertEqual(report.regionPolicy.region, report.student.region)
     }
 
     func testTaskScopeKeepsSelectedBatchStudentMetricsHonest() async throws {

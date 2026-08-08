@@ -77,6 +77,20 @@ fun ReportDetailScreen(
         ReportSection("课程建议", Icons.Filled.PlayCircleFilled) {
             report.courseSuggestions.forEach { course -> CourseSuggestionRow(course) { selectedDetail = "课程建议\n${course.title}\n${course.focus} · ${course.duration}" } }
         }
+        ReportSection("规则依据与适用范围", Icons.Filled.VerifiedUser) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(5.dp),
+                modifier = Modifier.semantics {
+                    contentDescription = "规则依据：${report.ruleVersion}，适用地区${report.regionPolicy.region}，政策${report.regionPolicy.povertyAreaLabel ?: "通用学生政策"}，生效日期${report.regionPolicy.effectiveDate}"
+                }
+            ) {
+                ReportRuleRow("年级标准", report.ruleVersion)
+                ReportRuleRow("适用地区", report.regionPolicy.region)
+                ReportRuleRow("地区政策", report.regionPolicy.povertyAreaLabel ?: "通用学生政策")
+                ReportRuleRow("规则生效日期", report.regionPolicy.effectiveDate)
+                Text("报告保留本次测评使用的规则版本；场地端成绩或地区政策更新后可同步刷新。", color = Color.Gray, fontSize = 9.sp, modifier = Modifier.padding(top = 3.dp))
+            }
+        }
         Text("报告数据会在学校场地端上传成绩后自动刷新。", color = Color.Gray, fontSize = 9.sp, modifier = Modifier.padding(bottom = 8.dp))
     }
     selectedDetail?.let { detail -> AlertDialog(onDismissRequest = { selectedDetail = null }, title = { Text("报告详情") }, text = { Text(detail) }, confirmButton = { TextButton(onClick = { selectedDetail = null }) { Text("知道了") } }) }
@@ -118,6 +132,12 @@ private fun ReportScoreCard(score: ScoreResult, modifier: Modifier, onClick: () 
 @Composable
 private fun ReportSection(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, body: @Composable ColumnScope.() -> Unit) = Surface(Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(15.dp), shadowElevation = 1.dp) {
     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = Blue, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(7.dp)); Text(title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 14.sp) }; body() }
+}
+
+@Composable
+private fun ReportRuleRow(label: String, value: String) = Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+    Text(label, color = Color.Gray, fontSize = 10.sp, modifier = Modifier.width(78.dp))
+    Text(value, color = Navy, fontSize = 10.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
 }
 
 @Composable

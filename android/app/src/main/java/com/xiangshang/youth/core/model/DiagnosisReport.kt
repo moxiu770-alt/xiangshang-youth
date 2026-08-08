@@ -8,7 +8,9 @@ data class DiagnosisReport(
     val riskAlerts: List<String>,
     val trainingAdvice: List<String>,
     val courseSuggestions: List<CourseSuggestion>,
-    val ruleVersion: String
+    val ruleVersion: String,
+    /** Regional policy snapshot used for this report's scoring explanation. */
+    val regionPolicy: RegionPolicy
 ) {
     val totalScore: Double get() = scores.sumOf { it.score }
 }

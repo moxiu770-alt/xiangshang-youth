@@ -169,6 +169,8 @@ class LocalFeatureStateTest {
         val report = MockRepository().report(student)
         assertEquals(7, report.scores.size)
         assertEquals(28.5, report.totalScore, 0.001)
+        assertEquals("2026-09-01", report.regionPolicy.effectiveDate)
+        assertEquals(student.region, report.regionPolicy.region)
         assertEquals("男", student.gender)
         assertEquals("王", UserProfile("u1", "王女士", "13800138000", UserRole.Parent, "向上实验小学").avatarInitials)
     }

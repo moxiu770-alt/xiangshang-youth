@@ -487,7 +487,9 @@ struct TeacherDashboard: View {
                 action("person.2.fill", "待分班学生", .orange, .unassignedStudents)
                 action("figure.run", "查看延时课", .teal, .teacherTasks)
                 action("medal.fill", "优秀学生评选", ReferenceColor.purple, .outstandingStudents)
-                action("person.badge.plus", "学生名单", .orange, .studentList(nil))
+                // Keep class management reachable from the main teacher
+                // workbench, rather than duplicating the student-list shortcut.
+                action("person.badge.plus", "班级管理", .orange, .teacherClasses)
             }
             .padding(.horizontal, 12)
             ReferenceCard {

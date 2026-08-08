@@ -73,6 +73,15 @@ final class LaunchAndRoleFlowTests: XCTestCase {
         button(containing: "返回").tap()
         XCTAssertTrue(staticText(containing: "班级健康概览").waitForExistence(timeout: 3))
 
+        // Keep the dedicated class-management page exposed directly from the
+        // teacher workbench instead of regressing into a duplicate roster card.
+        let classManagement = button(containing: "班级管理")
+        XCTAssertTrue(classManagement.waitForExistence(timeout: 2))
+        classManagement.tap()
+        XCTAssertTrue(staticText(containing: "我管理的班级").waitForExistence(timeout: 3))
+        button(containing: "返回").tap()
+        XCTAssertTrue(staticText(containing: "班级健康概览").waitForExistence(timeout: 3))
+
         let teacherAccount = button(containing: "我的")
         XCTAssertTrue(teacherAccount.waitForExistence(timeout: 2))
         teacherAccount.tap()

@@ -130,6 +130,8 @@ final class LaunchAndRoleFlowTests: XCTestCase {
         XCTAssertTrue(report.waitForExistence(timeout: 3))
         report.tap()
         XCTAssertTrue(staticText(containing: "7项能力得分").waitForExistence(timeout: 5))
+        XCTAssertTrue(staticText(containing: "规则依据与适用范围").waitForExistence(timeout: 3))
+        XCTAssertTrue(staticText(containing: "规则生效日期").exists)
         let back = button(containing: "返回")
         XCTAssertTrue(back.waitForExistence(timeout: 2))
         back.tap()

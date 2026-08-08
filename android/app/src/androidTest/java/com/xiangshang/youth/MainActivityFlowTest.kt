@@ -162,6 +162,8 @@ class MainActivityFlowTest {
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("7项能力得分").fetchSemanticsNodes().isNotEmpty()
         }
+        composeRule.onNodeWithText("规则依据与适用范围").assertIsDisplayed()
+        composeRule.onNodeWithText("规则生效日期").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("返回").performClick()
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("查看详细报告", substring = true).fetchSemanticsNodes().isNotEmpty()

@@ -218,7 +218,7 @@ private fun NavHostController.replaceRoot(destination: String) {
             val destination = if (role.name == "Parent") Destinations.Parent else if (role.name == "Teacher") Destinations.Teacher else Destinations.Principal
             nav.replaceRoot(destination)
         }, onLogout = { viewModel.logout(); nav.replaceRoot(Destinations.Login) }) }
-        composable(Destinations.Parent) { ParentHomeScreen(state, nav, viewModel::registerActivity, viewModel::bookExpert, viewModel::saveDraft, viewModel::clearDraft, { viewModel.refreshDashboard() }, { name, phone -> viewModel.submitActivityCommand(name, phone) }, { name, date, note -> viewModel.submitExpertCommand(name, date, note) }) }
+        composable(Destinations.Parent) { ParentHomeScreen(state, nav, viewModel::registerActivity, viewModel::bookExpert, viewModel::saveDraft, viewModel::clearDraft, { viewModel.refreshDashboard() }, { name, phone -> viewModel.submitActivityCommand(name, phone) }, { name, date, note -> viewModel.submitExpertCommand(name, date, note) }, viewModel::clearWorkflowState) }
         // The family manager remains visible after a successful binding, so a
         // parent can bind more than one child in the same household. Entry
         // points that merely need a child to unlock a report/task use the

@@ -392,7 +392,7 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertEqual(Set(state.boundChildren.map(\.id)), ["s01", "s02"])
     }
 
-    func testExpertBookingIsIdempotentUntilRemoteSync() async {
+    func testExpertBookingIsIdempotentAndCanBeCorrectedUntilRemoteSync() async {
         let suite = "xiangshang.youth.expert-idempotency-tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defaults.removePersistentDomain(forName: suite)
@@ -404,6 +404,11 @@ final class LocalFeatureStateTests: XCTestCase {
 
         XCTAssertEqual(state.localFeatures.expertAppointments.count, 1)
         XCTAssertEqual(state.localFeatures.expertAppointments.first?.status, .pendingSync)
+
+        state.bookExpert(name: "张教授", preferredDate: "周六下午", note: "希望改为周末咨询")
+        XCTAssertEqual(state.localFeatures.expertAppointments.count, 1)
+        XCTAssertEqual(state.localFeatures.expertAppointments.first?.preferredDate, "周六下午")
+        XCTAssertEqual(state.localFeatures.expertAppointments.first?.note, "希望改为周末咨询")
     }
 
     func testMockWorkflowCommandsExposeTerminalSuccessAndValidationStates() async {

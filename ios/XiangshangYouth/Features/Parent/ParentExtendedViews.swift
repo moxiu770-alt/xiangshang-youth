@@ -529,6 +529,7 @@ struct ActivityDetailSheet: View {
     @State private var phone = "13800138000"
     @State private var consented = false
     @State private var validationMessage: String?
+    @State private var isEditingRegistration = false
     private let activityID = "health-growth-season-2026"
     private var draftKey: String { "activity-registration-\(activityID)" }
     private var commandKey: String { "activity:\(activityID)" }
@@ -543,8 +544,15 @@ struct ActivityDetailSheet: View {
             Label("7 月 16 日–8 月 15 日", systemImage: "calendar").font(.system(size: 12)).foregroundStyle(.secondary)
             Text("完成综合健康测评，了解孩子的运动发展与健康成长情况。提交后将同步至孩子成长档案。") .font(.system(size: 13)).foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 7) { Text("活动说明").font(.system(size: 15, weight: .bold)); Text("• 完成四项健康测评\n• 查看个性化成长报告\n• 可预约学校体测场地") .font(.system(size: 12)).foregroundStyle(ReferenceColor.navy) }.padding(12).background(ReferenceColor.sky, in: RoundedRectangle(cornerRadius: 12))
-            if registered && !hasFailure {
-                Label("报名信息已保存；活动开始前将通过消息中心通知您。", systemImage: "checkmark.circle.fill").font(.system(size: 12, weight: .medium)).foregroundStyle(ReferenceColor.green)
+            if registered && !hasFailure && !isEditingRegistration {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("报名信息已保存；活动开始前将通过消息中心通知您。", systemImage: "checkmark.circle.fill").font(.system(size: 12, weight: .medium)).foregroundStyle(ReferenceColor.green)
+                    Button("修改报名信息") {
+                        if let record = state.localFeatures.activityRegistrations.first(where: { $0.activityID == activityID }) { contactName = record.contactName; phone = record.phone }
+                        isEditingRegistration = true
+                        state.clearWorkflowState(commandKey)
+                    }.font(.system(size: 12, weight: .semibold))
+                }
             } else {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("报名信息").font(.system(size: 15, weight: .bold))
@@ -565,16 +573,16 @@ struct ActivityDetailSheet: View {
                 validationMessage = nil
                 Task {
                     let success = await state.submitActivityCommand(activityID, contactName: contactName, phone: phone)
-                    if success { state.clearDraft(draftKey) }
+                    if success { state.clearDraft(draftKey); isEditingRegistration = false }
                 }
             } label: {
                 HStack(spacing: 7) {
                     if commandState.isSubmitting { ProgressView().tint(.white) }
-                    Text(commandState.isSubmitting ? "正在提交…" : registered ? "已保存待同步" : "确认报名")
+                    Text(commandState.isSubmitting ? "正在提交…" : isEditingRegistration ? "更新报名信息" : registered ? "已保存待同步" : "确认报名")
                 }
                 .font(.system(size: 14, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 12).foregroundStyle(.white).background(hasFailure ? .orange : registered ? ReferenceColor.green : ReferenceColor.blue, in: RoundedRectangle(cornerRadius: 12))
             }
-            .buttonStyle(.plain).disabled(commandState.isSubmitting || (registered && !hasFailure))
+            .buttonStyle(.plain).disabled(commandState.isSubmitting || (registered && !hasFailure && !isEditingRegistration))
         }.padding(16) }.navigationTitle("活动详情").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }
         .task {
             if let values = state.localFeatures.drafts[draftKey]?.split(separator: "|", maxSplits: 2).map(String.init), values.count >= 2 {
@@ -628,6 +636,7 @@ struct ExpertDetailSheet: View {
     @State private var date = "2026-09-12 上午"
     @State private var note = "想了解孩子的运动发展建议。"
     @State private var submitted = false
+    @State private var isEditingBooking = false
     private var draftKey: String { "expert-\(name)" }
     private var commandKey: String { "expert:\(name)" }
     var body: some View { NavigationStack { VStack(spacing: 14) {
@@ -637,8 +646,8 @@ struct ExpertDetailSheet: View {
             .font(.system(size: 13)).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal, 28)
         let commandState = state.workflowState(for: commandKey)
         let failed: Bool = { if case .failed = commandState { return true }; return false }()
-        if submitted && !failed { Label("预约信息已保存，专家团队将尽快与您联系。", systemImage: "checkmark.circle.fill").font(.system(size: 12)).foregroundStyle(ReferenceColor.green) } else { VStack(spacing: 8) { TextField("期望咨询时间", text: $date).textFieldStyle(.roundedBorder); TextField("咨询说明", text: $note, axis: .vertical).lineLimit(3...5).textFieldStyle(.roundedBorder) }.padding(.horizontal, 20).onChange(of: date) { _, _ in state.saveDraft("\(date)|\(note)", key: draftKey) }.onChange(of: note) { _, _ in state.saveDraft("\(date)|\(note)", key: draftKey) }; if case let .failed(message) = commandState { Text(message).font(.caption).foregroundStyle(.red) }; Button { if submitted && !failed { dismiss() } else { Task { if await state.submitExpertCommand(name: name, preferredDate: date, note: note) { state.clearDraft(draftKey); submitted = true } } } } label: { HStack { if commandState.isSubmitting { ProgressView() }; Text(commandState.isSubmitting ? "正在提交…" : submitted && !failed ? "完成" : failed ? "重新提交" : "提交预约") } }.buttonStyle(.borderedProminent).disabled(commandState.isSubmitting || (!submitted && (date.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))) }
-    }.frame(maxWidth: .infinity, maxHeight: .infinity).navigationTitle("专家详情").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }.task { if let saved = state.localFeatures.drafts[draftKey]?.split(separator: "|", maxSplits: 1).map(String.init), saved.count == 2 { date = saved[0]; note = saved[1] }; submitted = state.localFeatures.expertAppointments.contains { $0.expertName == name && ($0.status == .pendingSync || $0.status == .submitted) } } } }
+        if submitted && !failed && !isEditingBooking { VStack(spacing: 9) { Label("预约信息已保存，专家团队将尽快与您联系。", systemImage: "checkmark.circle.fill").font(.system(size: 12)).foregroundStyle(ReferenceColor.green); Button("修改预约信息") { isEditingBooking = true; state.clearWorkflowState(commandKey) }.buttonStyle(.bordered) } } else { VStack(spacing: 8) { TextField("期望咨询时间", text: $date).textFieldStyle(.roundedBorder); TextField("咨询说明", text: $note, axis: .vertical).lineLimit(3...5).textFieldStyle(.roundedBorder) }.padding(.horizontal, 20).onChange(of: date) { _, _ in state.saveDraft("\(date)|\(note)", key: draftKey) }.onChange(of: note) { _, _ in state.saveDraft("\(date)|\(note)", key: draftKey) }; if case let .failed(message) = commandState { Text(message).font(.caption).foregroundStyle(.red) }; Button { Task { if await state.submitExpertCommand(name: name, preferredDate: date, note: note) { state.clearDraft(draftKey); submitted = true; isEditingBooking = false } } } label: { HStack { if commandState.isSubmitting { ProgressView() }; Text(commandState.isSubmitting ? "正在提交…" : isEditingBooking ? "更新预约" : failed ? "重新提交" : "提交预约") } }.buttonStyle(.borderedProminent).disabled(commandState.isSubmitting || date.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
+    }.frame(maxWidth: .infinity, maxHeight: .infinity).navigationTitle("专家详情").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }.task { if let saved = state.localFeatures.drafts[draftKey]?.split(separator: "|", maxSplits: 1).map(String.init), saved.count == 2 { date = saved[0]; note = saved[1] } else if let saved = state.localFeatures.expertAppointments.first(where: { $0.expertName == name }) { date = saved.preferredDate; note = saved.note }; submitted = state.localFeatures.expertAppointments.contains { $0.expertName == name && ($0.status == .pendingSync || $0.status == .submitted) } } } }
 }
 
 struct ExpertListView: View {

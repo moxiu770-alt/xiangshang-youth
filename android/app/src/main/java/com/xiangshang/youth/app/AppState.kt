@@ -315,13 +315,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun clearDraft(key: String) = mutate { it.copy(drafts = it.drafts - key) }
     fun bookExpert(name: String, date: String, note: String) {
         if (date.isBlank() || note.isBlank()) return
-        // Keep the local command idempotent while the remote appointment API is
-        // still a seam. Reopening an expert card must not create duplicate rows.
-        if (_state.value.local.expertAppointments.any {
-                it.expertName == name &&
-                    (it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Submitted)
-            }) return
-        mutate { it.copy(expertAppointments = listOf(ExpertAppointment(expertName = name, preferredDate = date, note = note, status = LocalSubmissionStatus.PendingSync)) + it.expertAppointments) }
+        // An update replaces the existing local projection. This preserves
+        // idempotency without preventing a family from correcting a booking.
+        mutate { local ->
+            local.copy(expertAppointments = listOf(ExpertAppointment(expertName = name, preferredDate = date, note = note, status = LocalSubmissionStatus.PendingSync)) + local.expertAppointments.filterNot { it.expertName == name })
+        }
     }
     fun saveCourseUpload(taskId: String, attendance: Int, notes: String, attachment: String, submit: Boolean) { if (attendance < 0 || (submit && (notes.isBlank() || attachment.isBlank()))) return; mutate { local -> val record=CourseUploadRecord(taskId=taskId, attendanceCount=attendance, notes=notes.trim(), attachmentName=attachment, status=if (submit) LocalSubmissionStatus.PendingSync else LocalSubmissionStatus.Draft); local.copy(courseUploads=listOf(record)+local.courseUploads.filterNot { it.taskId==taskId }, uploadedTaskIds=if (submit) local.uploadedTaskIds+taskId else local.uploadedTaskIds) } }
     private fun markActivitySynced(activityId: String) = updateActivitySyncStatus(activityId, LocalSubmissionStatus.Submitted)

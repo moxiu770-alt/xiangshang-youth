@@ -4,6 +4,8 @@ Kotlin + Jetpack Compose + MVVM + StateFlow 的一期原生客户端。默认使
 
 联调时可用 `-PapiBaseUrl=https://staging.example.com/` 注入 Retrofit 地址；请求统一附带 KeyStore 中的 Bearer token，并将超时、取消、401/403、5xx 和网络异常映射到 `ApiError`。不传该参数时仍使用示例地址，Mock 模式不会发起网络请求。
 
+联调构建需显式打开远端数据源，避免错误把演示环境切到接口：`./gradlew :app:assembleDebug -PuseRemoteDataSource=true -PapiBaseUrl=https://<服务地址>/`。不传 `useRemoteDataSource=true` 时始终使用 Mock 数据。
+
 ## 启动
 
 ```bash

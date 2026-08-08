@@ -76,7 +76,7 @@ export ANDROID_HOME="/Users/luyanpeng/Library/Android/sdk"
 - **逐页状态机**：每个列表、详情、提交、上传和刷新入口都要统一覆盖 `idle / loading / success / empty / error / retry`，并补充防重复提交、超时和取消行为。当前 Mock 主流程、教师/家长/校长主要列表与详情、通知/班级圈/课程上传已补齐页面级加载、空、错误和重试；真实接口接入时仍需把服务端失败、取消和超时映射到同一状态容器。
 - **真实交互反馈**：报名、复核、补测、动态、课程上传和客服咨询已具备 Mock 校验、成功反馈、本地持久化及统一 command/use-case 状态；设置与忘记密码仍需接入完整账户服务，真实联调前还要用服务端错误码补齐失败回滚、超时和取消模拟。
 - **登录与账号恢复**：微信/手机号/账号登录的回调、验证码失效、切换账号、注销、会话过期和深链冷启动需要在真实设备上走通；当前页面和本地会话已具备，第三方 SDK 回调待接入。
-- **网络接入边界**：iOS `URLSession` 与 Android `Retrofit/OkHttp` 已具备统一超时、鉴权、取消、401/403/5xx/网络错误映射和版本化 endpoint；默认仍为 Mock，联调时通过 iOS `XS_API_BASE_URL` 环境变量或 Android `-PapiBaseUrl=https://.../` 注入服务地址，不改页面层。
+- **网络接入边界**：iOS `URLSession` 与 Android `Retrofit/OkHttp` 已具备统一超时、鉴权、取消、401/403/5xx/网络错误映射和版本化 endpoint；默认仍为 Mock。联调时必须显式同时打开数据源和服务地址：iOS Scheme 设置 `XS_USE_REMOTE_DATA_SOURCE=1`、`XS_API_BASE_URL=https://.../`；Android 构建传入 `-PuseRemoteDataSource=true -PapiBaseUrl=https://.../`，不改页面层。
 - **权限与系统能力**：通知权限已接入 iOS `UNUserNotificationCenter` 与 Android 13+ `POST_NOTIFICATIONS`，并覆盖拒绝后的可恢复提示；照片/文件选择、相机、分享、系统浏览器和外部登录回跳仍需在真实业务接入时统一权限解释、拒绝后的降级 UI。
 
 ### P1：达到商业交付质量

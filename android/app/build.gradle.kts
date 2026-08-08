@@ -7,6 +7,7 @@ android {
     namespace = "com.xiangshang.youth"
     compileSdk = 36
     val configuredApiBaseUrl = providers.gradleProperty("apiBaseUrl").orElse("https://api.example.com/").get()
+    val configuredRemoteDataSource = providers.gradleProperty("useRemoteDataSource").orElse("false").get().toBoolean()
     defaultConfig {
         applicationId = "com.xiangshang.youth"
         minSdk = 26
@@ -15,6 +16,7 @@ android {
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "API_BASE_URL", "\"$configuredApiBaseUrl\"")
+        buildConfigField("boolean", "USE_REMOTE_DATA_SOURCE", configuredRemoteDataSource.toString())
     }
     buildFeatures { compose = true; buildConfig = true }
     composeOptions { kotlinCompilerExtensionVersion = "1.5.15" }

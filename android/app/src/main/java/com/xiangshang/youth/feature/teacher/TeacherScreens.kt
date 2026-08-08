@@ -60,7 +60,7 @@ import com.xiangshang.youth.shared.component.*
 
 /** Mirrors the two teacher workbenches in the supplied mobile reference screens. */
 @Composable
-fun TeacherHomeScreen(state: AppUiState, nav: NavHostController, setSportsWorkbench: (Boolean) -> Unit = {}, refreshDashboard: () -> Unit = {}) {
+fun TeacherHomeScreen(state: AppUiState, nav: NavHostController, setSportsWorkbench: (Boolean) -> Unit, refreshDashboard: () -> Unit = {}) {
     val sportsTeacher = state.local.teacherUsesSportsWorkbench
     val dashboardError = state.error
     if (dashboardError != null && state.data == null) {

@@ -177,7 +177,21 @@ final class LaunchAndRoleFlowTests: XCTestCase {
 
     private func loginAndWaitForRoleSelection() {
         XCTAssertTrue(button(containing: "微信登录").waitForExistence(timeout: 10))
+        XCTAssertTrue(button(containing: "手机号登录").exists)
+        XCTAssertTrue(button(containing: "账号密码登录").exists)
         XCTAssertTrue(button(containing: "注册新账号").exists)
+        XCTAssertTrue(button(containing: "忘记密码").exists)
+
+        // Keep all commercial login routes alive. A prior implementation
+        // visually showed these choices but only left the phone route usable.
+        button(containing: "手机号登录").tap()
+        XCTAssertTrue(app.textFields["手机号"].waitForExistence(timeout: 2))
+        button(containing: "账号密码登录").tap()
+        XCTAssertTrue(app.textFields["账号 / 手机号"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.secureTextFields.firstMatch.exists)
+        // This tap only selects WeChat because the account method is active;
+        // the actual authorization attempt remains below the consent check.
+        button(containing: "微信登录").tap()
 
         let consent = button(containing: "请阅读并同意")
         XCTAssertTrue(consent.exists)

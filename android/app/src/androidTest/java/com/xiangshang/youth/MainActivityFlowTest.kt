@@ -50,6 +50,15 @@ class MainActivityFlowTest {
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("微信登录").fetchSemanticsNodes().isNotEmpty()
         }
+        // The production login page must expose all three entry points, not
+        // merely draw inactive alternatives below a phone-only flow.
+        composeRule.onNodeWithText("手机号登录").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("手机号").assertIsDisplayed()
+        composeRule.onNodeWithText("账号密码登录").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("账号 / 手机号").assertIsDisplayed()
+        // This selects WeChat after account login has been active; it must not
+        // start authorization before consent is intentionally confirmed below.
+        composeRule.onNodeWithText("微信登录").performClick()
         composeRule.onNodeWithText("请阅读并同意相关协议").performClick()
         composeRule.onNodeWithText("微信登录").performClick()
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {

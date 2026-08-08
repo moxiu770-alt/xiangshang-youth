@@ -32,6 +32,8 @@ data class LocalFeatureState(
     val sessionRoleName: String? = null,
     val selectedChildId: String? = null,
     val boundChildIds: Set<String> = emptySet(),
+    val selectedPrincipalTaskId: String? = null,
+    val teacherUsesSportsWorkbench: Boolean = false,
     val readMessageIds: Set<String> = emptySet(),
     val settings: LocalAppSettings = LocalAppSettings()
 )
@@ -69,6 +71,8 @@ class LocalFeatureStore(context: Context) {
         sessionRoleName = prefs.getString("session_role_name", null),
         selectedChildId = prefs.getString("selected_child_id", null),
         boundChildIds = prefs.getStringSet("bound_child_ids", emptySet()) ?: emptySet(),
+        selectedPrincipalTaskId = prefs.getString("selected_principal_task_id", null),
+        teacherUsesSportsWorkbench = prefs.getBoolean("teacher_uses_sports_workbench", false),
         readMessageIds = prefs.getStringSet("read_message_ids", emptySet()) ?: emptySet(),
         settings = LocalAppSettings(prefs.getBoolean("notifications_enabled", true), prefs.getBoolean("reduce_motion", false))
     )
@@ -97,6 +101,8 @@ class LocalFeatureStore(context: Context) {
         .putString("session_role_name", value.sessionRoleName)
         .putString("selected_child_id", value.selectedChildId)
         .putStringSet("bound_child_ids", value.boundChildIds)
+        .putString("selected_principal_task_id", value.selectedPrincipalTaskId)
+        .putBoolean("teacher_uses_sports_workbench", value.teacherUsesSportsWorkbench)
         .putStringSet("read_message_ids", value.readMessageIds)
         .putBoolean("notifications_enabled", value.settings.notificationsEnabled)
         .putBoolean("reduce_motion", value.settings.reduceMotion).apply()

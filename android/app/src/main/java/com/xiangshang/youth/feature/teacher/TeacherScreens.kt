@@ -60,8 +60,8 @@ import com.xiangshang.youth.shared.component.*
 
 /** Mirrors the two teacher workbenches in the supplied mobile reference screens. */
 @Composable
-fun TeacherHomeScreen(state: AppUiState, nav: NavHostController, refreshDashboard: () -> Unit = {}) {
-    var sportsTeacher by rememberSaveable { mutableStateOf(false) }
+fun TeacherHomeScreen(state: AppUiState, nav: NavHostController, setSportsWorkbench: (Boolean) -> Unit = {}, refreshDashboard: () -> Unit = {}) {
+    val sportsTeacher = state.local.teacherUsesSportsWorkbench
     val dashboardError = state.error
     if (dashboardError != null && state.data == null) {
         TeacherUnavailableState(state, nav, dashboardError, refreshDashboard)
@@ -83,8 +83,8 @@ fun TeacherHomeScreen(state: AppUiState, nav: NavHostController, refreshDashboar
             modifier = Modifier.widthIn(max = 720.dp).fillMaxWidth().fillMaxHeight(),
             contentPadding = PaddingValues(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            item { TeacherIdentity(sportsTeacher, nav, state.unreadMessageCount, state.loading, refreshDashboard) { sportsTeacher = !sportsTeacher } }
-            item { TeacherRoleSwitch(sportsTeacher) { sportsTeacher = it } }
+            item { TeacherIdentity(sportsTeacher, nav, state.unreadMessageCount, state.loading, refreshDashboard) { setSportsWorkbench(!sportsTeacher) } }
+            item { TeacherRoleSwitch(sportsTeacher, setSportsWorkbench) }
             item {
                 // The application-level accessibility setting must affect the
                 // role-panel swap too.  Leaving AnimatedContent's default

@@ -107,6 +107,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         featureStore.save(local)
         _state.value = _state.value.copy(local = local, role = null)
     }
+    fun selectPrincipalTask(taskId: String) = mutate { it.copy(selectedPrincipalTaskId = taskId) }
+    fun setTeacherSportsWorkbench(enabled: Boolean) = mutate { it.copy(teacherUsesSportsWorkbench = enabled) }
     fun chooseChild(student: Student) {
         mutate { it.copy(selectedChildId = student.id) }
         _state.value = _state.value.copy(selectedChild = student)

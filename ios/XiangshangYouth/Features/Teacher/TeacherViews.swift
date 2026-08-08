@@ -7,7 +7,11 @@ struct TeacherHomeView: View {
     @EnvironmentObject private var state: AppState
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var selectedTab = 0
-    @State private var isSportsTeacher = false
+
+    private var isSportsTeacher: Bool { state.localFeatures.teacherUsesSportsWorkbench }
+    private var sportsTeacherBinding: Binding<Bool> {
+        Binding(get: { state.localFeatures.teacherUsesSportsWorkbench }, set: { state.setTeacherSportsWorkbench($0) })
+    }
 
     private var reduceMotion: Bool { state.localFeatures.settings.reduceMotion || systemReduceMotion }
 
@@ -17,7 +21,7 @@ struct TeacherHomeView: View {
         VStack(spacing: 0) {
             Group {
                 switch selectedTab {
-                case 0: TeacherDashboard(isSportsTeacher: $isSportsTeacher)
+                case 0: TeacherDashboard(isSportsTeacher: sportsTeacherBinding)
                 case 1:
                     if isSportsTeacher {
                         SportsUploadDashboard()

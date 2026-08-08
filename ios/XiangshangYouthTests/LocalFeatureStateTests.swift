@@ -129,11 +129,15 @@ final class LocalFeatureStateTests: XCTestCase {
 
         state.updateCourseProgress("体质成长课", progress: 1.25)
         state.updateCourseProgress("视力守护课", progress: -0.2)
+        state.selectPrincipalTask("t2")
+        state.setTeacherSportsWorkbench(true)
 
         XCTAssertEqual(state.localFeatures.courseProgress["体质成长课"], 1)
         XCTAssertEqual(state.localFeatures.courseProgress["视力守护课"], 0)
         let restored = AppState(featureStore: store)
         XCTAssertEqual(restored.localFeatures.courseProgress["体质成长课"], 1)
+        XCTAssertEqual(restored.localFeatures.selectedPrincipalTaskID, "t2")
+        XCTAssertTrue(restored.localFeatures.teacherUsesSportsWorkbench)
     }
 
     func testFeatureStorePersistsCommercialWorkflowRecords() {

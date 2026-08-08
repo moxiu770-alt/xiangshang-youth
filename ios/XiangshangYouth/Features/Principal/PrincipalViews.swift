@@ -63,7 +63,6 @@ struct PrincipalHomeView: View {
 struct PrincipalDashboard: View {
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var router: AppRouter
-    @State private var selectedTaskID = ""
     @State private var dashboardAppeared = false
     @State private var isRegionDetailShown = false
 
@@ -71,7 +70,7 @@ struct PrincipalDashboard: View {
     private var classes: [ClassInfo] { state.data?.classes ?? [] }
     private var activeTask: TestTask? {
         let tasks = state.data?.tasks ?? []
-        return tasks.first(where: { $0.id == selectedTaskID }) ?? tasks.first
+        return tasks.first(where: { $0.id == state.localFeatures.selectedPrincipalTaskID }) ?? tasks.first
     }
     private var selectedTaskLabel: String {
         guard let task = activeTask else { return "本轮测评" }
@@ -134,7 +133,7 @@ struct PrincipalDashboard: View {
                     Menu {
                         ForEach(state.data?.tasks ?? []) { task in
                             Button {
-                                selectedTaskID = task.id
+                                state.selectPrincipalTask(task.id)
                             } label: {
                                 Label(task.title, systemImage: task.id == activeTask?.id ? "checkmark" : "circle")
                             }
@@ -187,7 +186,10 @@ struct PrincipalDashboard: View {
         .background(ReferenceColor.canvas)
         .refreshable { await state.refreshDashboard() }
         .task {
-            if selectedTaskID.isEmpty { selectedTaskID = state.data?.tasks.first?.id ?? "" }
+            if state.localFeatures.selectedPrincipalTaskID == nil,
+               let defaultTaskID = state.data?.tasks.first?.id {
+                state.selectPrincipalTask(defaultTaskID)
+            }
             withAnimation(.spring(response: 0.65, dampingFraction: 0.78)) { dashboardAppeared = true }
         }
         .sheet(isPresented: $isRegionDetailShown) {

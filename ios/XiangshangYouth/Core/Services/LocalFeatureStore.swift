@@ -28,6 +28,11 @@ struct LocalFeatureState: Codable, Equatable {
     var sessionRole: UserRole?
     var selectedChildID: String? = nil
     var boundChildIDs: Set<String> = []
+    /// Keep dashboard context across a relaunch. These are presentation
+    /// preferences only; the authoritative task and permission data remains
+    /// repository-owned once remote mode is enabled.
+    var selectedPrincipalTaskID: String? = nil
+    var teacherUsesSportsWorkbench = false
     /// Message ids opened by the user.  Mock messages remain immutable, so the
     /// local read set is the client-side source of truth until MessageApi is live.
     var readMessageIDs: Set<String> = []
@@ -141,6 +146,8 @@ final class LocalFeatureStore: ObservableObject {
         if legacy["taskStatusSyncStates"] == nil { legacy["taskStatusSyncStates"] = [String: String]() }
         if legacy["selectedChildID"] == nil { legacy["selectedChildID"] = NSNull() }
         if legacy["boundChildIDs"] == nil { legacy["boundChildIDs"] = [String]() }
+        if legacy["selectedPrincipalTaskID"] == nil { legacy["selectedPrincipalTaskID"] = NSNull() }
+        if legacy["teacherUsesSportsWorkbench"] == nil { legacy["teacherUsesSportsWorkbench"] = false }
         if legacy["readMessageIDs"] == nil { legacy["readMessageIDs"] = [String]() }
         if legacy["likedClassPostIDs"] == nil { legacy["likedClassPostIDs"] = [String]() }
         if legacy["classPostComments"] == nil { legacy["classPostComments"] = [[String: Any]]() }

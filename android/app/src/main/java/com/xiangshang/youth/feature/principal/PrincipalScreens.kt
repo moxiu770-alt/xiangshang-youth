@@ -29,14 +29,13 @@ import java.util.Locale
 private fun com.xiangshang.youth.core.model.TestTask.selectorLabel(): String =
     "$gradeName · ${if (title.contains("补测")) "专项补测" else "秋季测评"}"
 
-@Composable fun PrincipalHomeScreen(state: AppUiState, nav: NavHostController, onChooseAnotherRole: () -> Unit, refreshDashboard: () -> Unit = {}) = AppScaffold("学校运动健康总览", onNotifications = { nav.navigateSingleTop(Destinations.Notifications) }, notificationCount = state.unreadMessageCount, onRefresh = refreshDashboard, isRefreshing = state.loading, onSwitchRole = onChooseAnotherRole, bottomBar = { PrincipalBottomBar(nav) }) {
+@Composable fun PrincipalHomeScreen(state: AppUiState, nav: NavHostController, onChooseAnotherRole: () -> Unit, onSelectTask: (String) -> Unit = {}, refreshDashboard: () -> Unit = {}) = AppScaffold("学校运动健康总览", onNotifications = { nav.navigateSingleTop(Destinations.Notifications) }, notificationCount = state.unreadMessageCount, onRefresh = refreshDashboard, isRefreshing = state.loading, onSwitchRole = onChooseAnotherRole, bottomBar = { PrincipalBottomBar(nav) }) {
     val dashboardError = state.error
     if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = { refreshDashboard() }, dismiss = LocalDashboardClearError.current); return@AppScaffold }
     if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }
     if (state.data.students.isEmpty()) { EmptyState("暂无学校测评数据，场地端上传后会显示在这里。"); return@AppScaffold }
-    var selectedTaskId by rememberSaveable { mutableStateOf("") }
     var taskMenuExpanded by rememberSaveable { mutableStateOf(false) }
-    val activeTask = state.data.tasks.firstOrNull { it.id == selectedTaskId } ?: state.data.tasks.firstOrNull()
+    val activeTask = state.data.tasks.firstOrNull { it.id == state.local.selectedPrincipalTaskId } ?: state.data.tasks.firstOrNull()
     // The task completion number is supplied by the service as an aggregate.
     // Scope the local sample cards to the selected task so choosing a
     // four年级补测 does not retain whole-school risk and poverty figures.
@@ -70,7 +69,7 @@ private fun com.xiangshang.youth.core.model.TestTask.selectorLabel(): String =
                         DropdownMenuItem(
                             text = { Text(task.title, fontSize = 12.sp) },
                             leadingIcon = { if (task.id == activeTask?.id) Icon(Icons.Filled.Check, contentDescription = null, tint = Blue) },
-                            onClick = { selectedTaskId = task.id; taskMenuExpanded = false }
+                            onClick = { onSelectTask(task.id); taskMenuExpanded = false }
                         )
                     }
                 }

@@ -313,7 +313,7 @@ private fun NavHostController.replaceRoot(destination: String) {
                 )
             }
         }
-        composable(Destinations.Teacher) { TeacherHomeScreen(state, nav, viewModel::refreshDashboard) }
+        composable(Destinations.Teacher) { TeacherHomeScreen(state, nav, viewModel::setTeacherSportsWorkbench, viewModel::refreshDashboard) }
         composable(Destinations.TeacherMessages) { TeacherMessagesScreen(state, nav, viewModel::markMessageRead, viewModel::refreshDashboard) }
         composable(Destinations.Classes) { TeacherClassesScreen(state, nav) }
         composable(Destinations.TeacherCircle) {
@@ -340,7 +340,7 @@ private fun NavHostController.replaceRoot(destination: String) {
             PrincipalHomeScreen(state, nav, onChooseAnotherRole = {
                 viewModel.clearRoleSelection()
                 nav.replaceRoot(Destinations.Role)
-            }, refreshDashboard = viewModel::refreshDashboard)
+            }, onSelectTask = viewModel::selectPrincipalTask, refreshDashboard = viewModel::refreshDashboard)
         }
         composable(Destinations.PrincipalGrades) { GradeStatsScreen(state, nav, rootTab = true) }
         composable(Destinations.PrincipalClassStats) { ClassStatsScreen(state, nav, null, rootTab = true) }

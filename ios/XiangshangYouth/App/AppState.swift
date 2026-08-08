@@ -153,6 +153,8 @@ enum WorkflowCommandState: Equatable {
     func clearError() { error = nil }
     func selectRole(_ role: UserRole) { selectedRole = role; if var profile { profile = UserProfile(id: profile.id, name: role == .teacher ? "李老师" : role == .principal ? "周校长" : "王女士", phone: profile.phone, role: role, schoolName: profile.schoolName, avatarInitials: role == .teacher ? "李" : role == .principal ? "周" : "王"); self.profile = profile; persistSession() } }
     func chooseAnotherRole() { selectedRole = nil }
+    func selectPrincipalTask(_ taskID: String) { mutateLocal { $0.selectedPrincipalTaskID = taskID } }
+    func setTeacherSportsWorkbench(_ enabled: Bool) { mutateLocal { $0.teacherUsesSportsWorkbench = enabled } }
     func switchAccount() { ApiClient.shared.token = nil; featureStore.reset(); localFeatures = featureStore.state; profile = nil; selectedRole = nil; selectedChild = nil; data = nil; error = nil; reportLoading = false; reportError = nil; workflowStates.removeAll(); refreshedReports.removeAll() }
     private var refreshedReports: [String: DiagnosisReport] = [:]
     func report(for student: Student) -> DiagnosisReport { refreshedReports[student.id] ?? repository.report(for: student) }

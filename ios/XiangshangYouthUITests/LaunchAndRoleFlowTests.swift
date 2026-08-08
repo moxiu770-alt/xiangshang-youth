@@ -121,6 +121,23 @@ final class LaunchAndRoleFlowTests: XCTestCase {
         XCTAssertTrue(back.waitForExistence(timeout: 2))
         back.tap()
         XCTAssertTrue(staticText(containing: "综合测评").waitForExistence(timeout: 3))
+
+        // “孩子管理” is a durable family workspace.  It differs from a
+        // report/assessment binding guard: after the first child is bound the
+        // parent can still add a second child without being popped away.
+        app.buttons["我的"].tap()
+        let familyManager = button(containing: "已绑定孩子")
+        XCTAssertTrue(familyManager.waitForExistence(timeout: 3))
+        familyManager.tap()
+        XCTAssertTrue(staticText(containing: "已绑定孩子 1 人").waitForExistence(timeout: 3))
+        button(containing: "绑定孩子").tap()
+        XCTAssertTrue(app.textFields["child-name-field"].waitForExistence(timeout: 3))
+        app.textFields["child-name-field"].tap()
+        app.textFields["child-name-field"].typeText("王小雨")
+        app.textFields["child-binding-code-field"].tap()
+        app.textFields["child-binding-code-field"].typeText("XS-S02")
+        button(containing: "确认绑定").tap()
+        XCTAssertTrue(staticText(containing: "已绑定孩子 2 人").waitForExistence(timeout: 4))
     }
 
     private func loginAndWaitForRoleSelection() {

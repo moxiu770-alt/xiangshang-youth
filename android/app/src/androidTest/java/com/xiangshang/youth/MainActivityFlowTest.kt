@@ -132,5 +132,24 @@ class MainActivityFlowTest {
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("查看详细报告", substring = true).fetchSemanticsNodes().isNotEmpty()
         }
+
+        // “孩子管理” is a family-management entry point, not a one-shot
+        // binding guard.  After the first child is bound, it must stay open
+        // so the same household can add another child without losing context.
+        composeRule.onNodeWithContentDescription("我的").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("孩子管理").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onAllNodesWithText("孩子管理")[0].performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("已绑定孩子 1 人").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("绑定孩子").performClick()
+        composeRule.onNodeWithText("孩子姓名").performTextInput("王小雨")
+        composeRule.onNodeWithText("学校绑定码").performTextInput("XS-S02")
+        composeRule.onNodeWithText("确认绑定").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("已绑定孩子 2 人").fetchSemanticsNodes().isNotEmpty()
+        }
     }
 }

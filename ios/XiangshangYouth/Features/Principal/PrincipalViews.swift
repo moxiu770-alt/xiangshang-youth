@@ -409,6 +409,13 @@ struct ClassStatsView: View {
             VStack(spacing: 9) {
                 if showsBack { ParentPageNavigation(title: "班级完成率", showsBack: true) }
                 ReferenceHeader(name: "周校长", school: "向上实验小学", initial: "周")
+                if !showsBack {
+                    Text("班级完成率")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(ReferenceColor.navy)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 14)
+                }
                 FilterBar(options: ["全部年级"] + (state.data?.grades.map(\.name) ?? []), selection: $selectedGrade).padding(.horizontal, 12)
                 Text("\(classes.count)个班级 · 点击班级查看需重点跟进的学生")
                     .font(.system(size: 10)).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 14)
@@ -480,7 +487,7 @@ struct RiskStudentsView: View {
             VStack(spacing: 8) {
                 if showsBack { ParentPageNavigation(title: "重点风险学生", showsBack: true) }
                 ReferenceHeader(name: "周校长", school: "向上实验小学", initial: "周")
-                HStack { Text("重点关注学生").font(.system(size: 14, weight: .bold)); Spacer(); Text("共\(students.count)人").font(.system(size: 10, weight: .semibold)).foregroundStyle(.red) }.padding(.horizontal, 14)
+                HStack { Text(showsBack ? "重点关注学生" : "重点风险学生").font(.system(size: 14, weight: .bold)); Spacer(); Text("共\(students.count)人").font(.system(size: 10, weight: .semibold)).foregroundStyle(.red) }.padding(.horizontal, 14)
                 FilterBar(options: ["全部", "待复核", "待补测", "低分"], selection: $selectedRisk).padding(.horizontal, 12)
                 Text("点击学生查看7项测评、风险提示和训练建议。")
                     .font(.system(size: 9)).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 14)

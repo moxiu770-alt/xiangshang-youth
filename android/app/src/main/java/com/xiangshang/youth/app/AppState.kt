@@ -99,10 +99,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }.onFailure { handleDashboardFailure(it) }
     }
     fun chooseRole(role: UserRole) {
-        val local = _state.value.local.copy(sessionRoleName = role.name)
+        val visibleProfile = _state.value.profile
+        // Preserve the family account name on the first upgrade from the
+        // former session schema, before the active workbench overwrites it
+        // with 李老师/周校长.
+        val local = _state.value.local
+            .let { current ->
+                if (current.parentAccountName.isNullOrBlank() && visibleProfile?.role == UserRole.Parent) {
+                    current.copy(parentAccountName = visibleProfile.name)
+                } else current
+            }
+            .copy(sessionRoleName = role.name)
         featureStore.save(local)
-        val parentName = _state.value.local.parentAccountName ?: _state.value.profile?.takeIf { it.role == UserRole.Parent }?.name ?: "王女士"
-        _state.value = _state.value.copy(local = local, role = role, profile = _state.value.profile?.copy(role = role, name = if (role == UserRole.Teacher) "李老师" else if (role == UserRole.Principal) "周校长" else parentName))
+        val parentName = local.parentAccountName ?: visibleProfile?.takeIf { it.role == UserRole.Parent }?.name ?: "王女士"
+        _state.value = _state.value.copy(local = local, role = role, profile = visibleProfile?.copy(role = role, name = if (role == UserRole.Teacher) "李老师" else if (role == UserRole.Principal) "周校长" else parentName))
     }
     fun clearRoleSelection() {
         val local = _state.value.local.copy(sessionRoleName = null)

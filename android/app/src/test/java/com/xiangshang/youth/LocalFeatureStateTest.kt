@@ -80,6 +80,7 @@ class LocalFeatureStateTest {
             sessionActive = true,
             sessionPhone = "13800138000",
             sessionRoleName = "Teacher",
+            parentAccountName = "王女士",
             selectedChildId = "s02",
             selectedPrincipalTaskId = "t2",
             teacherUsesSportsWorkbench = true,
@@ -105,6 +106,7 @@ class LocalFeatureStateTest {
         assertEquals("核验视频后建议周五补测。", state.reviewNotes["s01"])
         assertTrue(state.sessionActive)
         assertEquals("Teacher", state.sessionRoleName)
+        assertEquals("王女士", state.parentAccountName)
         assertEquals("s02", state.selectedChildId)
         assertEquals("t2", state.selectedPrincipalTaskId)
         assertTrue(state.teacherUsesSportsWorkbench)

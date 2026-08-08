@@ -139,6 +139,24 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertEqual(state.profile?.name, "新家长")
     }
 
+    func testLegacyParentSessionKeepsItsNameOnFirstRoleSwitch() {
+        let suite = "xiangshang.youth.legacy-parent-name-tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let store = LocalFeatureStore(defaults: defaults)
+        store.update { value in
+            value.sessionProfile = UserProfile(id: "u1", name: "陈女士", phone: "13800138000", role: .parent, schoolName: "向上实验小学", avatarInitials: "陈")
+            value.parentAccountName = nil
+        }
+        let state = AppState(featureStore: store)
+
+        state.selectRole(.teacher)
+        state.selectRole(.parent)
+
+        XCTAssertEqual(state.profile?.name, "陈女士")
+        XCTAssertEqual(state.localFeatures.parentAccountName, "陈女士")
+    }
+
     func testCourseProgressIsPersistedWithinTheValidRange() {
         let suite = "xiangshang.youth.course-progress-tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!

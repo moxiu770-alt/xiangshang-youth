@@ -161,6 +161,14 @@ enum WorkflowCommandState: Equatable {
     func selectRole(_ role: UserRole) {
         selectedRole = role
         if var profile {
+            // Builds released before `parentAccountName` existed may already
+            // have a real parent profile in the session payload. Capture it
+            // before replacing the visible identity with a teacher/principal
+            // workbench name, otherwise the first post-upgrade role switch
+            // would silently reset that family name to the mock default.
+            if localFeatures.parentAccountName == nil, profile.role == .parent {
+                mutateLocal { $0.parentAccountName = profile.name }
+            }
             let parentName = localFeatures.parentAccountName ?? (profile.role == .parent ? profile.name : "王女士")
             let name = role == .teacher ? "李老师" : role == .principal ? "周校长" : parentName
             profile = UserProfile(

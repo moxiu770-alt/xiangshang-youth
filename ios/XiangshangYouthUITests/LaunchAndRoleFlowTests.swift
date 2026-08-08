@@ -62,6 +62,17 @@ final class LaunchAndRoleFlowTests: XCTestCase {
         XCTAssertTrue(messageBack.waitForExistence(timeout: 2))
         messageBack.tap()
         XCTAssertTrue(staticText(containing: "班级健康概览").waitForExistence(timeout: 3))
+
+        // The assignment shortcut has its own data scope. Mock fixtures have
+        // no unassigned students, so it must present the truthful empty state
+        // instead of silently opening the generic student list.
+        let unassignedStudents = button(containing: "待分班学生")
+        XCTAssertTrue(unassignedStudents.waitForExistence(timeout: 2))
+        unassignedStudents.tap()
+        XCTAssertTrue(staticText(containing: "暂无待分班学生").waitForExistence(timeout: 3))
+        button(containing: "返回").tap()
+        XCTAssertTrue(staticText(containing: "班级健康概览").waitForExistence(timeout: 3))
+
         let teacherAccount = button(containing: "我的")
         XCTAssertTrue(teacherAccount.waitForExistence(timeout: 2))
         teacherAccount.tap()

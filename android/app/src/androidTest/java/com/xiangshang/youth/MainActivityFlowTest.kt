@@ -82,6 +82,17 @@ class MainActivityFlowTest {
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("班级健康概览").fetchSemanticsNodes().isNotEmpty()
         }
+        // This is not a generic roster shortcut: the bundled fixture has no
+        // pending placements, so the dedicated route must show its honest
+        // empty state and retain a working secondary-page back action.
+        composeRule.onNodeWithContentDescription("待分班学生").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("暂无待分班学生", substring = true).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription("返回").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("班级健康概览").fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithContentDescription("消息通知").performClick()
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("消息中心").fetchSemanticsNodes().isNotEmpty()

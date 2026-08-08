@@ -207,7 +207,7 @@ private fun TeacherActionGrid(nav: NavHostController) {
     Column(Modifier.padding(horizontal = 12.dp).fillMaxWidth().background(Color.White, RoundedCornerShape(10.dp)).padding(9.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         actions.chunked(4).forEach { row -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             row.forEach { (title, icon, color) ->
-                Surface(Modifier.weight(1f).height(67.dp).semantics { role = Role.Button; contentDescription = title }.clickable { nav.navigate(when (title) { "班级看板" -> Destinations.TeacherBoard; "预警中心" -> Destinations.Review; "优秀学生评选" -> Destinations.OutstandingStudents; "学生列表", "待分班学生", "学生名单" -> Destinations.Students; else -> Destinations.Tasks }) }, color = color.copy(alpha = .055f), shape = RoundedCornerShape(9.dp)) {
+                Surface(Modifier.weight(1f).height(67.dp).semantics { role = Role.Button; contentDescription = title }.clickable { nav.navigate(when (title) { "班级看板" -> Destinations.TeacherBoard; "预警中心" -> Destinations.Review; "优秀学生评选" -> Destinations.OutstandingStudents; "待分班学生" -> Destinations.UnassignedStudents; "学生列表", "学生名单" -> Destinations.Students; else -> Destinations.Tasks }) }, color = color.copy(alpha = .055f), shape = RoundedCornerShape(9.dp)) {
                     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) { Surface(color = color, shape = RoundedCornerShape(12.dp), modifier = Modifier.size(31.dp)) { Icon(icon, null, tint = Color.White, modifier = Modifier.padding(7.dp)) }; Spacer(Modifier.height(4.dp)); Text(title, color = Navy, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, maxLines = 1) }
                 }
             }
@@ -484,7 +484,7 @@ fun TeacherClassBoardScreen(state: AppUiState, nav: NavHostController, onOpenRep
     }
 }
 @Composable
-fun StudentListScreen(state: AppUiState, nav: NavHostController, className: String? = null, outstandingOnly: Boolean = false, onOpenStudent: (com.xiangshang.youth.core.model.Student) -> Unit) = AppScaffold(if (outstandingOnly) "优秀学生评选" else "学生列表", onBack = { nav.popBackStack() }) {
+fun StudentListScreen(state: AppUiState, nav: NavHostController, className: String? = null, outstandingOnly: Boolean = false, unassignedOnly: Boolean = false, onOpenStudent: (com.xiangshang.youth.core.model.Student) -> Unit) = AppScaffold(when { outstandingOnly -> "优秀学生评选"; unassignedOnly -> "待分班学生"; else -> "学生列表" }, onBack = { nav.popBackStack() }) {
     val dashboardError = state.error
     if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current); return@AppScaffold }
     if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }
@@ -492,9 +492,11 @@ fun StudentListScreen(state: AppUiState, nav: NavHostController, className: Stri
         state.data.students.isEmpty() -> EmptyState("暂无学生数据，班级名单同步后会显示在这里。")
         else -> {
             val students = state.data.students.filter { student ->
-                (className == null || student.className == className) && (!outstandingOnly || ((student.totalScore ?: 0.0) >= 30.0 && (state.local.studentTaskStatuses[student.id] ?: student.taskStatus).name == "Completed"))
+                (className == null || student.className == className) &&
+                    (!outstandingOnly || ((student.totalScore ?: 0.0) >= 30.0 && (state.local.studentTaskStatuses[student.id] ?: student.taskStatus).name == "Completed")) &&
+                    (!unassignedOnly || student.className.isBlank())
             }.sortedByDescending { it.totalScore ?: 0.0 }
-            if (students.isEmpty()) EmptyState("暂无符合条件的学生，总分达到 30 分且已完成测评的学生会显示在这里。")
+            if (students.isEmpty()) EmptyState(if (unassignedOnly) "暂无待分班学生，当前学生均已完成班级归属；学校同步新的待分班名单后会显示在这里。" else "暂无符合条件的学生，总分达到 30 分且已完成测评的学生会显示在这里。")
             else students.forEach {
             StudentCard(it) { onOpenStudent(it) }
             Spacer(Modifier.height(7.dp))

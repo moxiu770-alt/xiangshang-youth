@@ -480,7 +480,7 @@ struct TeacherDashboard: View {
                 action("rectangle.stack.fill", "班级看板", ReferenceColor.blue, .teacherClassBoard)
                 action("exclamationmark.triangle.fill", "预警中心", .red, .reviewList)
                 action("person.3.fill", "学生列表", ReferenceColor.green, .studentList(nil))
-                action("person.2.fill", "待分班学生", .orange, .teacherClasses)
+                action("person.2.fill", "待分班学生", .orange, .unassignedStudents)
                 action("figure.run", "查看延时课", .teal, .teacherTasks)
                 action("medal.fill", "优秀学生评选", ReferenceColor.purple, .outstandingStudents)
                 action("person.badge.plus", "学生名单", .orange, .studentList(nil))
@@ -1049,9 +1049,21 @@ struct TeacherClassesView: View {
 }
 
 enum StudentListMode: Equatable {
-    case all, outstanding
-    var title: String { self == .outstanding ? "优秀学生评选" : "学生列表" }
-    var emptyDetail: String { self == .outstanding ? "完成测评后，总分达到 30 分的学生会显示在这里。" : "当前班级暂未同步学生名单。" }
+    case all, outstanding, unassigned
+    var title: String {
+        switch self {
+        case .all: "学生列表"
+        case .outstanding: "优秀学生评选"
+        case .unassigned: "待分班学生"
+        }
+    }
+    var emptyDetail: String {
+        switch self {
+        case .all: "当前班级暂未同步学生名单。"
+        case .outstanding: "完成测评后，总分达到 30 分的学生会显示在这里。"
+        case .unassigned: "当前所有学生均已完成班级归属，学校同步新的待分班名单后会显示在这里。"
+        }
+    }
 }
 
 struct StudentListView: View {
@@ -1070,9 +1082,10 @@ struct StudentListView: View {
                     let students = (state.data?.students ?? []).filter {
                         (classInfo == nil || $0.className == classInfo?.name)
                         && (mode != .outstanding || (($0.totalScore ?? 0) >= 30 && state.taskStatus(for: $0) == .completed))
+                        && (mode != .unassigned || $0.className.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                     if students.isEmpty {
-                        EmptyStateView(title: mode == .outstanding ? "暂无符合条件的学生" : "暂无学生数据", detail: mode.emptyDetail)
+                        EmptyStateView(title: mode == .outstanding ? "暂无符合条件的学生" : mode == .unassigned ? "暂无待分班学生" : "暂无学生数据", detail: mode.emptyDetail)
                     } else {
                         ForEach(students.sorted { ($0.totalScore ?? 0) > ($1.totalScore ?? 0) }) { student in
                             StudentCard(student: student) { router.push(.report(student)) }

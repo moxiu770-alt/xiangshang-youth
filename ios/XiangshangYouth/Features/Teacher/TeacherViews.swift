@@ -569,17 +569,20 @@ struct TeacherClassBoardView: View {
     @EnvironmentObject private var router: AppRouter
     @State private var dashboardAppeared = false
     @State private var selectedPeriod = 0
+    @State private var historicalDetailShown = false
     private var classInfo: ClassInfo? { state.data?.classes.first(where: { $0.name == "三年级2班" }) }
     private var classStudents: [Student] { state.data?.students.filter { $0.className == "三年级2班" } ?? [] }
-    private var measuredCount: Int { classStudents.filter { state.taskStatus(for: $0) == .completed }.count }
-    private var riskCount: Int { classStudents.filter { ($0.totalScore ?? 35) < 25 || state.taskStatus(for: $0) == .review || state.taskStatus(for: $0) == .retest }.count }
-    private var lowScoreCount: Int { classStudents.filter { ($0.totalScore ?? 35) < 25 }.count }
-    private var reviewCount: Int { classStudents.filter { state.taskStatus(for: $0) == .review }.count }
-    private var retestCount: Int { classStudents.filter { state.taskStatus(for: $0) == .retest }.count }
-    private var processingCount: Int { classStudents.filter { [.checkedIn, .waiting, .testing].contains(state.taskStatus(for: $0)) }.count }
-    private var completedCount: Int { classStudents.filter { state.taskStatus(for: $0) == .completed }.count }
-    private var riskStudents: [Student] { classStudents.filter { (($0.totalScore ?? 35) < 25) || [.review, .retest].contains(state.taskStatus(for: $0)) } }
-    private var completion: Double { classStudents.isEmpty ? 0 : Double(measuredCount) / Double(classStudents.count) }
+    private var isHistorical: Bool { selectedPeriod == 1 }
+    private var totalCount: Int { isHistorical ? 20 : classStudents.count }
+    private var measuredCount: Int { isHistorical ? 18 : classStudents.filter { state.taskStatus(for: $0) == .completed }.count }
+    private var riskCount: Int { isHistorical ? 2 : classStudents.filter { ($0.totalScore ?? 35) < 25 || state.taskStatus(for: $0) == .review || state.taskStatus(for: $0) == .retest }.count }
+    private var lowScoreCount: Int { isHistorical ? 1 : classStudents.filter { ($0.totalScore ?? 35) < 25 }.count }
+    private var reviewCount: Int { isHistorical ? 1 : classStudents.filter { state.taskStatus(for: $0) == .review }.count }
+    private var retestCount: Int { isHistorical ? 1 : classStudents.filter { state.taskStatus(for: $0) == .retest }.count }
+    private var processingCount: Int { isHistorical ? 0 : classStudents.filter { [.checkedIn, .waiting, .testing].contains(state.taskStatus(for: $0)) }.count }
+    private var completedCount: Int { isHistorical ? measuredCount : classStudents.filter { state.taskStatus(for: $0) == .completed }.count }
+    private var riskStudents: [Student] { isHistorical ? [] : classStudents.filter { (($0.totalScore ?? 35) < 25) || [.review, .retest].contains(state.taskStatus(for: $0)) } }
+    private var completion: Double { totalCount == 0 ? 0 : Double(measuredCount) / Double(totalCount) }
 
     var body: some View {
         ScrollView {
@@ -596,7 +599,7 @@ struct TeacherClassBoardView: View {
                     Spacer()
                     VStack(spacing: 1) {
                         Text("三年级2班 · 班级数据看板").font(.system(size: 14, weight: .bold))
-                        Text("向上实验小学 · 三年级2班 · 共\(classStudents.count)人").font(.system(size: 8)).foregroundStyle(.secondary)
+                        Text("向上实验小学 · 三年级2班 · 共\(totalCount)人").font(.system(size: 8)).foregroundStyle(.secondary)
                     }
                     Spacer()
                     Button { router.push(.teacherMessages) } label: {
@@ -619,21 +622,31 @@ struct TeacherClassBoardView: View {
                 }
                 .padding(.horizontal, 12)
 
-                boardCard(title: "班级健康概览", trailing: "查看明细", action: { router.push(.studentList(classInfo)) }) {
+                if isHistorical {
+                    Button { historicalDetailShown = true } label: {
+                        Label("2026春季为已归档汇总；学生明细请切换回本轮综合测评查看", systemImage: "archivebox.fill")
+                            .font(.system(size: 9)).foregroundStyle(ReferenceColor.purple)
+                            .frame(maxWidth: .infinity, alignment: .leading).padding(9)
+                            .background(ReferenceColor.purple.opacity(0.08), in: RoundedRectangle(cornerRadius: 9))
+                    }
+                    .buttonStyle(.plain).padding(.horizontal, 12)
+                }
+
+                boardCard(title: "班级健康概览", trailing: isHistorical ? "归档说明" : "查看明细", action: drillDown { router.push(.studentList(classInfo)) }) {
                     HStack {
-                        boardStat("班级人数", "\(classStudents.count)", "person.3.fill", ReferenceColor.blue) { router.push(.studentList(classInfo)) }
-                        boardStat("已测评", "\(measuredCount)", "checkmark.circle.fill", ReferenceColor.green) { router.push(.teacherTasks) }
-                        boardStat("测评率", "\(Int(completion * 100))%", "circle", ReferenceColor.green) { router.push(.teacherTasks) }
-                        boardStat("待处理预警", "\(riskCount)", "exclamationmark.shield.fill", .red) { router.push(.reviewList) }
+                        boardStat("班级人数", "\(totalCount)", "person.3.fill", ReferenceColor.blue, action: drillDown { router.push(.studentList(classInfo)) })
+                        boardStat("已测评", "\(measuredCount)", "checkmark.circle.fill", ReferenceColor.green, action: drillDown { router.push(.teacherTasks) })
+                        boardStat("测评率", "\(Int(completion * 100))%", "circle", ReferenceColor.green, action: drillDown { router.push(.teacherTasks) })
+                        boardStat("待处理预警", "\(riskCount)", "exclamationmark.shield.fill", .red, action: drillDown { router.push(.reviewList) })
                     }
                 }
 
-                boardCard(title: "四维测评健康度", trailing: "健康明细", action: { router.push(.reviewList) }) {
+                boardCard(title: "四维测评健康度", trailing: isHistorical ? "归档说明" : "健康明细", action: drillDown { router.push(.reviewList) }) {
                     HStack(spacing: 6) {
-                        healthGauge("体质", ReferenceColor.blue, completion: completion) { router.push(.reviewList) }
-                        healthGauge("心理", ReferenceColor.pink, completion: completion) { router.push(.reviewList) }
-                        healthGauge("视力", ReferenceColor.green, completion: completion) { router.push(.reviewList) }
-                        healthGauge("口腔", ReferenceColor.purple, completion: completion) { router.push(.reviewList) }
+                        healthGauge("体质", ReferenceColor.blue, completion: completion, action: drillDown { router.push(.reviewList) })
+                        healthGauge("心理", ReferenceColor.pink, completion: completion, action: drillDown { router.push(.reviewList) })
+                        healthGauge("视力", ReferenceColor.green, completion: completion, action: drillDown { router.push(.reviewList) })
+                        healthGauge("口腔", ReferenceColor.purple, completion: completion, action: drillDown { router.push(.reviewList) })
                     }
                 }
 
@@ -641,14 +654,14 @@ struct TeacherClassBoardView: View {
                     // This is a teacher-scoped drill-down.  Routing to the
                     // principal risk workbench leaked the wrong role header
                     // and school-wide context into a class teacher's board.
-                    compactBoardCard(title: "问题分布", trailing: "", action: { router.push(.reviewList) }) {
+                    compactBoardCard(title: "问题分布", trailing: "", action: drillDown { router.push(.reviewList) }) {
                         VStack(spacing: 5) {
                             smallBar("低分", min(1, Double(lowScoreCount) / Double(max(1, classStudents.count))), ReferenceColor.blue, "\(lowScoreCount)人")
                             smallBar("待复核", min(1, Double(reviewCount) / Double(max(1, classStudents.count))), .orange, "\(reviewCount)人")
                             smallBar("待补测", min(1, Double(retestCount) / Double(max(1, classStudents.count))), ReferenceColor.purple, "\(retestCount)人")
                         }
                     }
-                    compactBoardCard(title: "班级总评", trailing: "", action: { router.push(.reviewList) }) {
+                    compactBoardCard(title: "班级总评", trailing: "", action: drillDown { router.push(.reviewList) }) {
                         HStack(spacing: 10) {
                             ZStack {
                                 Circle().trim(from: 0.15, to: 0.92).stroke(AngularGradient(colors: [ReferenceColor.green, ReferenceColor.yellow, .red], center: .center), style: StrokeStyle(lineWidth: 8, lineCap: .round)).rotationEffect(.degrees(-90))
@@ -666,12 +679,15 @@ struct TeacherClassBoardView: View {
                 }
                 .padding(.horizontal, 12)
 
-                boardCard(title: "测评平均完成趋势", trailing: "查看详情", action: { router.push(.teacherTasks) }) {
+                boardCard(title: "测评平均完成趋势", trailing: isHistorical ? "归档说明" : "查看详情", action: drillDown { router.push(.teacherTasks) }) {
                     CompletionTrendChart()
                 }
 
-                boardCard(title: "重点关注学生", trailing: "查看全部", action: { router.push(.reviewList) }) {
-                    if riskStudents.isEmpty {
+                boardCard(title: "重点关注学生", trailing: isHistorical ? "归档说明" : "查看全部", action: drillDown { router.push(.reviewList) }) {
+                    if isHistorical {
+                        Text("历史周期共有\(riskCount)名重点关注学生，已归档处理；不展示当前学生档案。")
+                            .font(.system(size: 10)).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+                    } else if riskStudents.isEmpty {
                         Text("当前没有重点风险学生").font(.system(size: 10)).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
                     } else {
                         VStack(spacing: 6) {
@@ -731,13 +747,29 @@ struct TeacherClassBoardView: View {
                 dashboardAppeared = true
             }
         }
+        .sheet(isPresented: $historicalDetailShown) {
+            NavigationStack {
+                List {
+                    Section("2026春季归档") {
+                        LabeledContent("班级人数", value: "20 人")
+                        LabeledContent("完成测评", value: "18 人 · 90%")
+                        LabeledContent("重点关注", value: "2 人 · 已归档")
+                    }
+                    Section("查看范围") {
+                        Text("该周期仅保留班级汇总。出于学生健康数据保护，历史学生明细需由学校管理端授权后查看；本应用当前只开放本轮测评的学生报告。")
+                    }
+                }
+                .navigationTitle("历史测评归档")
+                .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { historicalDetailShown = false } } }
+            }
+        }
     }
 
     private var classBoardExport: String {
         """
         向上少年 · 三年级2班测评数据报告
         测评完成率：\(Int(completion * 100))%
-        已完成：\(measuredCount) / \(classStudents.count) 人
+        已完成：\(measuredCount) / \(totalCount) 人
         待处理预警：\(riskCount) 人
         待复核：\(reviewCount) 人；待补测：\(retestCount) 人
         规则版本：小学综合运动能力标准 v1.0
@@ -754,6 +786,10 @@ struct TeacherClassBoardView: View {
                 .background(selected ? ReferenceColor.sky : .white, in: Capsule())
                 .overlay(Capsule().stroke(ReferenceColor.blue.opacity(selected ? 0.35 : 0.08), lineWidth: 1))
         }.buttonStyle(.plain)
+    }
+
+    private func drillDown(_ action: @escaping () -> Void) -> () -> Void {
+        { if isHistorical { historicalDetailShown = true } else { action() } }
     }
 
     private func boardCard<Content: View>(title: String, trailing: String, action: @escaping () -> Void, @ViewBuilder content: () -> Content) -> some View {

@@ -20,7 +20,10 @@ class MainActivityFlowTest {
     // A cold AVD can spend several seconds creating the Compose runtime after
     // the native launch window. Keep the UI assertion honest without making it
     // flaky on slower CI/emulator hosts.
-    private val coldStartTimeout = 15_000L
+    // Freshly booted AVDs may take over 20 seconds to create the first
+    // Compose frame after the splash. Keep this distinct from normal UI waits
+    // so real navigation regressions still fail fast once the app is warm.
+    private val coldStartTimeout = 35_000L
 
     @Test
     fun launchShowsBrandedSplashContent() {
@@ -30,10 +33,12 @@ class MainActivityFlowTest {
 
     @Test
     fun loginFlowsThroughAllRolesAndParentBinding() {
-        // Connected-test runners do not guarantee an empty app sandbox.  A
-        // prior manual run may have restored the role picker instead of the
-        // login screen, so explicitly end that session before asserting the
-        // anonymous first-run journey.
+        // Instrumentation does not guarantee an empty encrypted preference
+        // sandbox. Clear the active ViewModel session as well as its store;
+        // recreating an Activity alone would retain the old ViewModel.
+        composeRule.activity.runOnUiThread {
+            composeRule.activity.resetSessionForUiTest()
+        }
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("微信登录").fetchSemanticsNodes().isNotEmpty() ||
                 composeRule.onAllNodesWithText("退出当前账号").fetchSemanticsNodes().isNotEmpty()
@@ -56,6 +61,24 @@ class MainActivityFlowTest {
         // account switch returns to the full role picker instead of forcing a
         // parent account.
         composeRule.onNodeWithText("学校端").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("班级健康概览").fetchSemanticsNodes().isNotEmpty()
+        }
+        // Historical period selection must affect the board rather than merely
+        // tinting a chip. It intentionally opens a protected aggregate view
+        // instead of leaking current student reports as historical records.
+        composeRule.onNodeWithContentDescription("班级看板").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("2026春季").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("2026春季").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("历史归档完成率 90%").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("查看归档说明").performClick()
+        composeRule.onNodeWithText("2026春季测评归档").assertIsDisplayed()
+        composeRule.onNodeWithText("关闭").performClick()
+        composeRule.onNodeWithContentDescription("返回").performClick()
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("班级健康概览").fetchSemanticsNodes().isNotEmpty()
         }

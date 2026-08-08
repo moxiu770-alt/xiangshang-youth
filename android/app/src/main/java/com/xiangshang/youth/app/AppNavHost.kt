@@ -34,7 +34,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.xiangshang.youth.feature.auth.*
 import com.xiangshang.youth.feature.parent.*
@@ -99,23 +98,17 @@ private fun NavHostController.replaceRoot(destination: String) {
         onDispose { resolver.unregisterContentObserver(observer) }
     }
 
-    // System-bar mutations are expensive IPC calls. Running them from a
-    // SideEffect on every Compose recomposition can overwhelm Android System UI
-    // during the animated splash, which presents as a misleading "System UI
-    // isn't responding" dialog over the launch artwork. Reapply only when the
-    // route/session chrome actually changes.
+    // The launch theme itself is fullscreen. Do not issue an immersive hide
+    // request from Compose while Android is still drawing its system-owned
+    // splash: on lower-memory devices that IPC can make System UI surface an
+    // ANR dialog over the poster. We only restore normal bars once the app has
+    // left its launch route.
     LaunchedEffect(isSplash, state.profile != null, state.restoringSession) {
-        (view.context as? Activity)?.window?.let { window ->
+        if (!isSplash) (view.context as? Activity)?.window?.let { window ->
             WindowInsetsControllerCompat(window, view).apply {
-                // Dark artwork/gradient surfaces use light icons; dashboard surfaces are
-                // light and follow the reference screens with dark status-bar icons.
-                if (isSplash) {
-                    hide(WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.navigationBars())
-                } else {
-                    show(WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.navigationBars())
-                    isAppearanceLightStatusBars = state.profile != null && !state.restoringSession
-                    isAppearanceLightNavigationBars = true
-                }
+                show(androidx.core.view.WindowInsetsCompat.Type.statusBars() or androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+                isAppearanceLightStatusBars = state.profile != null && !state.restoringSession
+                isAppearanceLightNavigationBars = true
             }
         }
     }

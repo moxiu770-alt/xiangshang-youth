@@ -63,4 +63,10 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         incomingDeepLink = intent.data
     }
+
+    /** Keeps instrumentation isolated from a prior manual session. The
+     * production logout flow continues to use the same ViewModel operation. */
+    fun resetSessionForUiTest() {
+        if (::appViewModel.isInitialized) appViewModel.logout()
+    }
 }

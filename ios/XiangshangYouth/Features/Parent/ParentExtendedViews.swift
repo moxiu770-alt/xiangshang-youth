@@ -183,6 +183,7 @@ struct ParentClassCircleDashboard: View {
                             }
                         ),
                         commentCount: state.localFeatures.classPostComments.filter { $0.postID == pinnedNoticeID }.count,
+                        comments: state.localFeatures.classPostComments.filter { $0.postID == pinnedNoticeID },
                         onComment: { openComment(for: pinnedNoticeID) }
                     )
                 }
@@ -192,6 +193,7 @@ struct ParentClassCircleDashboard: View {
                             HStack { Image(systemName: "person.crop.circle.fill").font(.system(size: 28)).foregroundStyle(ReferenceColor.sky); VStack(alignment: .leading, spacing: 1) { Text(post.author).font(.system(size: 11, weight: .bold)).foregroundStyle(ReferenceColor.blue); Text("刚刚发布 · 本班可见").font(.system(size: 8)).foregroundStyle(.secondary) }; Spacer(); if post.author == "王女士" { Button("编辑") { editingPost = post }.font(.system(size: 9, weight: .semibold)).foregroundStyle(ReferenceColor.blue) } }
                             Text(post.content).font(.system(size: 12)).foregroundStyle(ReferenceColor.navy)
                             HStack { Button { state.toggleClassPostLike(post.id) } label: { Label(state.localFeatures.likedClassPostIDs.contains(post.id) ? "已赞" : "点赞", systemImage: state.localFeatures.likedClassPostIDs.contains(post.id) ? "hand.thumbsup.fill" : "hand.thumbsup") }.buttonStyle(.plain); Button { openComment(for: post.id) } label: { Label("评论", systemImage: "bubble.left") }.buttonStyle(.plain); Spacer(); ShareLink(item: post.content) { Label("分享", systemImage: "square.and.arrow.up") } }.font(.system(size: 10, weight: .semibold)).foregroundStyle(state.localFeatures.likedClassPostIDs.contains(post.id) ? ReferenceColor.blue : .secondary)
+                            commentPreview(for: post.id)
                         }
                     }.padding(.horizontal, 12)
                 }
@@ -244,7 +246,22 @@ struct ParentClassCircleDashboard: View {
         commentDraft = state.localFeatures.drafts[commentDraftKey(for: postID)] ?? ""
         commentPostID = postID
     }
-    private func pinnedAnnouncementPost(author: String, content: String, isTeacher: Bool, isLiked: Binding<Bool>, commentCount: Int, onComment: @escaping () -> Void) -> some View { ReferenceCard { VStack(alignment: .leading, spacing: 7) { HStack { Image(systemName: isTeacher ? "graduationcap.circle.fill" : "person.crop.circle.fill").font(.system(size: 28)).foregroundStyle(ReferenceColor.blue); VStack(alignment: .leading, spacing: 1) { Text(author).font(.system(size: 11, weight: .bold)).foregroundStyle(ReferenceColor.blue); Text("今天 08:30 · 本班可见").font(.system(size: 8)).foregroundStyle(.secondary) }; Spacer(); Text("置顶").font(.system(size: 9, weight: .bold)).foregroundStyle(ReferenceColor.yellow) }; Text(content).font(.system(size: 12)).foregroundStyle(ReferenceColor.navy); HStack { Button { isLiked.wrappedValue.toggle() } label: { Label(isLiked.wrappedValue ? "已赞" : "点赞", systemImage: isLiked.wrappedValue ? "hand.thumbsup.fill" : "hand.thumbsup") }.buttonStyle(.plain); Button(action: onComment) { Label("评论 \(3 + commentCount)", systemImage: "bubble.left") }.buttonStyle(.plain); Spacer(); ShareLink(item: content) { Label("分享", systemImage: "square.and.arrow.up") } }.font(.system(size: 10, weight: .semibold)).foregroundStyle(isLiked.wrappedValue ? ReferenceColor.blue : .secondary) }.accessibilityElement(children: .contain) }.padding(.horizontal, 12) }
+    private func pinnedAnnouncementPost(author: String, content: String, isTeacher: Bool, isLiked: Binding<Bool>, commentCount: Int, comments: [ClassPostComment], onComment: @escaping () -> Void) -> some View { ReferenceCard { VStack(alignment: .leading, spacing: 7) { HStack { Image(systemName: isTeacher ? "graduationcap.circle.fill" : "person.crop.circle.fill").font(.system(size: 28)).foregroundStyle(ReferenceColor.blue); VStack(alignment: .leading, spacing: 1) { Text(author).font(.system(size: 11, weight: .bold)).foregroundStyle(ReferenceColor.blue); Text("今天 08:30 · 本班可见").font(.system(size: 8)).foregroundStyle(.secondary) }; Spacer(); Text("置顶").font(.system(size: 9, weight: .bold)).foregroundStyle(ReferenceColor.yellow) }; Text(content).font(.system(size: 12)).foregroundStyle(ReferenceColor.navy); HStack { Button { isLiked.wrappedValue.toggle() } label: { Label(isLiked.wrappedValue ? "已赞" : "点赞", systemImage: isLiked.wrappedValue ? "hand.thumbsup.fill" : "hand.thumbsup") }.buttonStyle(.plain); Button(action: onComment) { Label("评论 \(3 + commentCount)", systemImage: "bubble.left") }.buttonStyle(.plain); Spacer(); ShareLink(item: content) { Label("分享", systemImage: "square.and.arrow.up") } }.font(.system(size: 10, weight: .semibold)).foregroundStyle(isLiked.wrappedValue ? ReferenceColor.blue : .secondary); commentPreview(comments) }.accessibilityElement(children: .contain) }.padding(.horizontal, 12) }
+    @ViewBuilder private func commentPreview(for postID: UUID) -> some View { commentPreview(state.localFeatures.classPostComments.filter { $0.postID == postID }) }
+    @ViewBuilder private func commentPreview(_ comments: [ClassPostComment]) -> some View {
+        if !comments.isEmpty {
+            VStack(alignment: .leading, spacing: 3) {
+                Divider()
+                Text("最新评论").font(.system(size: 8, weight: .semibold)).foregroundStyle(.secondary)
+                ForEach(Array(comments.suffix(2))) { comment in
+                    Text("\(comment.author)：\(comment.text)").font(.system(size: 9)).foregroundStyle(ReferenceColor.navy).lineLimit(2)
+                }
+            }
+            .padding(.top, 1)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("最新评论，\(comments.count)条")
+        }
+    }
     private func star(_ title: String, _ name: String, _ color: Color) -> some View { VStack(spacing: 3) { Image(systemName: "star.fill").foregroundStyle(color).font(.system(size: 21)); Text(title).font(.system(size: 9, weight: .bold)); Text(name).font(.system(size: 8)).foregroundStyle(.secondary) }.frame(maxWidth: .infinity) }
     private func moment(_ image: String, _ title: String) -> some View { Button { selectedMoment = title } label: { VStack(alignment: .leading, spacing: 4) { Image(image).resizable().scaledToFill().frame(height: 48).frame(maxWidth: .infinity).clipped().clipShape(RoundedRectangle(cornerRadius: 7)); Text(title).font(.system(size: 9, weight: .bold)).foregroundStyle(ReferenceColor.navy) }.frame(maxWidth: .infinity) }.buttonStyle(.plain) }
 }

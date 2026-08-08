@@ -415,7 +415,7 @@ struct RegisterView: View {
         guard code.count >= 4 else { error = "请输入短信验证码。"; return }
         guard password.count >= 6 else { error = "密码至少需要 6 位。"; return }
         submitted = true
-        Task { await state.login(phone: phone) }
+        Task { await state.login(phone: phone, displayName: name) }
     }
 }
 

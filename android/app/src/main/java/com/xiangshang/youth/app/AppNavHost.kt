@@ -198,7 +198,7 @@ private fun NavHostController.replaceRoot(destination: String) {
                 loading = state.loading,
                 serverError = state.error,
                 onClearError = viewModel::clearError,
-                onLogin = { identifier -> viewModel.login(identifier) { nav.replaceRoot(Destinations.Role) } },
+                onLogin = { identifier -> viewModel.login(identifier, onSuccess = { nav.replaceRoot(Destinations.Role) }) },
                 onRegister = { nav.navigate(Destinations.Register) },
                 onForgotPassword = { nav.navigate(Destinations.PasswordReset) }
             )
@@ -206,7 +206,7 @@ private fun NavHostController.replaceRoot(destination: String) {
         composable(Destinations.Register) {
             RegisterScreen(
                 onBack = { nav.popBackStack() },
-                onRegistered = { phone -> viewModel.login(phone) { nav.replaceRoot(Destinations.Role) } },
+                onRegistered = { name, phone -> viewModel.login(phone, displayName = name, onSuccess = { nav.replaceRoot(Destinations.Role) }) },
                 loading = state.loading,
                 serverError = state.error,
                 onClearError = viewModel::clearError

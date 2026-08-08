@@ -121,7 +121,10 @@ enum WorkflowCommandState: Equatable {
         }
     }
     func dismissSplash() { isShowingSplash = false }
-    func login(phone: String) async {
+    /// Starts a parent account session. `displayName` is supplied by the
+    /// registration form and intentionally remains local until the real auth
+    /// service becomes the source of truth.
+    func login(phone: String, displayName: String? = nil) async {
         loading = true
         error = nil
         defer { loading = false }
@@ -129,13 +132,17 @@ enum WorkflowCommandState: Equatable {
         // screen. Keep its internal identifier out of the account profile until
         // the real WeChat bind endpoint returns the verified mobile number.
         let displayPhone = phone == "wechat_authorization" ? "13800138000" : phone
-        let candidate = UserProfile(id: "u1", name: "王女士", phone: displayPhone, role: .parent, schoolName: "向上实验小学", avatarInitials: "王")
+        let normalizedName = displayName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = normalizedName?.isEmpty == false ? normalizedName! : "王女士"
+        let avatarInitial = String(name.prefix(1))
+        let candidate = UserProfile(id: "u1", name: name, phone: displayPhone, role: .parent, schoolName: "向上实验小学", avatarInitials: avatarInitial)
         do {
             // Commit the session only after the dashboard has loaded. A failed login
             // therefore stays on the form and can show its error inline instead of
             // jumping to an empty role screen.
             data = try await repository.loadDashboard()
             profile = candidate
+            mutateLocal { $0.parentAccountName = name }
             selectedChild = data?.students.first(where: { $0.id == localFeatures.selectedChildID && localFeatures.boundChildIDs.contains($0.id) })
             persistSession()
             persistSelectedChild()
@@ -151,7 +158,23 @@ enum WorkflowCommandState: Equatable {
         } catch { self.handleDashboardError(error) }
     }
     func clearError() { error = nil }
-    func selectRole(_ role: UserRole) { selectedRole = role; if var profile { profile = UserProfile(id: profile.id, name: role == .teacher ? "李老师" : role == .principal ? "周校长" : "王女士", phone: profile.phone, role: role, schoolName: profile.schoolName, avatarInitials: role == .teacher ? "李" : role == .principal ? "周" : "王"); self.profile = profile; persistSession() } }
+    func selectRole(_ role: UserRole) {
+        selectedRole = role
+        if var profile {
+            let parentName = localFeatures.parentAccountName ?? (profile.role == .parent ? profile.name : "王女士")
+            let name = role == .teacher ? "李老师" : role == .principal ? "周校长" : parentName
+            profile = UserProfile(
+                id: profile.id,
+                name: name,
+                phone: profile.phone,
+                role: role,
+                schoolName: profile.schoolName,
+                avatarInitials: role == .teacher ? "李" : role == .principal ? "周" : String(name.prefix(1))
+            )
+            self.profile = profile
+            persistSession()
+        }
+    }
     func chooseAnotherRole() { selectedRole = nil }
     func selectPrincipalTask(_ taskID: String) { mutateLocal { $0.selectedPrincipalTaskID = taskID } }
     func setTeacherSportsWorkbench(_ enabled: Bool) { mutateLocal { $0.teacherUsesSportsWorkbench = enabled } }

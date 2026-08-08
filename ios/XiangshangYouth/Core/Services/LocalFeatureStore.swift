@@ -26,6 +26,10 @@ struct LocalFeatureState: Codable, Equatable {
     var reviewNotes: [String: String] = [:]
     var sessionProfile: UserProfile?
     var sessionRole: UserRole?
+    /// Account identity is distinct from the active workbench identity.  A
+    /// parent who temporarily enters a teacher/principal mock workbench must
+    /// get their own name back when returning to the family workspace.
+    var parentAccountName: String? = nil
     var selectedChildID: String? = nil
     var boundChildIDs: Set<String> = []
     /// Keep dashboard context across a relaunch. These are presentation
@@ -144,6 +148,7 @@ final class LocalFeatureStore: ObservableObject {
         guard var legacy = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
         if legacy["reviewNotes"] == nil { legacy["reviewNotes"] = [String: String]() }
         if legacy["taskStatusSyncStates"] == nil { legacy["taskStatusSyncStates"] = [String: String]() }
+        if legacy["parentAccountName"] == nil { legacy["parentAccountName"] = NSNull() }
         if legacy["selectedChildID"] == nil { legacy["selectedChildID"] = NSNull() }
         if legacy["boundChildIDs"] == nil { legacy["boundChildIDs"] = [String]() }
         if legacy["selectedPrincipalTaskID"] == nil { legacy["selectedPrincipalTaskID"] = NSNull() }

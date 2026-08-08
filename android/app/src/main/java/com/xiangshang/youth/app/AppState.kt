@@ -73,13 +73,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         runCatching { connectivityManager.registerDefaultNetworkCallback(networkCallback) }
         if (_state.value.local.sessionActive) restoreSession()
     }
-    fun login(identifier: String = "", onSuccess: () -> Unit = {}) = viewModelScope.launch {
+    fun login(identifier: String = "", displayName: String? = null, onSuccess: () -> Unit = {}) = viewModelScope.launch {
         _state.value = _state.value.copy(loading = true, restoringSession = false)
         runCatching { repository.dashboard() }.onSuccess { data ->
             val profilePhone = AuthIdentity.displayPhone(identifier)
-            val profile = UserProfile("u1", "王女士", profilePhone, UserRole.Parent, data.school.name)
+            val profileName = displayName?.trim().takeUnless { it.isNullOrEmpty() } ?: "王女士"
+            val profile = UserProfile("u1", profileName, profilePhone, UserRole.Parent, data.school.name)
             val selected = data.students.firstOrNull { it.id == _state.value.local.selectedChildId && it.id in _state.value.local.boundChildIds }
-            val local = _state.value.local.copy(sessionActive = true, sessionPhone = profile.phone, sessionRoleName = null, selectedChildId = selected?.id)
+            val local = _state.value.local.copy(sessionActive = true, sessionPhone = profile.phone, sessionRoleName = null, parentAccountName = profileName, selectedChildId = selected?.id)
             featureStore.save(local)
             _state.value = AppUiState(profile, data = data, selectedChild = selected, local = local)
             onSuccess()
@@ -100,7 +101,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun chooseRole(role: UserRole) {
         val local = _state.value.local.copy(sessionRoleName = role.name)
         featureStore.save(local)
-        _state.value = _state.value.copy(local = local, role = role, profile = _state.value.profile?.copy(role = role, name = if (role == UserRole.Teacher) "李老师" else if (role == UserRole.Principal) "周校长" else "王女士"))
+        val parentName = _state.value.local.parentAccountName ?: _state.value.profile?.takeIf { it.role == UserRole.Parent }?.name ?: "王女士"
+        _state.value = _state.value.copy(local = local, role = role, profile = _state.value.profile?.copy(role = role, name = if (role == UserRole.Teacher) "李老师" else if (role == UserRole.Principal) "周校长" else parentName))
     }
     fun clearRoleSelection() {
         val local = _state.value.local.copy(sessionRoleName = null)
@@ -358,7 +360,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             // Restore authentication/data, but do not restore the last workbench.
             // The next launch must show RoleSelect so a stale principal session
             // cannot prevent parent/teacher entry.
-            _state.value = _state.value.copy(profile = UserProfile("u1", "王女士", local.sessionPhone.ifBlank { "13800138000" }, UserRole.Parent, data.school.name), role = null, data = data, selectedChild = selected, loading = false, restoringSession = false)
+            _state.value = _state.value.copy(profile = UserProfile("u1", local.parentAccountName ?: "王女士", local.sessionPhone.ifBlank { "13800138000" }, UserRole.Parent, data.school.name), role = null, data = data, selectedChild = selected, loading = false, restoringSession = false)
         }.onFailure { error ->
             if (error is ApiError.Unauthorized) {
                 featureStore.clear()

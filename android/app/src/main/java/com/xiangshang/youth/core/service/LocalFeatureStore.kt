@@ -30,6 +30,8 @@ data class LocalFeatureState(
     val sessionActive: Boolean = false,
     val sessionPhone: String = "",
     val sessionRoleName: String? = null,
+    /** Stable account identity, independent of the selected role workbench. */
+    val parentAccountName: String? = null,
     val selectedChildId: String? = null,
     val boundChildIds: Set<String> = emptySet(),
     val selectedPrincipalTaskId: String? = null,
@@ -69,6 +71,7 @@ class LocalFeatureStore(context: Context) {
         sessionActive = prefs.getBoolean("session_active", false),
         sessionPhone = prefs.getString("session_phone", "").orEmpty(),
         sessionRoleName = prefs.getString("session_role_name", null),
+        parentAccountName = prefs.getString("parent_account_name", null),
         selectedChildId = prefs.getString("selected_child_id", null),
         boundChildIds = prefs.getStringSet("bound_child_ids", emptySet()) ?: emptySet(),
         selectedPrincipalTaskId = prefs.getString("selected_principal_task_id", null),
@@ -99,6 +102,7 @@ class LocalFeatureStore(context: Context) {
         .putBoolean("session_active", value.sessionActive)
         .putString("session_phone", value.sessionPhone)
         .putString("session_role_name", value.sessionRoleName)
+        .putString("parent_account_name", value.parentAccountName)
         .putString("selected_child_id", value.selectedChildId)
         .putStringSet("bound_child_ids", value.boundChildIds)
         .putString("selected_principal_task_id", value.selectedPrincipalTaskId)

@@ -121,6 +121,24 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertNotEqual(state.localFeatures.sessionProfile?.phone, "wechat_authorization")
     }
 
+    func testRegistrationNameIsKeptInThePersistedParentSession() async {
+        let suite = "xiangshang.youth.registration-name-tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let store = LocalFeatureStore(defaults: defaults)
+        let state = AppState(featureStore: store)
+
+        await state.login(phone: "13900139000", displayName: "新家长")
+
+        XCTAssertEqual(state.profile?.name, "新家长")
+        XCTAssertEqual(state.profile?.avatarInitials, "新")
+        XCTAssertEqual(state.localFeatures.sessionProfile?.name, "新家长")
+
+        state.selectRole(.teacher)
+        state.selectRole(.parent)
+        XCTAssertEqual(state.profile?.name, "新家长")
+    }
+
     func testCourseProgressIsPersistedWithinTheValidRange() {
         let suite = "xiangshang.youth.course-progress-tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!

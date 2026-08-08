@@ -87,8 +87,27 @@ struct RootView: View {
                 .zIndex(10)
         }
         if state.loading && !state.isShowingSplash && state.profile != nil && state.data != nil {
-            Color.black.opacity(0.08).ignoresSafeArea()
-            LoadingStateView().background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18)).padding(58)
+            // Refreshing existing content must not turn a teacher/principal
+            // board into a temporarily dead screen. Keep the existing data
+            // interactive and announce refresh progress in a compact banner.
+            VStack {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small).tint(ReferenceColor.blue)
+                    Text("正在刷新数据")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(ReferenceColor.navy)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background(.ultraThinMaterial, in: Capsule())
+                .shadow(color: .black.opacity(0.08), radius: 6, y: 2)
+                .padding(.top, 8)
+                Spacer()
+            }
+            .allowsHitTesting(false)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("正在刷新数据，当前内容仍可操作")
+            .zIndex(5)
         }
         if let error = state.error, !state.isShowingSplash, state.profile != nil, !state.restoringSession {
             Color.black.opacity(0.18).ignoresSafeArea()

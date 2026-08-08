@@ -12,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.ui.Alignment
@@ -34,6 +35,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.core.view.WindowInsetsControllerCompat
 import com.xiangshang.youth.feature.auth.*
 import com.xiangshang.youth.feature.parent.*
@@ -384,10 +387,28 @@ private fun NavHostController.replaceRoot(destination: String) {
     if (state.isOffline && !isSplash) {
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Top) { OfflineBanner() }
     }
-    // Login renders its loading/error state inside the form.  The global mask/dialog
-    // is reserved for authenticated dashboard refreshes, so no modal spinner window
-    // flashes over the login page.
-    if (state.loading && !state.restoringSession && state.profile != null) Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = .72f)), contentAlignment = Alignment.Center) { com.xiangshang.youth.shared.component.LoadingState() }
+    // Login renders loading inline. For an authenticated refresh, preserve the
+    // current board's interaction instead of placing a full-screen blocker over
+    // teacher/principal actions; this compact banner is deliberately passive.
+    if (state.loading && !state.restoringSession && state.profile != null && state.data != null) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            Surface(
+                modifier = Modifier.padding(top = 10.dp).semantics { contentDescription = "正在刷新数据，当前内容仍可操作" },
+                color = Color.White.copy(alpha = .94f),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
+                shadowElevation = 5.dp
+            ) {
+                Row(
+                    Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(Modifier.size(15.dp), color = Blue, strokeWidth = 2.dp)
+                    Text("正在刷新数据", color = Navy, style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
+    }
     if (privacyShielded && !isSplash) {
         Box(Modifier.fillMaxSize().background(Canvas), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {

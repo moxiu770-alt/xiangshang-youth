@@ -47,6 +47,33 @@ if [[ ! "$gradle_max_workers" =~ '^[1-9][0-9]*$' ]]; then
 fi
 gradle_args=(--no-daemon "--max-workers=$gradle_max_workers")
 
+# ADB can report a device as `device` even when Android's system process has
+# stopped responding. Bound connected tests so an unhealthy emulator cannot
+# leave the verification command running forever. CI or slower physical
+# devices can raise this without changing the script.
+connected_test_timeout_seconds="${CONNECTED_TEST_TIMEOUT_SECONDS:-300}"
+if [[ ! "$connected_test_timeout_seconds" =~ '^[1-9][0-9]*$' ]]; then
+  print -u2 "CONNECTED_TEST_TIMEOUT_SECONDS 必须是正整数，当前值：$connected_test_timeout_seconds"
+  exit 1
+fi
+
+function run_connected_tests_with_timeout() {
+  ./gradlew :app:connectedDebugAndroidTest "${gradle_args[@]}" "$@" &
+  local gradle_pid=$!
+  local elapsed_seconds=0
+  while kill -0 "$gradle_pid" 2>/dev/null; do
+    if (( elapsed_seconds >= connected_test_timeout_seconds )); then
+      print -u2 "Android 仪器测试超过 ${connected_test_timeout_seconds}s 未完成；设备可能处于 ANR 或启动异常状态。"
+      kill "$gradle_pid" 2>/dev/null || true
+      wait "$gradle_pid" 2>/dev/null || true
+      return 124
+    fi
+    sleep 1
+    elapsed_seconds=$((elapsed_seconds + 1))
+  done
+  wait "$gradle_pid"
+}
+
 function device_finished_booting() {
   local serial="$1"
   local boot_file query_pid attempts boot_value
@@ -76,6 +103,7 @@ cd "$project_dir"
 print "JAVA_HOME=$JAVA_HOME"
 print "ANDROID_HOME=$ANDROID_HOME"
 print "GRADLE_MAX_WORKERS=$gradle_max_workers"
+print "CONNECTED_TEST_TIMEOUT_SECONDS=$connected_test_timeout_seconds"
 ./gradlew :app:assembleDebug :app:assembleAndroidTest :app:testDebugUnitTest :app:lintDebug "${gradle_args[@]}" "$@"
 if (( $+commands[adb] )); then
   ready_devices=()
@@ -92,7 +120,7 @@ if (( $+commands[adb] )); then
   done < <(adb devices | awk 'NR > 1 && NF >= 2 { print $1, $2 }')
   if (( ${#ready_devices} > 0 )); then
     print "检测到 ${#ready_devices} 台已启动的 Android 设备，运行 Compose 仪器测试。"
-    ./gradlew :app:connectedDebugAndroidTest "${gradle_args[@]}" "$@"
+    run_connected_tests_with_timeout "$@"
   else
     print "未检测到已完成启动的 Android 真机/模拟器：已完成 APK、AndroidTest APK、JVM 单测和 lint；仪器测试待设备启动完成后执行。"
   fi

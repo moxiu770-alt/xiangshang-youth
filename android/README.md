@@ -15,7 +15,7 @@ cd android
 
 生成的 APK 位于 `app/build/outputs/apk/debug/app-debug.apk`。使用 Android Studio 打开 `android` 目录即可运行模拟器或真机。
 
-`run-android-checks.sh` 会自动使用 Android Studio 内置 JDK，并从 `ANDROID_SDK_ROOT`、`ANDROID_HOME` 或当前用户的标准 Android SDK 位置查找 SDK；它会同时执行 Debug APK 构建、`testDebugUnitTest` 和 `lintDebug`。检测到已完成启动的设备时，还会执行 Compose 仪器测试。如果只需要构建：
+`run-android-checks.sh` 会自动使用 Android Studio 内置 JDK，并从 `ANDROID_SDK_ROOT`、`ANDROID_HOME` 或当前用户的标准 Android SDK 位置查找 SDK；它会同时执行 Debug APK 构建、`testDebugUnitTest` 和 `lintDebug`。检测到已完成启动的设备时，还会执行 Compose 仪器测试。仪器测试默认 300 秒超时，避免系统 ANR 的模拟器无限占用终端；慢速真机可通过 `CONNECTED_TEST_TIMEOUT_SECONDS=600 ./run-android-checks.sh` 调整。如果只需要构建：
 
 ```bash
 cd android

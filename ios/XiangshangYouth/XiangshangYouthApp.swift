@@ -110,6 +110,17 @@ struct RootView: View {
             .zIndex(5)
         }
         if let error = state.error, !state.isShowingSplash, state.profile != nil, !state.restoringSession {
+            if state.data == nil {
+                Color.black.opacity(0.18).ignoresSafeArea()
+                ErrorStateView(message: error) {
+                    Task { await state.refreshDashboard() }
+                } dismiss: {
+                    state.error = nil
+                }
+                .background(.white, in: RoundedRectangle(cornerRadius: 20))
+                .padding(32)
+                .zIndex(8)
+            } else {
             // A failed background refresh must not make a populated workbench
             // feel disabled. Keep its cards available and offer explicit retry
             // and dismiss actions in a compact, reachable banner instead.
@@ -148,6 +159,7 @@ struct RootView: View {
             .accessibilityElement(children: .contain)
             .accessibilityLabel("刷新失败：\(error)，可重试或关闭提示")
             .zIndex(8)
+            }
         }
         if privacyShielded && !state.isShowingSplash {
             ZStack {

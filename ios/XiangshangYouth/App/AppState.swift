@@ -393,6 +393,11 @@ enum WorkflowCommandState: Equatable {
             : .failed("已同步 \(synchronized) 条，仍有 \(failed) 条等待网络恢复后重试。")
     }
     func markMessageRead(_ id: String) { mutateLocal { $0.readMessageIDs.insert(id) } }
+    func markAllMessagesRead() {
+        let messageIDs = data?.messages.map(\.id) ?? []
+        guard !messageIDs.isEmpty else { return }
+        mutateLocal { $0.readMessageIDs.formUnion(messageIDs) }
+    }
     @discardableResult
     func bindChild(name: String, code: String) -> Bool {
         let normalizedName = name.trimmingCharacters(in: .whitespacesAndNewlines)

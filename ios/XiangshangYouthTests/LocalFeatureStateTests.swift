@@ -318,6 +318,8 @@ final class LocalFeatureStateTests: XCTestCase {
         state.markMessageRead("m1")
         XCTAssertEqual(state.unreadMessageCount, 0)
         XCTAssertTrue(LocalFeatureStore(defaults: defaults).state.readMessageIDs.contains("m1"))
+        state.markAllMessagesRead()
+        XCTAssertTrue(Set(state.data?.messages.map(\.id) ?? []).isSubset(of: LocalFeatureStore(defaults: defaults).state.readMessageIDs))
     }
 
     func testNotificationsSettingSuppressesUnreadBadgeWithoutDeletingMessages() async {

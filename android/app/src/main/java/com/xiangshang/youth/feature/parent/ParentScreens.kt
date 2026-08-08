@@ -142,12 +142,12 @@ fun ParentHomeScreen(state: AppUiState, nav: NavHostController, registerActivity
 
 @Composable private fun ParentHeader(name: String, onClick: () -> Unit, onMessages: (() -> Unit)? = null, unreadCount: Int = 0, onRefresh: (() -> Unit)? = null, isRefreshing: Boolean = false) = Row(Modifier.fillMaxWidth().background(Color.White).padding(horizontal = 14.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) { Surface(Modifier.size(40.dp), color = Color(0xFF16AFA5), shape = CircleShape) { Text(name.take(1), color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 9.dp)) }; Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Text(name, color = Navy, fontWeight = FontWeight.Bold, fontSize = 14.sp); Text("三年级2班 · 点击切换孩子", color = Color.Gray, fontSize = 9.sp) }; IconButton(onClick = onClick) { Icon(Icons.Filled.ChevronRight, "切换孩子", tint = Blue) }; onRefresh?.let { action -> IconButton(onClick = action, enabled = !isRefreshing) { if (isRefreshing) CircularProgressIndicator(Modifier.size(17.dp), color = Blue, strokeWidth = 2.dp) else Icon(Icons.Filled.Refresh, "刷新数据", tint = Navy, modifier = Modifier.size(19.dp)) } }; onMessages?.let { action -> IconButton(onClick = action) { BadgedBox(badge = { if (unreadCount > 0) Badge(containerColor = Color.Red, modifier = Modifier.size(6.dp)) {} }) { Icon(Icons.Filled.NotificationsNone, contentDescription = "消息通知", tint = Navy, modifier = Modifier.size(20.dp)) } } } }
 
-@Composable fun NotificationsScreen(state: AppUiState, nav: NavHostController, markMessageRead: (String) -> Unit) = AppScaffold("消息通知", onBack = { nav.popBackStack() }) {
+@Composable fun NotificationsScreen(state: AppUiState, nav: NavHostController, markMessageRead: (String) -> Unit, markAllMessagesRead: () -> Unit) = AppScaffold("消息通知", onBack = { nav.popBackStack() }) {
     val dashboardError = state.error
     if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current); return@AppScaffold }
     if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }
     if (state.data.messages.isEmpty()) { EmptyState("暂无消息通知"); return@AppScaffold }
-    Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) { Text("全部通知", color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp); Spacer(Modifier.weight(1f)); Text("未读 ${state.unreadMessageCount}", color = Blue, fontSize = 10.sp) }
+    Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) { Text("全部通知", color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp); Spacer(Modifier.weight(1f)); if (state.unreadMessageCount > 0) TextButton(onClick = markAllMessagesRead, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp), modifier = Modifier.semantics { contentDescription = "将全部通知标记为已读" }) { Text("全部已读", fontSize = 10.sp) }; Text("未读 ${state.unreadMessageCount}", color = Blue, fontSize = 10.sp) }
     state.data.messages.forEachIndexed { index, item ->
         var detail by remember { mutableStateOf(false) }
         Surface(Modifier.fillMaxWidth().padding(vertical = 4.dp).semantics { role = Role.Button; contentDescription = "查看通知：${item.title}" }.clickable { markMessageRead(item.id); detail = true }, color = Color.White, shape = RoundedCornerShape(11.dp), shadowElevation = 1.dp) {
@@ -270,7 +270,7 @@ fun ParentEvaluationsScreen(state: AppUiState, nav: NavHostController, report: D
         }
     }
 }
-@Composable fun ParentMessagesScreen(state: AppUiState, nav: NavHostController, markMessageRead: (String) -> Unit) {
+@Composable fun ParentMessagesScreen(state: AppUiState, nav: NavHostController, markMessageRead: (String) -> Unit, markAllMessagesRead: () -> Unit) {
     var selectedTitle by remember { mutableStateOf<String?>(null) }
     var selectedContent by remember { mutableStateOf("") }
     var selectedTime by remember { mutableStateOf("") }
@@ -285,6 +285,11 @@ fun ParentEvaluationsScreen(state: AppUiState, nav: NavHostController, report: D
     if (state.loading || data == null) {
         LoadingState()
         return@ParentTabScaffold
+    }
+    if (state.unreadMessageCount > 0) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            TextButton(onClick = markAllMessagesRead, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp), modifier = Modifier.semantics { contentDescription = "将全部消息标记为已读" }) { Text("全部已读", fontSize = 10.sp) }
+        }
     }
     Row(Modifier.fillMaxWidth().padding(bottom = 7.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
         listOf("消息提醒", "系统通知").forEachIndexed { index, title ->

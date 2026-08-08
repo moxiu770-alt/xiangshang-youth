@@ -260,8 +260,8 @@ private fun NavHostController.replaceRoot(destination: String) {
                 )
             }
         }
-        composable(Destinations.Messages) { ParentMessagesScreen(state, nav, viewModel::markMessageRead) }
-        composable(Destinations.Notifications) { NotificationsScreen(state, nav, viewModel::markMessageRead) }
+        composable(Destinations.Messages) { ParentMessagesScreen(state, nav, viewModel::markMessageRead, viewModel::markAllMessagesRead) }
+        composable(Destinations.Notifications) { NotificationsScreen(state, nav, viewModel::markMessageRead, viewModel::markAllMessagesRead) }
         composable(Destinations.Health) { HealthProfileScreen(state, nav) }
         composable(Destinations.Report) {
             val child = state.selectedChild
@@ -314,7 +314,7 @@ private fun NavHostController.replaceRoot(destination: String) {
             }
         }
         composable(Destinations.Teacher) { TeacherHomeScreen(state, nav, viewModel::setTeacherSportsWorkbench, viewModel::refreshDashboard) }
-        composable(Destinations.TeacherMessages) { TeacherMessagesScreen(state, nav, viewModel::markMessageRead, viewModel::refreshDashboard) }
+        composable(Destinations.TeacherMessages) { TeacherMessagesScreen(state, nav, viewModel::markMessageRead, viewModel::markAllMessagesRead, viewModel::refreshDashboard) }
         composable(Destinations.Classes) { TeacherClassesScreen(state, nav) }
         composable(Destinations.TeacherCircle) {
             TeacherClassCircleScreen(

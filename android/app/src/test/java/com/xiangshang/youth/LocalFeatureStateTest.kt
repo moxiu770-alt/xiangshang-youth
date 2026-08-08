@@ -185,6 +185,8 @@ class LocalFeatureStateTest {
         assertEquals(1, initial.unreadMessageCount)
         val afterOpeningWarning = initial.copy(local = LocalFeatureState(readMessageIds = setOf("m1")))
         assertEquals(0, afterOpeningWarning.unreadMessageCount)
+        val afterMarkAll = initial.copy(local = LocalFeatureState(readMessageIds = data.messages.map { it.id }.toSet()))
+        assertEquals(0, afterMarkAll.unreadMessageCount)
     }
 
     @Test

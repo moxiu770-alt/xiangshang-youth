@@ -498,6 +498,17 @@ struct ParentMessagesDashboard: View {
             VStack(spacing: 8) {
                 ParentPageNavigation(title: "健康提醒", showsBack: true)
                 ReferenceHeader(name: state.selectedChild?.name ?? "王小明", school: "\(state.selectedChild?.className ?? "三年级2班") · 成长小档案", initial: String((state.selectedChild?.name ?? "王").prefix(1)), showsBell: false, avatarAsset: "ChildAvatar")
+                if state.unreadMessageCount > 0 {
+                    HStack {
+                        Spacer()
+                        Button("全部已读") { state.markAllMessagesRead() }
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(ReferenceColor.blue)
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("将全部消息标记为已读")
+                    }
+                    .padding(.horizontal, 14)
+                }
                 HStack(spacing: 0) {
                     tab("消息提醒", index: 0)
                     tab("系统通知", index: 1)

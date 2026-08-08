@@ -280,6 +280,17 @@ struct TeacherMessagesView: View {
         ScrollView {
             VStack(spacing: 8) {
                 ParentPageNavigation(title: "消息中心", showsBack: true)
+                if state.unreadMessageCount > 0 {
+                    HStack {
+                        Spacer()
+                        Button("全部已读") { state.markAllMessagesRead() }
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(ReferenceColor.blue)
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("将全部消息标记为已读")
+                    }
+                    .padding(.horizontal, 14)
+                }
                 if let error = state.error, state.data == nil {
                     ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
                 } else if state.loading || state.data == nil {

@@ -777,17 +777,20 @@ private fun statusColor(status: com.xiangshang.youth.core.model.TaskStatus): Col
     "Completed" -> Green; "Review", "Absent" -> Color.Red; "Retest" -> Color(0xFFFF8B1F); "Testing" -> Blue; else -> Color(0xFF7B8798)
 }
 
-@Composable fun TeacherMessagesScreen(state: AppUiState, nav: NavHostController, markMessageRead: (String) -> Unit, refreshDashboard: () -> Unit = {}) = AppScaffold("消息中心", onBack = { nav.popBackStack() }) {
+@Composable fun TeacherMessagesScreen(state: AppUiState, nav: NavHostController, markMessageRead: (String) -> Unit, markAllMessagesRead: () -> Unit, refreshDashboard: () -> Unit = {}) = AppScaffold("消息中心", onBack = { nav.popBackStack() }) {
     var selected by remember { mutableStateOf<MessageItem?>(null) }
     val error = state.error
     when {
         error != null && state.data == null -> ErrorState(error, retry = refreshDashboard, dismiss = LocalDashboardClearError.current)
         state.loading || state.data == null -> LoadingState()
         state.data.messages.isEmpty() -> EmptyState("暂无消息通知，新的测评和班级通知会显示在这里。")
-        else -> state.data.messages.forEach { item ->
+        else -> {
+            if (state.unreadMessageCount > 0) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { TextButton(onClick = markAllMessagesRead, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp), modifier = Modifier.semantics { contentDescription = "将全部消息标记为已读" }) { Text("全部已读", fontSize = 10.sp) } }
+            state.data.messages.forEach { item ->
             val presentation = teacherMessagePresentation(item)
             val unread = !item.isRead && item.id !in state.local.readMessageIds
             Surface(Modifier.fillMaxWidth().padding(vertical = 4.dp).semantics { role = Role.Button; contentDescription = "查看消息：${item.title}" }.clickable { markMessageRead(item.id); selected = item }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) { Icon(presentation.first, null, tint = presentation.second); Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Row(verticalAlignment = Alignment.CenterVertically) { Text(item.title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); if (unread) { Spacer(Modifier.width(5.dp)); Box(Modifier.size(5.dp).background(Color.Red, CircleShape)) } }; Text(item.content, color = Color.Gray, fontSize = 9.sp, maxLines = 1) }; Text(item.time, color = Color.Gray, fontSize = 8.sp); Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray, modifier = Modifier.size(15.dp)) } }
+            }
         }
     }
     selected?.let { item -> AlertDialog(onDismissRequest = { selected = null }, title = { Text(item.title) }, text = { Column { Text(item.content); Text(item.time, color = Color.Gray, fontSize = 10.sp, modifier = Modifier.padding(top = 10.dp)); Text("已读", color = Green, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp)) } }, confirmButton = { TextButton(onClick = { selected = null }) { Text("关闭") } }) }

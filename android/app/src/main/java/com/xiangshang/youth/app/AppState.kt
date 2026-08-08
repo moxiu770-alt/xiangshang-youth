@@ -114,6 +114,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = _state.value.copy(selectedChild = student)
     }
     fun markMessageRead(messageId: String) = mutate { it.copy(readMessageIds = it.readMessageIds + messageId) }
+    fun markAllMessagesRead() = mutate { local ->
+        local.copy(readMessageIds = local.readMessageIds + (_state.value.data?.messages?.map { it.id }.orEmpty()))
+    }
     fun bindChild(name: String, code: String): Boolean {
         val child = ChildBindingValidator.findMatch(_state.value.data?.students.orEmpty(), name, code) ?: return false
         mutate { it.copy(boundChildIds = it.boundChildIds + child.id) }

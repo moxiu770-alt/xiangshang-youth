@@ -362,7 +362,10 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
 @Composable private fun RowScope.ParentNavItem(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean, onClick: () -> Unit) = NavigationBarItem(selected = selected, onClick = onClick, icon = { Icon(icon, null) }, label = { Text(label, fontSize = 9.sp) }, modifier = Modifier.semantics { contentDescription = "$label${if (selected) "，当前页面" else ""}" })
 
 @Composable fun ParentCoursesScreen(state: AppUiState, nav: NavHostController, updateCourseProgress: (String, Float) -> Unit, sendSupport: (String) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit, openSupport: Boolean = false, submitSupport: (String) -> Unit = sendSupport, clearWorkflow: (String) -> Unit = {}) {
-    var paid by remember { mutableStateOf(false) }; var detail by rememberSaveable(openSupport) { mutableStateOf<String?>(if (openSupport) "客服咨询" else null) }
+    var paid by remember { mutableStateOf(false) }
+    var detail by rememberSaveable(openSupport) { mutableStateOf<String?>(if (openSupport) "客服咨询" else null) }
+    var selectedCourse by rememberSaveable { mutableStateOf<String?>(null) }
+    var catalogOpen by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(openSupport) { if (openSupport) clearWorkflow("support") }
     ParentTabScaffold(nav, Destinations.Courses) {
         val dashboardError = state.error
@@ -372,12 +375,92 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
         val selectedChild = state.selectedChild
         Text("我的课程", color = Navy, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 10.dp)); Text("${selectedChild.name} · ${selectedChild.className}", color = Color.Gray, fontSize = 10.sp); Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth().background(Sky, RoundedCornerShape(9.dp))) { listOf("公益课程", "学校课程").forEachIndexed { index, text -> Text(text, color = if (paid == (index == 1)) Color.White else Blue, fontWeight = FontWeight.Bold, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.weight(1f).padding(8.dp).semantics { role = Role.Tab; contentDescription = "切换到$text" }.background(if (paid == (index == 1)) Blue else Color.Transparent, RoundedCornerShape(8.dp)).clickable { paid = index == 1 }) } }
-        Spacer(Modifier.height(10.dp)); ParentSection(if (paid) "精选学校课程" else "公益课堂", "全部课程") { detail = if (paid) "全部学校课程" else "全部公益课程" }
+        Spacer(Modifier.height(10.dp)); ParentSection(if (paid) "精选学校课程" else "公益课堂", "全部课程") { catalogOpen = true }
         val items = listOf("体质成长课" to Icons.AutoMirrored.Filled.DirectionsRun, "视力守护课" to Icons.Filled.RemoveRedEye, "口腔健康课" to Icons.Filled.MedicalServices, "心理舒展课" to Icons.Filled.Favorite)
-        items.chunked(2).forEach { row -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { row.forEach { (title, icon) -> Surface(Modifier.weight(1f).height(105.dp).semantics { role = Role.Button; contentDescription = "打开课程：$title" }.clickable { updateCourseProgress(title, .8f); detail = title }, color = Sky, shape = RoundedCornerShape(10.dp)) { Column(Modifier.padding(12.dp)) { Icon(icon, null, tint = Blue); Spacer(Modifier.height(8.dp)); Text(title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text(if ((state.local.courseProgress[title] ?: 0f) > 0f) "学习进度 80%" else if (paid) "校内课程 · 查看课程" else "公益 · 立即学习", color = Green, fontSize = 9.sp) } } }; if (row.size == 1) Spacer(Modifier.weight(1f)) }; Spacer(Modifier.height(8.dp)) }
+        items.chunked(2).forEach { row -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { row.forEach { (title, icon) -> Surface(Modifier.weight(1f).height(105.dp).semantics { role = Role.Button; contentDescription = "打开课程：$title" }.clickable { selectedCourse = title }, color = Sky, shape = RoundedCornerShape(10.dp)) { Column(Modifier.padding(12.dp)) { Icon(icon, null, tint = Blue); Spacer(Modifier.height(8.dp)); Text(title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); val progress = state.local.courseProgress[title] ?: 0f; Text(if (progress > 0f) "学习进度 ${(progress * 100).toInt()}%" else if (paid) "校内课程 · 查看课程" else "公益 · 立即学习", color = Green, fontSize = 9.sp) } } }; if (row.size == 1) Spacer(Modifier.weight(1f)) }; Spacer(Modifier.height(8.dp)) }
         Surface(Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "打开课程咨询" }.clickable { clearWorkflow("support"); detail = "客服咨询" }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.AutoMirrored.Filled.Message, null, tint = Blue); Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Text("课程咨询", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text("客服老师会在工作时间回复您", color = Color.Gray, fontSize = 9.sp) }; Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray) } }
     }
     detail?.let { title -> SimpleDialog(title = title, messages = state.local.supportMessages, drafts = state.local.drafts, send = sendSupport, submit = submitSupport, command = state.workflowStates["support"] ?: WorkflowCommandState(), commandDriven = title == "客服咨询", saveDraft = saveDraft, clearDraft = clearDraft, dismiss = { detail = null }) }
+    if (catalogOpen) CourseCatalogDialog(
+        paid = paid,
+        onOpenCourse = { title -> catalogOpen = false; selectedCourse = title },
+        dismiss = { catalogOpen = false }
+    )
+    selectedCourse?.let { title -> CourseLessonDialog(
+        title = title,
+        initialProgress = state.local.courseProgress[title] ?: 0f,
+        updateCourseProgress = updateCourseProgress,
+        dismiss = { selectedCourse = null }
+    ) }
+}
+
+/** A course is a real local workflow even while the production media endpoint
+ * is unavailable: progress is only recorded after the learner starts it. */
+@Composable
+private fun CourseLessonDialog(
+    title: String,
+    initialProgress: Float,
+    updateCourseProgress: (String, Float) -> Unit,
+    dismiss: () -> Unit
+) {
+    var progress by rememberSaveable(title) { mutableFloatStateOf(initialProgress) }
+    var playing by rememberSaveable(title) { mutableStateOf(false) }
+    val nextProgress = (progress + .25f).coerceAtMost(1f)
+    AlertDialog(
+        onDismissRequest = {
+            if (progress > initialProgress) updateCourseProgress(title, progress)
+            dismiss()
+        },
+        title = { Text(title) },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                Icon(if (playing) Icons.Filled.PauseCircle else Icons.Filled.PlayCircle, null, tint = Blue, modifier = Modifier.size(56.dp))
+                Text("课程视频已准备，学习进度会保存在本机并在联网后同步。", color = Color.Gray, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
+                LinearProgressIndicator({ progress }, Modifier.fillMaxWidth().padding(top = 16.dp).height(7.dp).clip(CircleShape), color = Green, trackColor = Sky)
+                Text("学习进度 ${(progress * 100).toInt()}%", color = Green, fontSize = 11.sp, modifier = Modifier.padding(top = 7.dp))
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                playing = !playing
+                if (playing) {
+                    progress = nextProgress
+                    updateCourseProgress(title, progress)
+                }
+            }) {
+                Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, null, modifier = Modifier.size(17.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(if (playing) "暂停学习" else if (progress >= 1f) "再次学习" else "播放课程")
+            }
+        },
+        dismissButton = { TextButton(onClick = { if (progress > initialProgress) updateCourseProgress(title, progress); dismiss() }) { Text("完成") } }
+    )
+}
+
+@Composable
+private fun CourseCatalogDialog(paid: Boolean, onOpenCourse: (String) -> Unit, dismiss: () -> Unit) {
+    val courses = if (paid) listOf("校内体能提升课", "校园视力守护课", "课后运动巩固课") else listOf("体质成长课", "视力守护课", "口腔健康课", "心理舒展课")
+    AlertDialog(
+        onDismissRequest = dismiss,
+        title = { Text(if (paid) "学校课程目录" else "公益课程目录") },
+        text = {
+            Column {
+                Text("选择课程后可开始学习，学习进度将保存在本机。", color = Color.Gray, fontSize = 11.sp)
+                courses.forEach { course ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 8.dp).semantics { role = Role.Button; contentDescription = "学习$course" }.clickable { onOpenCourse(course) }.padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Filled.PlayCircle, null, tint = Blue, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(course, color = Navy, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                        Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray, modifier = Modifier.size(17.dp))
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = dismiss) { Text("关闭") } }
+    )
 }
 
 @Composable fun ParentClassCircleScreen(state: AppUiState, nav: NavHostController, publishPost: (String, String) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit, toggleLike: (String) -> Unit, addComment: (String, String) -> Unit, submitPost: (String, String) -> Unit = publishPost, clearWorkflow: (String) -> Unit = {}) {

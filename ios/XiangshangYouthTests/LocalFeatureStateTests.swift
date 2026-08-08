@@ -120,6 +120,22 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertNotEqual(state.localFeatures.sessionProfile?.phone, "wechat_authorization")
     }
 
+    func testCourseProgressIsPersistedWithinTheValidRange() {
+        let suite = "xiangshang.youth.course-progress-tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let store = LocalFeatureStore(defaults: defaults)
+        let state = AppState(featureStore: store)
+
+        state.updateCourseProgress("体质成长课", progress: 1.25)
+        state.updateCourseProgress("视力守护课", progress: -0.2)
+
+        XCTAssertEqual(state.localFeatures.courseProgress["体质成长课"], 1)
+        XCTAssertEqual(state.localFeatures.courseProgress["视力守护课"], 0)
+        let restored = AppState(featureStore: store)
+        XCTAssertEqual(restored.localFeatures.courseProgress["体质成长课"], 1)
+    }
+
     func testFeatureStorePersistsCommercialWorkflowRecords() {
         let suite = "xiangshang.youth.tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!

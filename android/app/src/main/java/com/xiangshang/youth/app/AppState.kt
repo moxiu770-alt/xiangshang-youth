@@ -270,7 +270,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     fun completeAssessment(category: String) = mutate { it.copy(completedAssessments = it.completedAssessments + "${_state.value.selectedChild?.id ?: "anonymous"}-$category") }
-    fun updateCourseProgress(title: String, progress: Float) = mutate { it.copy(courseProgress = it.courseProgress + (title to progress)) }
+    /** Progress can originate from a resumed player or a local draft; keep the
+     * persisted value valid even if a caller supplies an out-of-range value. */
+    fun updateCourseProgress(title: String, progress: Float) = mutate {
+        it.copy(courseProgress = it.courseProgress + (title to progress.coerceIn(0f, 1f)))
+    }
     fun sendSupport(text: String) { if (text.isBlank()) return; mutate { it.copy(supportMessages = it.supportMessages + SupportMessage(text, true) + SupportMessage("已收到您的咨询，客服老师会在工作时间内为您回复。", false)) } }
     fun publishPost(author: String, content: String) { if (content.isBlank()) return; mutate { it.copy(classPosts = listOf(ClassPost(author = author, content = content)) + it.classPosts) } }
     fun updatePost(id: String, content: String) { if (content.isBlank()) return; mutate { local -> local.copy(classPosts = local.classPosts.map { if (it.id == id) it.copy(content = content) else it }) } }

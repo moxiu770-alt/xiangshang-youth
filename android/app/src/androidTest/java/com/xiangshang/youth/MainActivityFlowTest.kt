@@ -162,5 +162,27 @@ class MainActivityFlowTest {
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("已绑定孩子 2 人").fetchSemanticsNodes().isNotEmpty()
         }
+
+        // Course cards must not manufacture a completed progress value merely
+        // because they were opened. The learner starts the course explicitly,
+        // then the locally persisted progress becomes visible in the dialog.
+        composeRule.onNodeWithContentDescription("返回").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithContentDescription("我的课程").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription("我的课程").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("体质成长课").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("体质成长课").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("播放课程").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("播放课程").performClick()
+        composeRule.onNodeWithText("暂停学习").assertIsDisplayed()
+        // The card and lesson dialog both expose the persisted value; either
+        // one alone would prove too little, so assert the duplicated update.
+        composeRule.onAllNodesWithText("学习进度 25%").assertCountEquals(2)
+        composeRule.onNodeWithText("完成").performClick()
     }
 }

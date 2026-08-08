@@ -414,7 +414,11 @@ enum WorkflowCommandState: Equatable {
         }
     }
     func completeAssessment(_ category: AssessmentCategory) { mutateLocal { $0.completedAssessments.insert("\(selectedChild?.id ?? "anonymous")-\(category.rawValue)") } }
-    func updateCourseProgress(_ title: String, progress: Double) { mutateLocal { $0.courseProgress[title] = progress } }
+    /// Progress can arrive from a resumed player or local draft. Keep its
+    /// persisted representation within the valid 0...1 range.
+    func updateCourseProgress(_ title: String, progress: Double) {
+        mutateLocal { $0.courseProgress[title] = min(max(progress, 0), 1) }
+    }
     func sendSupportMessage(_ text: String) {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         mutateLocal { values in

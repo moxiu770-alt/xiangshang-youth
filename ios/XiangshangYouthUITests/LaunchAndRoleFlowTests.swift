@@ -33,6 +33,19 @@ final class LaunchAndRoleFlowTests: XCTestCase {
         XCTAssertTrue(classBoard.waitForExistence(timeout: 2))
         classBoard.tap()
         XCTAssertTrue(staticText(containing: "班级数据看板").waitForExistence(timeout: 3))
+        // The archived period is intentionally aggregate-only. Switching it
+        // must change the board and show the protected-history explanation,
+        // never reuse current student reports as historical records.
+        let historicalPeriod = button(containing: "2026春季")
+        XCTAssertTrue(historicalPeriod.waitForExistence(timeout: 2))
+        historicalPeriod.tap()
+        XCTAssertTrue(staticText(containing: "已归档汇总").waitForExistence(timeout: 3))
+        let archiveInfo = button(containing: "归档说明")
+        XCTAssertTrue(archiveInfo.waitForExistence(timeout: 2))
+        archiveInfo.tap()
+        XCTAssertTrue(staticText(containing: "历史测评归档").waitForExistence(timeout: 3))
+        button(containing: "关闭").tap()
+        button(containing: "本轮综合测评").tap()
         let issueDistribution = button(containing: "问题分布")
         XCTAssertTrue(issueDistribution.waitForExistence(timeout: 2))
         issueDistribution.tap()

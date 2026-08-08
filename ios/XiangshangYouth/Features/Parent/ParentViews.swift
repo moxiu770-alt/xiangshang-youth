@@ -525,9 +525,11 @@ struct ParentMessageDetail: Identifiable {
 }
 struct ParentMessagesDashboard: View {
     @EnvironmentObject private var state: AppState
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var selectedTab = 0
     @State private var selectedMessage: ParentMessageDetail?
     private var messages: [MessageItem] { state.data?.messages ?? [] }
+    private var reduceMotion: Bool { state.localFeatures.settings.reduceMotion || systemReduceMotion }
 
     var body: some View {
         ScrollView {
@@ -597,7 +599,10 @@ struct ParentMessagesDashboard: View {
     }
 
     private func tab(_ title: String, index: Int) -> some View {
-        Button { withAnimation(.easeInOut(duration: 0.2)) { selectedTab = index } } label: {
+        Button {
+            if reduceMotion { var transaction = Transaction(); transaction.animation = nil; withTransaction(transaction) { selectedTab = index } }
+            else { withAnimation(.easeInOut(duration: 0.2)) { selectedTab = index } }
+        } label: {
             VStack(spacing: 6) {
                 Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(selectedTab == index ? ReferenceColor.blue : .secondary)
                 Capsule().fill(selectedTab == index ? ReferenceColor.blue : .clear).frame(height: 2)

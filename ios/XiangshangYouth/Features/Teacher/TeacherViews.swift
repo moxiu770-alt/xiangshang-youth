@@ -356,10 +356,12 @@ struct TeacherMessagesView: View {
 struct TeacherDashboard: View {
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var router: AppRouter
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Binding var isSportsTeacher: Bool
     private var classStudents: [Student] { state.data?.students.filter { $0.className == "三年级2班" } ?? [] }
     private var measuredCount: Int { classStudents.filter { state.taskStatus(for: $0) == .completed }.count }
     private var riskCount: Int { classStudents.filter { ($0.totalScore ?? 35) < 25 || state.taskStatus(for: $0) == .review || state.taskStatus(for: $0) == .retest }.count }
+    private var reduceMotion: Bool { state.localFeatures.settings.reduceMotion || systemReduceMotion }
 
     var body: some View {
         ScrollView {
@@ -392,7 +394,7 @@ struct TeacherDashboard: View {
                 }
             }
         }
-        .animation(.spring(response: 0.45, dampingFraction: 0.82), value: isSportsTeacher)
+        .animation(reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.82), value: isSportsTeacher)
     }
 
     private var teacherHeader: some View {
@@ -405,7 +407,10 @@ struct TeacherDashboard: View {
                 Text(isSportsTeacher ? "体育老师" : "三年级2班").font(.system(size: 8, weight: .semibold)).foregroundStyle(ReferenceColor.green)
             }
             Spacer()
-            Button { withAnimation { isSportsTeacher.toggle() } } label: { Label("切换角色", systemImage: "arrow.left.arrow.right")
+            Button {
+                if reduceMotion { var transaction = Transaction(); transaction.animation = nil; withTransaction(transaction) { isSportsTeacher.toggle() } }
+                else { withAnimation { isSportsTeacher.toggle() } }
+            } label: { Label("切换角色", systemImage: "arrow.left.arrow.right")
                 .font(.system(size: 9, weight: .medium)).padding(.horizontal, 9).padding(.vertical, 5)
                 .background(.white, in: Capsule()).overlay(Capsule().stroke(ReferenceColor.navy.opacity(0.10), lineWidth: 1)) }.buttonStyle(.plain)
             Button { router.push(.teacherMessages) } label: { Image(systemName: "bell").font(.system(size: 16, weight: .medium)).foregroundStyle(ReferenceColor.navy)
@@ -433,7 +438,8 @@ struct TeacherDashboard: View {
 
     private func roleSwitchButton(_ title: String, _ icon: String, selected: Bool, color: Color, action: @escaping () -> Void) -> some View {
         Button {
-            withAnimation(.spring(response: 0.38, dampingFraction: 0.78)) { action() }
+            if reduceMotion { var transaction = Transaction(); transaction.animation = nil; withTransaction(transaction) { action() } }
+            else { withAnimation(.spring(response: 0.38, dampingFraction: 0.78)) { action() } }
         } label: {
             Label(title, systemImage: icon)
                 .font(.system(size: 14, weight: .bold))
@@ -582,6 +588,7 @@ struct TeacherDashboard: View {
 struct TeacherClassBoardView: View {
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var router: AppRouter
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var dashboardAppeared = false
     @State private var selectedPeriod = 0
     @State private var historicalDetailShown = false
@@ -598,6 +605,7 @@ struct TeacherClassBoardView: View {
     private var completedCount: Int { isHistorical ? measuredCount : classStudents.filter { state.taskStatus(for: $0) == .completed }.count }
     private var riskStudents: [Student] { isHistorical ? [] : classStudents.filter { (($0.totalScore ?? 35) < 25) || [.review, .retest].contains(state.taskStatus(for: $0)) } }
     private var completion: Double { totalCount == 0 ? 0 : Double(measuredCount) / Double(totalCount) }
+    private var reduceMotion: Bool { state.localFeatures.settings.reduceMotion || systemReduceMotion }
 
     var body: some View {
         ScrollView {
@@ -757,10 +765,9 @@ struct TeacherClassBoardView: View {
             }
         }
         .navigationBarBackButtonHidden()
-        .task {
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.75).delay(0.18)) {
-                dashboardAppeared = true
-            }
+        .task(id: reduceMotion) {
+            guard !reduceMotion else { dashboardAppeared = true; return }
+            withAnimation(.spring(response: 0.8, dampingFraction: 0.75).delay(0.18)) { dashboardAppeared = true }
         }
         .sheet(isPresented: $historicalDetailShown) {
             NavigationStack {
@@ -919,7 +926,10 @@ struct TeacherClassBoardView: View {
 struct CompletionTrendChart: View {
     private let values: [Double] = [0.70, 0.76, 0.84, 0.90]
     private let labels = ["第1周", "第2周", "第3周", "本周"]
+    @EnvironmentObject private var state: AppState
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var draw = false
+    private var reduceMotion: Bool { state.localFeatures.settings.reduceMotion || systemReduceMotion }
 
     var body: some View {
         VStack(spacing: 3) {
@@ -954,7 +964,10 @@ struct CompletionTrendChart: View {
                 }
             }
         }
-        .task { withAnimation(.easeOut(duration: 1.1)) { draw = true } }
+        .task(id: reduceMotion) {
+            guard !reduceMotion else { draw = true; return }
+            withAnimation(.easeOut(duration: 1.1)) { draw = true }
+        }
     }
 }
 

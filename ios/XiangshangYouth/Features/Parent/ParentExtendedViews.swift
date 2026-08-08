@@ -593,10 +593,12 @@ struct CourseDetailSheet: View {
     let title: String
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var state: AppState
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var isPlaying = false
     @State private var progress = 0.15
     @State private var draft = ""
     @State private var replyError: String?
+    private var reduceMotion: Bool { state.localFeatures.settings.reduceMotion || systemReduceMotion }
     var body: some View { let commandState = state.workflowState(for: "support"); return NavigationStack { VStack(spacing: 14) {
         if title == "客服咨询" {
             Image(systemName: "message.fill").font(.system(size: 42)).foregroundStyle(ReferenceColor.blue)
@@ -606,7 +608,7 @@ struct CourseDetailSheet: View {
             if let replyError { Text(replyError).font(.system(size: 10)).foregroundStyle(.red) }
             if case let .failed(message) = commandState { Text(message).font(.system(size: 10)).foregroundStyle(.red) }
         } else {
-            Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill").font(.system(size: 48)).foregroundStyle(ReferenceColor.blue); Text(title).font(.title3.bold()); Text("已为您加载课程视频。播放进度会自动保存并同步到孩子的学习记录。").font(.system(size: 13)).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal, 28); ProgressView(value: progress).tint(ReferenceColor.green).padding(.horizontal, 30); Button { isPlaying.toggle(); if isPlaying { withAnimation(.linear(duration: 2.5)) { progress = 0.8 }; state.updateCourseProgress(title, progress: 0.8) } } label: { Label(isPlaying ? "暂停学习" : "播放课程", systemImage: isPlaying ? "pause.fill" : "play.fill") }.buttonStyle(.borderedProminent)
+            Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill").font(.system(size: 48)).foregroundStyle(ReferenceColor.blue); Text(title).font(.title3.bold()); Text("已为您加载课程视频。播放进度会自动保存并同步到孩子的学习记录。").font(.system(size: 13)).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal, 28); ProgressView(value: progress).tint(ReferenceColor.green).padding(.horizontal, 30); Button { isPlaying.toggle(); if isPlaying { if reduceMotion { progress = 0.8 } else { withAnimation(.linear(duration: 2.5)) { progress = 0.8 } }; state.updateCourseProgress(title, progress: 0.8) } } label: { Label(isPlaying ? "暂停学习" : "播放课程", systemImage: isPlaying ? "pause.fill" : "play.fill") }.buttonStyle(.borderedProminent)
         }
     }.frame(maxWidth: .infinity, maxHeight: .infinity).navigationTitle(title).navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }.task { if title == "客服咨询" { state.clearWorkflowState("support") }; progress = state.localFeatures.courseProgress[title] ?? progress; draft = state.localFeatures.drafts[supportDraftKey] ?? "" } } }
     private var supportDraftKey: String { "support-\(title)" }

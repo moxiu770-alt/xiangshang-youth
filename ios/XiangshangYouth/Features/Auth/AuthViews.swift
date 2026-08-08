@@ -539,8 +539,10 @@ struct ResetPasswordView: View {
 struct RoleSelectView: View {
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var router: AppRouter
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var visible = false
     @State private var landscapeDrifts = false
+    private var reduceMotion: Bool { state.localFeatures.settings.reduceMotion || systemReduceMotion }
 
     var body: some View {
         ZStack {
@@ -583,7 +585,8 @@ struct RoleSelectView: View {
             .frame(maxWidth: 620)
             .frame(maxWidth: .infinity)
         }
-        .task {
+        .task(id: reduceMotion) {
+            guard !reduceMotion else { visible = true; landscapeDrifts = false; return }
             withAnimation(.spring(response: 0.55, dampingFraction: 0.8)) { visible = true }
             withAnimation(.easeInOut(duration: 5.5).repeatForever(autoreverses: true)) { landscapeDrifts = true }
         }

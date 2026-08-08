@@ -63,6 +63,7 @@ struct PrincipalHomeView: View {
 struct PrincipalDashboard: View {
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var router: AppRouter
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var dashboardAppeared = false
     @State private var isRegionDetailShown = false
 
@@ -94,6 +95,7 @@ struct PrincipalDashboard: View {
     }
     private var riskStudents: [Student] { activeTaskStudents.filter { ($0.totalScore ?? 35) < 25 || state.taskStatus(for: $0) == .review || state.taskStatus(for: $0) == .retest } }
     private var averageScore: Double { let scores = activeTaskStudents.compactMap(\.totalScore); return scores.isEmpty ? 0 : scores.reduce(0, +) / Double(scores.count) }
+    private var reduceMotion: Bool { state.localFeatures.settings.reduceMotion || systemReduceMotion }
 
     var body: some View {
         Group {
@@ -186,11 +188,12 @@ struct PrincipalDashboard: View {
         }
         .background(ReferenceColor.canvas)
         .refreshable { await state.refreshDashboard() }
-        .task {
+        .task(id: reduceMotion) {
             if state.localFeatures.selectedPrincipalTaskID == nil,
                let defaultTaskID = state.data?.tasks.first?.id {
                 state.selectPrincipalTask(defaultTaskID)
             }
+            guard !reduceMotion else { dashboardAppeared = true; return }
             withAnimation(.spring(response: 0.65, dampingFraction: 0.78)) { dashboardAppeared = true }
         }
         .sheet(isPresented: $isRegionDetailShown) {

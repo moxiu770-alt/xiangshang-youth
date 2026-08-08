@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -130,7 +131,7 @@ fun ParentHomeScreen(state: AppUiState, nav: NavHostController, registerActivity
                 Button(onClick = { nav.navigate("${Destinations.Assessment}/fitness") }, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp).height(29.dp), contentPadding = PaddingValues(horizontal = 28.dp)) { Text("继续测评", fontSize = 10.sp) }
             }
         }
-        Row(Modifier.padding(horizontal = 10.dp)) { ParentAction("测评报告", Icons.AutoMirrored.Filled.Assignment, Blue, Modifier.weight(1f)) { nav.navigate(Destinations.Report) }; ParentAction("健康提醒", Icons.Filled.Warning, Color.Red, Modifier.weight(1f)) { nav.navigate(Destinations.Messages) }; ParentAction(if (state.local.checkedInToday) "今日已打卡" else "打卡记录", Icons.AutoMirrored.Filled.FactCheck, Green, Modifier.weight(1f)) { nav.navigate(Destinations.Health) }; ParentAction("推荐课程", Icons.Filled.SmartDisplay, Color(0xFFFF9D25), Modifier.weight(1f)) { nav.navigate(Destinations.Courses) } }
+        ParentQuickActions(nav, state.local.checkedInToday)
         ParentSection("专家团队", "点击专家查看")
         Row(Modifier.padding(horizontal = 14.dp)) { listOf(R.drawable.expert_professor to "张教授", R.drawable.expert_doctor to "李医生", R.drawable.expert_coach to "王教练", R.drawable.expert_counselor to "刘主任").forEach { (image, name) -> Column(Modifier.weight(1f).semantics { role = Role.Button; contentDescription = "预约$name" }.clickable { expert = name }, horizontalAlignment = Alignment.CenterHorizontally) { Image(painterResource(image), null, Modifier.size(37.dp).clip(CircleShape), contentScale = ContentScale.Crop); Text(name, color = Navy, fontSize = 9.sp) } } }
         ParentSection("健康科普", "点击文章查看")
@@ -166,6 +167,28 @@ fun ParentHomeScreen(state: AppUiState, nav: NavHostController, registerActivity
 }
 @Composable private fun ParentMetric(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier, onClick: () -> Unit) = Surface(modifier.semantics { role = Role.Button; contentDescription = "打开${label}测评" }.clickable(onClick = onClick), color = color.copy(.08f), shape = RoundedCornerShape(9.dp)) { Row(Modifier.padding(9.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = color, modifier = Modifier.size(21.dp)); Spacer(Modifier.width(8.dp)); Column { Text(label, color = Navy, fontWeight = FontWeight.Bold, fontSize = 10.sp); Text(if (label == "体质") "继续测评" else "开始测评", color = Color.Gray, fontSize = 8.sp) } } }
 @Composable private fun ParentAction(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier, onClick: () -> Unit) = Column(modifier.semantics { role = Role.Button; contentDescription = label }, horizontalAlignment = Alignment.CenterHorizontally) { FilledIconButton(onClick = onClick, modifier = Modifier.size(39.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = color)) { Icon(icon, contentDescription = label, modifier = Modifier.size(20.dp)) }; Text(label, color = Navy, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, maxLines = 1) }
+
+/** Keep the reference's compact four-up row at normal type size, but give
+ * labels enough width at accessibility sizes instead of truncating them. */
+@Composable private fun ParentQuickActions(nav: NavHostController, checkedInToday: Boolean) {
+    val actions = listOf(
+        Triple("测评报告", Icons.AutoMirrored.Filled.Assignment, Blue) to Destinations.Report,
+        Triple("健康提醒", Icons.Filled.Warning, Color.Red) to Destinations.Messages,
+        Triple(if (checkedInToday) "今日已打卡" else "打卡记录", Icons.AutoMirrored.Filled.FactCheck, Green) to Destinations.Health,
+        Triple("推荐课程", Icons.Filled.SmartDisplay, Color(0xFFFF9D25)) to Destinations.Courses
+    )
+    val columns = if (LocalDensity.current.fontScale > 1.25f) 2 else 4
+    Column(Modifier.padding(horizontal = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        actions.chunked(columns).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                row.forEach { (item, destination) ->
+                    ParentAction(item.first, item.second, item.third, Modifier.weight(1f)) { nav.navigate(destination) }
+                }
+                repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
 @Composable
 private fun ParentSection(title: String, action: String, onAction: (() -> Unit)? = null) =
     Row(Modifier.padding(horizontal = 12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

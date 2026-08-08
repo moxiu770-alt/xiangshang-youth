@@ -84,14 +84,18 @@ struct ParentBindingPrompt: View {
 
 struct ParentLandingView: View {
     @EnvironmentObject private var state: AppState; @EnvironmentObject private var router: AppRouter
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var activityDetail: String?
     @State private var expertDetail: String?
     @State private var healthChannelDetail: String?
+    private var quickActionColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 8), count: dynamicTypeSize.isAccessibilitySize ? 2 : 4)
+    }
     var body: some View { ScrollView { VStack(spacing: 9) {
         ReferenceHeader(name: state.selectedChild?.name ?? "王小明", school: "\(state.selectedChild?.className ?? "三年级2班") · 点击切换孩子", initial: String((state.selectedChild?.name ?? "王").prefix(1)), avatarAsset: "ChildAvatar", identityAction: { router.push(.children(returnAfterBinding: false)) })
         Button { activityDetail = "向上少年健康成长季" } label: { ParentCampaignCard() }.buttonStyle(.plain).padding(.horizontal, 9)
         ReferenceCard { VStack(spacing: 8) { HStack { VStack(alignment: .leading) { Text("综合测评").font(.system(size: 17, weight: .bold)).foregroundStyle(ReferenceColor.blue); Text("运动表现、心理健康、口腔健康状况").font(.system(size: 9)).foregroundStyle(.secondary) }; Spacer(); Image(systemName: "sun.max.fill").foregroundStyle(ReferenceColor.yellow) }; LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 7) { assessmentMetric(.fitness); assessmentMetric(.mental); assessmentMetric(.vision); assessmentMetric(.oral) }; Button("继续测评") { router.push(.assessment(.fitness)) }.font(.system(size: 12, weight: .bold)).frame(maxWidth: 150).padding(.vertical, 6).background(ReferenceColor.blue, in: Capsule()).foregroundStyle(.white) }.padding(2) }.padding(.horizontal, 9)
-        HStack {
+        LazyVGrid(columns: quickActionColumns, spacing: 8) {
             Button { if let child = state.selectedChild { router.push(.report(child)) } else { router.push(.children(returnAfterBinding: true)) } } label: { ReferenceAction(icon: "calendar", title: "测评报告", color: ReferenceColor.blue) }.buttonStyle(.plain)
             Button { router.push(.parentMessages) } label: { ReferenceAction(icon: "exclamationmark.circle.fill", title: "健康提醒", color: .red) }.buttonStyle(.plain)
             // “打卡记录” is a read/navigation affordance. Do not silently

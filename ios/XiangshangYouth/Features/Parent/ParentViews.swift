@@ -94,7 +94,9 @@ struct ParentLandingView: View {
         HStack {
             Button { if let child = state.selectedChild { router.push(.report(child)) } else { router.push(.children(returnAfterBinding: true)) } } label: { ReferenceAction(icon: "calendar", title: "测评报告", color: ReferenceColor.blue) }.buttonStyle(.plain)
             Button { router.push(.parentMessages) } label: { ReferenceAction(icon: "exclamationmark.circle.fill", title: "健康提醒", color: .red) }.buttonStyle(.plain)
-            Button { state.checkInToday(); router.push(.healthProfile) } label: { ReferenceAction(icon: "checkmark.seal.fill", title: "打卡记录", color: ReferenceColor.green) }.buttonStyle(.plain)
+            // “打卡记录” is a read/navigation affordance. Do not silently
+            // create a health record merely because the parent wants to view it.
+            Button { router.push(.healthProfile) } label: { ReferenceAction(icon: "checkmark.seal.fill", title: "打卡记录", color: ReferenceColor.green) }.buttonStyle(.plain)
             Button { router.push(.parentCourses) } label: { ReferenceAction(icon: "play.rectangle.fill", title: "推荐课程", color: .orange) }.buttonStyle(.plain)
         }.padding(.horizontal, 10)
         HStack { Text("专家团队").font(.system(size: 14, weight: .bold)); Spacer(); Button("查看全部 ›") { router.push(.expertList) }.font(.system(size: 10, weight: .semibold)).foregroundStyle(ReferenceColor.blue) }.padding(.horizontal, 12)
@@ -376,7 +378,7 @@ struct HealthDashboard: View {
     @State private var checkInDetailShown = false
     private var report: DiagnosisReport? { state.selectedChild.map { state.report(for: $0) } }
     var body: some View { ScrollView { VStack(spacing: 10) { ParentPageNavigation(title: "健康档案", showsBack: true); ReferenceHeader(name: state.selectedChild?.name ?? "王小明", school: state.selectedChild?.className ?? "三年级2班", initial: String((state.selectedChild?.name ?? "王").prefix(1)), avatarAsset: "ChildAvatar"); ReferenceSectionTitle(title: "健康报告", trailing: "查看全部报告", action: { if let child = state.selectedChild { router.push(.report(child)) } }).padding(.horizontal, 12); HStack(spacing: 7) { healthMetric("figure.run", "体质", reportSummary, ReferenceColor.blue); healthMetric("eye.fill", "视力", reportSummary, ReferenceColor.green); healthMetric("mouth.fill", "口腔", reportSummary, ReferenceColor.purple); healthMetric("brain.head.profile", "心理", reportSummary, ReferenceColor.pink) }.padding(.horizontal, 12)
-        ReferenceCard { VStack(alignment: .leading, spacing: 8) { ReferenceSectionTitle(title: "本月打卡", trailing: "查看记录", action: { checkInDetailShown = true }); let days = ["日", "一", "二", "三", "四", "五", "六"]; HStack { ForEach(days, id: \.self) { Text($0).font(.system(size: 9)).frame(maxWidth: .infinity).foregroundStyle(.secondary) } }; LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 8) { ForEach(1...28, id: \.self) { day in Text("\(day)").font(.system(size: 9, weight: day % 3 == 0 ? .bold : .regular)).foregroundStyle(day % 3 == 0 ? ReferenceColor.green : ReferenceColor.navy).frame(width: 17, height: 17).background(day % 3 == 0 ? ReferenceColor.green.opacity(0.12) : .clear, in: Circle()) } } } }.padding(.horizontal, 12)
+        ReferenceCard { VStack(alignment: .leading, spacing: 8) { ReferenceSectionTitle(title: "本月打卡", trailing: "查看记录", action: { checkInDetailShown = true }); let days = ["日", "一", "二", "三", "四", "五", "六"]; HStack { ForEach(days, id: \.self) { Text($0).font(.system(size: 9)).frame(maxWidth: .infinity).foregroundStyle(.secondary) } }; LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 8) { ForEach(1...28, id: \.self) { day in Text("\(day)").font(.system(size: 9, weight: day % 3 == 0 ? .bold : .regular)).foregroundStyle(day % 3 == 0 ? ReferenceColor.green : ReferenceColor.navy).frame(width: 17, height: 17).background(day % 3 == 0 ? ReferenceColor.green.opacity(0.12) : .clear, in: Circle()) } }; Button { state.checkInToday(); checkInDetailShown = true } label: { Label(state.localFeatures.checkInDates.contains(Self.todayKey) ? "今日已打卡" : "确认今日运动打卡", systemImage: state.localFeatures.checkInDates.contains(Self.todayKey) ? "checkmark.circle.fill" : "checkmark.seal.fill").font(.system(size: 11, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 9).foregroundStyle(.white).background(state.localFeatures.checkInDates.contains(Self.todayKey) ? ReferenceColor.green : ReferenceColor.blue, in: RoundedRectangle(cornerRadius: 9)) }.buttonStyle(.plain).disabled(state.localFeatures.checkInDates.contains(Self.todayKey)) } }.padding(.horizontal, 12)
         RecentFamilyActivities().padding(.horizontal, 12)
         CourseSuggestionBanner().padding(.horizontal, 12)
         UpcomingTrainingCard().padding(.horizontal, 12)
@@ -407,6 +409,7 @@ struct HealthDashboard: View {
         }
     }
     private var reportSummary: String { "\(report?.assessmentDate ?? "待测评") · \(((report?.student.totalScore ?? 0) >= 25) ? "良好" : "需关注")" }
+    private static var todayKey: String { let formatter = DateFormatter(); formatter.locale = Locale(identifier: "en_US_POSIX"); formatter.dateFormat = "yyyy-MM-dd"; return formatter.string(from: .now) }
     private func healthMetric(_ icon: String, _ title: String, _ subtitle: String, _ color: Color) -> some View {
         Button { if let child = state.selectedChild { router.push(.report(child)) } else { router.push(.children(returnAfterBinding: true)) } } label: {
             ReferenceMetric(icon: icon, title: title, value: subtitle, color: color)

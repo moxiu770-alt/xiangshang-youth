@@ -47,7 +47,7 @@ import com.xiangshang.youth.core.model.UserRole
 import com.xiangshang.youth.shared.component.*
 
 @Composable
-fun ParentHomeScreen(state: AppUiState, nav: NavHostController, registerActivity: (String, String) -> Unit, checkInToday: () -> Unit, bookExpert: (String, String, String) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit, refreshDashboard: () -> Unit = {}, submitActivityCommand: (String, String) -> Unit = registerActivity, submitExpertCommand: (String, String, String) -> Unit = bookExpert) {
+fun ParentHomeScreen(state: AppUiState, nav: NavHostController, registerActivity: (String, String) -> Unit, bookExpert: (String, String, String) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit, refreshDashboard: () -> Unit = {}, submitActivityCommand: (String, String) -> Unit = registerActivity, submitExpertCommand: (String, String, String) -> Unit = bookExpert) {
     val context = LocalContext.current
     val reduceMotion = LocalReduceMotion.current
     val transition = rememberInfiniteTransition(label = "parent-campaign")
@@ -125,7 +125,7 @@ fun ParentHomeScreen(state: AppUiState, nav: NavHostController, registerActivity
                 Button(onClick = { nav.navigate("${Destinations.Assessment}/fitness") }, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp).height(29.dp), contentPadding = PaddingValues(horizontal = 28.dp)) { Text("继续测评", fontSize = 10.sp) }
             }
         }
-        Row(Modifier.padding(horizontal = 10.dp)) { ParentAction("测评报告", Icons.AutoMirrored.Filled.Assignment, Blue, Modifier.weight(1f)) { nav.navigate(Destinations.Report) }; ParentAction("健康提醒", Icons.Filled.Warning, Color.Red, Modifier.weight(1f)) { nav.navigate(Destinations.Messages) }; ParentAction(if (state.local.checkedInToday) "今日已打卡" else "打卡记录", Icons.AutoMirrored.Filled.FactCheck, Green, Modifier.weight(1f)) { checkInToday(); nav.navigate(Destinations.Health) }; ParentAction("推荐课程", Icons.Filled.SmartDisplay, Color(0xFFFF9D25), Modifier.weight(1f)) { nav.navigate(Destinations.Courses) } }
+        Row(Modifier.padding(horizontal = 10.dp)) { ParentAction("测评报告", Icons.AutoMirrored.Filled.Assignment, Blue, Modifier.weight(1f)) { nav.navigate(Destinations.Report) }; ParentAction("健康提醒", Icons.Filled.Warning, Color.Red, Modifier.weight(1f)) { nav.navigate(Destinations.Messages) }; ParentAction(if (state.local.checkedInToday) "今日已打卡" else "打卡记录", Icons.AutoMirrored.Filled.FactCheck, Green, Modifier.weight(1f)) { nav.navigate(Destinations.Health) }; ParentAction("推荐课程", Icons.Filled.SmartDisplay, Color(0xFFFF9D25), Modifier.weight(1f)) { nav.navigate(Destinations.Courses) } }
         ParentSection("专家团队", "点击专家查看")
         Row(Modifier.padding(horizontal = 14.dp)) { listOf(R.drawable.expert_professor to "张教授", R.drawable.expert_doctor to "李医生", R.drawable.expert_coach to "王教练", R.drawable.expert_counselor to "刘主任").forEach { (image, name) -> Column(Modifier.weight(1f).semantics { role = Role.Button; contentDescription = "预约$name" }.clickable { expert = name }, horizontalAlignment = Alignment.CenterHorizontally) { Image(painterResource(image), null, Modifier.size(37.dp).clip(CircleShape), contentScale = ContentScale.Crop); Text(name, color = Navy, fontSize = 9.sp) } } }
         ParentSection("健康科普", "点击文章查看")
@@ -305,7 +305,7 @@ fun ParentEvaluationsScreen(state: AppUiState, nav: NavHostController, report: D
     selectedTitle?.let { title -> AlertDialog(onDismissRequest = { selectedTitle = null }, title = { Text(title) }, text = { Column { Text(selectedContent); Text(selectedTime, color = Color.Gray, fontSize = 11.sp, modifier = Modifier.padding(top = 10.dp)) } }, confirmButton = { TextButton(onClick = { selectedTitle = null }) { Text("关闭") } }) }
 }
 @Composable
-fun HealthProfileScreen(state: AppUiState, nav: NavHostController) {
+fun HealthProfileScreen(state: AppUiState, nav: NavHostController, checkInToday: () -> Unit) {
     var checkInDetail by rememberSaveable { mutableStateOf(false) }
     ParentTabScaffold(nav, Destinations.Health) {
     val dashboardError = state.error
@@ -322,6 +322,7 @@ fun HealthProfileScreen(state: AppUiState, nav: NavHostController) {
             ParentSection("本月打卡", "查看记录") { checkInDetail = true }
             Text("日    一    二    三    四    五    六", color = Color.Gray, fontSize = 9.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
             Text("7     8     9    10    11    12    13\n14   15   16   17   18   19   20\n21   22   23   24   25   26   27", color = Green, fontSize = 10.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+            Button(onClick = { checkInToday(); checkInDetail = true }, enabled = !state.local.checkedInToday, modifier = Modifier.fillMaxWidth().padding(top = 9.dp)) { Text(if (state.local.checkedInToday) "今日已打卡" else "确认今日运动打卡") }
         }
     }
     Spacer(Modifier.height(9.dp))

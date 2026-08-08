@@ -294,11 +294,11 @@ struct AccountDashboard: View {
                 }.padding(14).background(.white, in: RoundedRectangle(cornerRadius: 12)).padding(.horizontal, 12).contentShape(RoundedRectangle(cornerRadius: 12)).onTapGesture { dialog = "个人资料" }.accessibilityElement(children: .combine).accessibilityLabel("查看个人资料").accessibilityAddTraits(.isButton)
                 if state.selectedRole == .parent {
                     HStack(spacing: 8) {
-                        accountMetric(title: "已绑定孩子", value: "\(state.boundChildren.count)", action: { router.push(.children) })
-                        accountMetric(title: "成长报告", value: state.selectedChild == nil ? "0" : "1", action: { if let child = state.selectedChild { router.push(.report(child)) } else { router.push(.children) } })
+                        accountMetric(title: "已绑定孩子", value: "\(state.boundChildren.count)", action: { router.push(.children(returnAfterBinding: false)) })
+                        accountMetric(title: "成长报告", value: state.selectedChild == nil ? "0" : "1", action: { if let child = state.selectedChild { router.push(.report(child)) } else { router.push(.children(returnAfterBinding: true)) } })
                         accountMetric(title: "未读消息", value: "\(state.unreadMessageCount)", action: { router.push(.parentMessages) })
                     }.padding(.horizontal, 12)
-                    ReferenceSectionTitle(title: "家庭服务", trailing: "孩子管理", action: { router.push(.children) }).padding(.horizontal, 12)
+                    ReferenceSectionTitle(title: "家庭服务", trailing: "孩子管理", action: { router.push(.children(returnAfterBinding: false)) }).padding(.horizontal, 12)
                 } else {
                     HStack(spacing: 8) {
                         accountMetric(title: "管理班级", value: "2", action: { router.push(.teacherClasses) })
@@ -614,7 +614,7 @@ struct ParentHealthDimension: View {
     let title: String; let detail: String; let color: Color
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var router: AppRouter
-    var body: some View { Button { if let child = state.selectedChild { router.push(.report(child)) } else { router.push(.children) } } label: {
+    var body: some View { Button { if let child = state.selectedChild { router.push(.report(child)) } else { router.push(.children(returnAfterBinding: true)) } } label: {
         HStack(spacing: 10) { Image(systemName: title == "体质" ? "figure.run" : title == "视力" ? "eye.fill" : title == "口腔" ? "mouth.fill" : "brain.head.profile").font(.system(size: 16, weight: .bold)).foregroundStyle(color).frame(width: 34, height: 34).background(color.opacity(0.10), in: RoundedRectangle(cornerRadius: 9)); VStack(alignment: .leading, spacing: 3) { Text(title).font(.system(size: 12, weight: .bold)); Text(detail).font(.system(size: 9)).foregroundStyle(.secondary) }; Spacer(); Text("良好").font(.system(size: 10, weight: .bold)).foregroundStyle(color); Image(systemName: "chevron.right").font(.system(size: 9)).foregroundStyle(.secondary) }
             .foregroundStyle(ReferenceColor.navy).padding(10).background(.white, in: RoundedRectangle(cornerRadius: 10))
     }.buttonStyle(.plain) }

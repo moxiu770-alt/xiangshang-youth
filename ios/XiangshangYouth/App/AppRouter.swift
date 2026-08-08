@@ -5,7 +5,7 @@ enum AssessmentCategory: String, Hashable, CaseIterable { case fitness = "体质
     var color: Color { switch self { case .fitness: ReferenceColor.blue; case .vision: ReferenceColor.green; case .oral: ReferenceColor.yellow; case .mental: ReferenceColor.pink } }
 }
 
-enum AppRoute: Hashable { case roleSelect; case parentHome; case parentCourses; case children; case parentEvaluations; case parentMessages; case notifications; case healthProfile; case assessment(AssessmentCategory); case expertList; case teacherHome; case teacherMessages; case teacherClasses; case teacherClassBoard; case studentList(ClassInfo?); case outstandingStudents; case teacherTasks; case teacherTaskDetail(TestTask); case reviewList; case principalHome; case gradeStats; case classStats; case riskStudents; case report(Student) }
+enum AppRoute: Hashable { case roleSelect; case parentHome; case parentCourses; case children(returnAfterBinding: Bool); case parentEvaluations; case parentMessages; case notifications; case healthProfile; case assessment(AssessmentCategory); case expertList; case teacherHome; case teacherMessages; case teacherClasses; case teacherClassBoard; case studentList(ClassInfo?); case outstandingStudents; case teacherTasks; case teacherTaskDetail(TestTask); case reviewList; case principalHome; case gradeStats; case classStats; case riskStudents; case report(Student) }
 
 @MainActor final class AppRouter: ObservableObject {
     @Published var path = NavigationPath()
@@ -75,8 +75,8 @@ enum AppRoute: Hashable { case roleSelect; case parentHome; case parentCourses; 
                 path.append(route)
                 routeStack.append(route)
             } else {
-                path.append(AppRoute.children)
-                routeStack.append(.children)
+                path.append(AppRoute.children(returnAfterBinding: true))
+                routeStack.append(.children(returnAfterBinding: true))
             }
         case "review":
             state.selectRole(.teacher)

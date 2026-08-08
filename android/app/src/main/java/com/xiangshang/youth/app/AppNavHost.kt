@@ -46,7 +46,7 @@ import com.xiangshang.youth.core.util.DeepLinkResolver
 import com.xiangshang.youth.core.util.DeepLinkTarget
 import com.xiangshang.youth.shared.component.*
 
-object Destinations { const val Splash="splash"; const val Login="login"; const val Register="register"; const val PasswordReset="passwordReset"; const val Role="role"; const val Parent="parent"; const val Children="children"; const val ParentEvaluations="parentEvaluations"; const val Assessment="assessment"; const val Courses="courses"; const val CoursesRoute="courses?openSupport={openSupport}"; const val Circle="circle"; const val Account="account"; const val Messages="messages"; const val Notifications="notifications"; const val Health="health"; const val Report="report"; const val ReportRoute="report/{studentId}"; const val Teacher="teacher"; const val TeacherMessages="teacherMessages"; const val Classes="classes"; const val TeacherCircle="teacherCircle"; const val TeacherBoard="teacherBoard"; const val Students="students"; const val StudentsRoute="students?className={className}"; const val OutstandingStudents="outstandingStudents"; const val Tasks="tasks"; const val TaskDetail="taskDetail"; const val TaskDetailRoute="taskDetail/{taskId}"; const val Review="review"; const val Principal="principal"; const val PrincipalGrades="principalGrades"; const val PrincipalClassStats="principalClassStats"; const val PrincipalRisk="principalRisk"; const val Grades="grades"; const val ClassStats="classStats"; const val ClassStatsRoute="classStats?grade={grade}"; const val Risk="risk"; const val RiskRoute="risk?className={className}" }
+object Destinations { const val Splash="splash"; const val Login="login"; const val Register="register"; const val PasswordReset="passwordReset"; const val Role="role"; const val Parent="parent"; const val Children="children"; const val ChildrenBinding="childrenBinding"; const val ParentEvaluations="parentEvaluations"; const val Assessment="assessment"; const val Courses="courses"; const val CoursesRoute="courses?openSupport={openSupport}"; const val Circle="circle"; const val Account="account"; const val Messages="messages"; const val Notifications="notifications"; const val Health="health"; const val Report="report"; const val ReportRoute="report/{studentId}"; const val Teacher="teacher"; const val TeacherMessages="teacherMessages"; const val Classes="classes"; const val TeacherCircle="teacherCircle"; const val TeacherBoard="teacherBoard"; const val Students="students"; const val StudentsRoute="students?className={className}"; const val OutstandingStudents="outstandingStudents"; const val Tasks="tasks"; const val TaskDetail="taskDetail"; const val TaskDetailRoute="taskDetail/{taskId}"; const val Review="review"; const val Principal="principal"; const val PrincipalGrades="principalGrades"; const val PrincipalClassStats="principalClassStats"; const val PrincipalRisk="principalRisk"; const val Grades="grades"; const val ClassStats="classStats"; const val ClassStatsRoute="classStats?grade={grade}"; const val Risk="risk"; const val RiskRoute="risk?className={className}" }
 
 /** Shared retry actions keep page-level failures actionable without threading
  * the same callbacks through every feature screen. */
@@ -154,7 +154,7 @@ private fun NavHostController.replaceRoot(destination: String) {
                     viewModel.chooseChild(requestedStudent)
                     nav.navigate(Destinations.Report) { launchSingleTop = true }
                 } else {
-                    nav.navigate(Destinations.Children) { launchSingleTop = true }
+                    nav.navigate(Destinations.ChildrenBinding) { launchSingleTop = true }
                 }
             }
             DeepLinkTarget.Review -> {
@@ -226,7 +226,12 @@ private fun NavHostController.replaceRoot(destination: String) {
             nav.replaceRoot(destination)
         }, onLogout = { viewModel.logout(); nav.replaceRoot(Destinations.Login) }) }
         composable(Destinations.Parent) { ParentHomeScreen(state, nav, viewModel::registerActivity, viewModel::checkInToday, viewModel::bookExpert, viewModel::saveDraft, viewModel::clearDraft, { viewModel.refreshDashboard() }, { name, phone -> viewModel.submitActivityCommand(name, phone) }, { name, date, note -> viewModel.submitExpertCommand(name, date, note) }) }
-        composable(Destinations.Children) { ChildrenScreen(state, nav, viewModel::bindChild, choose = { viewModel.chooseChild(it); nav.popBackStack() }, saveDraft = viewModel::saveDraft, clearDraft = viewModel::clearDraft, onBound = { nav.popBackStack() }) }
+        // The family manager remains visible after a successful binding, so a
+        // parent can bind more than one child in the same household. Entry
+        // points that merely need a child to unlock a report/task use the
+        // separate ChildrenBinding route below and return to their origin.
+        composable(Destinations.Children) { ChildrenScreen(state, nav, viewModel::bindChild, choose = { viewModel.chooseChild(it); nav.popBackStack() }, saveDraft = viewModel::saveDraft, clearDraft = viewModel::clearDraft, onBound = {}) }
+        composable(Destinations.ChildrenBinding) { ChildrenScreen(state, nav, viewModel::bindChild, choose = { viewModel.chooseChild(it); nav.popBackStack() }, saveDraft = viewModel::saveDraft, clearDraft = viewModel::clearDraft, onBound = { nav.popBackStack() }) }
         composable(Destinations.ParentEvaluations) { ParentEvaluationsScreen(state, nav, state.selectedChild?.let(viewModel::report)) }
         composable("${Destinations.Assessment}/{category}") { entry -> AssessmentFlowScreen(state, nav, entry.arguments?.getString("category") ?: "fitness", viewModel::completeAssessment, viewModel::saveDraft, viewModel::clearDraft) }
         composable(Destinations.Courses) { ParentCoursesScreen(state, nav, viewModel::updateCourseProgress, viewModel::sendSupport, viewModel::saveDraft, viewModel::clearDraft, submitSupport = viewModel::submitSupportCommand, clearWorkflow = viewModel::clearWorkflowState) }
@@ -279,7 +284,7 @@ private fun NavHostController.replaceRoot(destination: String) {
                 child == null -> AppScaffold("体测报告", onBack = { nav.popBackStack() }) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                         EmptyState("暂无孩子报告，请先完成孩子绑定。")
-                        androidx.compose.material3.Button(onClick = { nav.navigate(Destinations.Children) }) { Text("去绑定孩子") }
+                        androidx.compose.material3.Button(onClick = { nav.navigate(Destinations.ChildrenBinding) }) { Text("去绑定孩子") }
                     }
                 }
                 else -> ReportDetailScreen(

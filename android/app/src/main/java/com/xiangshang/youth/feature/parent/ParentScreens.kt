@@ -89,9 +89,9 @@ fun ParentHomeScreen(state: AppUiState, nav: NavHostController, registerActivity
     if (state.loading || state.data == null) { LoadingState(); return@Scaffold }
     if (state.selectedChild == null) {
         Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().fillMaxHeight().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            ParentHeader("请先绑定孩子", { nav.navigate(Destinations.Children) }, { nav.navigateSingleTop(Destinations.Notifications) }, state.unreadMessageCount)
+            ParentHeader("请先绑定孩子", { nav.navigate(Destinations.ChildrenBinding) }, { nav.navigateSingleTop(Destinations.Notifications) }, state.unreadMessageCount)
             EmptyState("绑定孩子后才能查看测评、报告和课程。")
-            Button(onClick = { nav.navigate(Destinations.Children) }) { Text("去绑定孩子") }
+            Button(onClick = { nav.navigate(Destinations.ChildrenBinding) }) { Text("去绑定孩子") }
         }
         return@Scaffold
     }
@@ -216,7 +216,7 @@ fun ParentEvaluationsScreen(state: AppUiState, nav: NavHostController, report: D
     val dashboardError = state.error
     if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current); return@ParentTabScaffold }
     if (state.loading || state.data == null) { LoadingState(); return@ParentTabScaffold }
-    if (state.selectedChild == null) { EmptyState("暂无孩子档案，请先完成孩子绑定。"); Button(onClick = { nav.navigate(Destinations.Children) }, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("去绑定孩子") }; return@ParentTabScaffold }
+    if (state.selectedChild == null) { EmptyState("暂无孩子档案，请先完成孩子绑定。"); Button(onClick = { nav.navigate(Destinations.ChildrenBinding) }, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("去绑定孩子") }; return@ParentTabScaffold }
     val selectedChild = state.selectedChild
     ParentHeader(selectedChild.name, onClick = { nav.navigate(Destinations.Children) })
     Spacer(Modifier.height(8.dp))
@@ -306,7 +306,7 @@ fun HealthProfileScreen(state: AppUiState, nav: NavHostController) {
     val dashboardError = state.error
     if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current); return@ParentTabScaffold }
     if (state.loading || state.data == null) { LoadingState(); return@ParentTabScaffold }
-    if (state.selectedChild == null) { EmptyState("暂无健康档案，请先完成孩子绑定。"); Button(onClick = { nav.navigate(Destinations.Children) }, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("去绑定孩子") }; return@ParentTabScaffold }
+    if (state.selectedChild == null) { EmptyState("暂无健康档案，请先完成孩子绑定。"); Button(onClick = { nav.navigate(Destinations.ChildrenBinding) }, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("去绑定孩子") }; return@ParentTabScaffold }
     ParentSection("健康报告", "查看全部报告") { nav.navigate(Destinations.Report) }
     Row { ScoreSummaryCard("体质", "良好", "本月", onClick = { nav.navigate(Destinations.Report) }); Spacer(Modifier.width(6.dp)); ScoreSummaryCard("视力", "正常", "本月", onClick = { nav.navigate(Destinations.Report) }); Spacer(Modifier.width(6.dp)); ScoreSummaryCard("口腔", "良好", "本月", onClick = { nav.navigate(Destinations.Report) }) }
     Spacer(Modifier.height(9.dp))
@@ -368,7 +368,7 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
         val dashboardError = state.error
         if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current); return@ParentTabScaffold }
         if (state.loading || state.data == null) { LoadingState(); return@ParentTabScaffold }
-        if (state.selectedChild == null) { EmptyState("暂无孩子档案，请先完成孩子绑定。"); Button(onClick = { nav.navigate(Destinations.Children) }) { Text("去绑定孩子") }; return@ParentTabScaffold }
+        if (state.selectedChild == null) { EmptyState("暂无孩子档案，请先完成孩子绑定。"); Button(onClick = { nav.navigate(Destinations.ChildrenBinding) }) { Text("去绑定孩子") }; return@ParentTabScaffold }
         val selectedChild = state.selectedChild
         Text("我的课程", color = Navy, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 10.dp)); Text("${selectedChild.name} · ${selectedChild.className}", color = Color.Gray, fontSize = 10.sp); Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth().background(Sky, RoundedCornerShape(9.dp))) { listOf("公益课程", "学校课程").forEachIndexed { index, text -> Text(text, color = if (paid == (index == 1)) Color.White else Blue, fontWeight = FontWeight.Bold, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.weight(1f).padding(8.dp).semantics { role = Role.Tab; contentDescription = "切换到$text" }.background(if (paid == (index == 1)) Blue else Color.Transparent, RoundedCornerShape(8.dp)).clickable { paid = index == 1 }) } }
@@ -398,7 +398,7 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
         val dashboardError = state.error
         if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current); return@ParentTabScaffold }
         if (state.loading || state.data == null) { LoadingState(); return@ParentTabScaffold }
-        if (state.selectedChild == null) { EmptyState("暂无孩子档案，请先完成孩子绑定。"); Button(onClick = { nav.navigate(Destinations.Children) }) { Text("去绑定孩子") }; return@ParentTabScaffold }
+        if (state.selectedChild == null) { EmptyState("暂无孩子档案，请先完成孩子绑定。"); Button(onClick = { nav.navigate(Destinations.ChildrenBinding) }) { Text("去绑定孩子") }; return@ParentTabScaffold }
         Text("班级圈", color = Navy, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 10.dp))
         val selectedChild = state.selectedChild
         Text("${selectedChild.name} · ${selectedChild.className} · 42人", color = Color.Gray, fontSize = 10.sp)
@@ -431,7 +431,7 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
     ParentTabScaffold(nav, Destinations.Account) {
         Text("我的", color = Navy, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 10.dp)); Spacer(Modifier.height(8.dp))
         Surface(Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "查看个人资料" }.clickable { accountInfo = "个人资料" }, color = Color.White, shape = RoundedCornerShape(12.dp)) { Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Surface(Modifier.size(52.dp), color = Sky, shape = CircleShape) { Text((state.profile?.name ?: "王").take(1), color = Blue, fontSize = 20.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 13.dp)) }; Spacer(Modifier.width(11.dp)); Column(Modifier.weight(1f)) { Text(state.profile?.name ?: "王女士", color = Navy, fontWeight = FontWeight.Bold); Text(state.profile?.schoolName ?: "向上实验小学", color = Color.Gray, fontSize = 9.sp); Text(state.role?.label ?: "家长", color = Blue, fontSize = 9.sp) }; Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray) } }
-        Spacer(Modifier.height(8.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) { AccountMetric("已绑定孩子", state.local.boundChildIds.size.toString(), Blue, Modifier.weight(1f)) { nav.navigate(Destinations.Children) }; AccountMetric("成长报告", if (state.selectedChild == null) "0" else "1", Green, Modifier.weight(1f)) { if (state.selectedChild != null) nav.navigate(Destinations.Report) else nav.navigate(Destinations.Children) }; AccountMetric("未读消息", state.unreadMessageCount.toString(), Color(0xFFFF638E), Modifier.weight(1f)) { nav.navigate(Destinations.Messages) } }
+        Spacer(Modifier.height(8.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) { AccountMetric("已绑定孩子", state.local.boundChildIds.size.toString(), Blue, Modifier.weight(1f)) { nav.navigate(Destinations.Children) }; AccountMetric("成长报告", if (state.selectedChild == null) "0" else "1", Green, Modifier.weight(1f)) { if (state.selectedChild != null) nav.navigate(Destinations.Report) else nav.navigate(Destinations.ChildrenBinding) }; AccountMetric("未读消息", state.unreadMessageCount.toString(), Color(0xFFFF638E), Modifier.weight(1f)) { nav.navigate(Destinations.Messages) } }
         Text("家庭服务", color = Navy, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp, bottom = 2.dp)); AccountRow("孩子管理", Icons.Filled.People, Blue) { nav.navigate(Destinations.Children) }
         Text("账户与设置", color = Navy, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)); listOf("我的健康档案" to Icons.Filled.Favorite, "我的课程" to Icons.Filled.PlayCircle, "客服咨询" to Icons.AutoMirrored.Filled.Message, "设置" to Icons.Filled.Settings, "消息" to Icons.Filled.Notifications).forEach { (title, icon) -> AccountRow(title, icon, Blue) {
             when (title) {
@@ -615,7 +615,7 @@ private fun SimpleDialog(
 
 @Composable fun AssessmentFlowScreen(state: AppUiState, nav: NavHostController, category: String, completeAssessment: (String) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit) {
     val childKey = state.selectedChild?.id ?: "anonymous"
-    if (state.selectedChild == null) { AppScaffold("绑定孩子", onBack = { nav.popBackStack() }) { EmptyState("请先绑定孩子，再开始健康测评。"); Button(onClick = { nav.navigate(Destinations.Children) }) { Text("去绑定孩子") } }; return }
+    if (state.selectedChild == null) { AppScaffold("绑定孩子", onBack = { nav.popBackStack() }) { EmptyState("请先绑定孩子，再开始健康测评。"); Button(onClick = { nav.navigate(Destinations.ChildrenBinding) }) { Text("去绑定孩子") } }; return }
     val selectedChild = state.selectedChild
     val title = when (category) { "vision" -> "视力"; "oral" -> "口腔"; "mental" -> "心理"; else -> "体质" }
     val icon = when (category) { "vision" -> Icons.Filled.RemoveRedEye; "oral" -> Icons.Filled.MedicalServices; "mental" -> Icons.Filled.Favorite; else -> Icons.AutoMirrored.Filled.DirectionsRun }

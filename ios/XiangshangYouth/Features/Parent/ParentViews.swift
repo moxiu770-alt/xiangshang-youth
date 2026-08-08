@@ -76,7 +76,7 @@ struct ParentBindingPrompt: View {
                 Image(systemName: "person.2.badge.plus").font(.system(size: 42)).foregroundStyle(ReferenceColor.blue)
                 Text("请先绑定孩子").font(.title3.bold()).foregroundStyle(ReferenceColor.navy)
                 Text("绑定后才能查看孩子的测评、报告和课程。\n绑定码由学校或班主任提供。").font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                Button("去绑定孩子") { router.push(.children) }.buttonStyle(.borderedProminent)
+                Button("去绑定孩子") { router.push(.children(returnAfterBinding: true)) }.buttonStyle(.borderedProminent)
             }.padding(24)
         }
     }
@@ -88,11 +88,11 @@ struct ParentLandingView: View {
     @State private var expertDetail: String?
     @State private var healthChannelDetail: String?
     var body: some View { ScrollView { VStack(spacing: 9) {
-        ReferenceHeader(name: state.selectedChild?.name ?? "王小明", school: "\(state.selectedChild?.className ?? "三年级2班") · 点击切换孩子", initial: String((state.selectedChild?.name ?? "王").prefix(1)), avatarAsset: "ChildAvatar", identityAction: { router.push(.children) })
+        ReferenceHeader(name: state.selectedChild?.name ?? "王小明", school: "\(state.selectedChild?.className ?? "三年级2班") · 点击切换孩子", initial: String((state.selectedChild?.name ?? "王").prefix(1)), avatarAsset: "ChildAvatar", identityAction: { router.push(.children(returnAfterBinding: false)) })
         Button { activityDetail = "向上少年健康成长季" } label: { ParentCampaignCard() }.buttonStyle(.plain).padding(.horizontal, 9)
         ReferenceCard { VStack(spacing: 8) { HStack { VStack(alignment: .leading) { Text("综合测评").font(.system(size: 17, weight: .bold)).foregroundStyle(ReferenceColor.blue); Text("运动表现、心理健康、口腔健康状况").font(.system(size: 9)).foregroundStyle(.secondary) }; Spacer(); Image(systemName: "sun.max.fill").foregroundStyle(ReferenceColor.yellow) }; LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 7) { assessmentMetric(.fitness); assessmentMetric(.mental); assessmentMetric(.vision); assessmentMetric(.oral) }; Button("继续测评") { router.push(.assessment(.fitness)) }.font(.system(size: 12, weight: .bold)).frame(maxWidth: 150).padding(.vertical, 6).background(ReferenceColor.blue, in: Capsule()).foregroundStyle(.white) }.padding(2) }.padding(.horizontal, 9)
         HStack {
-            Button { if let child = state.selectedChild { router.push(.report(child)) } else { router.push(.children) } } label: { ReferenceAction(icon: "calendar", title: "测评报告", color: ReferenceColor.blue) }.buttonStyle(.plain)
+            Button { if let child = state.selectedChild { router.push(.report(child)) } else { router.push(.children(returnAfterBinding: true)) } } label: { ReferenceAction(icon: "calendar", title: "测评报告", color: ReferenceColor.blue) }.buttonStyle(.plain)
             Button { router.push(.parentMessages) } label: { ReferenceAction(icon: "exclamationmark.circle.fill", title: "健康提醒", color: .red) }.buttonStyle(.plain)
             Button { state.checkInToday(); router.push(.healthProfile) } label: { ReferenceAction(icon: "checkmark.seal.fill", title: "打卡记录", color: ReferenceColor.green) }.buttonStyle(.plain)
             Button { router.push(.parentCourses) } label: { ReferenceAction(icon: "play.rectangle.fill", title: "推荐课程", color: .orange) }.buttonStyle(.plain)
@@ -137,7 +137,7 @@ struct ParentLandingView: View {
         .sheet(item: Binding(get: { healthChannelDetail.map(CourseSheetItem.init) }, set: { healthChannelDetail = $0?.name })) { item in HealthArticleSheet(title: item.name) }
     }
     private func metric(_ icon: String, _ title: String, _ subtitle: String, _ color: Color) -> some View {
-        Button { if let child = state.selectedChild { router.push(.report(child)) } else { router.push(.children) } } label: {
+        Button { if let child = state.selectedChild { router.push(.report(child)) } else { router.push(.children(returnAfterBinding: true)) } } label: {
             ReferenceMetric(icon: icon, title: title, value: subtitle, color: color)
         }.buttonStyle(.plain).accessibilityLabel("查看\(title)报告")
     }
@@ -172,6 +172,7 @@ struct ParentCampaignCard: View {
 }
 
 struct ChildrenView: View {
+    let returnAfterBinding: Bool
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var router: AppRouter
     @State private var bindingPresented = false
@@ -239,7 +240,7 @@ struct ChildrenView: View {
                         // selected child immediately unlocks the report/task
                         // entry point instead of leaving the family in a dead-end
                         // management screen.
-                        router.pop()
+                        if returnAfterBinding { router.pop() }
                     }.frame(maxWidth: .infinity) }
                 }
                 .navigationTitle("绑定孩子")
@@ -345,7 +346,7 @@ struct ParentEvaluationDashboard: View {
             }
         } }
     private func metric(_ icon: String, _ title: String, _ subtitle: String, _ color: Color) -> some View {
-        Button { if let child = state.selectedChild { router.push(.report(child)) } else { router.push(.children) } } label: {
+        Button { if let child = state.selectedChild { router.push(.report(child)) } else { router.push(.children(returnAfterBinding: true)) } } label: {
             ReferenceMetric(icon: icon, title: title, value: subtitle, color: color)
         }.buttonStyle(.plain).accessibilityLabel("查看\(title)报告")
     }
@@ -391,7 +392,7 @@ struct HealthDashboard: View {
     }
     private var reportSummary: String { "\(report?.assessmentDate ?? "待测评") · \(((report?.student.totalScore ?? 0) >= 25) ? "良好" : "需关注")" }
     private func healthMetric(_ icon: String, _ title: String, _ subtitle: String, _ color: Color) -> some View {
-        Button { if let child = state.selectedChild { router.push(.report(child)) } else { router.push(.children) } } label: {
+        Button { if let child = state.selectedChild { router.push(.report(child)) } else { router.push(.children(returnAfterBinding: true)) } } label: {
             ReferenceMetric(icon: icon, title: title, value: subtitle, color: color)
         }.buttonStyle(.plain).accessibilityLabel("查看\(title)报告")
     }

@@ -376,7 +376,21 @@ private fun ParentActivities(nav: NavHostController) = Column(verticalArrangemen
         Text("我的课程", color = Navy, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 10.dp)); Text("${selectedChild.name} · ${selectedChild.className}", color = Color.Gray, fontSize = 10.sp); Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth().background(Sky, RoundedCornerShape(9.dp))) { listOf("公益课程", "学校课程").forEachIndexed { index, text -> Text(text, color = if (paid == (index == 1)) Color.White else Blue, fontWeight = FontWeight.Bold, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.weight(1f).padding(8.dp).semantics { role = Role.Tab; contentDescription = "切换到$text" }.background(if (paid == (index == 1)) Blue else Color.Transparent, RoundedCornerShape(8.dp)).clickable { paid = index == 1 }) } }
         Spacer(Modifier.height(10.dp)); ParentSection(if (paid) "精选学校课程" else "公益课堂", "全部课程") { catalogOpen = true }
-        val items = listOf("体质成长课" to Icons.AutoMirrored.Filled.DirectionsRun, "视力守护课" to Icons.Filled.RemoveRedEye, "口腔健康课" to Icons.Filled.MedicalServices, "心理舒展课" to Icons.Filled.Favorite)
+        val items = if (paid) {
+            listOf(
+                "校内体能提升课" to Icons.AutoMirrored.Filled.DirectionsRun,
+                "校园视力守护课" to Icons.Filled.RemoveRedEye,
+                "课后运动巩固课" to Icons.Filled.FitnessCenter,
+                "亲子运动指导课" to Icons.Filled.Groups
+            )
+        } else {
+            listOf(
+                "体质成长课" to Icons.AutoMirrored.Filled.DirectionsRun,
+                "视力守护课" to Icons.Filled.RemoveRedEye,
+                "口腔健康课" to Icons.Filled.MedicalServices,
+                "心理舒展课" to Icons.Filled.Favorite
+            )
+        }
         items.chunked(2).forEach { row -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { row.forEach { (title, icon) -> Surface(Modifier.weight(1f).height(105.dp).semantics { role = Role.Button; contentDescription = "打开课程：$title" }.clickable { selectedCourse = title }, color = Sky, shape = RoundedCornerShape(10.dp)) { Column(Modifier.padding(12.dp)) { Icon(icon, null, tint = Blue); Spacer(Modifier.height(8.dp)); Text(title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); val progress = state.local.courseProgress[title] ?: 0f; Text(if (progress > 0f) "学习进度 ${(progress * 100).toInt()}%" else if (paid) "校内课程 · 查看课程" else "公益 · 立即学习", color = Green, fontSize = 9.sp) } } }; if (row.size == 1) Spacer(Modifier.weight(1f)) }; Spacer(Modifier.height(8.dp)) }
         Surface(Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "打开课程咨询" }.clickable { clearWorkflow("support"); detail = "客服咨询" }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.AutoMirrored.Filled.Message, null, tint = Blue); Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Text("课程咨询", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text("客服老师会在工作时间回复您", color = Color.Gray, fontSize = 9.sp) }; Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray) } }
     }
@@ -439,7 +453,7 @@ private fun CourseLessonDialog(
 
 @Composable
 private fun CourseCatalogDialog(paid: Boolean, onOpenCourse: (String) -> Unit, dismiss: () -> Unit) {
-    val courses = if (paid) listOf("校内体能提升课", "校园视力守护课", "课后运动巩固课") else listOf("体质成长课", "视力守护课", "口腔健康课", "心理舒展课")
+    val courses = if (paid) listOf("校内体能提升课", "校园视力守护课", "课后运动巩固课", "亲子运动指导课") else listOf("体质成长课", "视力守护课", "口腔健康课", "心理舒展课")
     AlertDialog(
         onDismissRequest = dismiss,
         title = { Text(if (paid) "学校课程目录" else "公益课程目录") },

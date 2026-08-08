@@ -61,7 +61,8 @@ struct ParentCoursesDashboard: View {
     @State private var selectedKind = 0
     @State private var selectedCourse: String?
     @State private var catalogShown = false
-    private let categories = [("figure.run", "体质", ReferenceColor.blue), ("eye.fill", "视力", ReferenceColor.green), ("mouth.fill", "口腔", ReferenceColor.purple), ("brain.head.profile", "心理", ReferenceColor.pink)]
+    private let publicCourses = [("figure.run", "体质成长课", ReferenceColor.blue), ("eye.fill", "视力守护课", ReferenceColor.green), ("mouth.fill", "口腔健康课", ReferenceColor.purple), ("brain.head.profile", "心理舒展课", ReferenceColor.pink)]
+    private let schoolCourses = [("figure.run", "校内体能提升课", ReferenceColor.blue), ("eye.fill", "校园视力守护课", ReferenceColor.green), ("figure.strengthtraining.traditional", "课后运动巩固课", ReferenceColor.purple), ("person.3.fill", "亲子运动指导课", ReferenceColor.pink)]
 
     var body: some View {
         ScrollView {
@@ -72,11 +73,11 @@ struct ParentCoursesDashboard: View {
                     .pickerStyle(.segmented).padding(.horizontal, 12)
                 ReferenceSectionTitle(title: selectedKind == 0 ? "公益课堂" : "精选学校课程", trailing: "全部课程", action: { catalogShown = true }).padding(.horizontal, 12)
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                    ForEach(categories, id: \.1) { icon, title, color in
-                        Button { selectedCourse = "\(title)健康成长课程" } label: {
+                    ForEach(selectedKind == 0 ? publicCourses : schoolCourses, id: \.1) { icon, title, color in
+                        Button { selectedCourse = title } label: {
                             VStack(alignment: .leading, spacing: 7) {
                                 Image(systemName: icon).font(.system(size: 23, weight: .semibold)).foregroundStyle(color)
-                                Text(title).font(.system(size: 13, weight: .bold)).foregroundStyle(ReferenceColor.navy)
+                                Text(title).font(.system(size: 13, weight: .bold)).foregroundStyle(ReferenceColor.navy).lineLimit(1)
                                 Text(selectedKind == 0 ? "公益 · 立即学习" : "校内课程 · 查看课程").font(.system(size: 9)).foregroundStyle(color)
                             }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
                                 .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: 11))
@@ -98,16 +99,21 @@ struct ParentCoursesDashboard: View {
             CourseDetailSheet(title: item.name)
         }
         .sheet(isPresented: $catalogShown) {
-            CourseCatalogSheet(kind: selectedKind == 0 ? "公益课堂" : "精选学校课程")
+            CourseCatalogSheet(kind: selectedKind == 0 ? "公益课堂" : "精选学校课程", isSchoolCourse: selectedKind == 1)
         }
     }
 }
 
 private struct CourseCatalogSheet: View {
     let kind: String
+    let isSchoolCourse: Bool
     @Environment(\.dismiss) private var dismiss
     @State private var selectedCourse: String?
-    private let courses = ["体质成长课", "视力守护课", "口腔健康课", "心理舒展课"]
+    private var courses: [String] {
+        isSchoolCourse
+            ? ["校内体能提升课", "校园视力守护课", "课后运动巩固课", "亲子运动指导课"]
+            : ["体质成长课", "视力守护课", "口腔健康课", "心理舒展课"]
+    }
 
     var body: some View {
         NavigationStack {

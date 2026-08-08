@@ -53,7 +53,8 @@ class LocalFeatureStateTest {
         val autumnTask = data.tasks.first { it.id == "t1" }
         val retestTask = data.tasks.first { it.id == "t2" }
 
-        assertTrue(autumnTask.scopedStudents(data.students).all { it.grade == "三年级" })
+        assertEquals(data.students.size, autumnTask.scopedStudents(data.students).size)
+        assertEquals(setOf("三年级", "四年级", "五年级"), autumnTask.scopedStudents(data.students).map { it.grade }.toSet())
         assertTrue(retestTask.scopedStudents(data.students).all { it.className == "四年级1班" })
         assertTrue(retestTask.scopedStudents(data.students).none { it.grade == "三年级" })
     }

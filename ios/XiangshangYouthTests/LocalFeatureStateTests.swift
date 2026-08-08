@@ -55,7 +55,8 @@ final class LocalFeatureStateTests: XCTestCase {
         let autumnTask = try XCTUnwrap(data.tasks.first(where: { $0.id == "t1" }))
         let retestTask = try XCTUnwrap(data.tasks.first(where: { $0.id == "t2" }))
 
-        XCTAssertTrue(autumnTask.scopedStudents(from: data.students).allSatisfy { $0.grade == "三年级" })
+        XCTAssertEqual(autumnTask.scopedStudents(from: data.students).count, data.students.count)
+        XCTAssertEqual(Set(autumnTask.scopedStudents(from: data.students).map(\.grade)), Set(["三年级", "四年级", "五年级"]))
         XCTAssertTrue(retestTask.scopedStudents(from: data.students).allSatisfy { $0.className == "四年级1班" })
         XCTAssertFalse(retestTask.scopedStudents(from: data.students).contains(where: { $0.grade == "三年级" }))
     }

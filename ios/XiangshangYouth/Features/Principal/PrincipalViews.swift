@@ -74,6 +74,7 @@ struct PrincipalDashboard: View {
     }
     private var selectedTaskLabel: String {
         guard let task = activeTask else { return "本轮测评" }
+        if task.gradeName == "全校" { return "本轮测评" }
         return "\(task.gradeName) · \(task.title.contains("补测") ? "专项补测" : "秋季测评")"
     }
     /// The task aggregate comes from the assessment service, while the

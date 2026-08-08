@@ -20,7 +20,7 @@ final class MockRepository: YouthRepository {
         }
     }()
     lazy var tasks: [TestTask] = [
-        TestTask(id: "t1", title: "2026年秋季综合运动能力测评", date: "2026-09-12 09:00", location: "南湖校区体育馆", gradeName: "三年级", className: "三年级1班、2班", items: TestItem.allCases, completedCount: 15, totalCount: 20, status: .testing, ruleVersion: "小学三年级运动能力标准 v1.0"),
+        TestTask(id: "t1", title: "2026年秋季综合运动能力测评", date: "2026-09-12 09:00", location: "南湖校区体育馆", gradeName: "全校", className: "三至五年级 · 6个班级", items: TestItem.allCases, completedCount: 15, totalCount: 20, status: .testing, ruleVersion: "小学综合运动能力标准 v1.0"),
         TestTask(id: "t2", title: "四年级专项补测", date: "2026-09-15 14:00", location: "风雨操场", gradeName: "四年级", className: "四年级1班", items: TestItem.allCases, completedCount: 8, totalCount: 10, status: .retest, ruleVersion: "小学四年级运动能力标准 v1.0"),
         TestTask(id: "t3", title: "五年级秋季综合运动能力测评", date: "2026-09-18 09:00", location: "南湖校区体育馆", gradeName: "五年级", className: "五年级1班、2班", items: TestItem.allCases, completedCount: 0, totalCount: 20, status: .notCheckedIn, ruleVersion: "小学五年级运动能力标准 v1.0")
     ]

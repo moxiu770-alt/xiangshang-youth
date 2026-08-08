@@ -17,6 +17,7 @@ data class TestTask(
      * representative student rows used for risk and care detail cards.
      */
     fun scopedStudents(students: List<Student>): List<Student> {
+        if (gradeName == "全校") return students
         val classNames = className.split("、").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
         val matchingClasses = students.filter { student ->
             student.grade == gradeName && (classNames.isEmpty() || student.className in classNames)

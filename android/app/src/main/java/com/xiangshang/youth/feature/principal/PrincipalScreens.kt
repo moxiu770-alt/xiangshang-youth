@@ -27,7 +27,7 @@ import com.xiangshang.youth.shared.component.*
 import java.util.Locale
 
 private fun com.xiangshang.youth.core.model.TestTask.selectorLabel(): String =
-    "$gradeName · ${if (title.contains("补测")) "专项补测" else "秋季测评"}"
+    if (gradeName == "全校") "本轮测评" else "$gradeName · ${if (title.contains("补测")) "专项补测" else "秋季测评"}"
 
 @Composable fun PrincipalHomeScreen(state: AppUiState, nav: NavHostController, onChooseAnotherRole: () -> Unit, onSelectTask: (String) -> Unit, refreshDashboard: () -> Unit = {}) = AppScaffold("学校运动健康总览", onNotifications = { nav.navigateSingleTop(Destinations.Notifications) }, notificationCount = state.unreadMessageCount, onRefresh = refreshDashboard, isRefreshing = state.loading, onSwitchRole = onChooseAnotherRole, bottomBar = { PrincipalBottomBar(nav) }) {
     val dashboardError = state.error

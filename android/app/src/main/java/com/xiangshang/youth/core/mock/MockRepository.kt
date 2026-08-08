@@ -22,7 +22,7 @@ class MockRepository : YouthRepository {
         Student("s" + (i + 1).toString().padStart(2, '0'), name, pairs[i % 6].first, pairs[i % 6].second, school.region, i % 3 == 0, statuses[i % statuses.size], if (i % 5 == 2) 19.5 else 24.0 + i % 11, if (i % 2 == 0) "男" else "女")
     }
     private val tasks = listOf(
-        TestTask("t1","2026年秋季综合运动能力测评","2026-09-12 09:00","南湖校区体育馆","三年级","三年级1班、2班",15,20,TaskStatus.Testing,"小学三年级运动能力标准 v1.0"),
+        TestTask("t1","2026年秋季综合运动能力测评","2026-09-12 09:00","南湖校区体育馆","全校","三至五年级 · 6个班级",15,20,TaskStatus.Testing,"小学综合运动能力标准 v1.0"),
         TestTask("t2","四年级专项补测","2026-09-15 14:00","风雨操场","四年级","四年级1班",8,10,TaskStatus.Retest,"小学四年级运动能力标准 v1.0"),
         TestTask("t3","五年级秋季综合运动能力测评","2026-09-18 09:00","南湖校区体育馆","五年级","五年级1班、2班",0,20,TaskStatus.NotCheckedIn,"小学五年级运动能力标准 v1.0")
     )

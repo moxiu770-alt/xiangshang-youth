@@ -30,6 +30,7 @@ struct TestTask: Identifiable, Codable, Hashable {
     /// by the user.  The backend aggregate remains authoritative for counts;
     /// this only scopes representative student-level details such as risks.
     func scopedStudents(from students: [Student]) -> [Student] {
+        if gradeName == "全校" { return students }
         let classNames = Set(className.split(separator: "、").map(String.init))
         let matchingClasses = students.filter { student in
             student.grade == gradeName && (classNames.isEmpty || classNames.contains(student.className))

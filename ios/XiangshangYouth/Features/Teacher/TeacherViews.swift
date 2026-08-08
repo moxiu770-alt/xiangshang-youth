@@ -357,11 +357,15 @@ struct TeacherDashboard: View {
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var router: AppRouter
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Binding var isSportsTeacher: Bool
     private var classStudents: [Student] { state.data?.students.filter { $0.className == "三年级2班" } ?? [] }
     private var measuredCount: Int { classStudents.filter { state.taskStatus(for: $0) == .completed }.count }
     private var riskCount: Int { classStudents.filter { ($0.totalScore ?? 35) < 25 || state.taskStatus(for: $0) == .review || state.taskStatus(for: $0) == .retest }.count }
     private var reduceMotion: Bool { state.localFeatures.settings.reduceMotion || systemReduceMotion }
+    private var actionGridColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 5), count: dynamicTypeSize.isAccessibilitySize ? 2 : 4)
+    }
 
     var body: some View {
         ScrollView {
@@ -476,7 +480,7 @@ struct TeacherDashboard: View {
                 }
             }
             .padding(.horizontal, 12)
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 5) {
+            LazyVGrid(columns: actionGridColumns, spacing: 5) {
                 action("rectangle.stack.fill", "班级看板", ReferenceColor.blue, .teacherClassBoard)
                 action("exclamationmark.triangle.fill", "预警中心", .red, .reviewList)
                 action("person.3.fill", "学生列表", ReferenceColor.green, .studentList(nil))

@@ -39,6 +39,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -204,14 +205,19 @@ private fun TeacherActionGrid(nav: NavHostController) {
         Triple("查看延时课", Icons.AutoMirrored.Filled.DirectionsRun, Color(0xFF10C9B7)), Triple("优秀学生评选", Icons.Filled.WorkspacePremium, Color(0xFF8755F4)),
         Triple("学生名单", Icons.Filled.Badge, Color(0xFFFF9E24))
     )
+    // Compose scales sp automatically.  At large system font sizes, a four-up
+    // grid squeezes labels into unreadable ellipses, so use the same two-up
+    // accessibility layout as iOS while keeping the reference four-up layout
+    // at the default font scale.
+    val columns = if (LocalDensity.current.fontScale > 1.25f) 2 else 4
     Column(Modifier.padding(horizontal = 12.dp).fillMaxWidth().background(Color.White, RoundedCornerShape(10.dp)).padding(9.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        actions.chunked(4).forEach { row -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+        actions.chunked(columns).forEach { row -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             row.forEach { (title, icon, color) ->
-                Surface(Modifier.weight(1f).height(67.dp).semantics { role = Role.Button; contentDescription = title }.clickable { nav.navigate(when (title) { "班级看板" -> Destinations.TeacherBoard; "预警中心" -> Destinations.Review; "优秀学生评选" -> Destinations.OutstandingStudents; "待分班学生" -> Destinations.UnassignedStudents; "学生列表", "学生名单" -> Destinations.Students; else -> Destinations.Tasks }) }, color = color.copy(alpha = .055f), shape = RoundedCornerShape(9.dp)) {
-                    Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) { Surface(color = color, shape = RoundedCornerShape(12.dp), modifier = Modifier.size(31.dp)) { Icon(icon, null, tint = Color.White, modifier = Modifier.padding(7.dp)) }; Spacer(Modifier.height(4.dp)); Text(title, color = Navy, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, maxLines = 1) }
+                Surface(Modifier.weight(1f).heightIn(min = 67.dp).semantics { role = Role.Button; contentDescription = title }.clickable { nav.navigate(when (title) { "班级看板" -> Destinations.TeacherBoard; "预警中心" -> Destinations.Review; "优秀学生评选" -> Destinations.OutstandingStudents; "待分班学生" -> Destinations.UnassignedStudents; "学生列表", "学生名单" -> Destinations.Students; else -> Destinations.Tasks }) }, color = color.copy(alpha = .055f), shape = RoundedCornerShape(9.dp)) {
+                    Column(Modifier.fillMaxSize().padding(vertical = 7.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) { Surface(color = color, shape = RoundedCornerShape(12.dp), modifier = Modifier.size(31.dp)) { Icon(icon, null, tint = Color.White, modifier = Modifier.padding(7.dp)) }; Spacer(Modifier.height(4.dp)); Text(title, color = Navy, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, maxLines = if (columns == 2) 2 else 1, textAlign = TextAlign.Center) }
                 }
             }
-            repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+            repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
         } }
     }
 }

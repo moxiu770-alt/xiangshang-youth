@@ -15,6 +15,8 @@ struct ReferenceHeader: View {
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var state: AppState
     let name: String; let school: String; let initial: String; var showsBell = true; var avatarAsset: String? = nil; var roleAction: (() -> Void)? = nil; var identityAction: (() -> Void)? = nil
+    @ScaledMetric(relativeTo: .headline) private var nameSize: CGFloat = 14
+    @ScaledMetric(relativeTo: .caption) private var schoolSize: CGFloat = 9
     var body: some View { HStack(spacing: 9) {
         if let identityAction {
             Button(action: identityAction) { identityContent }.buttonStyle(.plain).accessibilityLabel("切换孩子")
@@ -31,10 +33,10 @@ struct ReferenceHeader: View {
                 if let avatarAsset {
                     Image(avatarAsset).resizable().scaledToFill().frame(width: 40, height: 40).background(ReferenceColor.sky, in: Circle()).clipShape(Circle())
                 } else {
-                    Text(initial).font(.system(size: 15, weight: .bold)).foregroundStyle(.white).frame(width: 34, height: 34).background(LinearGradient(colors: [ReferenceColor.sky, ReferenceColor.blue], startPoint: .top, endPoint: .bottom), in: Circle())
+                    Text(initial).font(.system(size: nameSize, weight: .bold)).foregroundStyle(.white).frame(width: 34, height: 34).background(LinearGradient(colors: [ReferenceColor.sky, ReferenceColor.blue], startPoint: .top, endPoint: .bottom), in: Circle())
                 }
             }
-            VStack(alignment: .leading, spacing: 1) { Text(name).font(.system(size: 14, weight: .bold)).foregroundStyle(ReferenceColor.navy); Text(school).font(.system(size: 9)).foregroundStyle(.secondary) }
+            VStack(alignment: .leading, spacing: 1) { Text(name).font(.system(size: nameSize, weight: .bold)).foregroundStyle(ReferenceColor.navy); Text(school).font(.system(size: schoolSize)).foregroundStyle(.secondary).lineLimit(2) }
         }
     }
 }
@@ -46,10 +48,12 @@ struct ReferenceSectionTitle: View {
     /// Use when the enclosing card owns the tap target.  It keeps the visual
     /// affordance honest without introducing an inaccessible nested button.
     var showsLink: Bool = false
+    @ScaledMetric(relativeTo: .headline) private var titleSize: CGFloat = 14
+    @ScaledMetric(relativeTo: .caption) private var trailingSize: CGFloat = 10
     var body: some View {
         HStack {
             Text(title)
-                .font(.system(size: 14, weight: .bold))
+                .font(.system(size: titleSize, weight: .bold))
                 .foregroundStyle(ReferenceColor.navy)
                 .accessibilityAddTraits(.isHeader)
             Spacer()
@@ -66,7 +70,7 @@ struct ReferenceSectionTitle: View {
     }
     private func trailingLabel(showChevron: Bool) -> some View {
         HStack(spacing: 3) {
-            Text(trailing).font(.system(size: 10, weight: .medium)).foregroundStyle(showChevron ? ReferenceColor.blue : .secondary)
+            Text(trailing).font(.system(size: trailingSize, weight: .medium)).foregroundStyle(showChevron ? ReferenceColor.blue : .secondary).lineLimit(2)
             if showChevron { Image(systemName: "chevron.right").font(.system(size: 8, weight: .bold)).foregroundStyle(ReferenceColor.blue) }
         }
     }
@@ -77,6 +81,8 @@ struct ReferenceMetric: View {
     @EnvironmentObject private var state: AppState
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var breathes = false
+    @ScaledMetric(relativeTo: .caption) private var titleSize: CGFloat = 10
+    @ScaledMetric(relativeTo: .caption2) private var valueSize: CGFloat = 9
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             Image(systemName: icon)
@@ -84,8 +90,8 @@ struct ReferenceMetric: View {
                 .foregroundStyle(color)
                 .scaleEffect(breathes ? 1.1 : 0.94)
                 .symbolEffect(.pulse, options: .repeating, value: breathes)
-            Text(title).font(.system(size: 10, weight: .bold)).foregroundStyle(ReferenceColor.navy)
-            Text(value).font(.system(size: 9)).foregroundStyle(.secondary)
+            Text(title).font(.system(size: titleSize, weight: .bold)).foregroundStyle(ReferenceColor.navy).lineLimit(2)
+            Text(value).font(.system(size: valueSize)).foregroundStyle(.secondary).lineLimit(2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(9)
@@ -97,7 +103,26 @@ struct ReferenceMetric: View {
     }
 }
 
-struct ReferenceAction: View { let icon: String; let title: String; let color: Color; var body: some View { VStack(spacing: 7) { Image(systemName: icon).font(.system(size: 21, weight: .bold)).foregroundStyle(.white).frame(width: 39, height: 39).background(LinearGradient(colors: [color.opacity(0.75), color], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 12)); Text(title).font(.system(size: 10, weight: .bold)).foregroundStyle(ReferenceColor.navy).lineLimit(1) }.frame(maxWidth: .infinity).padding(.vertical, 8).accessibilityElement(children: .ignore).accessibilityLabel(title) }
+struct ReferenceAction: View {
+    let icon: String; let title: String; let color: Color
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .caption) private var titleSize: CGFloat = 10
+
+    var body: some View {
+        VStack(spacing: 7) {
+            Image(systemName: icon).font(.system(size: 21, weight: .bold)).foregroundStyle(.white).frame(width: 39, height: 39).background(LinearGradient(colors: [color.opacity(0.75), color], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 12))
+            Text(title)
+                .font(.system(size: titleSize, weight: .bold))
+                .foregroundStyle(ReferenceColor.navy)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                .minimumScaleFactor(0.8)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+    }
 }
 
 struct ReferenceCard<Content: View>: View { @ViewBuilder let content: Content; var body: some View { content.padding(11).background(.white, in: RoundedRectangle(cornerRadius: 11)).overlay(RoundedRectangle(cornerRadius: 11).stroke(ReferenceColor.blue.opacity(0.08), lineWidth: 1)).shadow(color: .black.opacity(0.025), radius: 4, y: 2) } }

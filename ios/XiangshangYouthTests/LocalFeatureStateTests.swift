@@ -3,6 +3,12 @@ import XCTest
 
 @MainActor
 final class LocalFeatureStateTests: XCTestCase {
+    func testRepositoryProviderUsesBundledMockDataByDefault() {
+        // A release or CI invocation without an explicit integration scheme
+        // must never accidentally route student data to the placeholder API.
+        XCTAssertTrue(RepositoryProvider.make() is MockRepository)
+    }
+
     func testApiClientBuildsAuthenticatedReadyJSONRequest() throws {
         let client = ApiClient(baseURL: URL(string: "https://example.test/api/")!)
         let body = Data("{\"status\":\"待复核\"}".utf8)

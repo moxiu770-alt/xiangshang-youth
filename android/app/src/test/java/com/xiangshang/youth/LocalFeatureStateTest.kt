@@ -13,15 +13,25 @@ import com.xiangshang.youth.core.model.UserProfile
 import com.xiangshang.youth.core.model.UserRole
 import com.xiangshang.youth.core.mock.MockRepository
 import com.xiangshang.youth.core.repository.RemoteRepository
+import com.xiangshang.youth.core.repository.RepositoryProvider
 import com.xiangshang.youth.app.AppUiState
 import com.xiangshang.youth.core.util.ChildBindingValidator
 import com.xiangshang.youth.core.util.AuthIdentity
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalFeatureStateTest {
+    @Test
+    fun repositoryProviderUsesBundledMockDataByDefault() {
+        // CI and a school-demo build must remain local unless the Gradle
+        // integration flag explicitly opts into the remote source.
+        assertFalse(BuildConfig.USE_REMOTE_DATA_SOURCE)
+        assertTrue(RepositoryProvider.create() is MockRepository)
+    }
+
     @Test
     fun wechatAuthorizationIdentifierNeverBecomesAProfilePhone() {
         assertEquals("13800138000", AuthIdentity.displayPhone(AuthIdentity.wechatAuthorizationIdentifier))

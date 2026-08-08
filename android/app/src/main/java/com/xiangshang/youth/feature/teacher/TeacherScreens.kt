@@ -597,7 +597,7 @@ fun TeacherTaskDetailScreen(state: AppUiState, nav: NavHostController, updateSta
             student.grade == task.gradeName && task.className.split("、").contains(student.className)
         }.forEach { student ->
             val taskStatus = state.local.studentTaskStatuses[student.id] ?: student.taskStatus
-            TeacherStudentStatusRow(student, taskStatus) { selectedStudent = student }
+            TeacherStudentStatusRow(student, taskStatus, state.local.taskStatusSyncStates[student.id]) { selectedStudent = student }
             Spacer(Modifier.height(5.dp))
         }
     }
@@ -626,7 +626,7 @@ fun ReviewListScreen(state: AppUiState, nav: NavHostController, submitDecision: 
     }
     Text("待处理 ${students.size} 人", color = Color.Red, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp, bottom = 6.dp))
     students.forEach { student ->
-        TeacherStudentStatusRow(student, state.local.studentTaskStatuses[student.id] ?: student.taskStatus) { selectedStudent = student }
+        TeacherStudentStatusRow(student, state.local.studentTaskStatuses[student.id] ?: student.taskStatus, state.local.taskStatusSyncStates[student.id]) { selectedStudent = student }
         state.local.reviewNotes[student.id]?.let { note ->
             Text("复核意见：$note", color = Color.Gray, fontSize = 9.sp, modifier = Modifier.padding(start = 12.dp, top = 3.dp))
         }
@@ -650,14 +650,25 @@ fun ReviewListScreen(state: AppUiState, nav: NavHostController, submitDecision: 
 }
 
 @Composable
-private fun TeacherStudentStatusRow(student: com.xiangshang.youth.core.model.Student, status: com.xiangshang.youth.core.model.TaskStatus, onClick: () -> Unit) = Surface(Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "更新${student.name}的测评状态，当前${status.label}" }.clickable(onClick = onClick), color = Color.White, shape = RoundedCornerShape(10.dp)) {
+private fun TeacherStudentStatusRow(student: com.xiangshang.youth.core.model.Student, status: com.xiangshang.youth.core.model.TaskStatus, syncState: LocalSubmissionStatus? = null, onClick: () -> Unit) = Surface(Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "更新${student.name}的测评状态，当前${status.label}${syncState?.let { "，${it.taskStatusLabel()}" } ?: ""}" }.clickable(onClick = onClick), color = Color.White, shape = RoundedCornerShape(10.dp)) {
     Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(student.name.take(1), color = Color.White, modifier = Modifier.background(Blue, CircleShape).padding(9.dp))
         Spacer(Modifier.width(9.dp))
         Column(Modifier.weight(1f)) { Text(student.name, color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text("${student.grade} · ${student.className}", color = Color.Gray, fontSize = 9.sp) }
-        Text(status.label, color = statusColor(status), fontWeight = FontWeight.Bold, fontSize = 10.sp, modifier = Modifier.background(statusColor(status).copy(alpha = .12f), RoundedCornerShape(12.dp)).padding(horizontal = 8.dp, vertical = 4.dp))
+        Column(horizontalAlignment = Alignment.End) {
+            Text(status.label, color = statusColor(status), fontWeight = FontWeight.Bold, fontSize = 10.sp, modifier = Modifier.background(statusColor(status).copy(alpha = .12f), RoundedCornerShape(12.dp)).padding(horizontal = 8.dp, vertical = 4.dp))
+            syncState?.let { Text(it.taskStatusLabel(), color = if (it == LocalSubmissionStatus.Failed) Color.Red else Color.Gray, fontSize = 8.sp, modifier = Modifier.padding(top = 2.dp)) }
+        }
         Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray, modifier = Modifier.padding(start = 5.dp).size(16.dp))
     }
+}
+
+private fun LocalSubmissionStatus.taskStatusLabel(): String = when (this) {
+    LocalSubmissionStatus.Draft -> "本地草稿"
+    LocalSubmissionStatus.PendingSync -> "待同步"
+    LocalSubmissionStatus.Submitting -> "同步中"
+    LocalSubmissionStatus.Submitted -> "已同步"
+    LocalSubmissionStatus.Failed -> "同步失败"
 }
 
 @Composable

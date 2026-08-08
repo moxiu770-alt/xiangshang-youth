@@ -1061,7 +1061,7 @@ struct TeacherTaskDetailView: View {
                         EmptyStateView(title: "暂无任务学生", detail: "该任务对应的年级或班级名单尚未同步。")
                     }
                     ForEach(taskStudents) { student in
-                        TeacherStudentStatusRow(student: student, status: state.taskStatus(for: student)) { selectedStudent = student }
+                        TeacherStudentStatusRow(student: student, status: state.taskStatus(for: student), syncState: state.localFeatures.taskStatusSyncStates[student.id]) { selectedStudent = student }
                     }
                 }
             }
@@ -1089,7 +1089,7 @@ struct ReviewListView: View {
                     Text("待处理 \(students.count) 人 · 点击可更新处理状态")
                         .font(.system(size: 10, weight: .semibold)).foregroundStyle(.red).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 14)
                     ForEach(students) { student in
-                        TeacherStudentStatusRow(student: student, status: state.taskStatus(for: student)) { selectedStudent = student }
+                        TeacherStudentStatusRow(student: student, status: state.taskStatus(for: student), syncState: state.localFeatures.taskStatusSyncStates[student.id]) { selectedStudent = student }
                             .padding(.horizontal, 12)
                         if let note = state.localFeatures.reviewNotes[student.id] {
                             Text("复核意见：\(note)")
@@ -1109,6 +1109,7 @@ struct ReviewListView: View {
 private struct TeacherStudentStatusRow: View {
     let student: Student
     let status: TaskStatus
+    let syncState: LocalSubmissionStatus?
     let action: () -> Void
     var body: some View {
         Button(action: action) {
@@ -1116,7 +1117,14 @@ private struct TeacherStudentStatusRow: View {
                 Text(String(student.name.prefix(1))).font(.system(size: 13, weight: .bold)).foregroundStyle(.white).frame(width: 32, height: 32).background(ReferenceColor.blue, in: Circle())
                 VStack(alignment: .leading, spacing: 3) { Text(student.name).font(.system(size: 12, weight: .bold)); Text("\(student.grade) · \(student.className)").font(.system(size: 9)).foregroundStyle(.secondary) }
                 Spacer()
-                Text(status.rawValue).font(.system(size: 10, weight: .bold)).foregroundStyle(status.color).padding(.horizontal, 8).padding(.vertical, 4).background(status.color.opacity(0.12), in: Capsule())
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(status.rawValue).font(.system(size: 10, weight: .bold)).foregroundStyle(status.color).padding(.horizontal, 8).padding(.vertical, 4).background(status.color.opacity(0.12), in: Capsule())
+                    if let syncState {
+                        Text(syncState.taskStatusLabel)
+                            .font(.system(size: 8, weight: .medium))
+                            .foregroundStyle(syncState == .failed ? Color.red : .secondary)
+                    }
+                }
                 Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold)).foregroundStyle(.secondary)
             }.padding(11).background(.white, in: RoundedRectangle(cornerRadius: 10))
         }.buttonStyle(.plain)
@@ -1175,5 +1183,17 @@ private struct TaskStatusSheet: View {
 private extension TaskStatus {
     var color: Color {
         switch self { case .completed: ReferenceColor.green; case .review, .absent: .red; case .retest: .orange; case .testing: ReferenceColor.blue; default: .secondary }
+    }
+}
+
+private extension LocalSubmissionStatus {
+    var taskStatusLabel: String {
+        switch self {
+        case .draft: "本地草稿"
+        case .pendingSync: "待同步"
+        case .submitting: "同步中"
+        case .submitted: "已同步"
+        case .failed: "同步失败"
+        }
     }
 }

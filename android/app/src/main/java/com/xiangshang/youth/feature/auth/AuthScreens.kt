@@ -29,6 +29,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -79,6 +81,7 @@ fun LoginScreen(
     var account by rememberSaveable { mutableStateOf("") }
     var code by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
+    var passwordVisible by rememberSaveable { mutableStateOf(false) }
     var agreement by rememberSaveable { mutableStateOf(false) }
     var codeSent by rememberSaveable { mutableStateOf(false) }
     var codeCountdown by rememberSaveable { mutableIntStateOf(0) }
@@ -151,7 +154,7 @@ fun LoginScreen(
                         }
                     } else if (method == 2) {
                         OutlinedTextField(value = account, onValueChange = { account = it; error = null; onClearError() }, label = { Text("账号 / 手机号") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(value = password, onValueChange = { password = it; error = null; onClearError() }, label = { Text("登录密码（至少 6 位）") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), singleLine = true, modifier = Modifier.fillMaxWidth())
+                        PasswordField(value = password, onValueChange = { password = it; error = null; onClearError() }, label = "登录密码（至少 6 位）", visible = passwordVisible, onVisibilityChanged = { passwordVisible = it }, modifier = Modifier.fillMaxWidth())
                     }
                     if (method != 0) Button(onClick = ::submitLogin, enabled = !loading, modifier = Modifier.fillMaxWidth().height(44.dp), shape = CircleShape) {
                         if (loading) CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(18.dp)) else Icon(Icons.AutoMirrored.Filled.ArrowForward, null)
@@ -199,6 +202,7 @@ fun RegisterScreen(
     var phone by rememberSaveable { mutableStateOf("") }
     var code by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
+    var passwordVisible by rememberSaveable { mutableStateOf(false) }
     var agreement by rememberSaveable { mutableStateOf(false) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     var success by rememberSaveable { mutableStateOf(false) }
@@ -232,7 +236,7 @@ fun RegisterScreen(
             OutlinedTextField(value = code, onValueChange = { code = it; error = null }, label = { Text("短信验证码") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.weight(1f))
             TextButton(onClick = { if (phone.filter(Char::isDigit).length != 11) error = "请先填写 11 位手机号。" else { codeSent = true; if (BuildConfig.DEBUG) code = "1234"; codeCountdown = 60 } }, enabled = codeCountdown == 0) { Text(if (codeCountdown > 0) "${codeCountdown}s" else if (codeSent) "重新获取" else "获取验证码", fontSize = 11.sp) }
         }
-        OutlinedTextField(value = password, onValueChange = { password = it; error = null }, label = { Text("设置密码（至少 6 位）") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 9.dp))
+        PasswordField(value = password, onValueChange = { password = it; error = null }, label = "设置密码（至少 6 位）", visible = passwordVisible, onVisibilityChanged = { passwordVisible = it }, modifier = Modifier.fillMaxWidth().padding(top = 9.dp))
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp).semantics { role = Role.Checkbox; contentDescription = if (agreement) "已同意用户协议、隐私政策和儿童隐私政策" else "同意用户协议、隐私政策和儿童隐私政策" }.clickable { agreement = !agreement }) { Checkbox(checked = agreement, onCheckedChange = { agreement = it }); Text("我已阅读并同意用户协议、隐私政策和儿童隐私政策", color = Navy, fontSize = 10.sp) }
         Row(horizontalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.padding(top = 2.dp)) {
             TextButton(onClick = { legalDocument = "用户协议" }, contentPadding = PaddingValues(0.dp)) { Text("查看用户协议", color = Blue, fontSize = 9.sp) }
@@ -263,6 +267,8 @@ fun PasswordResetScreen(onBack: () -> Unit) {
     var code by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var confirmation by rememberSaveable { mutableStateOf("") }
+    var passwordVisible by rememberSaveable { mutableStateOf(false) }
+    var confirmationVisible by rememberSaveable { mutableStateOf(false) }
     var codeSent by rememberSaveable { mutableStateOf(false) }
     var codeCountdown by rememberSaveable { mutableIntStateOf(0) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
@@ -316,22 +322,8 @@ fun PasswordResetScreen(onBack: () -> Unit) {
                 enabled = codeCountdown == 0
             ) { Text(if (codeCountdown > 0) "${codeCountdown}s" else if (codeSent) "重新获取" else "获取验证码", fontSize = 11.sp) }
         }
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it; error = null },
-            label = { Text("新密码（至少 6 位）") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(top = 9.dp)
-        )
-        OutlinedTextField(
-            value = confirmation,
-            onValueChange = { confirmation = it; error = null },
-            label = { Text("再次输入新密码") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(top = 9.dp)
-        )
+        PasswordField(value = password, onValueChange = { password = it; error = null }, label = "新密码（至少 6 位）", visible = passwordVisible, onVisibilityChanged = { passwordVisible = it }, modifier = Modifier.fillMaxWidth().padding(top = 9.dp))
+        PasswordField(value = confirmation, onValueChange = { confirmation = it; error = null }, label = "再次输入新密码", visible = confirmationVisible, onVisibilityChanged = { confirmationVisible = it }, modifier = Modifier.fillMaxWidth().padding(top = 9.dp))
         error?.let { Text(it, color = Color.Red, fontSize = 10.sp, modifier = Modifier.padding(top = 8.dp)) }
         Button(
             onClick = {
@@ -348,6 +340,34 @@ fun PasswordResetScreen(onBack: () -> Unit) {
             shape = CircleShape
         ) { Text("确认重置密码", fontWeight = FontWeight.Bold) }
     }
+}
+
+@Composable
+private fun PasswordField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    visible: Boolean,
+    onVisibilityChanged: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+        visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
+        singleLine = true,
+        trailingIcon = {
+            IconButton(onClick = { onVisibilityChanged(!visible) }) {
+                Icon(
+                    if (visible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                    contentDescription = if (visible) "隐藏密码" else "显示密码"
+                )
+            }
+        },
+        modifier = modifier
+    )
 }
 
 @Composable private fun LoginButton(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, background: Color, foreground: Color, onClick: () -> Unit, outlined: Boolean = false) = Surface(

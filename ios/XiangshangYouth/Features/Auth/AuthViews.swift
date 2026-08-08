@@ -177,8 +177,7 @@ struct LoginView: View {
                     .textContentType(.username)
                     .textFieldStyle(.roundedBorder)
                     .onChange(of: account) { _, _ in clearLoginError() }
-                SecureField("登录密码（至少 6 位）", text: $password)
-                    .textFieldStyle(.roundedBorder)
+                PasswordInput("登录密码（至少 6 位）", text: $password)
                     .onChange(of: password) { _, _ in clearLoginError() }
             }
             if method != .wechat {
@@ -322,6 +321,36 @@ private enum LoginMethod: String, CaseIterable {
     case wechat, phone, account
 }
 
+/// Keeps password verification usable on a phone: users can reveal the value
+/// briefly to correct a typo without sacrificing secure entry by default.
+private struct PasswordInput: View {
+    let title: String
+    @Binding var text: String
+    @State private var revealed = false
+
+    init(_ title: String, text: Binding<String>) {
+        self.title = title
+        _text = text
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Group {
+                if revealed { TextField(title, text: $text) }
+                else { SecureField(title, text: $text) }
+            }
+            .textContentType(.password)
+            .textFieldStyle(.roundedBorder)
+            Button { revealed.toggle() } label: {
+                Image(systemName: revealed ? "eye.slash" : "eye")
+                    .frame(width: 30, height: 30)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(revealed ? "隐藏密码" : "显示密码")
+        }
+    }
+}
+
 struct RegisterView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var state: AppState
@@ -375,7 +404,7 @@ struct RegisterView: View {
                             .font(.caption.weight(.semibold))
                             .disabled(codeCountdown > 0)
                         }
-                        SecureField("设置密码（至少 6 位）", text: $password)
+                        PasswordInput("设置密码（至少 6 位）", text: $password)
                     }
                     Section {
                         Button { confirmed.toggle() } label: {
@@ -487,8 +516,8 @@ struct ResetPasswordView: View {
                         }
                     }
                     Section("设置新密码") {
-                        SecureField("新密码（至少 6 位）", text: $password)
-                        SecureField("再次输入新密码", text: $confirmation)
+                        PasswordInput("新密码（至少 6 位）", text: $password)
+                        PasswordInput("再次输入新密码", text: $confirmation)
                     }
                     if let error {
                         Section { Text(error).font(.caption).foregroundStyle(.red) }

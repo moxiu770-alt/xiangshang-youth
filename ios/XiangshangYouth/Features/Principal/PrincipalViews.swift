@@ -142,7 +142,7 @@ struct PrincipalDashboard: View {
                 Button { isRegionDetailShown = true } label: {
                     ReferenceCard {
                         VStack(alignment: .leading, spacing: 8) {
-                            ReferenceSectionTitle(title: "区域关怀统计", trailing: "查看地区明细")
+                            ReferenceSectionTitle(title: "区域关怀统计", trailing: "查看地区明细", showsLink: true)
                             HStack(spacing: 12) {
                                 Image(systemName: "map.fill").font(.system(size: 26)).foregroundStyle(.orange).frame(width: 42, height: 42).background(.orange.opacity(0.12), in: Circle())
                                 VStack(alignment: .leading, spacing: 3) {
@@ -215,9 +215,7 @@ struct PrincipalDashboard: View {
     private var gradeComparison: some View {
         ReferenceCard {
             VStack(alignment: .leading, spacing: 9) {
-                Button { router.push(.gradeStats) } label: {
-                    ReferenceSectionTitle(title: "年级完成率对比", trailing: "全部年级")
-                }.buttonStyle(.plain)
+                ReferenceSectionTitle(title: "年级完成率对比", trailing: "全部年级", action: { router.push(.gradeStats) })
                 ForEach(Array((state.data?.grades ?? []).enumerated()), id: \.element.id) { index, grade in
                     let progress = completionRate(for: grade)
                     Button { router.pendingGradeFilter = grade.name; router.push(.classStats) } label: {

@@ -43,6 +43,9 @@ struct ReferenceSectionTitle: View {
     let title: String
     let trailing: String
     var action: (() -> Void)? = nil
+    /// Use when the enclosing card owns the tap target.  It keeps the visual
+    /// affordance honest without introducing an inaccessible nested button.
+    var showsLink: Bool = false
     var body: some View {
         HStack {
             Text(title)
@@ -57,7 +60,7 @@ struct ReferenceSectionTitle: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("\(title)，\(trailing)")
             } else {
-                trailingLabel(showChevron: false)
+                trailingLabel(showChevron: showsLink)
             }
         }
     }

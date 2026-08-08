@@ -30,6 +30,17 @@ class MainActivityFlowTest {
 
     @Test
     fun loginFlowsThroughAllRolesAndParentBinding() {
+        // Connected-test runners do not guarantee an empty app sandbox.  A
+        // prior manual run may have restored the role picker instead of the
+        // login screen, so explicitly end that session before asserting the
+        // anonymous first-run journey.
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("微信登录").fetchSemanticsNodes().isNotEmpty() ||
+                composeRule.onAllNodesWithText("退出当前账号").fetchSemanticsNodes().isNotEmpty()
+        }
+        if (composeRule.onAllNodesWithText("退出当前账号").fetchSemanticsNodes().isNotEmpty()) {
+            composeRule.onNodeWithText("退出当前账号").performClick()
+        }
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("微信登录").fetchSemanticsNodes().isNotEmpty()
         }

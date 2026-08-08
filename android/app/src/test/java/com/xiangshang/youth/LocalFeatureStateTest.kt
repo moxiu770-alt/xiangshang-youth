@@ -187,7 +187,7 @@ class LocalFeatureStateTest {
         assertEquals(1, initial.unreadMessageCount)
         val muted = initial.copy(local = LocalFeatureState(settings = com.xiangshang.youth.core.service.LocalAppSettings(notificationsEnabled = false)))
         assertEquals(0, muted.unreadMessageCount)
-        assertEquals(2, muted.data?.messages?.size)
+        assertEquals(6, muted.data?.messages?.size)
         val restored = muted.copy(local = muted.local.copy(settings = com.xiangshang.youth.core.service.LocalAppSettings(notificationsEnabled = true)))
         assertEquals(1, restored.unreadMessageCount)
     }

@@ -53,6 +53,7 @@ import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
 import com.xiangshang.youth.R
 import com.xiangshang.youth.app.*
+import com.xiangshang.youth.core.model.MessageItem
 import com.xiangshang.youth.core.service.LocalSubmissionStatus
 import com.xiangshang.youth.feature.parent.SettingsDialog
 import com.xiangshang.youth.shared.component.*
@@ -271,7 +272,13 @@ fun TeacherClassCircleScreen(
         TeacherUnavailableState(state, nav, null, refreshDashboard, selected = Destinations.TeacherCircle)
         return
     }
-    if (state.data.students.isEmpty()) { EmptyState("暂无班级动态，班级名单同步后会显示在这里。") ; return }
+    // A first-time school account can have a successful dashboard response but
+    // no roster yet. Keep the teacher workbench chrome in that empty state so
+    // the teacher can still switch tabs, open notifications, or retry later.
+    if (state.data.students.isEmpty()) {
+        TeacherEmptyRootState(state, nav, Destinations.TeacherCircle, "暂无班级动态，班级名单同步后会显示在这里。")
+        return
+    }
     var composer by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf<String?>(null) }
     var editingPost by remember { mutableStateOf<com.xiangshang.youth.core.service.ClassPost?>(null) }
@@ -328,6 +335,18 @@ private fun TeacherUnavailableState(
             } else {
                 LoadingState()
             }
+        }
+    }
+}
+
+/** Empty data is distinct from a network failure: preserve the root tab bar
+ * and useful teacher actions instead of rendering an un-navigable sentence. */
+@Composable
+private fun TeacherEmptyRootState(state: AppUiState, nav: NavHostController, selected: String, message: String) {
+    Scaffold(containerColor = Canvas, bottomBar = { TeacherBottomBar(nav, selected) }) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            TeacherIdentity(false, nav, state.unreadMessageCount, false, {})
+            EmptyState(message)
         }
     }
 }
@@ -753,18 +772,25 @@ private fun statusColor(status: com.xiangshang.youth.core.model.TaskStatus): Col
 }
 
 @Composable fun TeacherMessagesScreen(state: AppUiState, nav: NavHostController, markMessageRead: (String) -> Unit, refreshDashboard: () -> Unit = {}) = AppScaffold("消息中心", onBack = { nav.popBackStack() }) {
-    var selected by remember { mutableStateOf<Pair<String, String>?>(null) }
-    val items = listOf("m1" to ("学生预警通知" to "王小明体质指标需关注，请及时跟进。"), "m2" to ("学校通知" to "秋季综合测评工作安排已发布。"), "teacher-course" to ("课程通知" to "三年级2班延时课程将在明日 16:30 开始。"), "teacher-system" to ("系统消息" to "测评数据已完成同步。"))
+    var selected by remember { mutableStateOf<MessageItem?>(null) }
     val error = state.error
     when {
         error != null && state.data == null -> ErrorState(error, retry = refreshDashboard, dismiss = LocalDashboardClearError.current)
         state.loading || state.data == null -> LoadingState()
-        items.isEmpty() -> EmptyState("暂无消息通知，新的测评和班级通知会显示在这里。")
-        else -> items.forEachIndexed { index, (messageId, item) ->
-            val (title, detail) = item
-            val unread = messageId in setOf("m1", "m2") && messageId !in state.local.readMessageIds && state.data.messages.firstOrNull { it.id == messageId }?.isRead == false
-            Surface(Modifier.fillMaxWidth().padding(vertical = 4.dp).semantics { role = Role.Button; contentDescription = "查看消息：$title" }.clickable { markMessageRead(messageId); selected = title to detail }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) { Icon(if (index == 0) Icons.Filled.Warning else Icons.Filled.Notifications, null, tint = if (index == 0) Color.Red else Blue); Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Row(verticalAlignment = Alignment.CenterVertically) { Text(title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); if (unread) { Spacer(Modifier.width(5.dp)); Box(Modifier.size(5.dp).background(Color.Red, CircleShape)) } }; Text(detail, color = Color.Gray, fontSize = 9.sp) }; Text(if (index == 0) "刚刚" else "今天", color = Color.Gray, fontSize = 8.sp); Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray, modifier = Modifier.size(15.dp)) } }
+        state.data.messages.isEmpty() -> EmptyState("暂无消息通知，新的测评和班级通知会显示在这里。")
+        else -> state.data.messages.forEach { item ->
+            val presentation = teacherMessagePresentation(item)
+            val unread = !item.isRead && item.id !in state.local.readMessageIds
+            Surface(Modifier.fillMaxWidth().padding(vertical = 4.dp).semantics { role = Role.Button; contentDescription = "查看消息：${item.title}" }.clickable { markMessageRead(item.id); selected = item }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) { Icon(presentation.first, null, tint = presentation.second); Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Row(verticalAlignment = Alignment.CenterVertically) { Text(item.title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); if (unread) { Spacer(Modifier.width(5.dp)); Box(Modifier.size(5.dp).background(Color.Red, CircleShape)) } }; Text(item.content, color = Color.Gray, fontSize = 9.sp, maxLines = 1) }; Text(item.time, color = Color.Gray, fontSize = 8.sp); Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray, modifier = Modifier.size(15.dp)) } }
         }
     }
-    selected?.let { (title, detail) -> AlertDialog(onDismissRequest = { selected = null }, title = { Text(title) }, text = { Column { Text(if (title == "学生预警通知") "请查看学生7项测评报告并选择后续复核或补测状态。" else detail); Text("已读", color = Green, fontSize = 10.sp, modifier = Modifier.padding(top = 10.dp)) } }, confirmButton = { TextButton(onClick = { selected = null }) { Text("关闭") } }) }
+    selected?.let { item -> AlertDialog(onDismissRequest = { selected = null }, title = { Text(item.title) }, text = { Column { Text(item.content); Text(item.time, color = Color.Gray, fontSize = 10.sp, modifier = Modifier.padding(top = 10.dp)); Text("已读", color = Green, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp)) } }, confirmButton = { TextButton(onClick = { selected = null }) { Text("关闭") } }) }
+}
+
+private fun teacherMessagePresentation(item: MessageItem): Pair<androidx.compose.ui.graphics.vector.ImageVector, Color> = when {
+    item.category == "系统" -> Icons.Filled.Settings to Color(0xFF9A60F5)
+    item.title.contains("体质") -> Icons.Filled.Warning to Color.Red
+    item.title.contains("视力") -> Icons.Filled.Visibility to Green
+    item.title.contains("口腔") -> Icons.Filled.MedicalServices to Color(0xFF9A60F5)
+    else -> Icons.Filled.Notifications to Blue
 }

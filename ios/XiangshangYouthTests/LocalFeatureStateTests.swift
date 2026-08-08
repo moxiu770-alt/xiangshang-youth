@@ -307,7 +307,7 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertEqual(state.unreadMessageCount, 1)
         state.updateSettings(notificationsEnabled: false)
         XCTAssertEqual(state.unreadMessageCount, 0)
-        XCTAssertEqual(state.data?.messages.count, 2)
+        XCTAssertEqual(state.data?.messages.count, 6)
         state.updateSettings(notificationsEnabled: true)
         XCTAssertEqual(state.unreadMessageCount, 1)
     }

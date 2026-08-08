@@ -483,24 +483,14 @@ struct UpcomingTrainingCard: View {
 
 struct ParentMessagesView: View { var body: some View { ParentMessagesDashboard() } }
 struct ParentMessageDetail: Identifiable {
-    let id = UUID()
-    let title: String
-    let detail: String
-    let tag: String
-    let time: String
+    let message: MessageItem
+    var id: String { message.id }
 }
 struct ParentMessagesDashboard: View {
     @EnvironmentObject private var state: AppState
     @State private var selectedTab = 0
     @State private var selectedMessage: ParentMessageDetail?
-    private let messages: [(String, String, String, String, String, String, Color)] = [
-        ("m1", "exclamationmark.circle.fill", "体质提醒", "体质指标偏低，建议关注饮食与运动习惯", "健康提醒", "08:30", .red),
-        ("m2", "eye.fill", "视力提醒", "用眼时长超过建议时长，建议合理用眼", "健康提醒", "昨天 21:00", ReferenceColor.green),
-        ("health-oral", "mouth.fill", "口腔提醒", "建议定期进行口腔健康检查", "成长关注", "昨天 20:00", ReferenceColor.purple),
-        ("health-mental", "brain.head.profile", "心理提醒", "情绪状态良好，继续保持", "成长关注", "昨天 18:30", ReferenceColor.pink),
-        ("health-growth", "bell.fill", "成长提醒", "本月完成2次运动打卡", "成长提醒", "07-15 16:20", ReferenceColor.blue),
-        ("health-checkin", "star.fill", "打卡提醒", "今日运动打卡未完成，快去打卡吧！", "待完成", "07-15 08:00", .orange)
-    ]
+    private var messages: [MessageItem] { state.data?.messages ?? [] }
 
     var body: some View {
         ScrollView {
@@ -512,18 +502,21 @@ struct ParentMessagesDashboard: View {
                     tab("系统通知", index: 1)
                 }
                 .padding(.horizontal, 12)
-                let visibleMessages = selectedTab == 0 ? Array(messages.prefix(4)) : Array(messages.suffix(2))
-                ForEach(visibleMessages.indices, id: \.self) { index in
-                    let item = visibleMessages[index]
+                let visibleMessages = messages.filter { selectedTab == 0 ? $0.category != "系统" : $0.category == "系统" }
+                if visibleMessages.isEmpty {
+                    EmptyStateView(title: selectedTab == 0 ? "暂无消息提醒" : "暂无系统通知", detail: "新的测评、班级和系统通知会显示在这里。")
+                        .padding(.top, 26)
+                }
+                ForEach(visibleMessages) { item in
                     Button {
-                        state.markMessageRead(item.0)
-                        selectedMessage = ParentMessageDetail(title: item.2, detail: item.3, tag: item.4, time: item.5)
+                        state.markMessageRead(item.id)
+                        selectedMessage = ParentMessageDetail(message: item)
                     } label: {
-                        let isUnread = index < 2 && !state.localFeatures.readMessageIDs.contains(item.0)
-                        messageRow(icon: item.1, title: item.2, detail: item.3, tag: item.4, time: item.5, color: item.6, unread: isUnread)
+                        let isUnread = !item.isRead && !state.localFeatures.readMessageIDs.contains(item.id)
+                        messageRow(item: item, unread: isUnread)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("\(item.1)，\(item.2)，\(item.4)，查看详情")
+                    .accessibilityLabel("\(item.title)，\(item.category)，查看详情")
                 }
             }
             .padding(.bottom, 9)
@@ -543,13 +536,13 @@ struct ParentMessagesDashboard: View {
         .sheet(item: $selectedMessage) { item in
             NavigationStack {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text(item.tag).font(.caption.weight(.semibold)).foregroundStyle(ReferenceColor.blue)
-                    Text(item.detail).font(.body).foregroundStyle(ReferenceColor.navy)
-                    Text(item.time).font(.caption).foregroundStyle(.secondary)
+                    Text(item.message.category).font(.caption.weight(.semibold)).foregroundStyle(ReferenceColor.blue)
+                    Text(item.message.content).font(.body).foregroundStyle(ReferenceColor.navy)
+                    Text(item.message.time).font(.caption).foregroundStyle(.secondary)
                     Spacer()
                 }
                 .padding()
-                .navigationTitle(item.title)
+                .navigationTitle(item.message.title)
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { selectedMessage = nil } } }
             }
         }
@@ -564,21 +557,22 @@ struct ParentMessagesDashboard: View {
         }.buttonStyle(.plain)
     }
 
-    private func messageRow(icon: String, title: String, detail: String, tag: String, time: String, color: Color, unread: Bool) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon).font(.system(size: 16, weight: .semibold)).foregroundStyle(color)
-                .frame(width: 34, height: 34).background(color.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
+    private func messageRow(item: MessageItem, unread: Bool) -> some View {
+        let presentation = messagePresentation(for: item)
+        return HStack(spacing: 10) {
+            Image(systemName: presentation.icon).font(.system(size: 16, weight: .semibold)).foregroundStyle(presentation.color)
+                .frame(width: 34, height: 34).background(presentation.color.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
             VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.system(size: 12, weight: .bold))
-                Text(detail).font(.system(size: 9)).foregroundStyle(.secondary).lineLimit(1)
-                Text(tag).font(.system(size: 8, weight: .bold)).foregroundStyle(color)
-                    .padding(.horizontal, 5).padding(.vertical, 2).background(color.opacity(0.09), in: Capsule())
+                Text(item.title).font(.system(size: 12, weight: .bold))
+                Text(item.content).font(.system(size: 9)).foregroundStyle(.secondary).lineLimit(1)
+                Text(item.category).font(.system(size: 8, weight: .bold)).foregroundStyle(presentation.color)
+                    .padding(.horizontal, 5).padding(.vertical, 2).background(presentation.color.opacity(0.09), in: Capsule())
             }
             Spacer(minLength: 4)
             VStack(alignment: .trailing, spacing: 7) {
                 HStack(spacing: 4) {
                     if unread { Circle().fill(.red).frame(width: 4, height: 4) }
-                    Text(time).font(.system(size: 8)).foregroundStyle(.secondary)
+                    Text(item.time).font(.system(size: 8)).foregroundStyle(.secondary)
                 }
                 Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold)).foregroundStyle(.secondary)
             }
@@ -587,5 +581,14 @@ struct ParentMessagesDashboard: View {
         .background(.white, in: RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(ReferenceColor.blue.opacity(0.06), lineWidth: 1))
         .padding(.horizontal, 10)
+    }
+
+    private func messagePresentation(for item: MessageItem) -> (icon: String, color: Color) {
+        if item.title.contains("体质") { return ("exclamationmark.circle.fill", .red) }
+        if item.title.contains("视力") { return ("eye.fill", ReferenceColor.green) }
+        if item.title.contains("口腔") { return ("mouth.fill", ReferenceColor.purple) }
+        if item.title.contains("心理") { return ("brain.head.profile", ReferenceColor.pink) }
+        if item.title.contains("打卡") { return ("star.fill", .orange) }
+        return ("bell.fill", ReferenceColor.blue)
     }
 }

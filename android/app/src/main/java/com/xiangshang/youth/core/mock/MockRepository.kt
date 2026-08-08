@@ -26,7 +26,14 @@ class MockRepository : YouthRepository {
         TestTask("t2","四年级专项补测","2026-09-15 14:00","风雨操场","四年级","四年级1班",8,10,TaskStatus.Retest,"小学四年级运动能力标准 v1.0"),
         TestTask("t3","五年级秋季综合运动能力测评","2026-09-18 09:00","南湖校区体育馆","五年级","五年级1班、2班",0,20,TaskStatus.NotCheckedIn,"小学五年级运动能力标准 v1.0")
     )
-    override suspend fun dashboard() = DashboardData(school, grades, classes, students, tasks, listOf(ParentChild("pc1","p1",students[0],"母子"), ParentChild("pc2","p1",students[1],"母女")), listOf(MessageItem("m1","测评报告已生成","王小明的秋季综合运动能力测评报告已生成。","今天 10:30","报告",false), MessageItem("m2","补测提醒","请关注班级补测安排，携带运动鞋按时到场。","昨天 16:00","任务",true)))
+    override suspend fun dashboard() = DashboardData(school, grades, classes, students, tasks, listOf(ParentChild("pc1","p1",students[0],"母子"), ParentChild("pc2","p1",students[1],"母女")), listOf(
+        MessageItem("m1", "体质提醒", "体质指标偏低，建议关注饮食与运动习惯。", "08:30", "健康提醒", false),
+        MessageItem("m2", "视力提醒", "用眼时长超过建议时长，建议合理用眼。", "昨天 21:00", "健康提醒", true),
+        MessageItem("m3", "口腔提醒", "建议定期进行口腔健康检查。", "昨天 20:00", "成长关注", true),
+        MessageItem("m4", "心理提醒", "情绪状态良好，继续保持。", "昨天 18:30", "成长关注", true),
+        MessageItem("m5", "成长提醒", "本月完成2次运动打卡，继续保持运动习惯。", "07-15 16:20", "系统", true),
+        MessageItem("m6", "打卡提醒", "今日运动打卡未完成，快去打卡吧！", "07-15 08:00", "系统", true)
+    ))
     override fun report(student: Student): DiagnosisReport {
         val scoreValues = if (student.id == "s01") listOf(4.5, 4.0, 3.5, 4.5, 4.0, 3.5, 4.5) else listOf(3.5, 3.0, 2.5, 3.5, 3.0, 3.5, 3.0)
         val scores = TestItem.entries.mapIndexed { i, item ->

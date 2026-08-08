@@ -263,12 +263,15 @@ private struct CameraPicker: UIViewControllerRepresentable {
     }
 }
 
-struct TeacherMessageDetail: Identifiable { let id = UUID(); let title: String; let detail: String; let time: String }
+struct TeacherMessageDetail: Identifiable {
+    let message: MessageItem
+    var id: String { message.id }
+}
 
 struct TeacherMessagesView: View {
     @EnvironmentObject private var state: AppState
-    private let items = [("m1", "exclamationmark.triangle.fill", "学生预警通知", "王小明体质指标需关注，请及时跟进。", Color.red), ("m2", "building.2.fill", "学校通知", "秋季综合测评工作安排已发布。", ReferenceColor.blue), ("teacher-course", "calendar.badge.clock", "课程通知", "三年级2班延时课程将在明日 16:30 开始。", ReferenceColor.green), ("teacher-system", "gearshape.fill", "系统消息", "测评数据已完成同步。", ReferenceColor.purple)]
     @State private var selectedMessage: TeacherMessageDetail?
+    private var items: [MessageItem] { state.data?.messages ?? [] }
     var body: some View {
         ScrollView {
             VStack(spacing: 8) {
@@ -280,21 +283,21 @@ struct TeacherMessagesView: View {
                 } else if items.isEmpty {
                     EmptyStateView(title: "暂无消息通知", detail: "新的测评、补测和班级通知会显示在这里。")
                 } else {
-                    ForEach(items.indices, id: \.self) { index in
-                        let item = items[index]
-                        let unread = ["m1", "m2"].contains(item.0) && !state.localFeatures.readMessageIDs.contains(item.0) && state.data?.messages.first(where: { $0.id == item.0 })?.isRead == false
+                    ForEach(items) { item in
+                        let presentation = messagePresentation(for: item)
+                        let unread = !item.isRead && !state.localFeatures.readMessageIDs.contains(item.id)
                         Button {
-                            state.markMessageRead(item.0)
-                            selectedMessage = TeacherMessageDetail(title: item.2, detail: item.3, time: index == 0 ? "刚刚" : "今天")
+                            state.markMessageRead(item.id)
+                            selectedMessage = TeacherMessageDetail(message: item)
                         } label: {
                             HStack(spacing: 10) {
-                                Image(systemName: item.1).foregroundStyle(item.4).frame(width: 36, height: 36).background(item.4.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
+                                Image(systemName: presentation.icon).foregroundStyle(presentation.color).frame(width: 36, height: 36).background(presentation.color.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
                                 VStack(alignment: .leading, spacing: 4) {
-                                    HStack(spacing: 5) { Text(item.2).font(.system(size: 12, weight: .bold)); if unread { Circle().fill(.red).frame(width: 5, height: 5) } }
-                                    Text(item.3).font(.system(size: 9)).foregroundStyle(.secondary)
+                                    HStack(spacing: 5) { Text(item.title).font(.system(size: 12, weight: .bold)); if unread { Circle().fill(.red).frame(width: 5, height: 5) } }
+                                    Text(item.content).font(.system(size: 9)).foregroundStyle(.secondary)
                                 }
                                 Spacer()
-                                Text(index == 0 ? "刚刚" : "今天").font(.system(size: 8)).foregroundStyle(.secondary)
+                                Text(item.time).font(.system(size: 8)).foregroundStyle(.secondary)
                                 Image(systemName: "chevron.right").font(.system(size: 8)).foregroundStyle(.secondary)
                             }
                             .foregroundStyle(ReferenceColor.navy)
@@ -313,10 +316,10 @@ struct TeacherMessagesView: View {
         .sheet(item: $selectedMessage) { message in
             NavigationStack {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text(message.title).font(.title3.bold())
-                    Text(message.time).font(.caption).foregroundStyle(.secondary)
+                    Text(message.message.title).font(.title3.bold())
+                    Text(message.message.time).font(.caption).foregroundStyle(.secondary)
                     Divider()
-                    Text(message.detail).font(.body)
+                    Text(message.message.content).font(.body)
                     Spacer()
                 }
                 .padding()
@@ -324,6 +327,14 @@ struct TeacherMessagesView: View {
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { selectedMessage = nil } } }
             }
         }
+    }
+
+    private func messagePresentation(for item: MessageItem) -> (icon: String, color: Color) {
+        if item.category == "系统" { return ("gearshape.fill", ReferenceColor.purple) }
+        if item.title.contains("体质") { return ("exclamationmark.triangle.fill", .red) }
+        if item.title.contains("视力") { return ("eye.fill", ReferenceColor.green) }
+        if item.title.contains("口腔") { return ("mouth.fill", ReferenceColor.purple) }
+        return ("building.2.fill", ReferenceColor.blue)
     }
 }
 

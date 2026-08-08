@@ -4,6 +4,7 @@ struct AppScaffold<Content: View>: View {
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var state: AppState
     let title: String; @ViewBuilder var content: Content
+    @ScaledMetric(relativeTo: .headline) private var titleSize: CGFloat = 16
     var body: some View {
         VStack(spacing: 0) {
             ZStack {
@@ -22,7 +23,16 @@ struct AppScaffold<Content: View>: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                Text(title).font(.system(size: 16, weight: .bold)).foregroundStyle(AppTheme.ink)
+                // Keep a long school/class title out of the reserved back
+                // affordance. The full title remains exposed to VoiceOver.
+                Text(title)
+                    .font(.system(size: titleSize, weight: .bold))
+                    .foregroundStyle(AppTheme.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                    .truncationMode(.tail)
+                    .padding(.horizontal, 50)
+                    .accessibilityLabel(title)
             }.padding(.horizontal, 14).frame(height: 52).background { Rectangle().fill(.ultraThinMaterial).ignoresSafeArea(edges: .top) }
             if let error = state.error, state.data == nil {
                 ErrorStateView(message: error, retry: { Task { await state.refreshDashboard() } }, dismiss: state.clearError)

@@ -24,6 +24,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xiangshang.youth.app.*
@@ -39,7 +40,9 @@ import com.xiangshang.youth.core.model.*
                     color = Navy,
                     fontSize = 16.sp,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                    modifier = Modifier.semantics { heading() }
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.semantics { heading(); contentDescription = title }
                 )
             },
             navigationIcon = {

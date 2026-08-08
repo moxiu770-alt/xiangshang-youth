@@ -292,6 +292,7 @@ struct ParentPageNavigation: View {
     @EnvironmentObject private var state: AppState
     let title: String
     var showsBack = false
+    @ScaledMetric(relativeTo: .headline) private var titleSize: CGFloat = 15
     var body: some View {
         ZStack {
             if showsBack && !router.path.isEmpty {
@@ -308,7 +309,13 @@ struct ParentPageNavigation: View {
                 .accessibilityHint("返回上一页")
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Text(title).font(.system(size: 15, weight: .bold))
+            Text(title)
+                .font(.system(size: titleSize, weight: .bold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .truncationMode(.tail)
+                .padding(.horizontal, 48)
+                .accessibilityLabel(title)
             HStack {
                 Spacer()
                 Button { router.push(state.selectedRole == .teacher ? .teacherMessages : .notifications) } label: {

@@ -61,7 +61,9 @@ class MainActivityFlowTest {
             composeRule.onAllNodesWithText("请选择进入方式").fetchSemanticsNodes().isNotEmpty()
         }
 
-        // Principal workbench: verify the dedicated risk tab is a real route.
+        // Principal workbench: every bottom item is a root page. A regression
+        // once made only the overview root safe while grade/class pages showed
+        // a dead back affordance.
         composeRule.onNodeWithText("校长端").performClick()
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("学校运动健康总览").fetchSemanticsNodes().isNotEmpty()
@@ -69,10 +71,21 @@ class MainActivityFlowTest {
         // Role dashboards are application roots.  A back affordance here used
         // to expose the previous workbench instead of the role picker.
         composeRule.onNodeWithContentDescription("返回").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("年级").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("不同年级对比").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription("返回").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("班级").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("班级完成率").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription("返回").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("风险").performClick()
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("重点风险学生").fetchSemanticsNodes().isNotEmpty()
         }
+        composeRule.onNodeWithContentDescription("返回").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("总览").performClick()
         composeRule.onNodeWithText("退出校长端").performClick()
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {

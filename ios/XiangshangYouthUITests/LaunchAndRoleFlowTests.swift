@@ -64,6 +64,21 @@ final class LaunchAndRoleFlowTests: XCTestCase {
         // affordance (and its blank-host dismissal path) from returning.
         XCTAssertFalse(button(containing: "返回").exists)
 
+        // All four principal bottom tabs are application roots, not pushed
+        // drill-down pages. Cover each one so a single tab cannot quietly
+        // reintroduce the broken top-left back behavior.
+        button(containing: "年级").tap()
+        XCTAssertTrue(staticText(containing: "不同年级对比").waitForExistence(timeout: 3))
+        XCTAssertFalse(button(containing: "返回").exists)
+        button(containing: "班级").tap()
+        XCTAssertTrue(staticText(containing: "班级完成率").waitForExistence(timeout: 3))
+        XCTAssertFalse(button(containing: "返回").exists)
+        button(containing: "风险").tap()
+        XCTAssertTrue(staticText(containing: "重点风险学生").waitForExistence(timeout: 3))
+        XCTAssertFalse(button(containing: "返回").exists)
+        button(containing: "总览").tap()
+        XCTAssertTrue(staticText(containing: "学校运动健康总览").waitForExistence(timeout: 3))
+
         // A role dashboard is a root state, so exiting it must return to role
         // selection instead of exposing a stale NavigationStack back route.
         let exitPrincipal = button(containing: "退出校长端")

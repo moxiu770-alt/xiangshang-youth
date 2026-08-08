@@ -73,6 +73,10 @@ struct PrincipalDashboard: View {
         let tasks = state.data?.tasks ?? []
         return tasks.first(where: { $0.id == selectedTaskID }) ?? tasks.first
     }
+    private var selectedTaskLabel: String {
+        guard let task = activeTask else { return "本轮测评" }
+        return "\(task.gradeName) · \(task.title.contains("补测") ? "专项补测" : "秋季测评")"
+    }
     // `TestTask` is the school-level aggregate published by the assessment service.
     // The local student list is intentionally only a representative Mock sample, so it
     // must not replace the task aggregate and turn 15/20 into the misleading 2/4.
@@ -133,7 +137,7 @@ struct PrincipalDashboard: View {
                         }
                     } label: {
                         HStack(spacing: 3) {
-                            Text("本轮测评")
+                            Text(selectedTaskLabel)
                             Image(systemName: "chevron.up.chevron.down").font(.system(size: 8, weight: .bold))
                         }
                         .font(.system(size: 11, weight: .semibold))

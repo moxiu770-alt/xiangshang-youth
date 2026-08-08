@@ -26,6 +26,9 @@ import com.xiangshang.youth.app.*
 import com.xiangshang.youth.shared.component.*
 import java.util.Locale
 
+private fun com.xiangshang.youth.core.model.TestTask.selectorLabel(): String =
+    "$gradeName · ${if (title.contains("补测")) "专项补测" else "秋季测评"}"
+
 @Composable fun PrincipalHomeScreen(state: AppUiState, nav: NavHostController, onChooseAnotherRole: () -> Unit, refreshDashboard: () -> Unit = {}) = AppScaffold("学校运动健康总览", onNotifications = { nav.navigateSingleTop(Destinations.Notifications) }, notificationCount = state.unreadMessageCount, onRefresh = refreshDashboard, isRefreshing = state.loading, onSwitchRole = onChooseAnotherRole, bottomBar = { PrincipalBottomBar(nav) }) {
     val dashboardError = state.error
     if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = { refreshDashboard() }, dismiss = LocalDashboardClearError.current); return@AppScaffold }
@@ -55,7 +58,7 @@ import java.util.Locale
                     contentPadding = PaddingValues(horizontal = 5.dp, vertical = 0.dp),
                     modifier = Modifier.semantics { contentDescription = "选择统计任务"; stateDescription = activeTask?.title ?: "暂无任务" }
                 ) {
-                    Text("本轮测评", color = Blue, fontSize = 9.sp)
+                    Text(activeTask?.selectorLabel() ?: "本轮测评", color = Blue, fontSize = 9.sp)
                     Icon(Icons.Filled.UnfoldMore, contentDescription = null, tint = Blue, modifier = Modifier.size(13.dp))
                 }
                 DropdownMenu(expanded = taskMenuExpanded, onDismissRequest = { taskMenuExpanded = false }) {

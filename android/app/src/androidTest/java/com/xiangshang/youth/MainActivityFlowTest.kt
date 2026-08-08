@@ -83,6 +83,17 @@ class MainActivityFlowTest {
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("班级健康概览").fetchSemanticsNodes().isNotEmpty()
         }
+        // Class management is a distinct teacher workflow, not another alias
+        // for the student list. Keep this route covered so its dashboard
+        // shortcut cannot silently become unreachable again.
+        composeRule.onNodeWithContentDescription("班级管理").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("我管理的班级").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription("返回").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("班级健康概览").fetchSemanticsNodes().isNotEmpty()
+        }
         // This is not a generic roster shortcut: the bundled fixture has no
         // pending placements, so the dedicated route must show its honest
         // empty state and retain a working secondary-page back action.

@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -57,10 +58,14 @@ fun ReportDetailScreen(
             )
         }
         Text("7项能力得分", color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        report.scores.chunked(2).forEach { row ->
+        // Keep the approved two-up layout at normal type. Large system text
+        // gets a full-width row so each test name and review state remains
+        // readable instead of being compressed into a narrow tile.
+        val scoreColumns = if (LocalDensity.current.fontScale > 1.25f) 1 else 2
+        report.scores.chunked(scoreColumns).forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                 row.forEach { score -> ReportScoreCard(score, Modifier.weight(1f)) { selectedDetail = "${score.item.label}：${String.format(Locale.US, "%.1f", score.score)}分\n${score.note}\n置信度 ${(score.confidence * 100).toInt()}%" } }
-                if (row.size == 1) Spacer(Modifier.weight(1f))
+                repeat(scoreColumns - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
         ReportSection("能力标签", Icons.Filled.LocalOffer) {

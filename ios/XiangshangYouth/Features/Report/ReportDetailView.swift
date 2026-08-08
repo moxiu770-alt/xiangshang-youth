@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ReportDetailView: View {
     @EnvironmentObject private var state: AppState
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let student: Student
     @State private var selectedDetail: String?
     var body: some View {
@@ -55,7 +56,9 @@ struct ReportDetailView: View {
                         .background(.white, in: RoundedRectangle(cornerRadius: 16))
                 }
                 Text("7项能力得分").font(.headline).frame(maxWidth: .infinity, alignment: .leading)
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                // Preserve the two-column phone layout at normal text sizes,
+                // while giving each metric a full row at accessibility sizes.
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: dynamicTypeSize.isAccessibilitySize ? 1 : 2), spacing: 10) {
                     ForEach(report.scores) { score in
                         Button { selectedDetail = "\(score.item.shortName)：\(String(format: "%.1f", score.score))分\n\(score.note)\n置信度 \(Int(score.confidence * 100))%" } label: {
                             ReportMetricCard(result: score)

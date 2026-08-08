@@ -169,7 +169,8 @@ struct ParentClassCircleDashboard: View {
                 let visiblePosts = state.localFeatures.classPosts.filter { post in
                     selectedFilter == "全部" || (selectedFilter == "老师动态" && post.author.contains("老师")) || (selectedFilter == "家长分享" && !post.author.contains("老师"))
                 }
-                if visiblePosts.isEmpty {
+                // 置顶通知属于班级的固定信息，不应在家长发布动态后消失；仅在“家长分享”筛选中隐藏。
+                if selectedFilter != "家长分享" {
                     pinnedAnnouncementPost(
                         author: "李老师",
                         content: "本周运动打卡已开启，欢迎家长分享孩子的练习瞬间。",

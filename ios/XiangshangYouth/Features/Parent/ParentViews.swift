@@ -145,7 +145,10 @@ struct ParentLandingView: View {
 }
 
 struct ParentCampaignCard: View {
+    @EnvironmentObject private var state: AppState
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var drifts = false
+    private var reduceMotion: Bool { state.localFeatures.settings.reduceMotion || systemReduceMotion }
     var body: some View {
         ZStack(alignment: .leading) {
             Image("ParentCampaign")
@@ -167,7 +170,14 @@ struct ParentCampaignCard: View {
         .frame(height: 108)
         .clipShape(RoundedRectangle(cornerRadius: 11))
         .overlay(RoundedRectangle(cornerRadius: 11).stroke(ReferenceColor.blue.opacity(0.08), lineWidth: 1))
-        .task { withAnimation(.easeInOut(duration: 5).repeatForever(autoreverses: true)) { drifts = true } }
+        .task(id: reduceMotion) {
+            guard !reduceMotion else {
+                var transaction = Transaction(); transaction.animation = nil
+                withTransaction(transaction) { drifts = false }
+                return
+            }
+            withAnimation(.easeInOut(duration: 5).repeatForever(autoreverses: true)) { drifts = true }
+        }
     }
 }
 
@@ -317,9 +327,11 @@ struct ParentPageNavigation: View {
 
 struct ParentEvaluationDashboard: View {
     @EnvironmentObject private var state: AppState; @EnvironmentObject private var router: AppRouter
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var ringProgress = 0.0
     private var report: DiagnosisReport? { state.selectedChild.map { state.report(for: $0) } }
     private var reportProgress: Double { Double(report?.scores.count ?? 0) / Double(TestItem.allCases.count) }
+    private var reduceMotion: Bool { state.localFeatures.settings.reduceMotion || systemReduceMotion }
     var body: some View { ScrollView { VStack(spacing: 9) { ParentPageNavigation(title: "我的测评"); ReferenceHeader(name: state.selectedChild?.name ?? "王小明", school: "\(state.selectedChild?.className ?? "三年级2班") · 成长小档案", initial: String((state.selectedChild?.name ?? "王").prefix(1)), showsBell: false, avatarAsset: "ChildAvatar")
         HStack { ZStack { Circle().stroke(ReferenceColor.blue.opacity(0.15), lineWidth: 8).frame(width: 72, height: 72); Circle().trim(from: 0, to: ringProgress).stroke(LinearGradient(colors: [ReferenceColor.blue, ReferenceColor.green], startPoint: .top, endPoint: .bottom), style: StrokeStyle(lineWidth: 8, lineCap: .round)).rotationEffect(.degrees(-90)).frame(width: 72, height: 72); VStack { Text((report?.student.totalScore ?? 0) >= 25 ? "良好" : "需关注").font(.system(size: 14, weight: .bold)).foregroundStyle(ReferenceColor.blue); Text("综合能力").font(.system(size: 8)).foregroundStyle(.secondary) } }; VStack(alignment: .leading, spacing: 4) { Text("健康综合测评").font(.system(size: 14, weight: .bold)); Text("覆盖孩子的运动与健康成长情况").font(.system(size: 9)).foregroundStyle(.secondary); AnimatedProgressLine(value: reportProgress).frame(height: 6); Text("已完成 \(report?.scores.count ?? 0) 项 · 进度 \(Int(reportProgress * 100))% · 总分 \(String(format: "%.1f", report?.totalScore ?? 0))") .font(.system(size: 9)).foregroundStyle(ReferenceColor.blue) }; Spacer(); Image("ChildAvatar").resizable().scaledToFit().frame(width: 57, height: 57) }
         .padding(12)
@@ -333,7 +345,11 @@ struct ParentEvaluationDashboard: View {
         VStack(spacing: 7) { ParentHealthDimension(title: "体质", detail: "脊柱姿态 · 遗传身高 · 运动表现", color: ReferenceColor.blue); ParentHealthDimension(title: "视力", detail: "屈光筛查 · 用眼习惯", color: ReferenceColor.green); ParentHealthDimension(title: "口腔", detail: "龋齿风险 · 牙列发育", color: ReferenceColor.purple); ParentHealthDimension(title: "心理", detail: "情绪状态 · 同伴适应", color: ReferenceColor.pink) }.padding(.horizontal, 12)
     } }.background(ReferenceColor.canvas)
         .refreshable { await state.refreshDashboard() }
-        .task { withAnimation(.easeOut(duration: 1.0)) { ringProgress = reportProgress } }
+        .task(id: "\(reportProgress)-\(reduceMotion)") {
+            guard !reduceMotion else { ringProgress = reportProgress; return }
+            ringProgress = 0
+            withAnimation(.easeOut(duration: 1.0)) { ringProgress = reportProgress }
+        }
         .overlay {
             if let error = state.error, state.data == nil {
                 ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
@@ -400,8 +416,11 @@ struct HealthDashboard: View {
 
 struct RecentFamilyActivities: View {
     @EnvironmentObject private var router: AppRouter
+    @EnvironmentObject private var state: AppState
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var slides = false
     @State private var selectedActivity: String?
+    private var reduceMotion: Bool { state.localFeatures.settings.reduceMotion || systemReduceMotion }
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             ReferenceSectionTitle(title: "最近家庭运动", trailing: "查看全部", action: { router.push(.parentCourses) })
@@ -411,7 +430,14 @@ struct RecentFamilyActivities: View {
                 activityTile("ActivityBalance", "平衡挑战", "推荐给小明", ReferenceColor.yellow, offset: 3)
             }
         }
-        .task { withAnimation(.easeInOut(duration: 4).repeatForever(autoreverses: true)) { slides = true } }
+        .task(id: reduceMotion) {
+            guard !reduceMotion else {
+                var transaction = Transaction(); transaction.animation = nil
+                withTransaction(transaction) { slides = false }
+                return
+            }
+            withAnimation(.easeInOut(duration: 4).repeatForever(autoreverses: true)) { slides = true }
+        }
         .sheet(item: Binding(get: { selectedActivity.map(CourseSheetItem.init) }, set: { selectedActivity = $0?.name })) { item in
             CourseDetailSheet(title: item.name)
         }
@@ -434,8 +460,11 @@ struct RecentFamilyActivities: View {
 }
 
 struct CourseSuggestionBanner: View {
+    @EnvironmentObject private var state: AppState
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var lifts = false
     @State private var isPresented = false
+    private var reduceMotion: Bool { state.localFeatures.settings.reduceMotion || systemReduceMotion }
     var body: some View {
         Button { isPresented = true } label: {
             HStack(spacing: 10) {
@@ -459,7 +488,14 @@ struct CourseSuggestionBanner: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("推荐课程：青少年体姿改善课程，查看课程")
-        .task { withAnimation(.easeInOut(duration: 2.3).repeatForever(autoreverses: true)) { lifts = true } }
+        .task(id: reduceMotion) {
+            guard !reduceMotion else {
+                var transaction = Transaction(); transaction.animation = nil
+                withTransaction(transaction) { lifts = false }
+                return
+            }
+            withAnimation(.easeInOut(duration: 2.3).repeatForever(autoreverses: true)) { lifts = true }
+        }
         .sheet(isPresented: $isPresented) { CourseDetailSheet(title: "青少年体姿改善课程") }
     }
 }

@@ -7,6 +7,7 @@ struct AssessmentFlowView: View {
     let category: AssessmentCategory
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var state: AppState
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var step = 0
     @State private var completed = false
     @State private var answer = ""
@@ -37,15 +38,19 @@ struct AssessmentFlowView: View {
     private var draftKey: String { "assessment-\(state.selectedChild?.id ?? "anonymous")-\(category.rawValue)-\(step)" }
     private var progressKey: String { "assessment-progress-\(state.selectedChild?.id ?? "anonymous")-\(category.rawValue)" }
     private var completionKey: String { "\(state.selectedChild?.id ?? "anonymous")-\(category.rawValue)" }
+    private var reduceMotion: Bool { state.localFeatures.settings.reduceMotion || systemReduceMotion }
     private var inputPlaceholder: String { switch category { case .fitness: return ["例如：身高132cm，体重30kg", "例如：父亲175cm，母亲162cm", "例如：站姿筛查正常", "例如：学校场地端待回传"][step]; case .vision: return "例如：每日屏幕使用不超过1小时"; case .oral: return "例如：每日早晚刷牙，近期无牙痛"; case .mental: return "例如：已阅读并确认授权说明" } }
-    private func submitCurrentStep() { guard completed || !answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { validationMessage = "请填写本步骤信息后再继续。"; return }; if completed { router.push(.healthProfile); return }; if step < steps.count - 1 { withAnimation { step += 1 } } else { state.clearDrafts(prefix: "assessment-\(state.selectedChild?.id ?? "anonymous")-\(category.rawValue)-"); state.clearDraft(progressKey); completed = true; state.completeAssessment(category) } }
+    private func submitCurrentStep() { guard completed || !answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { validationMessage = "请填写本步骤信息后再继续。"; return }; if completed { router.push(.healthProfile); return }; if step < steps.count - 1 { if reduceMotion { var transaction = Transaction(); transaction.animation = nil; withTransaction(transaction) { step += 1 } } else { withAnimation { step += 1 } } } else { state.clearDrafts(prefix: "assessment-\(state.selectedChild?.id ?? "anonymous")-\(category.rawValue)-"); state.clearDraft(progressKey); completed = true; state.completeAssessment(category) } }
 }
 
 struct ParentCourseTeaser: View {
     let image: String; let title: String
+    @EnvironmentObject private var state: AppState
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var isShown = false
     @State private var isPresented = false
-    var body: some View { Button { isPresented = true } label: { VStack(alignment: .leading, spacing: 4) { Image(image).resizable().scaledToFill().frame(height: 48).frame(maxWidth: .infinity).clipped().scaleEffect(isShown ? 1.06 : 1); Text(title).font(.system(size: 9, weight: .bold)).foregroundStyle(ReferenceColor.navy); Text("免费学习 ›").font(.system(size: 8)).foregroundStyle(ReferenceColor.green) }.padding(4).background(.white, in: RoundedRectangle(cornerRadius: 8)) }.buttonStyle(.plain).task { withAnimation(.easeInOut(duration: 3).repeatForever(autoreverses: true)) { isShown = true } }.sheet(isPresented: $isPresented) { CourseDetailSheet(title: title) } }
+    private var reduceMotion: Bool { state.localFeatures.settings.reduceMotion || systemReduceMotion }
+    var body: some View { Button { isPresented = true } label: { VStack(alignment: .leading, spacing: 4) { Image(image).resizable().scaledToFill().frame(height: 48).frame(maxWidth: .infinity).clipped().scaleEffect(isShown ? 1.06 : 1); Text(title).font(.system(size: 9, weight: .bold)).foregroundStyle(ReferenceColor.navy); Text("免费学习 ›").font(.system(size: 8)).foregroundStyle(ReferenceColor.green) }.padding(4).background(.white, in: RoundedRectangle(cornerRadius: 8)) }.buttonStyle(.plain).task(id: reduceMotion) { guard !reduceMotion else { var transaction = Transaction(); transaction.animation = nil; withTransaction(transaction) { isShown = false }; return }; withAnimation(.easeInOut(duration: 3).repeatForever(autoreverses: true)) { isShown = true } }.sheet(isPresented: $isPresented) { CourseDetailSheet(title: title) } }
 }
 
 struct ParentArticleRow: View {

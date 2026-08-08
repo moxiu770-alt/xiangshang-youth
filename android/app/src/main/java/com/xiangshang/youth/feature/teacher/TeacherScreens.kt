@@ -133,7 +133,9 @@ private fun TeacherRoleSwitch(sports: Boolean, onSelect: (Boolean) -> Unit) = Ro
     Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)
 ) {
     TeacherRoleChip("班主任", Icons.Filled.Groups, !sports, Blue, Modifier.weight(1f)) { onSelect(false) }
-    TeacherRoleChip("体育老师", Icons.AutoMirrored.Filled.DirectionsRun, sports, Green, Modifier.weight(1f)) { onSelect(true) }
+    // Role selection is an identity control, so it shares the blue account
+    // palette with “班主任”. Green is reserved for completed/healthy metrics.
+    TeacherRoleChip("体育老师", Icons.AutoMirrored.Filled.DirectionsRun, sports, Blue, Modifier.weight(1f)) { onSelect(true) }
 }
 
 @Composable

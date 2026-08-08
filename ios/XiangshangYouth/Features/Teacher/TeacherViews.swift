@@ -430,7 +430,10 @@ struct TeacherDashboard: View {
     private var teacherSwitch: some View {
         HStack(spacing: 8) {
             roleSwitchButton("班主任", "person.3.fill", selected: !isSportsTeacher, color: ReferenceColor.blue) { isSportsTeacher = false }
-            roleSwitchButton("体育老师", "figure.run", selected: isSportsTeacher, color: ReferenceColor.green) { isSportsTeacher = true }
+            // The two choices are account roles, not task-health states. Keep
+            // both in the blue identity family used by the reference teacher
+            // panel; green remains reserved for completed/healthy data below.
+            roleSwitchButton("体育老师", "figure.run", selected: isSportsTeacher, color: ReferenceColor.blue) { isSportsTeacher = true }
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 12)

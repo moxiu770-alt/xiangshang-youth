@@ -109,6 +109,10 @@ fun LoginScreen(
         // At accessibility font scales the content must remain scrollable even
         // on a tall tablet; anchoring is only a normal-text layout refinement.
         val anchoredTabletLayout = maxWidth >= 600.dp && maxHeight >= 800.dp && LocalConfiguration.current.fontScale <= 1.15f
+        // Match the portrait reference on tall phones: the account card is a
+        // deliberate primary surface, not a compact block floating over a
+        // large empty gap. Short screens still use content height and scroll.
+        val loginPanelMinHeight = if (maxWidth < 600.dp && maxHeight >= 720.dp) maxHeight * 0.63f else 0.dp
         // Preserve the portrait login composition on tablets instead of turning
         // the reference card into a very wide desktop form.
         Column(
@@ -131,8 +135,8 @@ fun LoginScreen(
                 Text("科学评估 · 精准干预 · 守护3-18岁青少年身心健康", color = Color(0xFFFFBD2E), fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp).background(Color.White.copy(.17f), CircleShape))
             }
             Spacer(Modifier.height(10.dp))
-            Surface(Modifier.fillMaxWidth().padding(horizontal = 10.dp), color = Color.White, shape = RoundedCornerShape(26.dp), shadowElevation = 4.dp) {
-                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Surface(Modifier.fillMaxWidth().padding(horizontal = 10.dp).heightIn(min = loginPanelMinHeight), color = Color.White, shape = RoundedCornerShape(26.dp), shadowElevation = 4.dp) {
+                Column(Modifier.fillMaxWidth().fillMaxHeight().padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) { Text("登录开启成长之旅", color = Navy, fontSize = 14.sp, fontWeight = FontWeight.Bold); Spacer(Modifier.width(7.dp)); Icon(Icons.Filled.WbSunny, null, tint = Color(0xFFFFBD2E), modifier = Modifier.size(20.dp)) }
                     Column(verticalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth()) {
                         LoginButton("微信登录", Icons.Filled.ChatBubble, Blue, Color.White, { if (method == 0) submitLogin() else { method = 0; error = null; onClearError() } })
@@ -159,6 +163,7 @@ fun LoginScreen(
                         TextButton(onClick = onForgotPassword, contentPadding = PaddingValues(0.dp)) { Text("忘记密码？", color = Color.Gray, fontSize = 11.sp) }
                     }
                     Column(Modifier.fillMaxWidth().padding(top = 5.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { LoginCheck("专业身心测评与科学健康干预", "体质评估 · 科学干预"); LoginCheck("提供专属解决方案", "成长规划 · 定制方案"); LoginCheck("全程跟踪辅导", "专家护航 · 全程陪伴") }
+                    Spacer(Modifier.weight(1f, fill = true))
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Row(Modifier.weight(1f).semantics { role = Role.Checkbox; contentDescription = if (agreement) "已同意用户协议、隐私政策和儿童隐私政策" else "同意用户协议、隐私政策和儿童隐私政策" }.clickable { agreement = !agreement }) {
                             Checkbox(checked = agreement, onCheckedChange = { agreement = it })

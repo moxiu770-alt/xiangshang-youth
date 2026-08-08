@@ -96,7 +96,12 @@ struct LoginView: View {
                         .padding(.top, 30)
                         .padding(.bottom, 12)
 
-                        loginPanel
+                        // The reference login composition uses the white account
+                        // panel as the main visual block.  On modern tall phones a
+                        // content-sized card left a large dead gap before the
+                        // campus artwork, so reserve proportional panel height and
+                        // let its agreement row settle near the lower edge.
+                        loginPanel(minHeight: horizontalSizeClass == .compact ? proxy.size.height * 0.63 : 0)
                         Spacer(minLength: 12)
                         landscape
                     }
@@ -118,7 +123,7 @@ struct LoginView: View {
         .sheet(item: $legalDocument) { document in LegalDocumentView(document: document) }
     }
 
-    private var loginPanel: some View {
+    private func loginPanel(minHeight: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 11) {
             HStack {
                 Spacer()
@@ -207,6 +212,7 @@ struct LoginView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, 8)
+            Spacer(minLength: 6)
             HStack(spacing: 8) {
                 Button { agreementAccepted.toggle() } label: {
                     Label(agreementAccepted ? "已阅读并同意相关协议" : "请阅读并同意相关协议", systemImage: agreementAccepted ? "checkmark.circle.fill" : "circle")
@@ -226,6 +232,7 @@ struct LoginView: View {
             }
         }
         .padding(20)
+        .frame(minHeight: minHeight, alignment: .top)
         .background(.white, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
         .padding(.horizontal, 10)
         .shadow(color: ReferenceColor.blue.opacity(0.08), radius: 12, y: 4)

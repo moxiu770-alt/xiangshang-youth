@@ -110,11 +110,44 @@ struct RootView: View {
             .zIndex(5)
         }
         if let error = state.error, !state.isShowingSplash, state.profile != nil, !state.restoringSession {
-            Color.black.opacity(0.18).ignoresSafeArea()
-            ErrorStateView(message: error) {
-                Task { if state.profile == nil { await state.login(phone: "13800138000") } else { await state.refreshDashboard() } }
-            } dismiss: { state.error = nil }
-            .background(.white, in: RoundedRectangle(cornerRadius: 20)).padding(32)
+            // A failed background refresh must not make a populated workbench
+            // feel disabled. Keep its cards available and offer explicit retry
+            // and dismiss actions in a compact, reachable banner instead.
+            VStack {
+                HStack(spacing: 9) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    Text(error)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(ReferenceColor.navy)
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button("重试") { Task { await state.refreshDashboard() } }
+                        .font(.system(size: 12, weight: .bold))
+                        .buttonStyle(.borderedProminent)
+                        .tint(ReferenceColor.blue)
+                    Button {
+                        state.error = nil
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 24, height: 24)
+                    }
+                    .accessibilityLabel("关闭刷新失败提示")
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(.orange.opacity(0.22), lineWidth: 1))
+                .shadow(color: .black.opacity(0.10), radius: 8, y: 3)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                Spacer()
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("刷新失败：\(error)，可重试或关闭提示")
+            .zIndex(8)
         }
         if privacyShielded && !state.isShowingSplash {
             ZStack {

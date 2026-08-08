@@ -12,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Security
@@ -361,26 +362,34 @@ private fun NavHostController.replaceRoot(destination: String) {
         }
     }
     }
-    // Keep refresh failures actionable on every authenticated route, including
-    // secondary pages that intentionally keep their last successful content.
-    // Login remains inline so the small loading/error window never covers the
-    // authentication form.
+    // Keep refresh failures actionable without covering a populated dashboard.
+    // Existing cards remain usable; the banner owns only its small top area.
     if (state.error != null && state.profile != null && state.data != null && !state.restoringSession) {
-        androidx.compose.foundation.layout.Box(
-            Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.16f)),
-            contentAlignment = Alignment.Center
-        ) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             Surface(
-                Modifier.fillMaxWidth().padding(horizontal = 28.dp),
-                color = Color.White,
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
-                shadowElevation = 8.dp
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .semantics { contentDescription = "刷新失败：${state.error}，可重试或关闭提示" },
+                color = Color.White.copy(alpha = .96f),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                shadowElevation = 6.dp
             ) {
-                ErrorState(
-                    state.error ?: "数据加载失败",
-                    retry = { viewModel.refreshDashboard() },
-                    dismiss = viewModel::clearError
-                )
+                Row(
+                    Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text("⚠", color = Color(0xFFFF9700))
+                    Text(
+                        state.error ?: "数据加载失败",
+                        modifier = Modifier.weight(1f),
+                        color = Color(0xFF20385F),
+                        maxLines = 2
+                    )
+                    TextButton(onClick = viewModel::refreshDashboard) { Text("重试") }
+                    TextButton(onClick = viewModel::clearError) { Text("关闭") }
+                }
             }
         }
     }

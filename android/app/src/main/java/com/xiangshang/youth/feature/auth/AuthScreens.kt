@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -105,7 +106,9 @@ fun LoginScreen(
         // Keep the supplied portrait composition readable on tablets without
         // stranding the footer midway down a large screen. Small-height and
         // landscape windows retain a scrollable, content-sized layout.
-        val anchoredTabletLayout = maxWidth >= 600.dp && maxHeight >= 800.dp
+        // At accessibility font scales the content must remain scrollable even
+        // on a tall tablet; anchoring is only a normal-text layout refinement.
+        val anchoredTabletLayout = maxWidth >= 600.dp && maxHeight >= 800.dp && LocalConfiguration.current.fontScale <= 1.15f
         // Preserve the portrait login composition on tablets instead of turning
         // the reference card into a very wide desktop form.
         Column(
@@ -355,7 +358,7 @@ fun RoleSelectScreen(onRole: (UserRole) -> Unit, onLogout: () -> Unit = {}) {
     val landscapeScale by transition.animateFloat(1f, if (reduceMotion) 1f else 1.035f, infiniteRepeatable(tween(5400, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "role-landscape-scale")
     LaunchedEffect(Unit) { appeared = true }
     BoxWithConstraints(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.White, Sky)))) {
-        val anchoredTabletLayout = maxWidth >= 600.dp && maxHeight >= 800.dp
+        val anchoredTabletLayout = maxWidth >= 600.dp && maxHeight >= 800.dp && LocalConfiguration.current.fontScale <= 1.15f
         Column(
             Modifier
                 .widthIn(max = 620.dp)

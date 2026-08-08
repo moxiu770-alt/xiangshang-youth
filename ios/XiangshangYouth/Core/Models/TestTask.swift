@@ -23,4 +23,17 @@ enum TaskStatus: String, CaseIterable, Codable, Hashable {
     func allowsTransition(to next: TaskStatus) -> Bool { next == self || allowedNextStatuses.contains(next) }
 }
 
-struct TestTask: Identifiable, Codable, Hashable { let id: String; let title: String; let date: String; let location: String; let gradeName: String; let className: String; let items: [TestItem]; let completedCount: Int; let totalCount: Int; let status: TaskStatus; let ruleVersion: String }
+struct TestTask: Identifiable, Codable, Hashable {
+    let id: String; let title: String; let date: String; let location: String; let gradeName: String; let className: String; let items: [TestItem]; let completedCount: Int; let totalCount: Int; let status: TaskStatus; let ruleVersion: String
+
+    /// Keeps local dashboard cards aligned with the assessment batch selected
+    /// by the user.  The backend aggregate remains authoritative for counts;
+    /// this only scopes representative student-level details such as risks.
+    func scopedStudents(from students: [Student]) -> [Student] {
+        let classNames = Set(className.split(separator: "、").map(String.init))
+        let matchingClasses = students.filter { student in
+            student.grade == gradeName && (classNames.isEmpty || classNames.contains(student.className))
+        }
+        return matchingClasses.isEmpty ? students.filter { $0.grade == gradeName } : matchingClasses
+    }
+}

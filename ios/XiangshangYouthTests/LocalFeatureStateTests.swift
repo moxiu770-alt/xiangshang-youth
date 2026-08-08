@@ -47,6 +47,16 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertEqual(report.totalScore, 28.5, accuracy: 0.001)
     }
 
+    func testTaskScopeKeepsSelectedBatchStudentMetricsHonest() async throws {
+        let data = try await MockRepository.shared.loadDashboard()
+        let autumnTask = try XCTUnwrap(data.tasks.first(where: { $0.id == "t1" }))
+        let retestTask = try XCTUnwrap(data.tasks.first(where: { $0.id == "t2" }))
+
+        XCTAssertTrue(autumnTask.scopedStudents(from: data.students).allSatisfy { $0.grade == "三年级" })
+        XCTAssertTrue(retestTask.scopedStudents(from: data.students).allSatisfy { $0.className == "四年级1班" })
+        XCTAssertFalse(retestTask.scopedStudents(from: data.students).contains(where: { $0.grade == "三年级" }))
+    }
+
     func testTaskStatusStateMachineRejectsImpossibleQueueJumps() {
         XCTAssertEqual(TaskStatus.notCheckedIn.allowedNextStatuses, [.checkedIn, .absent])
         XCTAssertTrue(TaskStatus.notCheckedIn.allowsTransition(to: .checkedIn))

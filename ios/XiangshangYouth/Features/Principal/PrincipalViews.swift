@@ -77,6 +77,10 @@ struct PrincipalDashboard: View {
         guard let task = activeTask else { return "本轮测评" }
         return "\(task.gradeName) · \(task.title.contains("补测") ? "专项补测" : "秋季测评")"
     }
+    /// The task aggregate comes from the assessment service, while the
+    /// bundled students are a representative local sample. Scope supporting
+    /// cards to the selected grade/classes so a task switch is truthful.
+    private var activeTaskStudents: [Student] { activeTask?.scopedStudents(from: students) ?? students }
     // `TestTask` is the school-level aggregate published by the assessment service.
     // The local student list is intentionally only a representative Mock sample, so it
     // must not replace the task aggregate and turn 15/20 into the misleading 2/4.
@@ -88,8 +92,8 @@ struct PrincipalDashboard: View {
         guard !gradeClasses.isEmpty else { return 0 }
         return Double(gradeClasses.map(\.completionRate).reduce(0, +)) / Double(gradeClasses.count) / 100
     }
-    private var riskStudents: [Student] { students.filter { ($0.totalScore ?? 35) < 25 || state.taskStatus(for: $0) == .review || state.taskStatus(for: $0) == .retest } }
-    private var averageScore: Double { let scores = students.compactMap(\.totalScore); return scores.isEmpty ? 0 : scores.reduce(0, +) / Double(scores.count) }
+    private var riskStudents: [Student] { activeTaskStudents.filter { ($0.totalScore ?? 35) < 25 || state.taskStatus(for: $0) == .review || state.taskStatus(for: $0) == .retest } }
+    private var averageScore: Double { let scores = activeTaskStudents.compactMap(\.totalScore); return scores.isEmpty ? 0 : scores.reduce(0, +) / Double(scores.count) }
 
     var body: some View {
         Group {
@@ -170,7 +174,7 @@ struct PrincipalDashboard: View {
                                 Image(systemName: "map.fill").font(.system(size: 26)).foregroundStyle(.orange).frame(width: 42, height: 42).background(.orange.opacity(0.12), in: Circle())
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text("粤北山区 · 贫困地区关怀").font(.system(size: 12, weight: .bold))
-                                    Text("\(students.filter(\.isPovertyArea).count)名学生已纳入公益运动课程支持").font(.system(size: 10)).foregroundStyle(.secondary)
+                                    Text("\(activeTaskStudents.filter(\.isPovertyArea).count)名当前任务学生已纳入公益运动课程支持").font(.system(size: 10)).foregroundStyle(.secondary)
                                 }
                                 Spacer()
                                 Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold)).foregroundStyle(.secondary)
@@ -191,10 +195,10 @@ struct PrincipalDashboard: View {
                 List {
                     Section("地区测评覆盖") {
                         regionRow("南湖校区", count: students.count, detail: "覆盖3个年级 · 6个班级")
-                        regionRow("粤北山区", count: students.filter(\.isPovertyArea).count, detail: "贫困地区学生 · 已纳入公益支持")
+                        regionRow("粤北山区", count: activeTaskStudents.filter(\.isPovertyArea).count, detail: "当前任务贫困地区学生 · 已纳入公益支持")
                     }
                     Section("公益关怀进度") {
-                        LabeledContent("已完成测评", value: "\(students.filter { ($0.totalScore ?? 0) > 0 }.count) 人")
+                        LabeledContent("当前任务样本", value: "\(activeTaskStudents.count) 人")
                         LabeledContent("待重点跟进", value: "\(riskStudents.count) 人")
                         Text("地区标签和公益支持资格由学校管理端维护，场地端上传成绩后会自动刷新。")
                             .font(.footnote).foregroundStyle(.secondary)
@@ -210,14 +214,14 @@ struct PrincipalDashboard: View {
         ReferenceCard {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Label("2026年秋季综合运动能力测评", systemImage: "chart.line.uptrend.xyaxis").font(.system(size: 13, weight: .bold))
+                    Label(activeTask?.title ?? "综合运动能力测评", systemImage: "chart.line.uptrend.xyaxis").font(.system(size: 13, weight: .bold))
                     Spacer()
-                    Text("进行中").font(.system(size: 10, weight: .bold)).foregroundStyle(ReferenceColor.blue).padding(.horizontal, 9).padding(.vertical, 4).background(ReferenceColor.sky, in: Capsule())
+                    Text(activeTask?.status.rawValue ?? "待开始").font(.system(size: 10, weight: .bold)).foregroundStyle(ReferenceColor.blue).padding(.horizontal, 9).padding(.vertical, 4).background(ReferenceColor.sky, in: Capsule())
                 }
                 HStack(alignment: .bottom) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("\(Int(completionRate * 100))%").font(.system(size: 31, weight: .bold)).foregroundStyle(ReferenceColor.blue)
-                        Text("全校测评完成率").font(.system(size: 10)).foregroundStyle(.secondary)
+                        Text("当前任务完成率").font(.system(size: 10)).foregroundStyle(.secondary)
                     }
                     Spacer()
                     VStack(alignment: .trailing, spacing: 3) {
@@ -232,9 +236,9 @@ struct PrincipalDashboard: View {
 
     private var scoreGrid: some View {
         HStack(spacing: 7) {
-            dashboardMetric("平均总分", String(format: "%.1f", averageScore), "35分制", "sportscourt.fill", ReferenceColor.blue) { router.push(.gradeStats) }
+            dashboardMetric("平均总分", String(format: "%.1f", averageScore), "当前任务样本 · 35分制", "sportscourt.fill", ReferenceColor.blue) { router.push(.gradeStats) }
             dashboardMetric("风险学生", "\(riskStudents.count)", "待及时跟进", "exclamationmark.shield.fill", .red) { router.push(.riskStudents) }
-            dashboardMetric("公益支持", "\(students.filter(\.isPovertyArea).count)", "贫困地区学生", "heart.fill", ReferenceColor.pink) { isRegionDetailShown = true }
+            dashboardMetric("公益支持", "\(activeTaskStudents.filter(\.isPovertyArea).count)", "当前任务贫困地区学生", "heart.fill", ReferenceColor.pink) { isRegionDetailShown = true }
         }.padding(.horizontal, 12)
     }
 

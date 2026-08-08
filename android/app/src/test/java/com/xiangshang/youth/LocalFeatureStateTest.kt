@@ -45,6 +45,17 @@ class LocalFeatureStateTest {
     }
 
     @Test
+    fun selectedTaskScopesRepresentativeStudentMetricsToItsBatch() = runBlocking {
+        val data = MockRepository().dashboard()
+        val autumnTask = data.tasks.first { it.id == "t1" }
+        val retestTask = data.tasks.first { it.id == "t2" }
+
+        assertTrue(autumnTask.scopedStudents(data.students).all { it.grade == "三年级" })
+        assertTrue(retestTask.scopedStudents(data.students).all { it.className == "四年级1班" })
+        assertTrue(retestTask.scopedStudents(data.students).none { it.grade == "三年级" })
+    }
+
+    @Test
     fun featureWorkflowStateKeepsAllSubmittedOperations() {
         val state = LocalFeatureState(
             activityRegistered = true,

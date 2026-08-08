@@ -2,6 +2,7 @@ package com.xiangshang.youth.core.service
 
 import android.content.Context
 import android.util.Base64
+import androidx.core.content.edit
 import java.nio.charset.StandardCharsets
 import java.security.KeyStore
 import javax.crypto.Cipher
@@ -39,16 +40,19 @@ class SecureTokenStore(context: Context) {
 
     fun write(token: String?) {
         if (token.isNullOrBlank()) {
-            preferences.edit().remove(KEY_TOKEN).remove(KEY_IV).apply()
+            preferences.edit {
+                remove(KEY_TOKEN)
+                remove(KEY_IV)
+            }
             return
         }
         runCatching {
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.ENCRYPT_MODE, secretKey())
-            preferences.edit()
-                .putString(KEY_TOKEN, Base64.encodeToString(cipher.doFinal(token.toByteArray(StandardCharsets.UTF_8)), Base64.NO_WRAP))
-                .putString(KEY_IV, Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
-                .apply()
+            preferences.edit {
+                putString(KEY_TOKEN, Base64.encodeToString(cipher.doFinal(token.toByteArray(StandardCharsets.UTF_8)), Base64.NO_WRAP))
+                putString(KEY_IV, Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
+            }
         }
     }
 

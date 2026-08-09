@@ -27,10 +27,13 @@ class MainActivity : ComponentActivity() {
         ApiClient.initialize(this)
         // The visual spec uses full-bleed artwork on the launch/login surfaces.
         // Draw behind system bars so Android does not add a black status-bar band.
+        // AppNavHost restores normal system chrome as soon as the splash route
+        // finishes; keeping this transition here avoids a cropped poster during
+        // the first Compose-owned frame.
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowInsetsControllerCompat(window, window.decorView).apply {
             isAppearanceLightStatusBars = false
-            isAppearanceLightNavigationBars = true
+            isAppearanceLightNavigationBars = false
         }
         incomingDeepLink = intent?.data
         appViewModel = ViewModelProvider(this)[AppViewModel::class.java]

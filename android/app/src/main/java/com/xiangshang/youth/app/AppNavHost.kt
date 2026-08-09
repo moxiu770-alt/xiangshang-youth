@@ -73,6 +73,7 @@ private fun NavHostController.replaceRoot(destination: String) {
     }
 }
 
+@Suppress("DEPRECATION")
 @Composable fun AppNavHost(viewModel: AppViewModel, incomingDeepLink: Uri? = null, nav: NavHostController = rememberNavController(), privacyShielded: Boolean = false) {
     val state by viewModel.state.collectAsState()
     val view = LocalView.current
@@ -102,17 +103,29 @@ private fun NavHostController.replaceRoot(destination: String) {
         onDispose { resolver.unregisterContentObserver(observer) }
     }
 
-    // The launch theme itself is fullscreen. Do not issue an immersive hide
-    // request from Compose while Android is still drawing its system-owned
-    // splash: on lower-memory devices that IPC can make System UI surface an
-    // ANR dialog over the poster. We only restore normal bars once the app has
-    // left its launch route.
+    // Android 12+ owns a short system splash before Compose gets a frame. The
+    // system's immersive education prompt is not acceptable over a launch
+    // poster, so keep system bars visible but color their reserved strip to
+    // the poster during the handoff. Normal login/dashboard colors are
+    // restored immediately after the poster route completes.
     LaunchedEffect(isSplash, state.profile != null, state.restoringSession) {
-        if (!isSplash) (view.context as? Activity)?.window?.let { window ->
+        (view.context as? Activity)?.window?.let { window ->
             WindowInsetsControllerCompat(window, view).apply {
-                show(androidx.core.view.WindowInsetsCompat.Type.statusBars() or androidx.core.view.WindowInsetsCompat.Type.navigationBars())
-                isAppearanceLightStatusBars = state.profile != null && !state.restoringSession
-                isAppearanceLightNavigationBars = true
+                if (isSplash) {
+                    // The App content area begins below the temporary system
+                    // bar on some API 35+ devices. Match that small reserved
+                    // strip to the poster canvas so no black band appears.
+                    window.statusBarColor = 0xFF7452A5.toInt()
+                    window.navigationBarColor = 0xFF7452A5.toInt()
+                    isAppearanceLightStatusBars = false
+                    isAppearanceLightNavigationBars = false
+                } else {
+                    window.statusBarColor = 0xFF76B8F7.toInt()
+                    window.navigationBarColor = android.graphics.Color.WHITE
+                    show(androidx.core.view.WindowInsetsCompat.Type.statusBars() or androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+                    isAppearanceLightStatusBars = state.profile != null && !state.restoringSession
+                    isAppearanceLightNavigationBars = true
+                }
             }
         }
     }

@@ -74,6 +74,9 @@ class MainActivityFlowTest {
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("班级健康概览").fetchSemanticsNodes().isNotEmpty()
         }
+        // Teacher is a role root, just like principal. It must not inherit a
+        // stale navigation back affordance after an account switch.
+        composeRule.onAllNodesWithContentDescription("返回").assertCountEquals(0)
         // Historical period selection must affect the board rather than merely
         // tinting a chip. It intentionally opens a protected aggregate view
         // instead of leaking current student reports as historical records.
@@ -167,6 +170,9 @@ class MainActivityFlowTest {
             // reports and assessments are exposed.
             composeRule.onAllNodesWithText("去绑定孩子").fetchSemanticsNodes().isNotEmpty()
         }
+        // Family is also a role root. The binding flow that follows is a
+        // secondary route and will provide its own usable return control.
+        composeRule.onAllNodesWithContentDescription("返回").assertCountEquals(0)
         composeRule.onNodeWithText("去绑定孩子").assertIsDisplayed()
         // Secondary parent tabs must preserve the same actionable binding guard;
         // an empty report/health page must never strand a family account.

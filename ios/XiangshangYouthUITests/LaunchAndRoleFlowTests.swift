@@ -27,6 +27,10 @@ final class LaunchAndRoleFlowTests: XCTestCase {
         // duplicate dashboard back-stack entry.
         button(containing: "学校端").tap()
         XCTAssertTrue(staticText(containing: "班级健康概览").waitForExistence(timeout: 5))
+        // A teacher workbench is a role root, not a pushed page. This guards
+        // against a top-bar change reintroducing the dead back affordance that
+        // previously trapped users after they selected a different identity.
+        XCTAssertFalse(button(containing: "返回").exists)
         // Teacher board drill-downs must remain in the teacher workbench.
         // A former route opened the principal risk page from “问题分布”.
         let classBoard = button(containing: "班级看板")
@@ -121,6 +125,9 @@ final class LaunchAndRoleFlowTests: XCTestCase {
 
         button(containing: "家庭端").tap()
         XCTAssertTrue(staticText(containing: "综合测评").waitForExistence(timeout: 5))
+        // The family workbench is also a role root. Child/report drill-downs
+        // get a back control; the home itself must never show one.
+        XCTAssertFalse(button(containing: "返回").exists)
     }
 
     func testParentBindingUnlocksReportAndKeepsReturnPath() {

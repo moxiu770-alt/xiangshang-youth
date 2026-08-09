@@ -315,12 +315,20 @@ struct AccountDashboard: View {
         ScrollView {
             VStack(spacing: 10) {
                 ParentPageNavigation(title: "我的")
-                HStack(spacing: 12) {
-                    Image(state.selectedRole == .teacher ? "TeacherAvatar" : "ChildAvatar").resizable().scaledToFill().frame(width: 54, height: 54).background(ReferenceColor.sky, in: Circle()).clipShape(Circle())
-                    VStack(alignment: .leading, spacing: 3) { Text(state.profile?.name ?? "王女士").font(.system(size: 16, weight: .bold)); Text(state.profile?.schoolName ?? "向上实验小学").font(.system(size: 10)).foregroundStyle(.secondary); RoleBadge(role: state.selectedRole ?? .parent) }
-                    Spacer()
-                    Image(systemName: "chevron.right").foregroundStyle(.secondary)
-                }.padding(14).background(.white, in: RoundedRectangle(cornerRadius: 12)).padding(.horizontal, 12).contentShape(RoundedRectangle(cornerRadius: 12)).onTapGesture { dialog = "个人资料" }.accessibilityElement(children: .combine).accessibilityLabel("查看个人资料").accessibilityAddTraits(.isButton)
+                Button { dialog = "个人资料" } label: {
+                    HStack(spacing: 12) {
+                        Image(state.selectedRole == .teacher ? "TeacherAvatar" : "ChildAvatar").resizable().scaledToFill().frame(width: 54, height: 54).background(ReferenceColor.sky, in: Circle()).clipShape(Circle())
+                        VStack(alignment: .leading, spacing: 3) { Text(state.profile?.name ?? "王女士").font(.system(size: 16, weight: .bold)); Text(state.profile?.schoolName ?? "向上实验小学").font(.system(size: 10)).foregroundStyle(.secondary); RoleBadge(role: state.selectedRole ?? .parent) }
+                        Spacer()
+                        Image(systemName: "chevron.right").foregroundStyle(.secondary)
+                    }
+                    .padding(14).background(.white, in: RoundedRectangle(cornerRadius: 12))
+                    .contentShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 12)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("查看个人资料")
                 if state.selectedRole == .parent {
                     HStack(spacing: 8) {
                         accountMetric(title: "已绑定孩子", value: "\(state.boundChildren.count)", action: { router.push(.children(returnAfterBinding: false)) })

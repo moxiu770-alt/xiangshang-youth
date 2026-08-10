@@ -452,6 +452,24 @@ enum WorkflowCommandState: Equatable {
         }
     }
     func completeAssessment(_ category: AssessmentCategory) { mutateLocal { $0.completedAssessments.insert("\(selectedChild?.id ?? "anonymous")-\(category.rawValue)") } }
+    func bodyAssessment(for student: Student) -> BodyAssessmentRecord? {
+        localFeatures.bodyAssessments[student.id]
+    }
+    func saveBodyAssessment(_ record: BodyAssessmentRecord, for student: Student) {
+        mutateLocal { values in
+            values.bodyAssessments[student.id] = record
+            values.completedAssessments.insert("\(student.id)-身体测评")
+        }
+    }
+    func toggleBodyPlanDay(_ day: Date, for student: Student) {
+        let key = Self.dayFormatter.string(from: day)
+        mutateLocal { values in
+            guard var record = values.bodyAssessments[student.id] else { return }
+            if record.completedPlanDays.contains(key) { record.completedPlanDays.remove(key) }
+            else { record.completedPlanDays.insert(key) }
+            values.bodyAssessments[student.id] = record
+        }
+    }
     /// Progress can arrive from a resumed player or local draft. Keep its
     /// persisted representation within the valid 0...1 range.
     func updateCourseProgress(_ title: String, progress: Double) {

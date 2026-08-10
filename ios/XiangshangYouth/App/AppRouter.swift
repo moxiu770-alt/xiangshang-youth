@@ -5,7 +5,7 @@ enum AssessmentCategory: String, Hashable, CaseIterable { case fitness = "体质
     var color: Color { switch self { case .fitness: ReferenceColor.blue; case .vision: ReferenceColor.green; case .oral: ReferenceColor.yellow; case .mental: ReferenceColor.pink } }
 }
 
-enum AppRoute: Hashable { case roleSelect; case parentHome; case parentCourses; case children(returnAfterBinding: Bool); case parentEvaluations; case parentMessages; case notifications; case healthProfile; case assessment(AssessmentCategory); case expertList; case teacherHome; case teacherMessages; case teacherClasses; case teacherClassBoard; case studentList(ClassInfo?); case outstandingStudents; case unassignedStudents; case teacherTasks; case teacherTaskDetail(TestTask); case reviewList; case principalHome; case gradeStats; case classStats; case riskStudents; case report(Student) }
+enum AppRoute: Hashable { case roleSelect; case parentHome; case parentCourses; case children(returnAfterBinding: Bool); case parentEvaluations; case parentMessages; case notifications; case healthProfile; case bodyAssessment; case assessment(AssessmentCategory); case expertList; case teacherHome; case teacherMessages; case teacherClasses; case teacherClassBoard; case studentList(ClassInfo?); case outstandingStudents; case unassignedStudents; case teacherTasks; case teacherTaskDetail(TestTask); case reviewList; case principalHome; case gradeStats; case classStats; case riskStudents; case report(Student) }
 
 @MainActor final class AppRouter: ObservableObject {
     @Published var path = NavigationPath()

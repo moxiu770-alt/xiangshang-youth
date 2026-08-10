@@ -2,6 +2,8 @@ package com.xiangshang.youth.core.service
 
 import android.content.Context
 import com.xiangshang.youth.core.model.TaskStatus
+import com.xiangshang.youth.core.model.BodyAssessmentRecord
+import com.xiangshang.youth.core.model.BodyCaptureTask
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -12,6 +14,7 @@ data class LocalFeatureState(
     val activityRegistered: Boolean = false,
     val activityRegistrations: List<ActivityRegistration> = emptyList(),
     val completedAssessments: Set<String> = emptySet(),
+    val bodyAssessments: Map<String, BodyAssessmentRecord> = emptyMap(),
     val courseProgress: Map<String, Float> = emptyMap(),
     val supportMessages: List<SupportMessage> = emptyList(),
     val classPosts: List<ClassPost> = emptyList(),
@@ -54,6 +57,7 @@ class LocalFeatureStore(context: Context) {
         activityRegistered = prefs.getBoolean("activity_registered", false),
         activityRegistrations = decodeActivityRegistrations(prefs.getString("activity_registrations", null)),
         completedAssessments = prefs.getStringSet("completed_assessments", emptySet()) ?: emptySet(),
+        bodyAssessments = decodeBodyAssessments(prefs.getString("body_assessments", null)),
         courseProgress = decodeProgress(prefs.getString("course_progress", null)),
         supportMessages = decodeMessages(prefs.getString("support_messages", null)),
         classPosts = decodePosts(prefs.getString("class_posts", null)),
@@ -85,6 +89,7 @@ class LocalFeatureStore(context: Context) {
         .putBoolean("activity_registered", value.activityRegistered)
         .putString("activity_registrations", JSONArray().apply { value.activityRegistrations.forEach { put(JSONObject().put("id", it.id).put("activityId", it.activityId).put("contactName", it.contactName).put("phone", it.phone).put("status", it.status.name)) } }.toString())
         .putStringSet("completed_assessments", value.completedAssessments)
+        .putString("body_assessments", JSONObject().apply { value.bodyAssessments.forEach { (id, r) -> put(id, JSONObject().put("height", r.heightCm).put("weight", r.weightKg).put("measured", r.measuredAt).put("captures", JSONArray(r.captures.map { it.name })).put("asymmetric", r.asymmetric).put("gait", r.gaitConcern).put("followup", r.nextFollowUp).put("plan", JSONArray(r.planDays))) } }.toString())
         .putString("course_progress", JSONObject(value.courseProgress).toString())
         .putString("support_messages", JSONArray().apply { value.supportMessages.forEach { put(JSONObject().put("text", it.text).put("mine", it.mine)) } }.toString())
         .putString("class_posts", JSONArray().apply { value.classPosts.forEach { put(JSONObject().put("id", it.id).put("author", it.author).put("content", it.content)) } }.toString())
@@ -113,6 +118,7 @@ class LocalFeatureStore(context: Context) {
     }
     fun clear() { prefs.edit().clear().apply() }
     private fun decodeProgress(raw: String?): Map<String, Float> = runCatching { JSONObject(raw ?: "{}").keys().asSequence().associateWith { JSONObject(raw ?: "{}").optDouble(it).toFloat() } }.getOrDefault(emptyMap())
+    private fun decodeBodyAssessments(raw: String?): Map<String, BodyAssessmentRecord> = runCatching { val root = JSONObject(raw ?: "{}"); root.keys().asSequence().associateWith { id -> val o = root.getJSONObject(id); val c = o.optJSONArray("captures") ?: JSONArray(); val p = o.optJSONArray("plan") ?: JSONArray(); BodyAssessmentRecord(o.optDouble("height"), o.optDouble("weight"), o.optString("measured"), (0 until c.length()).mapNotNull { runCatching { BodyCaptureTask.valueOf(c.getString(it)) }.getOrNull() }.toSet(), o.optBoolean("asymmetric"), o.optBoolean("gait"), o.optString("followup"), (0 until p.length()).map { p.getString(it) }.toSet()) } }.getOrDefault(emptyMap())
     private fun decodeStringMap(raw: String?): Map<String, String> = runCatching { JSONObject(raw ?: "{}").keys().asSequence().associateWith { JSONObject(raw ?: "{}").optString(it) } }.getOrDefault(emptyMap())
     private fun decodeMessages(raw: String?): List<SupportMessage> = runCatching { val a = JSONArray(raw ?: "[]"); List(a.length()) { SupportMessage(a.getJSONObject(it).optString("text"), a.getJSONObject(it).optBoolean("mine")) } }.getOrDefault(emptyList())
     private fun decodeActivityRegistrations(raw: String?): List<ActivityRegistration> = runCatching { val a = JSONArray(raw ?: "[]"); List(a.length()) { val o = a.getJSONObject(it); ActivityRegistration(o.optString("id"), o.optString("activityId"), o.optString("contactName"), o.optString("phone"), o.optString("status").let { runCatching { LocalSubmissionStatus.valueOf(it) }.getOrDefault(LocalSubmissionStatus.PendingSync) }) } }.getOrDefault(emptyList())

@@ -301,6 +301,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     fun completeAssessment(category: String) = mutate { it.copy(completedAssessments = it.completedAssessments + "${_state.value.selectedChild?.id ?: "anonymous"}-$category") }
+    fun saveBodyAssessment(student: Student, record: BodyAssessmentRecord) = mutate { it.copy(bodyAssessments = it.bodyAssessments + (student.id to record), completedAssessments = it.completedAssessments + "${student.id}-身体测评") }
+    fun toggleBodyPlanDay(student: Student, key: String) = mutate { local -> val record = local.bodyAssessments[student.id] ?: return@mutate local; local.copy(bodyAssessments = local.bodyAssessments + (student.id to record.copy(planDays = if (key in record.planDays) record.planDays - key else record.planDays + key))) }
     /** Progress can originate from a resumed player or a local draft; keep the
      * persisted value valid even if a caller supplies an out-of-range value. */
     fun updateCourseProgress(title: String, progress: Float) = mutate {

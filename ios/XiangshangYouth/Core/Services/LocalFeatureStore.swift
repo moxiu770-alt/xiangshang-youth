@@ -32,6 +32,10 @@ struct LocalFeatureState: Codable, Equatable {
     var parentAccountName: String? = nil
     var selectedChildID: String? = nil
     var boundChildIDs: Set<String> = []
+    /// Family-controlled body assessment records. Raw camera assets are never
+    /// persisted here; only the completed visual tasks and parent-confirmed
+    /// observations are retained.
+    var bodyAssessments: [String: BodyAssessmentRecord] = [:]
     /// Keep dashboard context across a relaunch. These are presentation
     /// preferences only; the authoritative task and permission data remains
     /// repository-owned once remote mode is enabled.
@@ -151,6 +155,7 @@ final class LocalFeatureStore: ObservableObject {
         if legacy["parentAccountName"] == nil { legacy["parentAccountName"] = NSNull() }
         if legacy["selectedChildID"] == nil { legacy["selectedChildID"] = NSNull() }
         if legacy["boundChildIDs"] == nil { legacy["boundChildIDs"] = [String]() }
+        if legacy["bodyAssessments"] == nil { legacy["bodyAssessments"] = [String: Any]() }
         if legacy["selectedPrincipalTaskID"] == nil { legacy["selectedPrincipalTaskID"] = NSNull() }
         if legacy["teacherUsesSportsWorkbench"] == nil { legacy["teacherUsesSportsWorkbench"] = false }
         if legacy["readMessageIDs"] == nil { legacy["readMessageIDs"] = [String]() }

@@ -98,9 +98,7 @@ struct ParentLandingView: View {
         LazyVGrid(columns: quickActionColumns, spacing: 8) {
             Button { if let child = state.selectedChild { router.push(.report(child)) } else { router.push(.children(returnAfterBinding: true)) } } label: { ReferenceAction(icon: "calendar", title: "测评报告", color: ReferenceColor.blue) }.buttonStyle(.plain)
             Button { router.push(.parentMessages) } label: { ReferenceAction(icon: "exclamationmark.circle.fill", title: "健康提醒", color: .red) }.buttonStyle(.plain)
-            // “打卡记录” is a read/navigation affordance. Do not silently
-            // create a health record merely because the parent wants to view it.
-            Button { router.push(.healthProfile) } label: { ReferenceAction(icon: "checkmark.seal.fill", title: "打卡记录", color: ReferenceColor.green) }.buttonStyle(.plain)
+            Button { router.push(.bodyAssessment) } label: { ReferenceAction(icon: "figure.walk.motion", title: "身体测评", color: ReferenceColor.green) }.buttonStyle(.plain)
             Button { router.push(.parentCourses) } label: { ReferenceAction(icon: "play.rectangle.fill", title: "推荐课程", color: .orange) }.buttonStyle(.plain)
         }.padding(.horizontal, 10)
         HStack { Text("专家团队").font(.system(size: 14, weight: .bold)); Spacer(); Button("查看全部 ›") { router.push(.expertList) }.font(.system(size: 10, weight: .semibold)).foregroundStyle(ReferenceColor.blue) }.padding(.horizontal, 12)
@@ -147,7 +145,7 @@ struct ParentLandingView: View {
             ReferenceMetric(icon: icon, title: title, value: subtitle, color: color)
         }.buttonStyle(.plain).accessibilityLabel("查看\(title)报告")
     }
-    private func assessmentMetric(_ category: AssessmentCategory) -> some View { Button { router.push(.assessment(category)) } label: { ReferenceMetric(icon: category.icon, title: category.rawValue, value: category == .fitness ? "继续测评" : "开始测评", color: category.color) }.buttonStyle(.plain) }
+    private func assessmentMetric(_ category: AssessmentCategory) -> some View { Button { category == .fitness ? router.push(.bodyAssessment) : router.push(.assessment(category)) } label: { ReferenceMetric(icon: category.icon, title: category.rawValue, value: category == .fitness ? "身体测评" : "开始测评", color: category.color) }.buttonStyle(.plain) }
 }
 
 struct ParentCampaignCard: View {

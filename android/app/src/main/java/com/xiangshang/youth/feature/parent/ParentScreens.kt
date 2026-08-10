@@ -129,9 +129,9 @@ fun ParentHomeScreen(state: AppUiState, nav: NavHostController, registerActivity
         Surface(Modifier.padding(horizontal = 10.dp).fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(12.dp), shadowElevation = 1.dp) {
             Column(Modifier.padding(11.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("综合测评", color = Blue, fontWeight = FontWeight.Bold, fontSize = 17.sp); Text("运动表现、心理健康、口腔健康状况", color = Color.Gray, fontSize = 9.sp) }; Icon(Icons.Filled.WbSunny, null, tint = Color(0xFFFFBD2E)) }
-                Spacer(Modifier.height(8.dp)); Row { ParentMetric("体质", Icons.AutoMirrored.Filled.DirectionsRun, Blue, Modifier.weight(1f)) { nav.navigate("${Destinations.Assessment}/fitness") }; Spacer(Modifier.width(7.dp)); ParentMetric("心理", Icons.Filled.Favorite, Color(0xFFFF6D9B), Modifier.weight(1f)) { nav.navigate("${Destinations.Assessment}/mental") } }
+                Spacer(Modifier.height(8.dp)); Row { ParentMetric("体质", Icons.AutoMirrored.Filled.DirectionsRun, Blue, Modifier.weight(1f)) { nav.navigate(Destinations.BodyAssessment) }; Spacer(Modifier.width(7.dp)); ParentMetric("心理", Icons.Filled.Favorite, Color(0xFFFF6D9B), Modifier.weight(1f)) { nav.navigate("${Destinations.Assessment}/mental") } }
                 Spacer(Modifier.height(7.dp)); Row { ParentMetric("视力", Icons.Filled.RemoveRedEye, Green, Modifier.weight(1f)) { nav.navigate("${Destinations.Assessment}/vision") }; Spacer(Modifier.width(7.dp)); ParentMetric("口腔", Icons.Filled.MedicalServices, Color(0xFFFFBD2E), Modifier.weight(1f)) { nav.navigate("${Destinations.Assessment}/oral") } }
-                Button(onClick = { nav.navigate("${Destinations.Assessment}/fitness") }, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp).height(29.dp), contentPadding = PaddingValues(horizontal = 28.dp)) { Text("继续测评", fontSize = 10.sp) }
+                Button(onClick = { nav.navigate(Destinations.BodyAssessment) }, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp).height(29.dp), contentPadding = PaddingValues(horizontal = 28.dp)) { Text("身体测评", fontSize = 10.sp) }
             }
         }
         ParentQuickActions(nav, state.local.checkedInToday)

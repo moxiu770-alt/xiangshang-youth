@@ -34,7 +34,9 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>用于拍摄课堂记录和学生运动照片</string>
+	<string>用于家庭身体测评中的姿态和步态引导拍摄</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>用于在模拟器或家长选择时完成家庭身体测评的采集流程</string>
 	<key>UILaunchStoryboardName</key>
     <string>LaunchScreen</string>
 	<key>UIUserInterfaceStyle</key>

@@ -7,8 +7,8 @@ import retrofit2.http.Path
 
 interface ReportApi {
     @GET("v1/students/{studentId}/report")
-    suspend fun report(@Path("studentId") studentId: String): DiagnosisReport
+    suspend fun report(@Path("studentId") studentId: String): ApiEnvelope<DiagnosisReport>
 
     @POST("v1/students/{studentId}/report/refresh")
-    suspend fun refresh(@Path("studentId") studentId: String): DiagnosisReport
+    suspend fun refresh(@Path("studentId") studentId: String): ApiEnvelope<DiagnosisReport>
 }

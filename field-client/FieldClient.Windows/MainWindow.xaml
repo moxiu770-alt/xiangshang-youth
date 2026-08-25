@@ -1,0 +1,16 @@
+<Window x:Class="Xiangshang.FieldClient.Windows.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="向上少年 · 场地体测端" Width="1180" Height="760" MinWidth="980" MinHeight="640" Background="#F4F7FB">
+  <Grid Margin="28">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+    <DockPanel LastChildFill="False">
+      <StackPanel DockPanel.Dock="Left"><TextBlock Text="向上少年 · 场地体测端" FontSize="24" FontWeight="Bold" Foreground="#102C54"/><TextBlock Text="离线优先 · 设备已注册后同步中央服务" Margin="0,6,0,0" Foreground="#617087"/></StackPanel>
+      <Border DockPanel.Dock="Right" Padding="12,7" Background="#E5FAF6" CornerRadius="8"><TextBlock x:Name="ConnectionStatus" Text="等待设备配置" Foreground="#13966F" FontWeight="SemiBold"/></Border>
+    </DockPanel>
+    <Grid Grid.Row="1" Margin="0,24,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="2*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+      <Border Background="White" CornerRadius="16" Padding="22"><DockPanel><StackPanel DockPanel.Dock="Top"><TextBlock Text="候测队列" FontSize="18" FontWeight="Bold"/><TextBlock Text="按中央任务快照叫号；断网时继续记录，联网后安全重放。" Margin="0,5,0,16" Foreground="#617087"/></StackPanel><ListBox x:Name="QueueList" BorderThickness="0" DisplayMemberPath="StudentName"/></DockPanel></Border>
+      <Border Grid.Column="2" Background="White" CornerRadius="16" Padding="22"><StackPanel><TextBlock Text="采集控制" FontSize="18" FontWeight="Bold"/><TextBlock Text="相机与计时器通过适配器接入；未接入时可使用受控人工录入兜底。" Margin="0,6,0,20" Foreground="#617087"/><Button x:Name="CallNextButton" Content="叫下一位" Height="46" Margin="0,0,0,10" Click="CallNextButton_Click"/><Button x:Name="StartCaptureButton" Content="开始采集" Height="46" Margin="0,0,0,10" Click="StartCaptureButton_Click"/><Button x:Name="CompleteCaptureButton" Content="录入成绩并完成" Height="46" Margin="0,0,0,10" Click="CompleteCaptureButton_Click"/><Button x:Name="SyncButton" Content="立即同步" Height="42" Click="SyncButton_Click"/><Separator Margin="0,24,0,14"/><TextBlock x:Name="OperationHint" Text="请先在后台注册设备并加载任务。" TextWrapping="Wrap" Foreground="#617087"/></StackPanel></Border>
+    </Grid>
+  </Grid>
+</Window>

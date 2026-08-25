@@ -11,7 +11,11 @@ build/
 *.xcuserstate
 *.xcscmblueprint
 ios/**/xcuserdata/
+ios/**/project.xcworkspace/
 ios/**/project.xcworkspace/xcuserdata/
+*.xcresult/
+*.dSYM/
+*.ipa
 
 # Swift Package Manager
 .build/
@@ -24,6 +28,9 @@ android/local.properties
 *.apk
 *.aab
 
+# JavaScript dependencies
+node_modules/
+
 # IDE
 .idea/
 *.iml
@@ -31,7 +38,19 @@ android/local.properties
 # Logs
 *.log
 
+# Python generated files
+__pycache__/
+*.py[cod]
+
+# Local SDKs and .NET build outputs
+.tooling/
+field-client/**/bin/
+field-client/**/obj/
+field-client/artifacts/
+backend/monitoring/metrics_token
+
 # Secrets / environment
 .env
 .env.*
 !.env.example
+backend/storage/

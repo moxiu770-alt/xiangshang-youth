@@ -16,7 +16,7 @@ struct ReferenceHeader: View {
     @EnvironmentObject private var state: AppState
     let name: String; let school: String; let initial: String; var showsBell = true; var avatarAsset: String? = nil; var roleAction: (() -> Void)? = nil; var identityAction: (() -> Void)? = nil
     @ScaledMetric(relativeTo: .headline) private var nameSize: CGFloat = 14
-    @ScaledMetric(relativeTo: .caption) private var schoolSize: CGFloat = 9
+    @ScaledMetric(relativeTo: .caption) private var schoolSize: CGFloat = 11
     var body: some View { HStack(spacing: 9) {
         if let identityAction {
             Button(action: identityAction) { identityContent }.buttonStyle(.plain).accessibilityLabel("切换孩子")
@@ -25,7 +25,7 @@ struct ReferenceHeader: View {
         }
         Spacer()
         if let roleAction { Button(action: roleAction) { Image(systemName: "arrow.left.arrow.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(ReferenceColor.blue).frame(width: 44, height: 44).contentShape(Rectangle()) }.buttonStyle(.plain).accessibilityLabel("切换使用角色") }
-        if showsBell { Button { router.push(state.selectedRole == .teacher ? .teacherMessages : .notifications) } label: { Image(systemName: "bell").font(.system(size: 16, weight: .medium)).foregroundStyle(ReferenceColor.navy).frame(width: 32, height: 32).contentShape(Rectangle()).frame(width: 44, height: 44).contentShape(Rectangle()).overlay(alignment: .topTrailing) { if state.unreadMessageCount > 0 { Circle().fill(.red).frame(width: 5, height: 5).offset(x: -3, y: 3) } } }.buttonStyle(.plain).accessibilityLabel("消息通知").accessibilityHint("打开消息中心") }
+        if showsBell { Button { router.push(.messageCenter(for: state.selectedRole)) } label: { Image(systemName: "bell").font(.system(size: 16, weight: .medium)).foregroundStyle(ReferenceColor.navy).frame(width: 32, height: 32).contentShape(Rectangle()).frame(width: 44, height: 44).contentShape(Rectangle()).overlay(alignment: .topTrailing) { if state.unreadMessageCount > 0 { Circle().fill(.red).frame(width: 5, height: 5).offset(x: -3, y: 3) } } }.buttonStyle(.plain).accessibilityLabel("消息通知").accessibilityHint("打开消息中心") }
     }.padding(.horizontal, 14).padding(.vertical, 9).background { Rectangle().fill(.ultraThinMaterial).ignoresSafeArea(edges: .top) }.overlay(alignment: .bottom) { Rectangle().fill(ReferenceColor.navy.opacity(0.08)).frame(height: 0.5) } }
     private var identityContent: some View {
         HStack(spacing: 9) {
@@ -49,7 +49,7 @@ struct ReferenceSectionTitle: View {
     /// affordance honest without introducing an inaccessible nested button.
     var showsLink: Bool = false
     @ScaledMetric(relativeTo: .headline) private var titleSize: CGFloat = 14
-    @ScaledMetric(relativeTo: .caption) private var trailingSize: CGFloat = 10
+    @ScaledMetric(relativeTo: .caption) private var trailingSize: CGFloat = 11
     var body: some View {
         HStack {
             Text(title)
@@ -78,39 +78,30 @@ struct ReferenceSectionTitle: View {
 
 struct ReferenceMetric: View {
     let icon: String; let title: String; let value: String; let color: Color
-    @EnvironmentObject private var state: AppState
-    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
-    @State private var breathes = false
-    @ScaledMetric(relativeTo: .caption) private var titleSize: CGFloat = 10
-    @ScaledMetric(relativeTo: .caption2) private var valueSize: CGFloat = 9
+    @ScaledMetric(relativeTo: .body) private var titleSize: CGFloat = 13
+    @ScaledMetric(relativeTo: .caption) private var valueSize: CGFloat = 12
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             Image(systemName: icon)
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(color)
-                .scaleEffect(breathes ? 1.1 : 0.94)
-                .symbolEffect(.pulse, options: .repeating, value: breathes)
             Text(title).font(.system(size: titleSize, weight: .bold)).foregroundStyle(ReferenceColor.navy).lineLimit(2)
             Text(value).font(.system(size: valueSize)).foregroundStyle(.secondary).lineLimit(2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(9)
-        .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: 9))
-        .task(id: state.localFeatures.settings.reduceMotion || systemReduceMotion) {
-            guard !(state.localFeatures.settings.reduceMotion || systemReduceMotion) else { breathes = false; return }
-            withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) { breathes = true }
-        }
+        .padding(11)
+        .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
     }
 }
 
 struct ReferenceAction: View {
     let icon: String; let title: String; let color: Color
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @ScaledMetric(relativeTo: .caption) private var titleSize: CGFloat = 10
+    @ScaledMetric(relativeTo: .body) private var titleSize: CGFloat = 12
 
     var body: some View {
         VStack(spacing: 7) {
-            Image(systemName: icon).font(.system(size: 21, weight: .bold)).foregroundStyle(.white).frame(width: 39, height: 39).background(LinearGradient(colors: [color.opacity(0.75), color], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 12))
+            Image(systemName: icon).font(.system(size: 21, weight: .bold)).foregroundStyle(.white).frame(width: 44, height: 44).background(color, in: RoundedRectangle(cornerRadius: 12))
             Text(title)
                 .font(.system(size: titleSize, weight: .bold))
                 .foregroundStyle(ReferenceColor.navy)
@@ -125,7 +116,7 @@ struct ReferenceAction: View {
     }
 }
 
-struct ReferenceCard<Content: View>: View { @ViewBuilder let content: Content; var body: some View { content.padding(11).background(.white, in: RoundedRectangle(cornerRadius: 11)).overlay(RoundedRectangle(cornerRadius: 11).stroke(ReferenceColor.blue.opacity(0.08), lineWidth: 1)).shadow(color: .black.opacity(0.025), radius: 4, y: 2) } }
+struct ReferenceCard<Content: View>: View { @ViewBuilder let content: Content; var body: some View { content.padding(14).background(.white, in: RoundedRectangle(cornerRadius: 12)).overlay(RoundedRectangle(cornerRadius: 12).stroke(ReferenceColor.blue.opacity(0.08), lineWidth: 1)).shadow(color: .black.opacity(0.025), radius: 4, y: 2) } }
 
 struct AnimatedProgressLine: View {
     let value: Double

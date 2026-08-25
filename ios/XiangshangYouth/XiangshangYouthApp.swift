@@ -3,12 +3,15 @@ import SwiftUI
 @main struct XiangshangYouthApp: App {
     @StateObject private var state = AppState()
     @StateObject private var router = AppRouter()
-    var body: some Scene { WindowGroup { RootView().environmentObject(state).environmentObject(router).tint(AppTheme.primary).dynamicTypeSize(.xSmall ... .accessibility5).preferredColorScheme(.light) } }
+    @StateObject private var featureRollout = FeatureRollout()
+    init() { CrashMonitoring.configure(); BodyCaptureQualityGate.loadCanonicalProfilesIfAvailable(); ChildFollowAlongTuning.loadCanonicalProfilesIfAvailable() }
+    var body: some Scene { WindowGroup { RootView().environmentObject(state).environmentObject(router).environmentObject(featureRollout).tint(AppTheme.primary).dynamicTypeSize(.xSmall ... .accessibility5).preferredColorScheme(.light) } }
 }
 
 struct RootView: View {
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var router: AppRouter
+    @EnvironmentObject private var featureRollout: FeatureRollout
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.scenePhase) private var scenePhase
     // Respect both the in-app preference and the system accessibility setting.
@@ -29,7 +32,7 @@ struct RootView: View {
         // reintroduce time, signal or the Home indicator while it is visible.
         .statusBarHidden(state.isShowingSplash)
         .persistentSystemOverlays(state.isShowingSplash ? .hidden : .visible)
-        .onAppear { networkMonitor.start(); state.setOffline(networkMonitor.isOffline) }
+        .onAppear { networkMonitor.start(); state.setOffline(networkMonitor.isOffline); Task { await featureRollout.refreshIfConfigured() } }
         .onChange(of: networkMonitor.isOffline) { _, value in state.setOffline(value) }
     }
     private var navigationRoot: some View {
@@ -85,6 +88,35 @@ struct RootView: View {
             OfflineBanner(message: "当前处于离线模式，本地数据仍可查看；联网后可刷新最新数据。")
                 .transition(.move(edge: .top).combined(with: .opacity))
                 .zIndex(10)
+        }
+        if let persistenceError = state.localPersistenceError, !state.isShowingSplash {
+            VStack {
+                HStack(spacing: 9) {
+                    Image(systemName: "internaldrive.trianglebadge.exclamationmark")
+                        .foregroundStyle(.red)
+                    Text(persistenceError)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(ReferenceColor.navy)
+                        .lineLimit(2)
+                    Button { state.clearLocalPersistenceError() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 10, weight: .bold))
+                            .frame(width: 28, height: 28)
+                    }
+                    .accessibilityLabel("关闭本机保存受限提示")
+                }
+                .padding(.horizontal, 13)
+                .padding(.vertical, 9)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(.red.opacity(0.24), lineWidth: 1))
+                .shadow(color: .black.opacity(0.10), radius: 7, y: 2)
+                .padding(.horizontal, 16)
+                .padding(.top, networkMonitor.isOffline ? 48 : 8)
+                Spacer()
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("本机保存受限：\(persistenceError)")
+            .zIndex(11)
         }
         if state.loading && !state.isShowingSplash && state.profile != nil && state.data != nil {
             // Refreshing existing content must not turn a teacher/principal
@@ -175,10 +207,10 @@ struct RootView: View {
             .zIndex(100)
         }
     }
-    @ViewBuilder private func homeForRole(_ role: UserRole) -> some View { switch role { case .parent: ParentHomeView(); case .teacher: TeacherHomeView(); case .principal: PrincipalHomeView() } }
+    @ViewBuilder private func homeForRole(_ role: UserRole) -> some View { switch role { case .parent: ParentHomeView(); case .teacher: TeacherHomeView(); case .principal: BackendDashboardNoticeView() } }
     @ViewBuilder private func destination(for route: AppRoute) -> some View {
         switch route {
-        case .roleSelect: RoleSelectView(); case .parentHome: ParentHomeView(); case .parentCourses: ParentCoursesDashboard(); case .children(let returnAfterBinding): ChildrenView(returnAfterBinding: returnAfterBinding); case .parentEvaluations: ParentEvaluationsView(); case .parentMessages: ParentMessagesView(); case .notifications: NotificationsView(); case .healthProfile: HealthProfileView(); case .bodyAssessment: BodyAssessmentView(); case .assessment(let category): AssessmentFlowView(category: category); case .expertList: ExpertListView(); case .teacherHome: TeacherHomeView(); case .teacherMessages: TeacherMessagesView(); case .teacherClasses: TeacherClassesView(); case .teacherClassBoard: TeacherClassBoardView(); case .studentList(let c): StudentListView(classInfo: c); case .outstandingStudents: StudentListView(classInfo: nil, mode: .outstanding); case .unassignedStudents: StudentListView(classInfo: nil, mode: .unassigned); case .teacherTasks: TeacherTasksView(); case .teacherTaskDetail(let task): TeacherTaskDetailView(task: task); case .reviewList: ReviewListView(); case .principalHome: PrincipalHomeView(); case .gradeStats: GradeStatsView(showsBack: true); case .classStats: ClassStatsView(initialGrade: router.pendingGradeFilter, showsBack: true); case .riskStudents: RiskStudentsView(initialClass: router.pendingClassFilter, showsBack: true); case .report(let student): ReportDetailView(student: student)
+        case .roleSelect: RoleSelectView(); case .backendDashboard: BackendDashboardNoticeView(); case .parentHome: ParentHomeView(); case .parentCourses: ParentCoursesDashboard(); case .children(let returnAfterBinding): ChildrenView(returnAfterBinding: returnAfterBinding); case .parentEvaluations: ParentEvaluationsView(); case .parentMessages: ParentMessagesView(); case .notifications: NotificationsView(); case .healthProfile: HealthProfileView(); case .bodyAssessment: BodyAssessmentView(); case .assessment(let category): if category == .fitness { BodyAssessmentView() } else { AssessmentFlowView(category: category) }; case .activityList: ActivityListView(); case .expertList: ExpertListView(); case .teacherHome: TeacherHomeView(); case .teacherMessages: TeacherMessagesView(); case .teacherNoticeComposer: TeacherNoticeComposerView(); case .teacherClasses: TeacherClassesView(); case .teacherClassBoard: TeacherClassBoardView(); case .studentList(let c): StudentListView(classInfo: c); case .outstandingStudents: StudentListView(classInfo: nil, mode: .outstanding); case .unassignedStudents: StudentListView(classInfo: nil, mode: .unassigned); case .teacherTasks: TeacherTasksView(); case .teacherTaskDetail(let task): TeacherTaskDetailView(task: task); case .reviewList: ReviewListView(); case .report(let student): if state.hasPublishedSchoolReport(for: student) { ReportDetailView(student: student) } else { SchoolReportPendingView(student: student) }
         }
     }
 }

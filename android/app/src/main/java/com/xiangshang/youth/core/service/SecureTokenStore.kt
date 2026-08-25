@@ -30,19 +30,25 @@ class SecureTokenStore(context: Context) {
         }
     }
 
-    fun read(): String? = runCatching {
-        val encoded = preferences.getString(KEY_TOKEN, null) ?: return null
-        val iv = preferences.getString(KEY_IV, null) ?: return null
+    fun read(): String? = read(KEY_TOKEN, KEY_IV)
+    fun readRefresh(): String? = read(KEY_REFRESH_TOKEN, KEY_REFRESH_IV)
+
+    private fun read(valueKey: String, ivKey: String): String? = runCatching {
+        val encoded = preferences.getString(valueKey, null) ?: return null
+        val iv = preferences.getString(ivKey, null) ?: return null
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, secretKey(), GCMParameterSpec(128, Base64.decode(iv, Base64.NO_WRAP)))
         String(cipher.doFinal(Base64.decode(encoded, Base64.NO_WRAP)), StandardCharsets.UTF_8)
     }.getOrNull()
 
-    fun write(token: String?) {
+    fun write(token: String?) = write(token, KEY_TOKEN, KEY_IV)
+    fun writeRefresh(token: String?) = write(token, KEY_REFRESH_TOKEN, KEY_REFRESH_IV)
+
+    private fun write(token: String?, valueKey: String, ivKey: String) {
         if (token.isNullOrBlank()) {
             preferences.edit {
-                remove(KEY_TOKEN)
-                remove(KEY_IV)
+                remove(valueKey)
+                remove(ivKey)
             }
             return
         }
@@ -50,8 +56,8 @@ class SecureTokenStore(context: Context) {
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.ENCRYPT_MODE, secretKey())
             preferences.edit {
-                putString(KEY_TOKEN, Base64.encodeToString(cipher.doFinal(token.toByteArray(StandardCharsets.UTF_8)), Base64.NO_WRAP))
-                putString(KEY_IV, Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
+                putString(valueKey, Base64.encodeToString(cipher.doFinal(token.toByteArray(StandardCharsets.UTF_8)), Base64.NO_WRAP))
+                putString(ivKey, Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
             }
         }
     }
@@ -61,5 +67,7 @@ class SecureTokenStore(context: Context) {
     private companion object {
         const val KEY_TOKEN = "token"
         const val KEY_IV = "token_iv"
+        const val KEY_REFRESH_TOKEN = "refresh_token"
+        const val KEY_REFRESH_IV = "refresh_token_iv"
     }
 }

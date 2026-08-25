@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+"""Release readiness preflight for the mobile app and central service.
+
+The preflight deliberately distinguishes local/demo, pilot and production.  A
+local build may use MockRepository and placeholder values; pilot/production
+must explicitly select the remote service and must not silently fall back to a
+demo host.  Secrets are validated by shape only and are never printed.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+from urllib.parse import urlparse
+
+
+ROOT = Path(__file__).resolve().parents[1]
+PLACEHOLDER_HOSTS = {"api.example.com", "example.com", "localhost", "127.0.0.1"}
+REQUIRED_PRODUCTION_SECRETS = {
+    "MFA_ENCRYPTION_KEY": 32,
+    "VERIFICATION_CODE_PEPPER": 32,
+    "AUDIT_LOG_SIGNING_KEY": 32,
+    "FIELD_DEVICE_SIGNING_ENCRYPTION_KEY": 32,
+    "METRICS_TOKEN": 24,
+}
+
+
+def env(name: str) -> str:
+    return os.environ.get(name, "").strip()
+
+
+def add(checks: list[dict], name: str, ok: bool, detail: str, *, blocking: bool = True) -> None:
+    checks.append({"name": name, "ok": bool(ok), "blocking": blocking, "detail": detail})
+
+
+def https_url(value: str) -> bool:
+    try:
+        parsed = urlparse(value)
+        return parsed.scheme == "https" and bool(parsed.netloc) and parsed.hostname not in PLACEHOLDER_HOSTS
+    except ValueError:
+        return False
+
+
+def command_available(name: str) -> bool:
+    return subprocess.run(["sh", "-c", f"command -v {name} >/dev/null 2>&1"], check=False).returncode == 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--target", choices=("local", "pilot", "production"), default="local")
+    parser.add_argument("--json", dest="json_path", type=Path)
+    parser.add_argument("--allow-missing-devices", action="store_true")
+    args = parser.parse_args()
+
+    checks: list[dict] = []
+    strict = args.target != "local"
+    android_gradle = (ROOT / "android/app/build.gradle.kts").read_text(encoding="utf-8")
+    ios_project = (ROOT / "ios/XiangshangYouth/XiangshangYouth.xcodeproj/project.pbxproj").read_text(encoding="utf-8")
+
+    add(checks, "frontend-contract-script", (ROOT / "scripts/check_frontend_contract.py").is_file(), "跨端契约脚本存在")
+    add(checks, "privacy-manifest", (ROOT / "ios/XiangshangYouth/PrivacyInfo.xcprivacy").is_file(), "iOS 隐私清单存在")
+    add(checks, "android-cleartext-disabled", 'android:usesCleartextTraffic="false"' in (ROOT / "android/app/src/main/AndroidManifest.xml").read_text(encoding="utf-8"), "Android 明文流量已禁止")
+    add(checks, "android-release-guard", "Release build cannot use the placeholder" in android_gradle, "Android Release 会拦截占位地址和 Mock")
+    add(checks, "ios-release-guard", "Release requires API_BASE_URL" in ios_project and "Release requires USE_REMOTE_DATA_SOURCE=1" in ios_project, "iOS Release 会拦截占位地址和 Mock")
+
+    api_url = env("API_BASE_URL") or env("XS_API_BASE_URL")
+    remote = env("USE_REMOTE_DATA_SOURCE") or env("XS_USE_REMOTE_DATA_SOURCE")
+    if strict:
+        add(checks, "remote-api-url", https_url(api_url), "API_BASE_URL 必须是非占位 HTTPS 地址")
+        add(checks, "remote-data-source", remote.lower() in {"1", "true", "yes"}, "必须显式启用 RemoteRepository")
+        rollout = env("ROLLOUT_CONFIG_URL") or env("ROLLOUT_CONFIG_URL_IOS") or env("ROLLOUT_CONFIG_URL_ANDROID")
+        add(checks, "rollout-url", https_url(rollout), "灰度配置地址必须是非占位 HTTPS 地址")
+        sentry = env("SENTRY_DSN") or env("SENTRY_DSN_IOS") or env("SENTRY_DSN_ANDROID")
+        add(checks, "crash-dsn", sentry.startswith("https://") and "@" in sentry, "发布构建必须注入崩溃监控 DSN")
+        for key, minimum in REQUIRED_PRODUCTION_SECRETS.items():
+            value = env(key)
+            add(checks, f"secret:{key}", len(value) >= minimum and not value.lower().startswith("replace_with"), f"{key} 已注入且长度满足要求")
+        add(checks, "storage-driver", env("FILE_STORAGE_DRIVER") == "s3" and bool(env("S3_BUCKET")), "正式环境使用对象存储并配置 bucket")
+        add(checks, "backup", env("BACKUP_ENABLED").lower() == "true" and env("BACKUP_ARCHIVE_ENABLED").lower() == "true", "正式环境启用异地备份归档")
+        add(checks, "cors", bool(env("CORS_ORIGIN")) and env("CORS_ORIGIN") != "*", "正式环境 CORS 不得为通配符")
+        wechat_ready = bool(env("WECHAT_APP_ID")) and bool(env("WECHAT_APP_SECRET")) and https_url(env("WECHAT_REDIRECT_URI"))
+        add(checks, "wechat-oauth", wechat_ready, "正式登录页的微信授权必须配置 AppID、Secret 和 HTTPS 回调地址")
+    else:
+        add(checks, "demo-mode-explicit", remote.lower() not in {"1", "true", "yes"} or bool(api_url), "本地允许 Mock；若切 Remote 必须自行提供 API 地址", blocking=False)
+
+    model_corpus = ROOT / "qa/model_labeled_corpus.schema.json"
+    model_approval_schema = ROOT / "qa/model_validation_approval.schema.json"
+    model_verifier = ROOT / "scripts/verify_model_validation_approval.py"
+    add(checks, "model-schema", model_corpus.is_file(), "人工标注集 schema 存在")
+    add(checks, "model-approval-schema", model_approval_schema.is_file(), "模型人工审批 schema 存在")
+    add(checks, "model-approval-verifier", model_verifier.is_file(), "模型人工审批验证脚本存在")
+    if strict:
+        verification = subprocess.run([sys.executable, str(model_verifier)], cwd=ROOT, text=True, capture_output=True, check=False)
+        detail = (verification.stdout.strip() or verification.stderr.strip() or "模型人工验证失败").replace("\n", " ")
+        add(checks, "model-human-validation", verification.returncode == 0, detail, blocking=True)
+    else:
+        add(checks, "model-human-validation", True, "本地模式仅验证门禁脚本；模型保持 pending-human-validation", blocking=False)
+
+    git_remote = subprocess.run(["git", "config", "--get", "remote.origin.url"], cwd=ROOT, text=True, capture_output=True, check=False).stdout.strip()
+    add(checks, "git-remote", bool(git_remote) or not strict, "正式发布需要受保护的 Git 远程仓库", blocking=strict)
+    devices = {"xcrun": command_available("xcrun"), "adb": command_available("adb")}
+    device_detail = ", ".join(f"{key}={'可用' if value else '未发现'}" for key, value in devices.items())
+    add(checks, "device-tooling", all(devices.values()) or args.allow_missing_devices, device_detail, blocking=not args.allow_missing_devices)
+
+    failed = [item for item in checks if item["blocking"] and not item["ok"]]
+    result = {"target": args.target, "ok": not failed, "checks": checks}
+    if args.json_path:
+        args.json_path.parent.mkdir(parents=True, exist_ok=True)
+        args.json_path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    for item in checks:
+        marker = "PASS" if item["ok"] else ("BLOCK" if item["blocking"] else "WARN")
+        print(f"[{marker}] {item['name']}: {item['detail']}")
+    if failed:
+        print(f"release preflight failed: {len(failed)} blocking check(s)", file=sys.stderr)
+        return 1
+    print(f"release preflight passed for {args.target}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

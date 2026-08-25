@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "向上少年动作模型校准集",
+  "type": "object",
+  "required": ["kind", "evidenceLevel", "datasetId", "movement"],
+  "properties": {
+    "kind": { "const": "human-labeled-calibration" },
+    "evidenceLevel": { "const": "human-labeled" },
+    "datasetId": { "type": "string", "minLength": 1 },
+    "movement": {
+      "type": "array",
+      "minItems": 20,
+      "items": {
+        "type": "object",
+        "required": ["id", "split", "groupId", "clipHash", "expected", "rows"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "split": { "enum": ["train", "validation"] },
+          "groupId": { "type": "string", "minLength": 1 },
+          "clipHash": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+          "expected": { "enum": ["low", "attention", "high", "unavailable"] },
+          "metadata": { "type": "object" },
+          "rows": { "type": "array", "minItems": 1 }
+        }
+      }
+    }
+  }
+}

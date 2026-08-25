@@ -2,18 +2,19 @@ package com.xiangshang.youth.core.util
 
 /**
  * Keeps third-party authorization identifiers out of display profiles.
- * The backend will replace the fallback with the verified mobile returned by
- * the authorization bind endpoint.
+ * The backend must replace the authorization identifier with a verified
+ * mobile before it is displayed. Never invent a phone number for a third-party
+ * identity, even in Mock mode.
  */
 object AuthIdentity {
     const val wechatAuthorizationIdentifier = "wechat_authorization"
-    private const val fallbackPhone = "13800138000"
+    private const val unboundPhone = "未绑定手机号"
 
     fun displayPhone(identifier: String): String {
         val normalized = identifier.trim()
         return when {
-            normalized.isBlank() -> fallbackPhone
-            normalized == wechatAuthorizationIdentifier -> fallbackPhone
+            normalized.isBlank() -> unboundPhone
+            normalized == wechatAuthorizationIdentifier -> unboundPhone
             else -> normalized
         }
     }

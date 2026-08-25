@@ -7,8 +7,8 @@ import retrofit2.http.Path
 
 interface MessageApi {
     @GET("v1/users/{userId}/messages")
-    suspend fun messages(@Path("userId") userId: String): List<MessageItem>
+    suspend fun messages(@Path("userId") userId: String): ApiEnvelope<List<MessageItem>>
 
     @POST("v1/messages/{messageId}/read")
-    suspend fun markRead(@Path("messageId") messageId: String)
+    suspend fun markRead(@Path("messageId") messageId: String): ApiEnvelope<WriteAck>
 }

@@ -1,0 +1,19 @@
+{
+  "approvalVersion": "UY-MODEL-APPROVAL-1.0",
+  "approvalId": "REPLACE-WITH-APPROVAL-ID",
+  "status": "pending-human-validation",
+  "datasetId": "REPLACE-WITH-SECURE-DATASET-ID",
+  "corpusSha256": "REPLACE-WITH-64-HEX-SHA256",
+  "evaluationReportSha256": "REPLACE-WITH-64-HEX-SHA256",
+  "modelRegistryVersion": "UY-MODELS-1.0",
+  "modelVersions": {
+    "movement": "REPLACE-WITH-FROZEN-VERSION",
+    "posture": "REPLACE-WITH-FROZEN-VERSION",
+    "bmi": "REPLACE-WITH-FROZEN-VERSION",
+    "height": "REPLACE-WITH-FROZEN-VERSION",
+    "followAlong": "REPLACE-WITH-FROZEN-VERSION",
+    "growth": "REPLACE-WITH-FROZEN-VERSION"
+  },
+  "evaluatedAt": "REPLACE-WITH-ISO-8601",
+  "approvers": []
+}

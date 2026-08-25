@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "向上少年模型独立人工验证审批记录",
+  "description": "只保存不可逆摘要与审批证据，禁止包含儿童身份、原始视频、照片或骨架序列。",
+  "type": "object",
+  "required": ["approvalVersion", "approvalId", "status", "datasetId", "corpusSha256", "evaluationReportSha256", "modelRegistryVersion", "modelVersions", "evaluatedAt", "approvers"],
+  "properties": {
+    "approvalVersion": { "const": "UY-MODEL-APPROVAL-1.0" },
+    "approvalId": { "type": "string", "minLength": 8 },
+    "status": { "const": "human-validated" },
+    "datasetId": { "type": "string", "minLength": 1 },
+    "corpusSha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "evaluationReportSha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "modelRegistryVersion": { "type": "string", "minLength": 1 },
+    "modelVersions": {
+      "type": "object",
+      "required": ["movement", "posture", "bmi", "height", "followAlong", "growth"],
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "evaluatedAt": { "type": "string", "format": "date-time" },
+    "approvers": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["reviewerId", "role", "approvedAt"],
+        "properties": {
+          "reviewerId": { "type": "string", "minLength": 3 },
+          "role": { "enum": ["data-quality", "algorithm-owner", "clinical-or-safety-reviewer", "release-manager"] },
+          "approvedAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

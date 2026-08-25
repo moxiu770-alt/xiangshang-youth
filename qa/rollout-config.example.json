@@ -1,0 +1,6 @@
+{
+  "revision": "2026-08-11-pilot-01",
+  "features": [
+    { "key": "growthInsights", "enabled": true, "rolloutPercent": 10 }
+  ]
+}

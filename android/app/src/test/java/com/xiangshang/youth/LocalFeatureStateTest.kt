@@ -3,27 +3,142 @@ package com.xiangshang.youth
 import com.xiangshang.youth.core.service.ClassPost
 import com.xiangshang.youth.core.service.ActivityRegistration
 import com.xiangshang.youth.core.service.CourseUploadRecord
+import com.xiangshang.youth.core.service.CourseUploadValidator
 import com.xiangshang.youth.core.service.ExpertAppointment
+import com.xiangshang.youth.core.service.FamilyHealthRecord
 import com.xiangshang.youth.core.service.LocalSubmissionStatus
 import com.xiangshang.youth.core.service.LocalFeatureState
+import com.xiangshang.youth.core.service.LocalAppSettings
 import com.xiangshang.youth.core.service.SupportMessage
+import com.xiangshang.youth.core.service.HealthCheckInRecord
 import com.xiangshang.youth.core.model.TaskStatus
-import com.xiangshang.youth.core.model.ScoreReviewStatus
+import com.xiangshang.youth.core.model.AssessmentRiskLevel
+import com.xiangshang.youth.core.model.TestTask
+import com.xiangshang.youth.core.model.TestItem
+import com.xiangshang.youth.core.model.Student
 import com.xiangshang.youth.core.model.UserProfile
 import com.xiangshang.youth.core.model.UserRole
+import com.xiangshang.youth.core.service.MeResponse
 import com.xiangshang.youth.core.mock.MockRepository
 import com.xiangshang.youth.core.repository.RemoteRepository
 import com.xiangshang.youth.core.repository.RepositoryProvider
 import com.xiangshang.youth.app.AppUiState
+import com.xiangshang.youth.app.AppViewModel
+import com.xiangshang.youth.app.CourseRecommendationTarget
 import com.xiangshang.youth.core.util.ChildBindingValidator
 import com.xiangshang.youth.core.util.AuthIdentity
+import com.xiangshang.youth.core.util.BusinessClock
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Date
 
 class LocalFeatureStateTest {
+    @Test
+    fun healthCheckinsUseChildAndBusinessDateAsTheVisibleScope() {
+        val first = HealthCheckInRecord("checkin-a", "child-a", "2026-08-24", "跟练", 20, "moderate")
+        val sameDateOtherChild = HealthCheckInRecord("checkin-b", "child-b", "2026-08-24", "跑步", 30, "high")
+        val records = listOf(first, sameDateOtherChild)
+        assertEquals("跟练", records.single { it.childId == "child-a" && it.checkInDate == "2026-08-24" }.activityType)
+        assertEquals("跑步", records.single { it.childId == "child-b" && it.checkInDate == "2026-08-24" }.activityType)
+    }
+    @Test fun reportCourseDestinationUsesStableIdsAndChildScope() {
+        val first = CourseRecommendationTarget("child-a", "course-1", "lesson-1", "协调训练")
+        val sameTitleDifferentLesson = CourseRecommendationTarget("child-a", "course-1", "lesson-2", "协调训练")
+        val sameLessonDifferentChild = CourseRecommendationTarget("child-b", "course-1", "lesson-1", "协调训练")
+
+        assertNotEquals(first, sameTitleDifferentLesson)
+        assertNotEquals(first, sameLessonDifferentChild)
+    }
+
+    @Test fun mockRosterCarriesStableClassScopeInsteadOfUsingClassNameAsKey() = runBlocking {
+        val data = MockRepository().dashboard()
+        assertTrue(data.students.all { it.classId != null })
+        assertEquals("c31", data.students.first { it.className == "三年级1班" }.classId)
+    }
+
+    @Test fun courseProgressKeyIsolatedByChildAndLesson() {
+        val first = AppViewModel.courseProgressKey("child-a", "course-1", lessonId = "lesson-1")
+        assertNotEquals(first, AppViewModel.courseProgressKey("child-b", "course-1", lessonId = "lesson-1"))
+        assertNotEquals(first, AppViewModel.courseProgressKey("child-a", "course-1", lessonId = "lesson-2"))
+    }
+    @Test
+    fun businessClockKeepsSchoolDayStableAcrossDeviceMidnight() {
+        // 16:30 UTC is already the next school day in Shanghai, while it is
+        // still the previous calendar day in a UTC device setting.
+        val instant = Date(1787416200000L) // 2026-08-22T16:30:00Z
+        assertEquals("2026-08-23", BusinessClock.day(instant))
+        assertEquals("Asia/Shanghai", BusinessClock.timeZone.id)
+    }
+
+    @Test
+    fun voiceGuidancePreferenceIsOptOutAndSurvivesStateCopies() {
+        val defaults = LocalAppSettings()
+        assertTrue(defaults.voiceGuidanceEnabled)
+        val muted = defaults.copy(voiceGuidanceEnabled = false)
+        assertFalse(muted.voiceGuidanceEnabled)
+        assertTrue(muted.notificationsEnabled)
+    }
+
+    @Test
+    fun studentAndLocalStateCarryServerTaskVersionForConflictSafeEdits() {
+        val student = Student(
+            id = "s-version",
+            name = "测试学生",
+            grade = "三年级",
+            className = "三年级1班",
+            region = "南湖区",
+            isPovertyArea = false,
+            taskStatus = TaskStatus.CheckedIn,
+            totalScore = null,
+            gender = "男",
+            birthDate = "2017-01-01",
+            taskVersion = 7
+        )
+        val local = LocalFeatureState(taskStatusVersions = mapOf(student.id to student.taskVersion!!))
+
+        assertEquals(7, student.taskVersion)
+        assertEquals(7, local.taskStatusVersions[student.id])
+    }
+
+    @Test
+    fun oauthOnlySessionUsesAnExplicitUnboundPhoneLabel() {
+        assertEquals("未绑定手机号", MeResponse("u-oauth", "微信用户", null, "parent").displayPhone)
+        assertEquals("未绑定手机号", MeResponse("u-oauth", "微信用户", "  ", "parent").displayPhone)
+        assertEquals("13800000000", MeResponse("u-phone", "王女士", "13800000000", "parent").displayPhone)
+    }
+    @Test
+    fun mobileRolePickerOnlyExposesParentAndTeacherWorkbenches() {
+        assertEquals(listOf(UserRole.Parent, UserRole.Teacher), UserRole.mobileRoles)
+        assertFalse(UserRole.Principal in UserRole.mobileRoles)
+    }
+
+    @Test
+    fun publishedReportGateScopesThePublishedBatchToTheStudent() = runBlocking {
+        val base = MockRepository().dashboard()
+        val fourthGradeStudent = base.students.first { it.id == "s03" }.copy(taskStatus = TaskStatus.Completed)
+        val fifthGradeStudent = base.students.first { it.id == "s05" }.copy(taskStatus = TaskStatus.Completed)
+        val selectedTask = base.tasks.first { it.id == "t2" }
+        val state = AppUiState(data = base.copy(students = listOf(fourthGradeStudent, fifthGradeStudent), tasks = listOf(selectedTask)))
+
+        assertTrue(state.hasPublishedSchoolReport(fourthGradeStudent))
+        assertFalse(state.hasPublishedSchoolReport(fifthGradeStudent))
+    }
+
+    @Test
+    fun familyHealthRecordKeepsParentEntriesSeparateFromCompletionMarkers() {
+        val local = LocalFeatureState(
+            completedAssessments = setOf("s01-vision"),
+            familyHealthRecords = mapOf("s01-vision" to FamilyHealthRecord("s01", "vision", "2026-08-13 10:00", mapOf("基础信息" to "每日户外活动 2 小时")))
+        )
+
+        assertEquals("每日户外活动 2 小时", local.familyHealthRecords["s01-vision"]?.entries?.get("基础信息"))
+        assertFalse(local.familyHealthRecords.containsKey("s01-oral"))
+    }
+
     @Test
     fun repositoryProviderUsesBundledMockDataByDefault() {
         // CI and a school-demo build must remain local unless the Gradle
@@ -34,9 +149,20 @@ class LocalFeatureStateTest {
 
     @Test
     fun wechatAuthorizationIdentifierNeverBecomesAProfilePhone() {
-        assertEquals("13800138000", AuthIdentity.displayPhone(AuthIdentity.wechatAuthorizationIdentifier))
-        assertEquals("13800138000", AuthIdentity.displayPhone("  "))
+        assertEquals("未绑定手机号", AuthIdentity.displayPhone(AuthIdentity.wechatAuthorizationIdentifier))
+        assertEquals("未绑定手机号", AuthIdentity.displayPhone("  "))
         assertEquals("13900139000", AuthIdentity.displayPhone(" 13900139000 "))
+    }
+
+    @Test
+    fun activeDisplayNameUsesTheSessionProfileInsteadOfSeededMockNames() {
+        val parent = AppUiState(profile = UserProfile("u1", "陈女士", "13800138000", UserRole.Parent, "向上实验小学"), role = UserRole.Parent)
+        val teacher = AppUiState(profile = UserProfile("t1", "刘老师", "13800138000", UserRole.Teacher, "向上实验小学"), role = UserRole.Teacher)
+        val fallback = AppUiState(role = UserRole.Parent)
+
+        assertEquals("陈女士", parent.activeDisplayName)
+        assertEquals("刘老师", teacher.activeDisplayName)
+        assertEquals("家长", fallback.activeDisplayName)
     }
 
     @Test
@@ -70,11 +196,47 @@ class LocalFeatureStateTest {
     }
 
     @Test
+    fun principalSelectedTaskScopesReportsToTheSameBatch() = runBlocking {
+        val repository = MockRepository()
+        val data = repository.dashboard()
+        val retestTask = data.tasks.first { it.id == "t2" }
+        val scopedStudents = retestTask.scopedStudents(data.students)
+        val completedStudents = retestTask.completedStudents(data.students) { it.taskStatus }
+        val reports = completedStudents.map(repository::report)
+
+        assertTrue(scopedStudents.all { it.grade == "四年级" && it.className == "四年级1班" })
+        assertTrue(completedStudents.all { it.taskStatus == TaskStatus.Completed })
+        assertEquals(completedStudents.size, reports.size)
+        assertEquals(completedStudents.size * com.xiangshang.youth.core.model.TestItem.entries.size, reports.sumOf { it.scores.size })
+    }
+
+    @Test
+    fun unstartedTaskDoesNotQualifyForCurrentTaskReportAverages() = runBlocking {
+        val data = MockRepository().dashboard()
+        val futureTask = data.tasks.first { it.id == "t3" }
+
+        assertEquals(0, futureTask.completedCount)
+        assertFalse(futureTask.hasPublishedResults)
+    }
+
+    @Test
+    fun onlyCompletedStudentsCanOpenAPublishedSchoolReport() = runBlocking {
+        val data = MockRepository().dashboard()
+        val state = AppUiState(data = data)
+        val completed = data.students.first { it.taskStatus == TaskStatus.Completed }
+        val pendingReview = data.students.first { it.taskStatus == TaskStatus.Review }
+
+        assertTrue(state.hasPublishedSchoolReport(completed))
+        assertFalse(state.hasPublishedSchoolReport(pendingReview))
+    }
+
+    @Test
     fun featureWorkflowStateKeepsAllSubmittedOperations() {
         val state = LocalFeatureState(
             activityRegistered = true,
             activityRegistrations = listOf(ActivityRegistration(activityId = "health-growth-season-2026", contactName = "王女士", phone = "13800138000")),
             completedAssessments = setOf("s01-fitness"),
+            familyHealthRecords = mapOf("s01-mental" to FamilyHealthRecord("s01", "mental", "2026-08-13 10:00", mapOf("家庭感受记录" to "近一周睡眠规律"))),
             courseProgress = mapOf("体姿改善课程" to .8f),
             supportMessages = listOf(SupportMessage("想了解课程", true)),
             classPosts = listOf(ClassPost(author = "王女士", content = "今天完成运动打卡")),
@@ -103,6 +265,7 @@ class LocalFeatureStateTest {
         assertTrue(state.activityRegistered && state.checkedInToday)
         assertEquals("王女士", state.activityRegistrations.single().contactName)
         assertTrue("s01-fitness" in state.completedAssessments)
+        assertEquals("近一周睡眠规律", state.familyHealthRecords["s01-mental"]?.entries?.get("家庭感受记录"))
         assertEquals(.8f, state.courseProgress["体姿改善课程"])
         assertEquals("王女士", state.classPosts.single().author)
         assertTrue("post-1" in state.likedPostIds)
@@ -126,14 +289,14 @@ class LocalFeatureStateTest {
     }
 
     @Test
-    fun remoteReportUsesSafeFallbackUntilEndpointIsConfigured() = runBlocking {
+    fun remoteReportNeverFallsBackToBundledMockBeforeEndpointLoads() = runBlocking {
         val student = MockRepository().dashboard().students.first()
         val report = RemoteRepository().report(student)
 
         assertEquals(student.id, report.student.id)
-        assertEquals(7, report.scores.size)
-        assertTrue(report.scores.any { it.confidence < 0.8 && it.reviewStatus == ScoreReviewStatus.PendingReview })
-        assertTrue(report.scores.filter { it.confidence >= 0.8 }.all { it.reviewStatus == ScoreReviewStatus.Passed })
+        assertTrue(report.scores.isEmpty())
+        assertEquals(AssessmentRiskLevel.Unavailable, report.riskLevel)
+        assertTrue(report.riskAlerts.single().contains("尚未从学校服务返回"))
     }
 
     @Test
@@ -174,12 +337,35 @@ class LocalFeatureStateTest {
     }
 
     @Test
+    fun taskAggregatesClampMalformedCountsAndNormalizeItems() {
+        val task = TestTask("bad", "", "", "", "全校", "", 99, -2, TaskStatus.Testing, "v1", listOf(TestItem.ObstacleJump, TestItem.ObstacleJump))
+        assertEquals(0, task.boundedTotalCount)
+        assertEquals(0, task.boundedCompletedCount)
+        assertEquals(0, task.completionRate)
+        assertEquals(false, task.hasPublishedResults)
+        assertEquals(listOf(TestItem.ObstacleJump), task.normalizedItems)
+    }
+
+    @Test
+    fun taskScopeUsesStableStudentIdsInsteadOfDisplayNames() = runBlocking {
+        val data = MockRepository().dashboard()
+        val source = data.students.first { it.id == "s03" }
+        val sameNamedButOutOfScope = source.copy(id = "different-student", classId = "different-class")
+        val task = TestTask("stable-scope", "", "", "", source.grade, source.className, 0, 1, TaskStatus.NotCheckedIn, "v1", classIds = listOf("different-class"), studentIds = listOf(source.id))
+
+        assertEquals(listOf(source.id), task.scopedStudents(listOf(source, sameNamedButOutOfScope)).map { it.id })
+    }
+
+    @Test
     fun mockReportExposesSevenItemTotalScore() = runBlocking {
-        val student = MockRepository().dashboard().students.first()
+        val data = MockRepository().dashboard()
+        val student = data.students.first()
         val report = MockRepository().report(student)
         assertEquals(7, report.scores.size)
         assertEquals(28.5, report.totalScore, 0.001)
-        assertEquals("2026-09-01", report.regionPolicy.effectiveDate)
+        assertEquals(report.totalScore, data.students[0].totalScore ?: 0.0, 0.001)
+        assertTrue(data.students[2].totalScore == null)
+        assertEquals("2026-08-01", report.regionPolicy.effectiveDate)
         assertEquals(student.region, report.regionPolicy.region)
         assertEquals("男", student.gender)
         assertEquals("王", UserProfile("u1", "王女士", "13800138000", UserRole.Parent, "向上实验小学").avatarInitials)
@@ -222,10 +408,28 @@ class LocalFeatureStateTest {
             activityRegistrations = listOf(ActivityRegistration(activityId = "health-growth-season-2026", contactName = "王女士", phone = "13800138000")),
             expertAppointments = listOf(ExpertAppointment(expertName = "张教授", preferredDate = "周五上午", note = "运动发展咨询")),
             courseUploads = listOf(CourseUploadRecord(taskId = "after-class-upload", attendanceCount = 20, notes = "课堂记录", attachmentName = "课堂.jpg", status = LocalSubmissionStatus.PendingSync)),
-            taskStatusSyncStates = mapOf("s01" to LocalSubmissionStatus.PendingSync)
+            taskStatusSyncStates = mapOf("s01" to LocalSubmissionStatus.PendingSync),
+            bodyAssessmentSyncStates = mapOf("s01" to LocalSubmissionStatus.PendingSync)
         )
 
-        assertEquals(4, AppUiState(local = local).pendingSyncCount)
+        assertEquals(5, AppUiState(local = local).pendingSyncCount)
+    }
+
+    @Test
+    fun submittedCourseUploadContractRequiresPositiveAttendanceAndAttachmentReference() {
+        assertFalse(CourseUploadValidator.isValidForSubmission(0, "课堂记录", "课堂.jpg", "local://course/1"))
+        assertFalse(CourseUploadValidator.isValidForSubmission(20, "课堂记录", "课堂.jpg", null))
+        assertFalse(CourseUploadValidator.isValidForSubmission(20, "", "课堂.jpg", "local://course/1"))
+        assertTrue(CourseUploadValidator.isValidForSubmission(20, "课堂记录", "课堂.jpg", "local://course/1"))
+    }
+
+    @Test
+    fun supportMessageNeedsRemoteAcknowledgementBeforeItLeavesThePendingQueue() {
+        val local = LocalFeatureState(
+            supportMessages = listOf(SupportMessage("想咨询孩子姿态观察", true, status = LocalSubmissionStatus.PendingSync))
+        )
+
+        assertEquals(1, AppUiState(local = local).pendingSyncCount)
     }
 
     @Test
@@ -233,7 +437,8 @@ class LocalFeatureStateTest {
         val local = LocalFeatureState(
             activityRegistrations = listOf(ActivityRegistration(activityId = "health-growth-season-2026", contactName = "王女士", phone = "13800138000", status = LocalSubmissionStatus.Submitted)),
             expertAppointments = listOf(ExpertAppointment(expertName = "张教授", preferredDate = "周五上午", note = "运动发展咨询", status = LocalSubmissionStatus.Submitted)),
-            courseUploads = listOf(CourseUploadRecord(taskId = "after-class-upload", attendanceCount = 20, notes = "课堂记录", attachmentName = "课堂.jpg", status = LocalSubmissionStatus.Submitted))
+            courseUploads = listOf(CourseUploadRecord(taskId = "after-class-upload", attendanceCount = 20, notes = "课堂记录", attachmentName = "课堂.jpg", status = LocalSubmissionStatus.Submitted)),
+            bodyAssessmentSyncStates = mapOf("s01" to LocalSubmissionStatus.Submitted)
         )
 
         assertEquals(0, AppUiState(local = local).pendingSyncCount)
@@ -243,10 +448,11 @@ class LocalFeatureStateTest {
     fun failedWorkflowRecordsRemainVisibleForRetry() {
         val local = LocalFeatureState(
             activityRegistrations = listOf(ActivityRegistration(activityId = "health-growth-season-2026", contactName = "王女士", phone = "13800138000", status = LocalSubmissionStatus.Failed)),
-            courseUploads = listOf(CourseUploadRecord(taskId = "after-class-upload", attendanceCount = 20, notes = "课堂记录", attachmentName = "课堂.jpg", status = LocalSubmissionStatus.Failed))
+            courseUploads = listOf(CourseUploadRecord(taskId = "after-class-upload", attendanceCount = 20, notes = "课堂记录", attachmentName = "课堂.jpg", status = LocalSubmissionStatus.Failed)),
+            bodyAssessmentSyncStates = mapOf("s01" to LocalSubmissionStatus.Failed)
         )
 
-        assertEquals(2, AppUiState(local = local).pendingSyncCount)
+        assertEquals(3, AppUiState(local = local).pendingSyncCount)
     }
 
     @Test

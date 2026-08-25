@@ -17,16 +17,20 @@ final class LaunchAndRoleFlowTests: XCTestCase {
 
     func testLaunchLoginAndRoleSelection() {
         loginAndWaitForRoleSelection()
+        attachScreenshot("role-picker")
 
         XCTAssertTrue(button(containing: "家庭端").waitForExistence(timeout: 2))
         XCTAssertTrue(button(containing: "学校端").exists)
-        XCTAssertTrue(button(containing: "校长端").exists)
+        // School management analytics are delivered by the backend dashboard;
+        // the mobile app intentionally exposes only family and teacher roles.
+        XCTAssertFalse(button(containing: "校长端").exists)
 
         // The teacher dashboard bell is a real route, and returning from the
         // message list must restore the same root dashboard without exposing a
         // duplicate dashboard back-stack entry.
         button(containing: "学校端").tap()
         XCTAssertTrue(staticText(containing: "班级健康概览").waitForExistence(timeout: 5))
+        attachScreenshot("teacher-home")
         // A teacher workbench is a role root, not a pushed page. This guards
         // against a top-bar change reintroducing the dead back affordance that
         // previously trapped users after they selected a different identity.
@@ -92,42 +96,60 @@ final class LaunchAndRoleFlowTests: XCTestCase {
         let returnToRoles = button(containing: "切换使用角色")
         XCTAssertTrue(returnToRoles.waitForExistence(timeout: 2))
         returnToRoles.tap()
-        XCTAssertTrue(button(containing: "校长端").waitForExistence(timeout: 3))
-
-        button(containing: "校长端").tap()
-        XCTAssertTrue(staticText(containing: "学校运动健康总览").waitForExistence(timeout: 5))
-        // A role workbench is a root state, never a pushed secondary page.
-        // Keeping this assertion here prevents the old stray top-left back
-        // affordance (and its blank-host dismissal path) from returning.
-        XCTAssertFalse(button(containing: "返回").exists)
-
-        // All four principal bottom tabs are application roots, not pushed
-        // drill-down pages. Cover each one so a single tab cannot quietly
-        // reintroduce the broken top-left back behavior.
-        button(containing: "年级").tap()
-        XCTAssertTrue(staticText(containing: "不同年级对比").waitForExistence(timeout: 3))
-        XCTAssertFalse(button(containing: "返回").exists)
-        button(containing: "班级").tap()
-        XCTAssertTrue(staticText(containing: "班级完成率").waitForExistence(timeout: 3))
-        XCTAssertFalse(button(containing: "返回").exists)
-        button(containing: "风险").tap()
-        XCTAssertTrue(staticText(containing: "重点风险学生").waitForExistence(timeout: 3))
-        XCTAssertFalse(button(containing: "返回").exists)
-        button(containing: "总览").tap()
-        XCTAssertTrue(staticText(containing: "学校运动健康总览").waitForExistence(timeout: 3))
-
-        // A role dashboard is a root state, so exiting it must return to role
-        // selection instead of exposing a stale NavigationStack back route.
-        let exitPrincipal = button(containing: "退出校长端")
-        XCTAssertTrue(exitPrincipal.exists)
-        exitPrincipal.tap()
         XCTAssertTrue(button(containing: "家庭端").waitForExistence(timeout: 3))
+        XCTAssertTrue(button(containing: "学校端").exists)
+        XCTAssertFalse(button(containing: "校长端").exists)
 
         button(containing: "家庭端").tap()
         XCTAssertTrue(staticText(containing: "综合测评").waitForExistence(timeout: 5))
+        attachScreenshot("parent-home")
         // The family workbench is also a role root. Child/report drill-downs
         // get a back control; the home itself must never show one.
         XCTAssertFalse(button(containing: "返回").exists)
+    }
+
+    /// Keep the commercial login alternatives independently covered.  This is
+    /// intentionally shorter than the end-to-end role traversal so a future
+    /// accessibility-container change cannot hide dynamically inserted form
+    /// controls behind an otherwise tappable login button.
+    func testLoginMethodSwitchesExposeTheirFormControls() {
+        XCTAssertTrue(button(containing: "微信登录").waitForExistence(timeout: 10))
+
+        button(containing: "手机号登录").tap()
+        XCTAssertTrue(app.textFields["手机号"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.textFields["短信验证码"].exists)
+
+        button(containing: "账号密码登录").tap()
+        XCTAssertTrue(app.textFields["账号 / 手机号"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.secureTextFields.firstMatch.waitForExistence(timeout: 3))
+    }
+
+    func testAccessibilityLargeTextKeepsLoginActionsReachable() {
+        // Re-launch with the system accessibility content-size override. The
+        // login page is intentionally scrollable; this guards against a
+        // future visual refactor placing consent or registration below an
+        // unreachable fixed-height container.
+        app.terminate()
+        app = XCUIApplication()
+        app.launchArguments += [
+            "-ui-testing",
+            "-UIPreferredContentSizeCategoryName",
+            "UICTContentSizeCategoryAccessibilityXXXL"
+        ]
+        app.launch()
+        XCTAssertTrue(button(containing: "微信登录").waitForExistence(timeout: 10))
+        XCTAssertTrue(button(containing: "家长注册").exists)
+        XCTAssertTrue(button(containing: "忘记密码").exists)
+        button(containing: "手机号登录").tap()
+        XCTAssertTrue(app.textFields["手机号"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.textFields["短信验证码"].exists)
+    }
+
+    private func attachScreenshot(_ name: String) {
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     func testParentBindingUnlocksReportAndKeepsReturnPath() {
@@ -157,12 +179,16 @@ final class LaunchAndRoleFlowTests: XCTestCase {
         XCTAssertTrue(report.waitForExistence(timeout: 3))
         report.tap()
         XCTAssertTrue(staticText(containing: "7项能力得分").waitForExistence(timeout: 5))
+        attachScreenshot("report-detail")
         XCTAssertTrue(staticText(containing: "规则依据与适用范围").waitForExistence(timeout: 3))
         XCTAssertTrue(staticText(containing: "规则生效日期").exists)
         let back = button(containing: "返回")
         XCTAssertTrue(back.waitForExistence(timeout: 2))
         back.tap()
-        XCTAssertTrue(staticText(containing: "综合测评").waitForExistence(timeout: 3))
+        // Report detail is opened from the “我的测评” root tab.  Returning
+        // should preserve that tab, whose stable page title is the school
+        // assessment title rather than the landing-page campaign copy.
+        XCTAssertTrue(staticText(containing: "学校运动能力测评").waitForExistence(timeout: 3))
 
         // “孩子管理” is a durable family workspace.  It differs from a
         // report/assessment binding guard: after the first child is bound the
@@ -182,11 +208,39 @@ final class LaunchAndRoleFlowTests: XCTestCase {
         XCTAssertTrue(staticText(containing: "已绑定孩子 2 人").waitForExistence(timeout: 4))
     }
 
+    /// Regression coverage for the two compact-width defects reported from a
+    /// physical iPhone: status text overlapping the evaluation ring and the
+    /// activity sheet expanding wider than the screen because of its hero image.
+    func testParentEvaluationAndActivityStayInsideScreenBounds() {
+        loginAndWaitForRoleSelection()
+        button(containing: "家庭端").tap()
+        button(containing: "去绑定孩子").tap()
+        button(containing: "绑定孩子").tap()
+        app.textFields["child-name-field"].tap()
+        app.textFields["child-name-field"].typeText("王小明")
+        app.textFields["child-binding-code-field"].tap()
+        app.textFields["child-binding-code-field"].typeText("XS-S01")
+        button(containing: "确认绑定").tap()
+
+        button(containing: "我的测评").tap()
+        XCTAssertTrue(staticText(containing: "学校运动能力测评").waitForExistence(timeout: 4))
+        attachScreenshot("parent-evaluation-compact")
+
+        button(containing: "首页").tap()
+        let campaign = button(containing: "向上少年健康成长季")
+        XCTAssertTrue(campaign.waitForExistence(timeout: 4))
+        campaign.tap()
+        XCTAssertTrue(staticText(containing: "活动说明").waitForExistence(timeout: 4))
+        assertInsideScreen(staticText(containing: "活动说明"))
+        assertInsideScreen(button(containing: "确认报名"))
+        attachScreenshot("activity-detail-compact")
+    }
+
     private func loginAndWaitForRoleSelection() {
         XCTAssertTrue(button(containing: "微信登录").waitForExistence(timeout: 10))
         XCTAssertTrue(button(containing: "手机号登录").exists)
         XCTAssertTrue(button(containing: "账号密码登录").exists)
-        XCTAssertTrue(button(containing: "注册新账号").exists)
+        XCTAssertTrue(button(containing: "家长注册").exists)
         XCTAssertTrue(button(containing: "忘记密码").exists)
 
         // Keep all commercial login routes alive. A prior implementation
@@ -216,5 +270,12 @@ final class LaunchAndRoleFlowTests: XCTestCase {
 
     private func staticText(containing text: String) -> XCUIElement {
         app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
+    }
+
+    private func assertInsideScreen(_ element: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(element.exists, file: file, line: line)
+        let screen = XCUIScreen.main.screenshot().image.size
+        XCTAssertGreaterThanOrEqual(element.frame.minX, 0, file: file, line: line)
+        XCTAssertLessThanOrEqual(element.frame.maxX, screen.width, file: file, line: line)
     }
 }

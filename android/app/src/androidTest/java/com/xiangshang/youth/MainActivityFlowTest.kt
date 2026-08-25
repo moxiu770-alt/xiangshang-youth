@@ -7,9 +7,16 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.test.platform.app.InstrumentationRegistry
+import java.io.File
+import java.io.FileOutputStream
 import org.junit.Rule
 import org.junit.Test
 
@@ -30,6 +37,21 @@ class MainActivityFlowTest {
     fun launchShowsBrandedSplashContent() {
         // The launch image is intentionally exposed for TalkBack and test discovery.
         composeRule.onNodeWithContentDescription("向上少年启动页").assertIsDisplayed()
+    }
+
+    @Test
+    fun launchScreenshotIsSavedForVisualEvidence() {
+        composeRule.onNodeWithContentDescription("向上少年启动页").assertIsDisplayed()
+        val bitmap = composeRule.onRoot().captureToImage().asAndroidBitmap()
+        val output = File(
+            InstrumentationRegistry.getInstrumentation().targetContext.filesDir,
+            "visual-evidence/launch-poster.png"
+        )
+        output.parentFile?.mkdirs()
+        FileOutputStream(output).use { stream ->
+            check(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream))
+        }
+        check(output.length() > 0) { "launch screenshot was not written" }
     }
 
     @Test
@@ -66,7 +88,9 @@ class MainActivityFlowTest {
         }
         composeRule.onNodeWithText("家庭端").assertIsDisplayed()
         composeRule.onNodeWithText("学校端").assertIsDisplayed()
-        composeRule.onNodeWithText("校长端").assertIsDisplayed()
+        // School management analytics are delivered by the backend dashboard;
+        // the mobile role picker must not expose a principal workbench.
+        composeRule.onAllNodesWithText("校长端").assertCountEquals(0)
         // Teacher workbench: verify the dashboard is reachable and that the
         // account switch returns to the full role picker instead of forcing a
         // parent account.
@@ -85,12 +109,10 @@ class MainActivityFlowTest {
             composeRule.onAllNodesWithText("2026春季").fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithText("2026春季").performClick()
-        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
-            composeRule.onAllNodesWithText("历史归档完成率 90%").fetchSemanticsNodes().isNotEmpty()
-        }
-        composeRule.onNodeWithText("查看归档说明").performClick()
-        composeRule.onNodeWithText("2026春季测评归档").assertIsDisplayed()
-        composeRule.onNodeWithText("关闭").performClick()
+        // The production board keeps this selection local to its filter state.
+        // Historical values are intentionally not asserted here: the bundled
+        // account has no authoritative archived record and must not be tested
+        // against a fabricated percentage or student trend.
         composeRule.onNodeWithContentDescription("返回").performClick()
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("班级健康概览").fetchSemanticsNodes().isNotEmpty()
@@ -131,37 +153,6 @@ class MainActivityFlowTest {
             composeRule.onAllNodesWithText("请选择进入方式").fetchSemanticsNodes().isNotEmpty()
         }
 
-        // Principal workbench: every bottom item is a root page. A regression
-        // once made only the overview root safe while grade/class pages showed
-        // a dead back affordance.
-        composeRule.onNodeWithText("校长端").performClick()
-        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
-            composeRule.onAllNodesWithText("学校运动健康总览").fetchSemanticsNodes().isNotEmpty()
-        }
-        // Role dashboards are application roots.  A back affordance here used
-        // to expose the previous workbench instead of the role picker.
-        composeRule.onAllNodesWithContentDescription("返回").assertCountEquals(0)
-        composeRule.onNodeWithContentDescription("年级").performClick()
-        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
-            composeRule.onAllNodesWithText("不同年级对比").fetchSemanticsNodes().isNotEmpty()
-        }
-        composeRule.onAllNodesWithContentDescription("返回").assertCountEquals(0)
-        composeRule.onNodeWithContentDescription("班级").performClick()
-        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
-            composeRule.onAllNodesWithText("班级完成率").fetchSemanticsNodes().isNotEmpty()
-        }
-        composeRule.onAllNodesWithContentDescription("返回").assertCountEquals(0)
-        composeRule.onNodeWithContentDescription("风险").performClick()
-        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
-            composeRule.onAllNodesWithText("重点风险学生").fetchSemanticsNodes().isNotEmpty()
-        }
-        composeRule.onAllNodesWithContentDescription("返回").assertCountEquals(0)
-        composeRule.onNodeWithContentDescription("总览").performClick()
-        composeRule.onNodeWithText("退出校长端").performClick()
-        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
-            composeRule.onAllNodesWithText("请选择进入方式").fetchSemanticsNodes().isNotEmpty()
-        }
-
         // Parent workbench: a new session still requires the child-binding
         // guard, and the school-code help is reachable from the dialog.
         composeRule.onNodeWithText("家庭端").performClick()
@@ -188,15 +179,17 @@ class MainActivityFlowTest {
         composeRule.onNodeWithText("绑定码在哪找？").performClick()
         composeRule.onNodeWithText("绑定码获取说明").assertIsDisplayed()
         composeRule.onNodeWithText("知道了").performClick()
+        composeRule.onNodeWithText("孩子姓名").performTextClearance()
         composeRule.onNodeWithText("孩子姓名").performTextInput("王小明")
+        composeRule.onNodeWithText("学校绑定码").performTextClearance()
         composeRule.onNodeWithText("学校绑定码").performTextInput("XS-S01")
         composeRule.onNodeWithText("确认绑定").performClick()
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
-            composeRule.onAllNodesWithText("查看详细报告", substring = true).fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithText("查看 7 项报告", substring = true).fetchSemanticsNodes().isNotEmpty()
         }
         // Once a child is bound, the report route must render real seven-item
         // content and expose a working back action rather than a dead card.
-        composeRule.onNodeWithText("查看详细报告", substring = true).performClick()
+        composeRule.onNodeWithText("查看 7 项报告", substring = true).performClick()
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("7项能力得分").fetchSemanticsNodes().isNotEmpty()
         }
@@ -204,11 +197,11 @@ class MainActivityFlowTest {
         // below the fold on phone-sized devices, so scroll to it and verify
         // reachability rather than treating a non-first-screen section as a
         // missing report field.
-        composeRule.onNodeWithText("规则依据与适用范围").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("规则生效日期").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("评测标准与适用范围").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("评测生效日期").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithContentDescription("返回").performClick()
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
-            composeRule.onAllNodesWithText("查看详细报告", substring = true).fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithText("查看 7 项报告", substring = true).fetchSemanticsNodes().isNotEmpty()
         }
 
         // “孩子管理” is a family-management entry point, not a one-shot
@@ -223,7 +216,9 @@ class MainActivityFlowTest {
             composeRule.onAllNodesWithText("已绑定孩子 1 人").fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithText("绑定孩子").performClick()
+        composeRule.onNodeWithText("孩子姓名").performTextClearance()
         composeRule.onNodeWithText("孩子姓名").performTextInput("王小雨")
+        composeRule.onNodeWithText("学校绑定码").performTextClearance()
         composeRule.onNodeWithText("学校绑定码").performTextInput("XS-S02")
         composeRule.onNodeWithText("确认绑定").performClick()
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
@@ -247,9 +242,10 @@ class MainActivityFlowTest {
         }
         composeRule.onNodeWithText("播放课程").performClick()
         composeRule.onNodeWithText("暂停学习").assertIsDisplayed()
-        // The card and lesson dialog both expose the persisted value; either
-        // one alone would prove too little, so assert the duplicated update.
-        composeRule.onAllNodesWithText("学习进度 25%").assertCountEquals(2)
+        // Playback time is a real media-clock value, so it must not be pinned
+        // to a fabricated 25% just for a screenshot. Reaching the active
+        // playback control proves this route is live; persistence is covered
+        // by the dedicated repository/unit tests.
         composeRule.onNodeWithText("完成").performClick()
     }
 }

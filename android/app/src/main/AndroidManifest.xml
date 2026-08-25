@@ -17,6 +17,20 @@
     <!-- Student health records, drafts and session state must not be copied to
          an unmanaged device backup. Remote sync will remain the source of truth. -->
     <application android:allowBackup="false" android:fullBackupContent="@xml/backup_rules" android:dataExtractionRules="@xml/data_extraction_rules" android:enableOnBackInvokedCallback="true" tools:targetApi="tiramisu" android:label="向上少年" android:icon="@drawable/ic_launcher" android:roundIcon="@drawable/ic_launcher" android:theme="@style/Theme.XiangshangYouth" android:supportsRtl="true" android:usesCleartextTraffic="false">
+        <!-- Sentry's library provider tries to initialize even when a local or
+             test build intentionally has no DSN. Initialization is owned by
+             CrashMonitoring so production still starts it only after CI injects
+             the DSN, while debug and instrumentation builds remain runnable. -->
+        <provider
+            android:name="io.sentry.android.core.SentryInitProvider"
+            tools:node="remove" />
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/course_attachment_paths" />
+        </provider>
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!-- CameraX ImageProxy.image is intentionally used only by the two local,
+         non-persisting pose pipelines. Keep this opt-in explicit instead of
+         masking the error with a lint baseline or a broad suppression. -->
+    <issue id="UnsafeOptInUsageError">
+        <option name="opt-in" value="androidx.camera.core.ExperimentalGetImage" />
+    </issue>
+</lint>

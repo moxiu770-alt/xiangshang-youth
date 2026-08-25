@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		48DDA398303B035800CE2867 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = F1E2D3C4B5A6978877665545 /* Sentry */; };
 		B2C3D4E5F600000000000003 /* ../XiangshangYouthTests/LocalFeatureStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F600000000000002 /* ../XiangshangYouthTests/LocalFeatureStateTests.swift */; };
 		C2C3D4E5F600000000000003 /* ../XiangshangYouthUITests/LaunchAndRoleFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2C3D4E5F600000000000002 /* ../XiangshangYouthUITests/LaunchAndRoleFlowTests.swift */; };
 		D2C3D4E5F600000000000003 /* ../XiangshangYouthUITests/SplashScreenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2C3D4E5F600000000000002 /* ../XiangshangYouthUITests/SplashScreenTests.swift */; };
@@ -31,7 +32,11 @@
 
 /* Begin PBXFileReference section */
 		4815524C3021F73E00DFEF89 /* XiangshangYouth.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = XiangshangYouth.xcodeproj; sourceTree = "<group>"; };
+		485C31A4303C561A00FCC7D1 /* XiangshangYouth.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = XiangshangYouth.xcodeproj; sourceTree = "<group>"; };
+		485C324B303CAA8A00FCC7D1 /* XiangshangYouth.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = XiangshangYouth.xcodeproj; sourceTree = "<group>"; };
 		485E1CB03020A9AC00AA1653 /* XiangshangYouth.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = XiangshangYouth.xcodeproj; sourceTree = "<group>"; };
+		48923D603036C53C005EC78E /* XiangshangYouth.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = XiangshangYouth.xcodeproj; sourceTree = "<group>"; };
+		48DDA3E6303B035800CE2867 /* XiangshangYouth.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = XiangshangYouth.xcodeproj; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000000000003 /* XiangshangYouth.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = XiangshangYouth.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B2C3D4E5F600000000000001 /* XiangshangYouthTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = XiangshangYouthTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B2C3D4E5F600000000000002 /* ../XiangshangYouthTests/LocalFeatureStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../XiangshangYouthTests/LocalFeatureStateTests.swift; sourceTree = SOURCE_ROOT; };
@@ -65,6 +70,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				48DDA398303B035800CE2867 /* Sentry in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -90,7 +96,27 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		485C31A6303C561A00FCC7D1 /* Products */ = {
+			isa = PBXGroup;
+			name = Products;
+			sourceTree = "<group>";
+		};
+		485C324D303CAA8A00FCC7D1 /* Products */ = {
+			isa = PBXGroup;
+			name = Products;
+			sourceTree = "<group>";
+		};
 		485E1CB23020A9AC00AA1653 /* Products */ = {
+			isa = PBXGroup;
+			name = Products;
+			sourceTree = "<group>";
+		};
+		48923D623036C53C005EC78E /* Products */ = {
+			isa = PBXGroup;
+			name = Products;
+			sourceTree = "<group>";
+		};
+		48DDA3E8303B035800CE2867 /* Products */ = {
 			isa = PBXGroup;
 			name = Products;
 			sourceTree = "<group>";
@@ -142,6 +168,8 @@
 				A1B2C3D4E5F6000000000008 /* Sources */,
 				A1B2C3D4E5F6000000000009 /* Frameworks */,
 				A1B2C3D4E5F6000000000010 /* Resources */,
+				E1F2A3B4C5D6000000000001 /* Shared model assets */,
+				E1F2A3B4C5D6000000000002 /* Release central-service configuration */,
 			);
 			buildRules = (
 			);
@@ -152,6 +180,7 @@
 			);
 			name = XiangshangYouth;
 			packageProductDependencies = (
+				F1E2D3C4B5A6978877665545 /* Sentry */,
 			);
 			productName = XiangshangYouth;
 			productReference = A1B2C3D4E5F6000000000003 /* XiangshangYouth.app */;
@@ -216,6 +245,9 @@
 			);
 			mainGroup = A1B2C3D4E5F6000000000007;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				F1E2D3C4B5A6978877665544 /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A1B2C3D4E5F6000000000002 /* Products */;
 			projectDirPath = "";
@@ -227,6 +259,22 @@
 				{
 					ProductGroup = 4815524E3021F73E00DFEF89 /* Products */;
 					ProjectRef = 4815524C3021F73E00DFEF89 /* XiangshangYouth.xcodeproj */;
+				},
+				{
+					ProductGroup = 48923D623036C53C005EC78E /* Products */;
+					ProjectRef = 48923D603036C53C005EC78E /* XiangshangYouth.xcodeproj */;
+				},
+				{
+					ProductGroup = 485C31A6303C561A00FCC7D1 /* Products */;
+					ProjectRef = 485C31A4303C561A00FCC7D1 /* XiangshangYouth.xcodeproj */;
+				},
+				{
+					ProductGroup = 485C324D303CAA8A00FCC7D1 /* Products */;
+					ProjectRef = 485C324B303CAA8A00FCC7D1 /* XiangshangYouth.xcodeproj */;
+				},
+				{
+					ProductGroup = 48DDA3E8303B035800CE2867 /* Products */;
+					ProjectRef = 48DDA3E6303B035800CE2867 /* XiangshangYouth.xcodeproj */;
 				},
 			);
 			projectRoot = "";
@@ -247,6 +295,42 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		E1F2A3B4C5D6000000000001 /* Shared model assets */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/../../android/app/src/main/assets/body_pose_capture_profiles.json",
+				"$(SRCROOT)/../../android/app/src/main/assets/follow_along_action_profiles.json",
+			);
+			name = "Shared model assets";
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/body_pose_capture_profiles.json",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/follow_along_action_profiles.json",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\nDEST_DIR=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH\"\nmkdir -p \"$DEST_DIR\"\nfor NAME in body_pose_capture_profiles follow_along_action_profiles; do\n  SOURCE=\"$SRCROOT/../../android/app/src/main/assets/$NAME.json\"\n  if [ -f \"$SOURCE\" ]; then cp \"$SOURCE\" \"$DEST_DIR/$NAME.json\"; fi\ndone\n";
+		};
+		E1F2A3B4C5D6000000000002 /* Release central-service configuration */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Release central-service configuration";
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/central-service-configuration.stamp",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\nSTAMP=\"$DERIVED_FILE_DIR/central-service-configuration.stamp\"\nmkdir -p \"$(dirname \"$STAMP\")\"\ntouch \"$STAMP\"\nif [ \"$CONFIGURATION\" != \"Release\" ]; then exit 0; fi\ncase \"$API_BASE_URL\" in\n  https://*) ;;\n  *) echo \"error: Release requires API_BASE_URL=https://<central-service>/\" >&2; exit 1 ;;\nesac\ncase \"$API_BASE_URL\" in\n  https://api.example.com|https://api.example.com/) echo \"error: Release cannot use the placeholder API_BASE_URL\" >&2; exit 1 ;;\nesac\nif [ \"$USE_REMOTE_DATA_SOURCE\" != \"1\" ]; then\n  echo \"error: Release requires USE_REMOTE_DATA_SOURCE=1\" >&2\n  exit 1\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		A1B2C3D4E5F6000000000008 /* Sources */ = {
@@ -293,10 +377,14 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				API_BASE_URL = "https://api.example.com/";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
+				USE_REMOTE_DATA_SOURCE = 0;
 			};
 			name = Debug;
 		};
@@ -304,16 +392,19 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				API_BASE_URL = "https://api.example.com/";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				SWIFT_VERSION = 5.0;
+				USE_REMOTE_DATA_SOURCE = 1;
 			};
 			name = Release;
 		};
 		A1B2C3D4E5F6000000000014 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				API_BASE_URL = "https://api.example.com/";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -328,18 +419,23 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.xiangshang.youth;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				RELEASE_CHANNEL = development;
+				ROLLOUT_CONFIG_URL = "";
 				SDKROOT = iphoneos;
+				SENTRY_DSN = "";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				USE_REMOTE_DATA_SOURCE = 0;
 			};
 			name = Debug;
 		};
 		A1B2C3D4E5F6000000000015 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				API_BASE_URL = "https://api.example.com/";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -353,12 +449,16 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.xiangshang.youth;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				RELEASE_CHANNEL = pilot;
+				ROLLOUT_CONFIG_URL = "";
 				SDKROOT = iphoneos;
+				SENTRY_DSN = "";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				USE_REMOTE_DATA_SOURCE = 1;
 			};
 			name = Release;
 		};
@@ -366,7 +466,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = ATVJ3LFYM7;
 				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.xiangshang.youth.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -380,7 +483,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = ATVJ3LFYM7;
 				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.xiangshang.youth.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -393,7 +499,10 @@
 		C2C3D4E5F600000000000011 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = ATVJ3LFYM7;
 				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.xiangshang.youth.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -406,7 +515,10 @@
 		C2C3D4E5F600000000000012 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = ATVJ3LFYM7;
 				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.xiangshang.youth.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -456,6 +568,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		F1E2D3C4B5A6978877665544 /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/getsentry/sentry-cocoa.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.30.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		F1E2D3C4B5A6978877665545 /* Sentry */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F1E2D3C4B5A6978877665544 /* XCRemoteSwiftPackageReference "sentry-cocoa" */;
+			productName = Sentry;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A1B2C3D4E5F6000000000004 /* Project object */;
 }

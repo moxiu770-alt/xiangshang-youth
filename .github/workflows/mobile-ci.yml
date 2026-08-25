@@ -1,4 +1,4 @@
-name: Mobile CI
+name: Platform CI
 
 on:
   pull_request:
@@ -9,13 +9,123 @@ permissions:
   contents: read
 
 jobs:
+  backend:
+    name: Backend integration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: xiangshang_youth
+          POSTGRES_USER: xiangshang
+          POSTGRES_PASSWORD: ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U xiangshang -d xiangshang_youth"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install backend dependencies
+        run: npm ci
+      - name: Migrate and seed test database
+        env:
+          DATABASE_URL: postgres://xiangshang:ci_password@127.0.0.1:5432/xiangshang_youth
+          TEST_DATABASE_URL: postgres://xiangshang:ci_password@127.0.0.1:5432/xiangshang_youth
+          PGOPTIONS: -c search_path=xiangshang_integration,public
+          SEED_PASSWORD: TestPass123!
+        run: npm run migrate && npm run seed
+      - name: Run backend integration tests
+        env:
+          DATABASE_URL: postgres://xiangshang:ci_password@127.0.0.1:5432/xiangshang_youth
+          TEST_DATABASE_URL: postgres://xiangshang:ci_password@127.0.0.1:5432/xiangshang_youth
+          PGOPTIONS: -c search_path=xiangshang_integration,public
+          SEED_PASSWORD: TestPass123!
+        run: npm run check && npm test && npm run test:integration && npm audit --omit=dev --audit-level=high
+      - name: Validate OpenAPI contract
+        run: npm run lint:openapi
+      - name: Create and verify database backup
+        env:
+          DATABASE_URL: postgres://xiangshang:ci_password@127.0.0.1:5432/xiangshang_youth
+          PGPASSWORD: ci_password
+        run: |
+          BACKUP_DIR="$RUNNER_TEMP/xiangshang-backups" npm run backup
+          backup_file="$(find "$RUNNER_TEMP/xiangshang-backups" -name '*.dump' -type f -print -quit)"
+          test -n "$backup_file"
+          BACKUP_FILE="$backup_file" npm run backup:verify
+          psql --username=xiangshang --dbname=postgres://xiangshang:ci_password@127.0.0.1:5432/postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS xiangshang_restore_verify'
+          createdb --username=xiangshang --owner=xiangshang --dbname=postgres://xiangshang:ci_password@127.0.0.1:5432/postgres xiangshang_restore_verify
+          BACKUP_FILE="$backup_file" RESTORE_DATABASE_URL=postgres://xiangshang:ci_password@127.0.0.1:5432/xiangshang_restore_verify RESTORE_SCHEMA=xiangshang_integration RESTORE_EXPECT_DATA=true npm run backup:restore-verify
+          psql --username=xiangshang --dbname=postgres://xiangshang:ci_password@127.0.0.1:5432/postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS xiangshang_restore_verify'
+
+  production-container:
+    name: Production container contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate production Compose interpolation
+        working-directory: backend
+        run: |
+          set -a
+          source .env.production.example
+          set +a
+          docker compose -f docker-compose.prod.yml config --quiet
+      - name: Build production API image
+        run: docker build --pull --tag xiangshang-youth-api:ci backend
+      - name: Verify runtime user and PostgreSQL backup tools
+        run: |
+          docker run --rm --entrypoint sh xiangshang-youth-api:ci -c 'test "$(id -u)" != 0 && node --version && pg_dump --version && pg_restore --version'
+      - name: Validate gateway configuration
+        run: >-
+          docker run --rm --network none --entrypoint caddy
+          -e PUBLIC_HOST=api.example.edu.cn
+          -e ACME_EMAIL=ops@example.edu.cn
+          -v "$GITHUB_WORKSPACE/backend/Caddyfile:/etc/caddy/Caddyfile:ro"
+          caddy:2.11.4-alpine validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
   source-integrity:
     name: Source integrity
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       - name: Verify patch whitespace
         run: git diff --check HEAD^
+      - name: Verify cross-platform model contract
+        run: python3 scripts/check_model_contract.py
+      - name: Run model golden corpus gate
+        run: node scripts/evaluate_model_corpus.mjs
+      - name: Run deterministic model boundary fuzz gate
+        run: node scripts/fuzz_model_boundaries.mjs
+      - name: Run leak-safe calibration fitter test
+        run: node scripts/test_model_calibration.mjs
+      - name: Verify cross-platform frontend contract
+        run: python3 scripts/check_frontend_contract.py
+      - name: Run local release preflight (no secrets, no devices)
+        run: python3 scripts/release_preflight.py --target local --allow-missing-devices --json "$RUNNER_TEMP/youth-local-preflight.json"
+      - name: Discover device matrix without fabricating results
+        run: python3 scripts/device_matrix_preflight.py --output "$RUNNER_TEMP/youth-device-matrix.json"
+      - name: Upload release preflight evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: xiangshang-youth-release-preflight
+          path: |
+            ${{ runner.temp }}/youth-local-preflight.json
+            ${{ runner.temp }}/youth-device-matrix.json
+          if-no-files-found: error
 
   android:
     name: Android unit test and build
@@ -31,14 +141,76 @@ jobs:
           java-version: '17'
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
-      - name: Run unit tests and build debug APK
-        run: ./gradlew :app:testDebugUnitTest :app:assembleDebug --no-daemon --max-workers=2 --console=plain
+      - name: Run unit tests, lint and build debug/test APKs
+        run: >-
+          ./gradlew
+          :app:testDebugUnitTest
+          :app:lintDebug
+          :app:assembleDebug
+          :app:assembleDebugAndroidTest
+          --no-daemon --max-workers=2 --console=plain
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: xiangshang-youth-android-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+      - name: Upload Compose instrumentation APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: xiangshang-youth-android-instrumentation
+          path: android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          if-no-files-found: error
+      - name: Run Compose instrumentation flow on a clean emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: Pixel_2
+          disable-animations: true
+          emulator-options: -no-window -noaudio -no-boot-anim
+          script: |
+            cd android
+            ./gradlew :app:connectedDebugAndroidTest --no-daemon --max-workers=2 --console=plain
+            mkdir -p "$RUNNER_TEMP/android-visual-evidence"
+            adb shell run-as com.xiangshang.youth cat files/visual-evidence/launch-poster.png > "$RUNNER_TEMP/android-visual-evidence/launch-poster.png"
+            test -s "$RUNNER_TEMP/android-visual-evidence/launch-poster.png"
+      - name: Upload Android visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xiangshang-youth-android-visual-evidence
+          path: ${{ runner.temp }}/android-visual-evidence
+          if-no-files-found: warn
+
+  field-client:
+    name: Windows field client
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: field-client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore locked dependencies
+        run: |
+          dotnet restore FieldClient.Core.Tests/FieldClient.Core.Tests.csproj --locked-mode
+          dotnet restore FieldClient.Windows/FieldClient.Windows.csproj --locked-mode
+      - name: Test offline outbox
+        run: dotnet test FieldClient.Core.Tests/FieldClient.Core.Tests.csproj --configuration Release --no-restore
+      - name: Build Windows field client
+        run: dotnet build FieldClient.Windows/FieldClient.Windows.csproj --configuration Release --no-restore
+      - name: Verify Windows publish artifact
+        run: dotnet publish FieldClient.Windows/FieldClient.Windows.csproj --configuration Release --runtime win-x64 --self-contained false --no-restore -p:PublishSingleFile=true --output ./artifacts/field-client-win-x64
+      - name: Block vulnerable NuGet dependencies
+        shell: pwsh
+        run: |
+          $result = dotnet list FieldClient.Windows/FieldClient.Windows.csproj package --vulnerable --include-transitive | Out-String
+          Write-Host $result
+          if ($result -match 'vulnerable packages') { throw 'Vulnerable field-client dependency detected.' }
 
   ios:
     name: iOS tests
@@ -58,4 +230,12 @@ jobs:
           -project ios/XiangshangYouth/XiangshangYouth.xcodeproj
           -scheme XiangshangYouth
           -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}"
+          -resultBundlePath "$RUNNER_TEMP/XiangshangYouth.xcresult"
           test -quiet
+      - name: Upload iOS test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xiangshang-youth-ios-xcresult
+          path: ${{ runner.temp }}/XiangshangYouth.xcresult
+          if-no-files-found: warn

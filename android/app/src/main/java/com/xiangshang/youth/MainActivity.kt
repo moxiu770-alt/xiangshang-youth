@@ -15,7 +15,11 @@ import androidx.lifecycle.ViewModelProvider
 import com.xiangshang.youth.app.AppViewModel
 import com.xiangshang.youth.app.XiangshangYouthTheme
 import com.xiangshang.youth.app.AppNavHost
+import com.xiangshang.youth.core.model.BodyCaptureQualityGate
 import com.xiangshang.youth.core.service.ApiClient
+import com.xiangshang.youth.core.monitoring.CrashMonitoring
+import com.xiangshang.youth.core.service.FeatureRollout
+import com.xiangshang.youth.feature.parent.ChildFollowAlongTuning
 
 class MainActivity : ComponentActivity() {
     private var incomingDeepLink: Uri? by mutableStateOf(null)
@@ -24,7 +28,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        CrashMonitoring.initialize(this)
+        FeatureRollout.initialize(this)
         ApiClient.initialize(this)
+        preloadPostureCaptureProfiles()
+        preloadFollowAlongProfiles()
         // The visual spec uses full-bleed artwork on the launch/login surfaces.
         // Draw behind system bars so Android does not add a black status-bar band.
         // AppNavHost restores normal system chrome as soon as the splash route
@@ -32,6 +40,15 @@ class MainActivity : ComponentActivity() {
         // the first Compose-owned frame.
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowInsetsControllerCompat(window, window.decorView).apply {
+            // AppNavHost repeats this policy while Splash is the active route,
+            // but applying it here also covers Android's first Compose frame.
+            // Without this eager hide a time/signal strip can flash over the
+            // approved pure-poster launch artwork during the handoff.
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(
+                androidx.core.view.WindowInsetsCompat.Type.statusBars() or
+                    androidx.core.view.WindowInsetsCompat.Type.navigationBars()
+            )
             isAppearanceLightStatusBars = false
             isAppearanceLightNavigationBars = false
         }
@@ -71,5 +88,31 @@ class MainActivity : ComponentActivity() {
      * production logout flow continues to use the same ViewModel operation. */
     fun resetSessionForUiTest() {
         if (::appViewModel.isInitialized) appViewModel.logout()
+    }
+
+    private fun preloadPostureCaptureProfiles() {
+        runCatching {
+            assets.open("body_pose_capture_profiles.json").bufferedReader().use { reader ->
+                val raw = reader.readText()
+                if (!BodyCaptureQualityGate.setProfileOverridesFromJson(raw)) {
+                    BodyCaptureQualityGate.clearProfileOverrides()
+                }
+            }
+        }.onFailure {
+            BodyCaptureQualityGate.clearProfileOverrides()
+        }
+    }
+
+    private fun preloadFollowAlongProfiles() {
+        runCatching {
+            assets.open("follow_along_action_profiles.json").bufferedReader().use { reader ->
+                val raw = reader.readText()
+                if (!ChildFollowAlongTuning.setProfileOverridesFromJson(raw)) {
+                    ChildFollowAlongTuning.clearProfileOverrides()
+                }
+            }
+        }.onFailure {
+            ChildFollowAlongTuning.clearProfileOverrides()
+        }
     }
 }

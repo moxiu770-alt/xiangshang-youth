@@ -13,32 +13,40 @@ import javax.crypto.spec.GCMParameterSpec
 /**
  * Small encrypted SharedPreferences facade for local workflow state. It keeps
  * the existing LocalFeatureStore API while encrypting values with an
- * Android-Keystore AES key. If Keystore is unavailable, it falls back to the
- * old preference representation so Mock mode still boots and can be retried.
+ * Android-Keystore AES key. If Keystore is unavailable, state is kept only in
+ * memory for this process; it is never downgraded to plaintext preferences.
  */
 class SecurePreferences(context: Context, name: String) {
     private val preferences = context.applicationContext.getSharedPreferences(name, Context.MODE_PRIVATE)
     private val cipher = runCatching { ValueCipher("xiangshang.local-feature-state") }.getOrNull()
+    private val memoryStrings = mutableMapOf<String, String?>()
+    private val memorySets = mutableMapOf<String, Set<String>?>()
+    private val memoryBooleans = mutableMapOf<String, Boolean>()
+
+    init { if (cipher == null) preferences.edit().clear().apply() }
 
     fun getString(key: String, defaultValue: String?): String? {
+        if (cipher == null) return memoryStrings[key] ?: defaultValue
         val raw = runCatching { preferences.getString(key, null) }.getOrNull() ?: return defaultValue
-        return cipher?.decrypt(raw) ?: raw
+        return cipher.decrypt(raw) ?: defaultValue
     }
 
     fun getStringSet(key: String, defaultValue: Set<String>?): Set<String>? {
+        if (cipher == null) return memorySets[key] ?: defaultValue
         val encrypted = runCatching { preferences.getString(key, null) }.getOrNull()
         if (encrypted != null) {
-            cipher?.decrypt(encrypted)?.let { return decodeSet(it) }
+            cipher.decrypt(encrypted)?.let { return decodeSet(it) }
         }
-        return runCatching { preferences.getStringSet(key, defaultValue) }.getOrDefault(defaultValue)
+        return defaultValue
     }
 
     fun getBoolean(key: String, defaultValue: Boolean): Boolean {
+        if (cipher == null) return memoryBooleans[key] ?: defaultValue
         val encrypted = runCatching { preferences.getString(key, null) }.getOrNull()
         if (encrypted != null) {
-            cipher?.decrypt(encrypted)?.let { return it == "1" || it.equals("true", ignoreCase = true) }
+            cipher.decrypt(encrypted)?.let { return it == "1" || it.equals("true", ignoreCase = true) }
         }
-        return runCatching { preferences.getBoolean(key, defaultValue) }.getOrDefault(defaultValue)
+        return defaultValue
     }
 
     fun edit(): Editor = Editor()
@@ -47,32 +55,39 @@ class SecurePreferences(context: Context, name: String) {
         private val delegate = preferences.edit()
 
         fun putString(key: String, value: String?): Editor {
+            if (cipher == null) { memoryStrings[key] = value; return this }
             if (value == null) delegate.remove(key)
-            else delegate.remove(key).putString(key, encryptOrPlain(value))
+            else delegate.remove(key).putString(key, cipher.encrypt(value))
             return this
         }
 
         fun putStringSet(key: String, value: Set<String>?): Editor {
+            if (cipher == null) { memorySets[key] = value; return this }
             if (value == null) delegate.remove(key)
             else {
                 val encoded = JSONArray(value.toList()).toString()
-                val encrypted = runCatching { cipher?.encrypt(encoded) }.getOrNull()
-                if (encrypted == null) delegate.remove(key).putStringSet(key, value)
-                else delegate.remove(key).putString(key, encrypted)
+                delegate.remove(key).putString(key, cipher.encrypt(encoded))
             }
             return this
         }
 
         fun putBoolean(key: String, value: Boolean): Editor {
-            delegate.remove(key).putString(key, encryptOrPlain(if (value) "1" else "0"))
+            if (cipher == null) memoryBooleans[key] = value
+            else delegate.remove(key).putString(key, cipher.encrypt(if (value) "1" else "0"))
             return this
         }
 
-        fun remove(key: String): Editor { delegate.remove(key); return this }
-        fun clear(): Editor { delegate.clear(); return this }
+        fun remove(key: String): Editor {
+            memoryStrings.remove(key); memorySets.remove(key); memoryBooleans.remove(key)
+            if (cipher != null) delegate.remove(key)
+            return this
+        }
+        fun clear(): Editor {
+            memoryStrings.clear(); memorySets.clear(); memoryBooleans.clear()
+            if (cipher != null) delegate.clear()
+            return this
+        }
         fun apply() { delegate.apply() }
-
-        private fun encryptOrPlain(value: String): String = runCatching { cipher?.encrypt(value) }.getOrNull() ?: value
     }
 
     private fun decodeSet(raw: String): Set<String> = runCatching {

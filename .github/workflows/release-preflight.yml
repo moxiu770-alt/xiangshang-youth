@@ -1,0 +1,48 @@
+name: Release preflight (operator supplied)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "pilot or production"
+        required: true
+        default: pilot
+        type: choice
+        options: [pilot, production]
+
+permissions:
+  contents: read
+
+jobs:
+  release-preflight:
+    name: Validate injected release configuration
+    runs-on: ubuntu-latest
+    environment: release
+    env:
+      API_BASE_URL: ${{ secrets.API_BASE_URL }}
+      USE_REMOTE_DATA_SOURCE: "1"
+      ROLLOUT_CONFIG_URL: ${{ secrets.ROLLOUT_CONFIG_URL }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      MFA_ENCRYPTION_KEY: ${{ secrets.MFA_ENCRYPTION_KEY }}
+      VERIFICATION_CODE_PEPPER: ${{ secrets.VERIFICATION_CODE_PEPPER }}
+      AUDIT_LOG_SIGNING_KEY: ${{ secrets.AUDIT_LOG_SIGNING_KEY }}
+      FIELD_DEVICE_SIGNING_ENCRYPTION_KEY: ${{ secrets.FIELD_DEVICE_SIGNING_ENCRYPTION_KEY }}
+      METRICS_TOKEN: ${{ secrets.METRICS_TOKEN }}
+      FILE_STORAGE_DRIVER: s3
+      S3_BUCKET: ${{ secrets.S3_BUCKET }}
+      BACKUP_ENABLED: "true"
+      BACKUP_ARCHIVE_ENABLED: "true"
+      CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
+      WECHAT_APP_ID: ${{ secrets.WECHAT_APP_ID }}
+      WECHAT_APP_SECRET: ${{ secrets.WECHAT_APP_SECRET }}
+      WECHAT_REDIRECT_URI: ${{ secrets.WECHAT_REDIRECT_URI }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run strict release preflight
+        run: python3 scripts/release_preflight.py --target "${{ inputs.target }}" --allow-missing-devices --json "$RUNNER_TEMP/youth-release-preflight.json"
+      - name: Upload release evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: xiangshang-youth-${{ inputs.target }}-preflight
+          path: ${{ runner.temp }}/youth-release-preflight.json
+          if-no-files-found: error

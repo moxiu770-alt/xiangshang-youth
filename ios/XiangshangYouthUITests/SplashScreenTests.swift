@@ -9,5 +9,9 @@ final class SplashScreenTests: XCTestCase {
         app.launch()
 
         XCTAssertTrue(app.images["向上少年启动页"].waitForExistence(timeout: 2))
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = "launch-poster"
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 }

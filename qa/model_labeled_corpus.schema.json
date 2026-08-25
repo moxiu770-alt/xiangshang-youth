@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "向上少年冻结模型独立验证集",
+  "type": "object",
+  "required": ["version", "kind", "evidenceLevel", "datasetId", "annotatorProtocolVersion", "movement", "body", "followAlong"],
+  "properties": {
+    "version": { "type": "string", "pattern": "^UY-IMCA-CV-[0-9]+\\.[0-9]+$" },
+    "kind": { "const": "human-labeled-independent-validation" },
+    "evidenceLevel": { "const": "human-labeled" },
+    "datasetId": { "type": "string", "minLength": 1 },
+    "annotatorProtocolVersion": { "type": "string", "minLength": 1 },
+    "movement": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "expected", "split", "groupId", "clipHash"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "split": { "const": "validation" },
+          "groupId": { "type": "string", "minLength": 1 },
+          "clipHash": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+          "ageMonths": { "type": "integer", "minimum": 72, "maximum": 216 },
+          "gender": { "type": "string" },
+          "metadata": { "type": "object" },
+          "expected": { "enum": ["low", "attention", "high", "unavailable"] },
+          "rows": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["item", "score", "confidence"],
+              "properties": {
+                "item": { "type": "string" },
+                "score": { "type": "number", "minimum": 0, "maximum": 5 },
+                "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+                "reviewStatus": { "enum": ["passed", "pendingReview"] },
+                "humanReviewed": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "body": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "heightCm", "weightKg", "ageMonths", "gender", "expected", "snapshots", "split", "groupId", "clipHash"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "split": { "const": "validation" },
+          "groupId": { "type": "string", "minLength": 1 },
+          "clipHash": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+          "metadata": { "type": "object" },
+          "heightCm": { "type": "number", "minimum": 90, "maximum": 190 },
+          "weightKg": { "type": "number", "minimum": 15, "maximum": 90 },
+          "ageMonths": { "type": "integer", "minimum": 72, "maximum": 216 },
+          "gender": { "type": "string", "minLength": 1 },
+          "expected": { "enum": ["green", "yellow", "red", "pending", "unavailable"] },
+          "expectedBmi": { "enum": ["green", "yellow", "red", "unavailable"] },
+          "expectedHeight": { "enum": ["low", "lower", "middle", "upper", "high"] },
+          "expectedPosture": { "enum": ["green", "yellow", "red", "pending", "unavailable"] },
+          "snapshots": { "type": "array", "minItems": 1 }
+        }
+      }
+    },
+    "growth": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "period", "checkInDates", "planDates", "expectedPlanTitle", "expectedActiveDays", "expectedConsistencyPercent", "split", "groupId", "clipHash"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "split": { "const": "validation" },
+          "groupId": { "type": "string", "minLength": 1 },
+          "clipHash": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+          "period": { "enum": ["week", "month"] },
+          "checkInDates": { "type": "array", "items": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" } },
+          "planDates": { "type": "array", "items": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" } },
+          "assessmentCount": { "type": "integer", "minimum": 0 },
+          "bodyAttention": { "enum": ["green", "yellow", "red", "pending", "unavailable", null] },
+          "totalScore": { "type": ["number", "null"], "minimum": 0, "maximum": 35 },
+          "expectedPlanTitle": { "type": "string", "minLength": 1 },
+          "expectedActiveDays": { "type": "integer", "minimum": 0 },
+          "expectedConsistencyPercent": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "metadata": { "type": "object" }
+        }
+      }
+    },
+    "followAlong": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "category", "ageMonths", "expectedRepCount", "predictedRepCount", "algorithmVersion", "split", "groupId", "clipHash"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "split": { "const": "validation" },
+          "groupId": { "type": "string", "minLength": 1 },
+          "clipHash": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+          "metadata": { "type": "object" },
+          "category": { "type": "string", "minLength": 1 },
+          "ageMonths": { "type": "integer", "minimum": 72, "maximum": 216 },
+          "algorithmVersion": { "const": "UY-FOLLOW-CV-1.0" },
+          "expectedRepCount": { "type": "integer", "minimum": 0 },
+          "predictedRepCount": { "type": "integer", "minimum": 0 },
+          "qualityScore": { "type": "integer", "minimum": 0, "maximum": 100 }
+        }
+      }
+    }
+  }
+}

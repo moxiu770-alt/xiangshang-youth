@@ -4,7 +4,7 @@ Kotlin + Jetpack Compose + MVVM + StateFlow 的一期原生客户端。默认使
 
 联调时可用 `-PapiBaseUrl=https://staging.example.com/` 注入 Retrofit 地址；请求统一附带 KeyStore 中的 Bearer token，并将超时、取消、401/403、5xx 和网络异常映射到 `ApiError`。不传该参数时仍使用示例地址，Mock 模式不会发起网络请求。
 
-联调构建需显式打开远端数据源，避免错误把演示环境切到接口：`./gradlew :app:assembleDebug -PuseRemoteDataSource=true -PapiBaseUrl=https://<服务地址>/`。不传 `useRemoteDataSource=true` 时始终使用 Mock 数据。
+联调构建需显式打开远端数据源，避免错误把演示环境切到接口：`./gradlew :app:assembleDebug -PuseRemoteDataSource=true -PapiBaseUrl=https://<服务地址>/ -PschoolId=<学校ID>`。不传 `useRemoteDataSource=true` 时始终使用 Mock 数据。
 
 ## 启动
 
@@ -26,6 +26,6 @@ export ANDROID_HOME="/Users/luyanpeng/Library/Android/sdk"
 
 本机已配置 `XiangshangYouth_QA_API34` 和 `ChangXiang_A34` 两个模拟器，项目 SDK 路径写在 `local.properties` 中。
 
-默认测试登录页使用预填账号，登录后可以选择家长、教师或校长角色。
+默认测试登录页使用预填账号，登录后可以选择家长或教师角色。学校总览、年级/班级对比和风险学生由后台数据看板提供，移动端不再承载校长工作台。
 
-发布校验：`./gradlew :app:assembleRelease` 已可构建，产物为 `app/build/outputs/apk/release/app-release-unsigned.apk`；真实上架前需要配置发行签名与 Play/App Store 审核材料。
+Release 校验必须显式指定 HTTPS 中央服务并启用远程数据源：`./gradlew :app:assembleRelease -PapiBaseUrl=https://<正式或预发布中央服务>/ -PuseRemoteDataSource=true`。构建会拒绝 `http://`、`api.example.com` 占位地址和任何 Mock 数据源配置；产物为 `app/build/outputs/apk/release/app-release-unsigned.apk`。真实上架前仍需配置发行签名与应用商店审核材料。

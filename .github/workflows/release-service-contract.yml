@@ -1,0 +1,64 @@
+name: Release service contract
+
+on:
+  pull_request:
+    paths:
+      - 'android/**'
+      - 'ios/**'
+      - '.github/workflows/release-service-contract.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - 'ios/**'
+      - '.github/workflows/release-service-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  android-release-contract:
+    name: Android Release central-service contract
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+      - name: Build Release with an explicit central service
+        run: >-
+          ./gradlew :app:assembleRelease
+          -PapiBaseUrl=https://release-contract.example.edu.cn/
+          -PuseRemoteDataSource=true
+          --no-daemon --max-workers=2 --console=plain
+      - name: Assert an unsigned Release APK exists
+        run: test -f app/build/outputs/apk/release/app-release-unsigned.apk
+
+  ios-release-contract:
+    name: iOS Release central-service contract
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Release with an explicit central service
+        run: >-
+          xcodebuild build
+          -project ios/XiangshangYouth/XiangshangYouth.xcodeproj
+          -scheme XiangshangYouth
+          -configuration Release
+          -sdk iphonesimulator
+          API_BASE_URL=https://release-contract.example.edu.cn/
+          USE_REMOTE_DATA_SOURCE=1
+          CODE_SIGNING_ALLOWED=NO
+      - name: Assert the generated app uses remote data
+        shell: bash
+        run: |
+          info_plist="$(find "$HOME/Library/Developer/Xcode/DerivedData" -path '*Release-iphonesimulator/XiangshangYouth.app/Info.plist' -print -quit)"
+          test -n "$info_plist"
+          /usr/libexec/PlistBuddy -c 'Print :APIBaseURL' "$info_plist" | grep -Fx 'https://release-contract.example.edu.cn/'
+          test "$(/usr/libexec/PlistBuddy -c 'Print :UseRemoteDataSource' "$info_plist")" = '1'

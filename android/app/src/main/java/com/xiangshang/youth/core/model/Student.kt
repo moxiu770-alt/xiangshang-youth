@@ -1,6 +1,24 @@
 package com.xiangshang.youth.core.model
+
+import com.squareup.moshi.Json
+
 enum class TaskStatus(val label: String) {
-    NotCheckedIn("未签到"), CheckedIn("已签到"), Waiting("候测"), Testing("测试中"), Completed("已完成"), Review("待复核"), Retest("待补测"), Absent("缺席");
+    @Json(name = "未签到")
+    NotCheckedIn("未签到"),
+    @Json(name = "已签到")
+    CheckedIn("已签到"),
+    @Json(name = "候测")
+    Waiting("候测"),
+    @Json(name = "测试中")
+    Testing("测试中"),
+    @Json(name = "已完成")
+    Completed("已完成"),
+    @Json(name = "待复核")
+    Review("待复核"),
+    @Json(name = "待补测")
+    Retest("待补测"),
+    @Json(name = "缺席")
+    Absent("缺席");
 
     /** Keeps field-test actions on the documented queue state machine. */
     fun allowedNextStatuses(): List<TaskStatus> = when (this) {
@@ -25,5 +43,11 @@ data class Student(
     val isPovertyArea: Boolean,
     val taskStatus: TaskStatus,
     val totalScore: Double?,
-    val gender: String = ""
+    val gender: String = "",
+    /** ISO-8601 calendar date used by BMI-for-age calculation. */
+    val birthDate: String? = null,
+    /** Monotonic server-side task row version for conflict-safe teacher edits. */
+    val taskVersion: Int? = null,
+    /** Stable class scope; className is display-only. */
+    @Json(name = "classId") val classId: String? = null
 )

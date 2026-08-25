@@ -5,75 +5,30 @@ import UIKit
 
 struct TeacherHomeView: View {
     @EnvironmentObject private var state: AppState
-    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var selectedTab = 0
 
     private var isSportsTeacher: Bool { state.localFeatures.teacherUsesSportsWorkbench }
+    private var canUseSportsWorkbench: Bool { state.teacherHasCapability("UPLOAD_AFTER_SCHOOL_COURSE") }
     private var sportsTeacherBinding: Binding<Bool> {
         Binding(get: { state.localFeatures.teacherUsesSportsWorkbench }, set: { state.setTeacherSportsWorkbench($0) })
     }
 
-    private var reduceMotion: Bool { state.localFeatures.settings.reduceMotion || systemReduceMotion }
-
     var body: some View {
-        ZStack {
-            ReferenceColor.canvas.ignoresSafeArea()
-        VStack(spacing: 0) {
+        TabView(selection: $selectedTab) {
+            TeacherDashboard(isSportsTeacher: sportsTeacherBinding).tabItem { Label("首页", systemImage: "house.fill") }.tag(0)
             Group {
-                switch selectedTab {
-                case 0: TeacherDashboard(isSportsTeacher: sportsTeacherBinding)
-                case 1:
-                    if isSportsTeacher {
-                        SportsUploadDashboard()
-                    } else {
-                        TeacherClassCircleDashboard()
-                    }
-                default: AccountDashboard()
-                }
+                if isSportsTeacher && canUseSportsWorkbench { SportsUploadDashboard() } else { TeacherClassCircleDashboard() }
             }
-            .id("\(selectedTab)-\(isSportsTeacher)")
-            .transition(.opacity.combined(with: .move(edge: .trailing)))
-            teacherBottomBar
+            .tabItem { Label(isSportsTeacher && canUseSportsWorkbench ? "延时上传" : "班级圈", systemImage: isSportsTeacher && canUseSportsWorkbench ? "camera.fill" : "rectangle.grid.2x2") }
+            .tag(1)
+            AccountDashboard().tabItem { Label("我的", systemImage: "person.fill") }.tag(2)
         }
-        .background(ReferenceColor.canvas)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: selectedTab)
+        .tint(ReferenceColor.blue)
+        .toolbarBackground(.ultraThinMaterial, for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
         .frame(maxWidth: 720)
         .frame(maxWidth: .infinity)
-        }
-    }
-
-    private var teacherBottomBar: some View {
-        HStack {
-            tabButton(index: 0, icon: "house.fill", title: "首页")
-            tabButton(index: 1, icon: isSportsTeacher ? "camera.fill" : "rectangle.grid.2x2", title: isSportsTeacher ? "延时上传" : "班级圈")
-            tabButton(index: 2, icon: "person", title: "我的")
-        }
-        .padding(.top, 7)
-        .padding(.bottom, 5)
-        .background(.white)
-        .overlay(alignment: .top) { Rectangle().fill(ReferenceColor.navy.opacity(0.06)).frame(height: 0.5) }
-    }
-
-    private func tabButton(index: Int, icon: String, title: String) -> some View {
-        Button {
-            if reduceMotion {
-                var transaction = Transaction()
-                transaction.animation = nil
-                withTransaction(transaction) { selectedTab = index }
-            } else {
-                withAnimation { selectedTab = index }
-            }
-        } label: {
-            VStack(spacing: 3) {
-                Image(systemName: icon).font(.system(size: 15, weight: .semibold))
-                Text(title).font(.system(size: 9, weight: .medium))
-            }
-            .foregroundStyle(selectedTab == index ? ReferenceColor.blue : Color.secondary)
-            .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(title)
-        .accessibilityHint(selectedTab == index ? "当前页面" : "打开\(title)")
+        .onAppear { if !canUseSportsWorkbench && isSportsTeacher { state.setTeacherSportsWorkbench(false) } }
     }
 }
 
@@ -82,13 +37,60 @@ struct TeacherClassCircleDashboard: View {
     @State private var composerShown = false
     @State private var selectedNotice: String?
     @State private var editingPost: ClassPostDraft?
+    private var currentTeacherName: String { state.activeDisplayName }
+    private var primaryClassName: String { state.managedTeacherClasses.first?.name ?? "我的班级" }
     var body: some View { ScrollView { VStack(spacing: 10) {
-        ParentPageNavigation(title: "三年级2班 · 班级圈")
-        ReferenceCard { VStack(alignment: .leading, spacing: 7) { HStack { Image(systemName: "megaphone.fill").foregroundStyle(ReferenceColor.blue); Text("班级公告").font(.system(size: 13, weight: .bold)); Spacer(); Button("全部公告 ›") { selectedNotice = "全部班级公告\n请家长于 9 月 12 日前完成孩子健康信息确认，并留意测评时间与场地安排。" }.font(.system(size: 9)).foregroundStyle(ReferenceColor.blue).buttonStyle(.plain) }; Button { selectedNotice = "秋季综合测评通知\n请家长于 9 月 12 日前完成孩子健康信息确认。测评当天请为孩子准备舒适运动服和饮水。" } label: { VStack(alignment: .leading, spacing: 4) { Text("秋季综合测评通知").font(.system(size: 12, weight: .bold)); Text("请家长于 9 月 12 日前完成孩子健康信息确认。") .font(.system(size: 9)).foregroundStyle(.secondary) }.frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.plain) } }.padding(.horizontal, 12)
-        Button { composerShown = true } label: { Label("发布公告或班级动态", systemImage: "square.and.pencil").font(.system(size: 12, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 10).foregroundStyle(.white).background(ReferenceColor.blue, in: RoundedRectangle(cornerRadius: 10)) }.buttonStyle(.plain).padding(.horizontal, 12)
-        ForEach(state.localFeatures.classPosts) { post in ReferenceCard { VStack(alignment: .leading, spacing: 5) { HStack { Text(post.author).font(.system(size: 10, weight: .bold)).foregroundStyle(ReferenceColor.blue); Spacer(); if post.author == "李老师" { Button("编辑") { editingPost = post }.font(.system(size: 9, weight: .semibold)).foregroundStyle(ReferenceColor.blue) } }; Text(post.content).font(.system(size: 12)); Text("刚刚发布").font(.system(size: 8)).foregroundStyle(.secondary) } }.padding(.horizontal, 12) }
-        ReferenceSectionTitle(title: "班级动态", trailing: "本班最新").padding(.horizontal, 12)
-        ForEach([("今日体能活动", "孩子们完成了侧向滑步与障碍跳练习，表现很棒！"), ("家校共育小贴士", "建议每天安排 20 分钟亲子运动时间。")], id: \.0) { item in Button { selectedNotice = "\(item.0)\n\(item.1)" } label: { ReferenceCard { HStack { VStack(alignment: .leading, spacing: 5) { Text(item.0).font(.system(size: 12, weight: .bold)); Text(item.1).font(.system(size: 9)).foregroundStyle(.secondary); Text("李老师 · 今天").font(.system(size: 8)).foregroundStyle(ReferenceColor.green) }; Spacer(); Image(systemName: "chevron.right").font(.system(size: 9)).foregroundStyle(.secondary) } }.padding(.horizontal, 12) }.buttonStyle(.plain).accessibilityLabel("查看\(item.0)") }
+        ParentPageNavigation(title: "\(primaryClassName) · 班级圈")
+        if !state.usesRemoteDataSource { ReferenceCard { VStack(alignment: .leading, spacing: 7) { HStack { Image(systemName: "megaphone.fill").foregroundStyle(ReferenceColor.blue); Text("班级公告").font(.system(size: 13, weight: .bold)); Spacer(); Button("全部公告 ›") { selectedNotice = "全部班级公告\n请家长于 9 月 12 日前完成孩子健康信息确认，并留意测评时间与场地安排。" }.font(.system(size: 12)).foregroundStyle(ReferenceColor.blue).buttonStyle(.plain) }; Button { selectedNotice = "秋季综合测评通知\n请家长于 9 月 12 日前完成孩子健康信息确认。测评当天请为孩子准备舒适运动服和饮水。" } label: { VStack(alignment: .leading, spacing: 4) { Text("秋季综合测评通知").font(.system(size: 12, weight: .bold)); Text("请家长于 9 月 12 日前完成孩子健康信息确认。") .font(.system(size: 12)).foregroundStyle(.secondary) }.frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.plain) } }.padding(.horizontal, 12) }
+        Button { composerShown = true } label: { Label("发布公告或班级动态", systemImage: "square.and.pencil").font(.system(size: 15, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 12).foregroundStyle(.white).background(ReferenceColor.blue, in: RoundedRectangle(cornerRadius: 10)) }.buttonStyle(.plain).padding(.horizontal, 12)
+        ReferenceSectionTitle(title: "班级动态", trailing: state.classPostsNextCursor == nil ? "本班最新" : "可继续加载").padding(.horizontal, 12)
+        if state.usesRemoteDataSource, state.classPostsLoading, state.localFeatures.classPosts.isEmpty {
+            LoadingStateView().padding(.vertical, 20)
+        } else if state.usesRemoteDataSource, let error = state.classPostsError, state.localFeatures.classPosts.isEmpty {
+            ErrorStateView(message: error) { Task { await state.loadClassPosts() } }.padding(.horizontal, 12)
+        } else if state.localFeatures.classPosts.isEmpty {
+            EmptyStateView(title: "暂无班级动态", detail: "发布班级通知或动态后，会按审核状态显示在这里。").padding(.horizontal, 12)
+        } else {
+            ForEach(state.localFeatures.classPosts) { post in
+                ReferenceCard {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(post.displayName ?? post.author).font(.system(size: 14, weight: .bold)).foregroundStyle(ReferenceColor.blue)
+                                Text("\(post.status.taskStatusLabel) · \(post.moderationStatus == "approved" || post.moderationStatus == "published" ? "已审核" : "待审核")")
+                                    .font(.system(size: 12)).foregroundStyle(post.status == .failed ? .red : .secondary)
+                            }
+                            Spacer()
+                            Menu {
+                                if post.postID == nil || post.status != .submitted { Button("编辑") { editingPost = post } }
+                                if state.teacherHasCapability("PUBLISH_CLASS_NOTICE"), post.postID != nil {
+                                    Button((post.isPinned ?? false) ? "取消置顶" : "置顶") { Task { await state.setClassPostPinnedCommand(post, pinned: !(post.isPinned ?? false)) } }
+                                }
+                                Button("举报") { Task { await state.reportClassPostCommand(post) } }
+                                Button("删除", role: .destructive) { Task { await state.deleteClassPostCommand(post) } }
+                            } label: {
+                                Image(systemName: "ellipsis.circle").font(.system(size: 20)).foregroundStyle(ReferenceColor.blue)
+                            }.accessibilityLabel("管理班级动态")
+                        }
+                        Text(post.content).font(.system(size: 14)).foregroundStyle(ReferenceColor.navy).fixedSize(horizontal: false, vertical: true)
+                        HStack(spacing: 8) {
+                            if post.isPinned == true { Label("置顶", systemImage: "pin.fill").foregroundStyle(ReferenceColor.yellow) }
+                            if post.reportStatus == "reported" { Label("已举报", systemImage: "exclamationmark.bubble.fill").foregroundStyle(.orange) }
+                            Spacer()
+                            Text(post.createdAt.formatted(date: .abbreviated, time: .shortened)).foregroundStyle(.secondary)
+                        }.font(.system(size: 12))
+                    }
+                }.padding(.horizontal, 12)
+            }
+            if state.usesRemoteDataSource, let cursor = state.classPostsNextCursor {
+                Button { Task { await state.loadClassPosts(cursor: cursor) } } label: {
+                    Text(state.classPostsLoading ? "加载中…" : "加载更多动态").font(.system(size: 15, weight: .semibold)).frame(maxWidth: .infinity).padding(.vertical, 11)
+                }.buttonStyle(.bordered).disabled(state.classPostsLoading).padding(.horizontal, 12)
+            } else if state.usesRemoteDataSource, let error = state.classPostsError {
+                ErrorStateView(message: error) { Task { await state.loadClassPosts(cursor: state.classPostsNextCursor) } }.padding(.horizontal, 12)
+            }
+        }
+        if !state.usesRemoteDataSource { ForEach([("今日体能活动", "孩子们完成了侧向滑步与障碍跳练习，表现很棒！"), ("家校共育小贴士", "建议每天安排 20 分钟亲子运动时间。")], id: \.0) { item in Button { selectedNotice = "\(item.0)\n\(item.1)" } label: { ReferenceCard { HStack { VStack(alignment: .leading, spacing: 5) { Text(item.0).font(.system(size: 12, weight: .bold)); Text(item.1).font(.system(size: 12)).foregroundStyle(.secondary); Text("\(currentTeacherName) · 今天").font(.system(size: 12)).foregroundStyle(ReferenceColor.green) }; Spacer(); Image(systemName: "chevron.right").font(.system(size: 12)).foregroundStyle(.secondary) } }.padding(.horizontal, 12) }.buttonStyle(.plain).accessibilityLabel("查看\(item.0)") } }
     }.padding(.bottom, 10) }
         .background(ReferenceColor.canvas)
         .overlay {
@@ -104,9 +106,10 @@ struct TeacherClassCircleDashboard: View {
                     .background(ReferenceColor.canvas)
             }
         }
-        .sheet(isPresented: $composerShown) { PublishClassPostSheet(author: "李老师") }
+        .sheet(isPresented: $composerShown) { PublishClassPostSheet(author: currentTeacherName) }
         .sheet(item: $editingPost) { post in PublishClassPostSheet(author: post.author, editingPost: post) }
-        .sheet(item: Binding(get: { selectedNotice.map(TeacherNoticeSheetItem.init) }, set: { selectedNotice = $0?.value })) { item in TeacherNoticeDetailSheet(value: item.value) }
+        .sheet(item: Binding(get: { selectedNotice.map(TeacherNoticeSheetItem.init) }, set: { selectedNotice = $0?.value })) { item in TeacherNoticeDetailSheet(value: item.value, author: currentTeacherName) }
+        .task { if state.usesRemoteDataSource { await state.loadClassPosts() } }
     }
 }
 
@@ -117,6 +120,7 @@ private struct TeacherNoticeSheetItem: Identifiable {
 
 private struct TeacherNoticeDetailSheet: View {
     let value: String
+    let author: String
     @Environment(\.dismiss) private var dismiss
     private var title: String { value.components(separatedBy: "\n").first ?? "班级动态" }
     private var detail: String { value.components(separatedBy: "\n").dropFirst().joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -124,7 +128,7 @@ private struct TeacherNoticeDetailSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    Label("李老师 · 今天", systemImage: "person.crop.circle.fill")
+                    Label("\(author) · 今天", systemImage: "person.crop.circle.fill")
                         .font(.footnote).foregroundStyle(ReferenceColor.blue)
                     Text(detail.isEmpty ? "暂无补充说明。" : detail)
                         .font(.body).foregroundStyle(ReferenceColor.navy)
@@ -141,15 +145,18 @@ private struct TeacherNoticeDetailSheet: View {
 
 struct SportsUploadDashboard: View {
     @EnvironmentObject private var state: AppState
-    private let taskID = "sports-upload-2026-09-12"
     @State private var isUploadFormShown = false
+    private var uploadTaskRecord: TestTask? { state.data?.tasks.first }
+    private var taskID: String { uploadTaskRecord?.id ?? "sports-upload-local" }
+    private var uploadClassName: String { uploadTaskRecord?.className ?? state.managedTeacherClasses.first?.name ?? "我的班级" }
+    private var uploadTaskTitle: String { uploadTaskRecord?.title ?? "课后测评任务" }
     var body: some View { ScrollView { VStack(spacing: 10) {
         ParentPageNavigation(title: "延时课程上传")
-        ReferenceCard { VStack(alignment: .leading, spacing: 9) { ReferenceSectionTitle(title: "一（6）班体能提升课", trailing: "17:20–18:00"); Label("请上传测评结果记录与课堂照片", systemImage: "camera.badge.ellipsis").font(.system(size: 10)).foregroundStyle(.secondary); HStack { uploadTile("photo.on.rectangle", "课堂照片"); uploadTile("doc.text.fill", "测评记录"); uploadTile("person.3.fill", "出勤名单") } } }.padding(.horizontal, 12)
-        ReferenceCard { VStack(alignment: .leading, spacing: 7) { Text("今日待上传课程").font(.system(size: 13, weight: .bold)); uploadTask("16:30 · 一（6）班测评任务", "已完成，待上传"); uploadTask("17:20 · 体能提升班", "课程进行中") } }.padding(.horizontal, 12)
+        ReferenceCard { VStack(alignment: .leading, spacing: 9) { ReferenceSectionTitle(title: "\(uploadClassName) · 课后记录", trailing: uploadTaskRecord?.date ?? "待排期"); Label("请上传测评结果记录与课堂照片", systemImage: "camera.badge.ellipsis").font(.system(size: 12)).foregroundStyle(.secondary); HStack { uploadTile("photo.on.rectangle", "课堂照片"); uploadTile("doc.text.fill", "测评记录"); uploadTile("person.3.fill", "出勤名单") } } }.padding(.horizontal, 12)
+        ReferenceCard { VStack(alignment: .leading, spacing: 7) { Text("待上传课程").font(.system(size: 13, weight: .bold)); uploadTask(uploadTaskTitle, uploadTaskRecord == nil ? "暂无已排期任务" : "可填写并保存记录") } }.padding(.horizontal, 12)
         let submitted = state.localFeatures.uploadedTaskIDs.contains(taskID)
-        Button { isUploadFormShown = true } label: { Text(submitted ? "查看本机课程记录" : "填写并保存课程记录").font(.system(size: 13, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 11).foregroundStyle(.white).background(submitted ? ReferenceColor.green : .orange, in: RoundedRectangle(cornerRadius: 10)) }.buttonStyle(.plain).padding(.horizontal, 12)
-        if let record = state.localFeatures.courseUploads.first(where: { $0.taskID == taskID }) { Text(record.status == .pendingSync ? "已保存 · 待同步：\(record.attachmentName) · 出勤 \(record.attendanceCount) 人" : record.status == .submitted ? "已同步：\(record.attachmentName) · 出勤 \(record.attendanceCount) 人" : record.status == .failed ? "同步失败，稍后可在设置中重试：\(record.attachmentName)" : "已保存草稿：\(record.notes)").font(.system(size: 9)).foregroundStyle(record.status == .failed ? .red : .secondary).padding(.horizontal, 14) }
+        Button { isUploadFormShown = true } label: { Text(submitted ? "查看课程记录" : "填写并保存课程记录").font(.system(size: 13, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 11).foregroundStyle(.white).background(submitted ? ReferenceColor.green : .orange, in: RoundedRectangle(cornerRadius: 10)) }.buttonStyle(.plain).padding(.horizontal, 12)
+        if let record = state.localFeatures.courseUploads.first(where: { $0.taskID == taskID }) { Text(record.status == .pendingSync ? "已保存 · 待同步：\(record.attachmentName) · 出勤 \(record.attendanceCount) 人" : record.status == .submitted ? "已同步：\(record.attachmentName) · 出勤 \(record.attendanceCount) 人" : record.status == .failed ? "同步失败，稍后可在设置中重试：\(record.attachmentName)" : "已保存草稿：\(record.notes)").font(.system(size: 12)).foregroundStyle(record.status == .failed ? .red : .secondary).padding(.horizontal, 14) }
     }.padding(.bottom, 10) }
         .background(ReferenceColor.canvas)
         .overlay {
@@ -167,17 +174,20 @@ struct SportsUploadDashboard: View {
         }
         .sheet(isPresented: $isUploadFormShown) { CourseUploadSheet(taskID: taskID) }
     }
-    private func uploadTile(_ icon: String, _ title: String) -> some View { Button { isUploadFormShown = true } label: { VStack(spacing: 5) { Image(systemName: icon).font(.system(size: 18)).foregroundStyle(ReferenceColor.blue); Text(title).font(.system(size: 9, weight: .medium)) }.frame(maxWidth: .infinity).padding(.vertical, 8).background(ReferenceColor.sky, in: RoundedRectangle(cornerRadius: 8)) }.buttonStyle(.plain).accessibilityLabel("上传\(title)") }
-    private func uploadTask(_ title: String, _ status: String) -> some View { Button { isUploadFormShown = true } label: { HStack { Image(systemName: "figure.run").foregroundStyle(ReferenceColor.green); VStack(alignment: .leading) { Text(title).font(.system(size: 11, weight: .bold)); Text(status).font(.system(size: 9)).foregroundStyle(.secondary) }; Spacer(); Image(systemName: "chevron.right").font(.system(size: 9)).foregroundStyle(.secondary) }.padding(.vertical, 4) }.buttonStyle(.plain).accessibilityLabel("查看\(title)\(status)") }
+    private func uploadTile(_ icon: String, _ title: String) -> some View { Button { isUploadFormShown = true } label: { VStack(spacing: 5) { Image(systemName: icon).font(.system(size: 18)).foregroundStyle(ReferenceColor.blue); Text(title).font(.system(size: 12, weight: .medium)) }.frame(maxWidth: .infinity).padding(.vertical, 8).background(ReferenceColor.sky, in: RoundedRectangle(cornerRadius: 8)) }.buttonStyle(.plain).accessibilityLabel("上传\(title)") }
+    private func uploadTask(_ title: String, _ status: String) -> some View { Button { isUploadFormShown = true } label: { HStack { Image(systemName: "figure.run").foregroundStyle(ReferenceColor.green); VStack(alignment: .leading) { Text(title).font(.system(size: 12, weight: .bold)); Text(status).font(.system(size: 12)).foregroundStyle(.secondary) }; Spacer(); Image(systemName: "chevron.right").font(.system(size: 12)).foregroundStyle(.secondary) }.padding(.vertical, 4) }.buttonStyle(.plain).accessibilityLabel("查看\(title)\(status)") }
 }
 
 struct CourseUploadSheet: View {
     let taskID: String
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var state: AppState
-    @State private var attendance = "26"
-    @State private var notes = "完成侧向滑步与障碍跳训练，学生整体表现良好。"
-    @State private var attachment = "课堂活动照片.jpg"
+    // A new upload must start as a real form, not as a bundled demonstration
+    // record. Existing drafts/records are restored in the task below.
+    @State private var attendance = ""
+    @State private var notes = ""
+    @State private var attachment = ""
+    @State private var attachmentReference: String?
     @State private var error: String?
     @State private var isImporterShown = false
     @State private var isCameraShown = false
@@ -197,9 +207,11 @@ struct CourseUploadSheet: View {
                     Button("保存草稿") { save(submit: false) }
                     Button {
                         guard let count = Int(attendance), count > 0 else { error = "请填写大于 0 的有效出勤人数。"; return }
-                        guard !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !attachment.isEmpty else { error = "提交前请补齐课堂记录和附件。"; return }
+                        guard !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                              !attachment.isEmpty,
+                              attachmentReference?.isEmpty == false else { error = "提交前请补齐课堂记录并选择可上传的照片附件。"; return }
                         Task {
-                            if await state.submitCourseUploadCommand(taskID: taskID, attendanceCount: count, notes: notes, attachmentName: attachment) {
+                        if await state.submitCourseUploadCommand(taskID: taskID, attendanceCount: count, notes: notes, attachmentName: attachment, attachmentReference: attachmentReference) {
                                 state.clearDraft(draftKey)
                                 dismiss()
                             }
@@ -207,7 +219,7 @@ struct CourseUploadSheet: View {
                     } label: {
                         HStack { if commandState.isSubmitting { ProgressView() }; Text(commandState.isSubmitting ? "正在提交…" : "提交审核") }
                     }
-                    .disabled(commandState.isSubmitting || (Int(attendance) ?? 0) <= 0 || notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || attachment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(commandState.isSubmitting || (Int(attendance) ?? 0) <= 0 || notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || attachment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || attachmentReference?.isEmpty != false)
                     if case let .failed(message) = commandState { Text(message).foregroundStyle(.red) }
                 }
                 if let error { Section { Text(error).foregroundStyle(.red) } }
@@ -215,18 +227,35 @@ struct CourseUploadSheet: View {
             .navigationTitle("延时课程上传")
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }
             .task {
-                if let record = state.localFeatures.courseUploads.first(where: { $0.taskID == taskID }) { attendance = String(record.attendanceCount); notes = record.notes; attachment = record.attachmentName }
+                if let record = state.localFeatures.courseUploads.first(where: { $0.taskID == taskID }) { attendance = String(record.attendanceCount); notes = record.notes; attachment = record.attachmentName; attachmentReference = record.attachmentReference }
                 else if let draft = state.localFeatures.drafts[draftKey]?.split(separator: "|", maxSplits: 2).map(String.init), draft.count == 3 { attendance = draft[0]; notes = draft[1]; attachment = draft[2] }
             }
             .onChange(of: attendance) { _, _ in saveDraft() }
             .onChange(of: notes) { _, _ in saveDraft() }
             .onChange(of: attachment) { _, _ in saveDraft() }
-            .fileImporter(isPresented: $isImporterShown, allowedContentTypes: [.image]) { result in if case let .success(url) = result { attachment = url.lastPathComponent } }
-            .sheet(isPresented: $isCameraShown) { CameraPicker(onImage: { _ in attachment = "课堂照片-\(Self.fileStamp()).jpg"; isCameraShown = false }, onCancel: { isCameraShown = false }) }
+            .fileImporter(isPresented: $isImporterShown, allowedContentTypes: [.image]) { result in
+                do {
+                    if case let .success(url) = result {
+                        let stored = try CourseAttachmentStore.persistImportedFile(url)
+                        attachment = stored.name
+                        attachmentReference = stored.reference
+                        error = nil
+                    }
+                } catch let uploadError { error = uploadError.localizedDescription }
+            }
+            .sheet(isPresented: $isCameraShown) { CameraPicker(onImage: { image in
+                do {
+                    let stored = try CourseAttachmentStore.persistCameraImage(image)
+                    attachment = stored.name
+                    attachmentReference = stored.reference
+                    error = nil
+                } catch let cameraError { error = cameraError.localizedDescription }
+                isCameraShown = false
+            }, onCancel: { isCameraShown = false }) }
         }
     }
     private func saveDraft() { state.saveDraft("\(attendance)|\(notes)|\(attachment)", key: draftKey) }
-    private func save(submit: Bool) { guard let count = Int(attendance), count >= 0 else { error = "请填写有效的出勤人数。"; return }; if submit && (notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || attachment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) { error = "提交前请补齐课堂记录和附件。"; return }; state.saveCourseUpload(taskID: taskID, attendanceCount: count, notes: notes, attachmentName: attachment, submit: submit); if submit { state.clearDraft(draftKey); dismiss() } else { error = "草稿已保存，可稍后继续编辑。" } }
+    private func save(submit: Bool) { guard let count = Int(attendance), count >= 0 else { error = "请填写有效的出勤人数。"; return }; if submit && (notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || attachment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || attachmentReference == nil) { error = "提交前请补齐课堂记录并选择可上传的照片附件。"; return }; state.saveCourseUpload(taskID: taskID, attendanceCount: count, notes: notes, attachmentName: attachment, attachmentReference: attachmentReference, submit: submit); if submit { state.clearDraft(draftKey); dismiss() } else { error = "草稿已保存，可稍后继续编辑。" } }
     private func openCamera() {
         guard UIImagePickerController.isSourceTypeAvailable(.camera) else { error = "当前设备没有可用相机，请使用文件选择照片。"; return }
         switch AVCaptureDevice.authorizationStatus(for: .video) {
@@ -267,90 +296,13 @@ private struct CameraPicker: UIViewControllerRepresentable {
     }
 }
 
-struct TeacherMessageDetail: Identifiable {
-    let message: MessageItem
-    var id: String { message.id }
-}
-
-struct TeacherMessagesView: View {
-    @EnvironmentObject private var state: AppState
-    @State private var selectedMessage: TeacherMessageDetail?
-    private var items: [MessageItem] { state.data?.messages ?? [] }
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 8) {
-                ParentPageNavigation(title: "消息中心", showsBack: true)
-                if state.unreadMessageCount > 0 {
-                    HStack {
-                        Spacer()
-                        Button("全部已读") { state.markAllMessagesRead() }
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(ReferenceColor.blue)
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("将全部消息标记为已读")
-                    }
-                    .padding(.horizontal, 14)
-                }
-                if let error = state.error, state.data == nil {
-                    ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
-                } else if state.loading || state.data == nil {
-                    LoadingStateView()
-                } else if items.isEmpty {
-                    EmptyStateView(title: "暂无消息通知", detail: "新的测评、补测和班级通知会显示在这里。")
-                } else {
-                    ForEach(items) { item in
-                        let presentation = messagePresentation(for: item)
-                        let unread = !item.isRead && !state.localFeatures.readMessageIDs.contains(item.id)
-                        Button {
-                            state.markMessageRead(item.id)
-                            selectedMessage = TeacherMessageDetail(message: item)
-                        } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: presentation.icon).foregroundStyle(presentation.color).frame(width: 36, height: 36).background(presentation.color.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack(spacing: 5) { Text(item.title).font(.system(size: 12, weight: .bold)); if unread { Circle().fill(.red).frame(width: 5, height: 5) } }
-                                    Text(item.content).font(.system(size: 9)).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                Text(item.time).font(.system(size: 8)).foregroundStyle(.secondary)
-                                Image(systemName: "chevron.right").font(.system(size: 8)).foregroundStyle(.secondary)
-                            }
-                            .foregroundStyle(ReferenceColor.navy)
-                            .padding(11)
-                            .background(.white, in: RoundedRectangle(cornerRadius: 10))
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.horizontal, 12)
-                    }
-                }
-            }
-            .padding(.bottom, 10)
-        }
-        .background(ReferenceColor.canvas)
-        .refreshable { await state.refreshDashboard() }
-        .sheet(item: $selectedMessage) { message in
-            NavigationStack {
-                VStack(alignment: .leading, spacing: 14) {
-                    Text(message.message.title).font(.title3.bold())
-                    Text(message.message.time).font(.caption).foregroundStyle(.secondary)
-                    Divider()
-                    Text(message.message.content).font(.body)
-                    Spacer()
-                }
-                .padding()
-                .navigationTitle("消息详情")
-                .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { selectedMessage = nil } } }
-            }
-        }
-    }
-
-    private func messagePresentation(for item: MessageItem) -> (icon: String, color: Color) {
-        if item.category == "系统" { return ("gearshape.fill", ReferenceColor.purple) }
-        if item.title.contains("体质") { return ("exclamationmark.triangle.fill", .red) }
-        if item.title.contains("视力") { return ("eye.fill", ReferenceColor.green) }
-        if item.title.contains("口腔") { return ("mouth.fill", ReferenceColor.purple) }
-        return ("building.2.fill", ReferenceColor.blue)
-    }
+/// Shared visual treatment for the teacher message list and its details.
+func messagePresentation(for item: MessageItem) -> (icon: String, color: Color) {
+    if item.category == "系统" { return ("gearshape.fill", ReferenceColor.purple) }
+    if item.title.contains("体质") { return ("exclamationmark.triangle.fill", .red) }
+    if item.title.contains("视力") { return ("eye.fill", ReferenceColor.green) }
+    if item.title.contains("口腔") { return ("mouth.fill", ReferenceColor.purple) }
+    return ("building.2.fill", ReferenceColor.blue)
 }
 
 struct TeacherDashboard: View {
@@ -358,13 +310,32 @@ struct TeacherDashboard: View {
     @EnvironmentObject private var router: AppRouter
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Binding var isSportsTeacher: Bool
-    private var classStudents: [Student] { state.data?.students.filter { $0.className == "三年级2班" } ?? [] }
+    private var canUseSportsWorkbench: Bool { state.teacherHasCapability("UPLOAD_AFTER_SCHOOL_COURSE") }
+    private var managedClasses: [ClassInfo] { state.managedTeacherClasses }
+    private var classStudents: [Student] {
+        let classIDs = Set(managedClasses.map(\.id))
+        return state.data?.students.filter { student in
+            guard let classID = student.classID else { return false }
+            return classIDs.contains(classID)
+        } ?? []
+    }
     private var measuredCount: Int { classStudents.filter { state.taskStatus(for: $0) == .completed }.count }
-    private var riskCount: Int { classStudents.filter { ($0.totalScore ?? 35) < 25 || state.taskStatus(for: $0) == .review || state.taskStatus(for: $0) == .retest }.count }
+    private func officialReport(for student: Student) -> DiagnosisReport? {
+        guard state.hasPublishedSchoolReport(for: student) else { return nil }
+        return state.visibleReport(for: student)
+    }
+    private var lowScoreStudentIDs: Set<String> {
+        Set(classStudents.compactMap(officialReport(for:)).filter { $0.requiresFollowUp }.map(\.student.id))
+    }
+    private var highScoreStudentIDs: Set<String> {
+        Set(classStudents.compactMap(officialReport(for:)).filter { $0.isComplete && $0.totalScore >= AssessmentScoreRules.highTotalThreshold && !$0.requiresReview }.map(\.student.id))
+    }
+    private var riskCount: Int { classStudents.filter { lowScoreStudentIDs.contains($0.id) || state.taskStatus(for: $0) == .review || state.taskStatus(for: $0) == .retest }.count }
     private var reduceMotion: Bool { state.localFeatures.settings.reduceMotion || systemReduceMotion }
     private var actionGridColumns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: 5), count: dynamicTypeSize.isAccessibilitySize ? 2 : 4)
+        Array(repeating: GridItem(.flexible(), spacing: 5), count: dynamicTypeSize.isAccessibilitySize || horizontalSizeClass == .compact ? 2 : 4)
     }
 
     var body: some View {
@@ -406,17 +377,19 @@ struct TeacherDashboard: View {
             Image("TeacherAvatar").resizable().scaledToFill()
                 .frame(width: 43, height: 43).background(ReferenceColor.sky, in: Circle()).clipShape(Circle())
             VStack(alignment: .leading, spacing: 2) {
-                Text("李老师").font(.system(size: 14, weight: .bold)).foregroundStyle(ReferenceColor.navy)
-                Text("向上实验小学").font(.system(size: 9)).foregroundStyle(.secondary)
-                Text(isSportsTeacher ? "体育老师" : "三年级2班").font(.system(size: 8, weight: .semibold)).foregroundStyle(ReferenceColor.green)
+                Text(state.activeDisplayName).font(.system(size: 14, weight: .bold)).foregroundStyle(ReferenceColor.navy)
+                Text(state.profile?.schoolName ?? "学校").font(.system(size: 12)).foregroundStyle(.secondary)
+                        Text(isSportsTeacher ? "延时课程工作台" : "负责 \(managedClasses.count) 个授权班级").font(.system(size: 12, weight: .semibold)).foregroundStyle(ReferenceColor.green)
             }
             Spacer()
-            Button {
-                if reduceMotion { var transaction = Transaction(); transaction.animation = nil; withTransaction(transaction) { isSportsTeacher.toggle() } }
-                else { withAnimation { isSportsTeacher.toggle() } }
-            } label: { Label("切换角色", systemImage: "arrow.left.arrow.right")
-                .font(.system(size: 9, weight: .medium)).padding(.horizontal, 9).padding(.vertical, 5)
-                .background(.white, in: Capsule()).overlay(Capsule().stroke(ReferenceColor.navy.opacity(0.10), lineWidth: 1)) }.buttonStyle(.plain)
+            if canUseSportsWorkbench {
+                Button {
+                    if reduceMotion { var transaction = Transaction(); transaction.animation = nil; withTransaction(transaction) { isSportsTeacher.toggle() } }
+                    else { withAnimation { isSportsTeacher.toggle() } }
+                } label: { Label("切换角色", systemImage: "arrow.left.arrow.right")
+                    .font(.system(size: 12, weight: .medium)).padding(.horizontal, 9).padding(.vertical, 5)
+                    .background(.white, in: Capsule()).overlay(Capsule().stroke(ReferenceColor.navy.opacity(0.10), lineWidth: 1)) }.buttonStyle(.plain)
+            }
             Button { router.push(.teacherMessages) } label: { Image(systemName: "bell").font(.system(size: 16, weight: .medium)).foregroundStyle(ReferenceColor.navy)
                 .overlay(alignment: .topTrailing) { if state.unreadMessageCount > 0 { Circle().fill(.red).frame(width: 5, height: 5).offset(x: 2, y: -2) } }
                 .frame(width: 44, height: 44).contentShape(Rectangle())
@@ -433,11 +406,11 @@ struct TeacherDashboard: View {
 
     private var teacherSwitch: some View {
         HStack(spacing: 8) {
-            roleSwitchButton("班主任", "person.3.fill", selected: !isSportsTeacher, color: ReferenceColor.blue) { isSportsTeacher = false }
+            roleSwitchButton("班级工作台", "person.3.fill", selected: !isSportsTeacher, color: ReferenceColor.blue) { isSportsTeacher = false }
             // The two choices are account roles, not task-health states. Keep
             // both in the blue identity family used by the reference teacher
             // panel; green remains reserved for completed/healthy data below.
-            roleSwitchButton("体育老师", "figure.run", selected: isSportsTeacher, color: ReferenceColor.blue) { isSportsTeacher = true }
+            if canUseSportsWorkbench { roleSwitchButton("延时课程", "figure.run", selected: isSportsTeacher, color: ReferenceColor.blue) { isSportsTeacher = true } }
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 12)
@@ -460,7 +433,7 @@ struct TeacherDashboard: View {
 
     private var classTeacherContent: some View {
         VStack(spacing: 10) {
-            Text("🔒 仅查看所有测评数据及授权数据").font(.system(size: 9)).foregroundStyle(.secondary)
+            Text("🔒 仅查看所有测评数据及授权数据").font(.system(size: 12)).foregroundStyle(.secondary)
             ReferenceCard {
                 VStack(spacing: 10) {
                     ReferenceSectionTitle(title: "班级健康概览", trailing: "查看班级看板", action: { router.push(.teacherClassBoard) })
@@ -472,10 +445,10 @@ struct TeacherDashboard: View {
                     }
                     Divider()
                     HStack {
-                        Text("问题分布（人）").font(.system(size: 10, weight: .bold))
+                        Text("问题分布（人）").font(.system(size: 12, weight: .bold))
                         Spacer()
-                        Text("低分 \(classStudents.filter { ($0.totalScore ?? 35) < 25 }.count) · 待复核 \(classStudents.filter { state.taskStatus(for: $0) == .review }.count) · 待补测 \(classStudents.filter { state.taskStatus(for: $0) == .retest }.count)")
-                            .font(.system(size: 9)).foregroundStyle(.secondary)
+                        Text("低分 \(lowScoreStudentIDs.count) · 表现良好 \(highScoreStudentIDs.count) · 待复核 \(classStudents.filter { state.taskStatus(for: $0) == .review }.count) · 待补测 \(classStudents.filter { state.taskStatus(for: $0) == .retest }.count)")
+                            .font(.system(size: 12)).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -492,14 +465,19 @@ struct TeacherDashboard: View {
                 action("person.badge.plus", "班级管理", .orange, .teacherClasses)
             }
             .padding(.horizontal, 12)
-            ReferenceCard {
-                VStack(alignment: .leading, spacing: 7) {
-                    ReferenceSectionTitle(title: "今日任务", trailing: "查看全部", action: { router.push(.teacherTasks) })
-                    teacherTaskRow("16:30–17:10 · 三年级2班综合测评", "进行中", ReferenceColor.green)
-                    teacherTaskRow("17:20–18:00 · 体能提升课", "待上传", .orange)
+            if state.usesRemoteDataSource {
+                EmptyStateView(title: "暂无今日任务", detail: "学校排期同步后会显示可处理任务.")
+                    .padding(.horizontal, 12)
+            } else {
+                ReferenceCard {
+                    VStack(alignment: .leading, spacing: 7) {
+                        ReferenceSectionTitle(title: "今日任务", trailing: "查看全部", action: { router.push(.teacherTasks) })
+                        teacherTaskRow("16:30–17:10 · \(managedClasses.first?.name ?? "班级")综合测评", "进行中", ReferenceColor.green)
+                        teacherTaskRow("17:20–18:00 · 体能提升课", "待上传", .orange)
+                    }
                 }
+                .padding(.horizontal, 12)
             }
-            .padding(.horizontal, 12)
         }
     }
 
@@ -507,10 +485,10 @@ struct TeacherDashboard: View {
         Button { router.push(.teacherTasks) } label: {
             HStack(spacing: 8) {
                 Image(systemName: "calendar.badge.clock").foregroundStyle(color)
-                Text(title).font(.system(size: 10, weight: .semibold)).foregroundStyle(ReferenceColor.navy)
+                Text(title).font(.system(size: 12, weight: .semibold)).foregroundStyle(ReferenceColor.navy)
                 Spacer()
-                Text(status).font(.system(size: 9, weight: .bold)).foregroundStyle(color)
-                Image(systemName: "chevron.right").font(.system(size: 8)).foregroundStyle(.secondary)
+                Text(status).font(.system(size: 12, weight: .bold)).foregroundStyle(color)
+                Image(systemName: "chevron.right").font(.system(size: 12)).foregroundStyle(.secondary)
             }
         }
         .buttonStyle(.plain)
@@ -531,7 +509,7 @@ struct TeacherDashboard: View {
                     let completed = state.data?.tasks.reduce(0) { $0 + $1.completedCount } ?? 0
                     let progress = total == 0 ? 0 : Double(completed) / Double(total)
                     AnimatedProgressLine(value: progress, colors: [ReferenceColor.green, ReferenceColor.blue])
-                    Text("已完成 \(completed) / \(total) 人    \(Int(progress * 100))%").font(.system(size: 9, weight: .bold)).foregroundStyle(ReferenceColor.green)
+                    Text("已完成 \(completed) / \(total) 人    \(Int(progress * 100))%").font(.system(size: 12, weight: .bold)).foregroundStyle(ReferenceColor.green)
                 }
             }
             .padding(.horizontal, 12)
@@ -543,14 +521,21 @@ struct TeacherDashboard: View {
             ReferenceCard {
                 VStack(alignment: .leading, spacing: 8) {
                     ReferenceSectionTitle(title: "今日任务", trailing: "查看全部", action: { router.push(.teacherTasks) })
-                    taskRow("16:30", "16:30 · 17:10", "一（6）班 测评任务", "待上课", ReferenceColor.green)
-                    taskRow("17:20", "17:20 · 18:00", "体能提升班", "待上课", ReferenceColor.blue)
+                    let tasks = Array((state.data?.tasks ?? []).prefix(2))
+                    if tasks.isEmpty {
+                        Text("暂无已排期任务").font(.system(size: 12)).foregroundStyle(.secondary).padding(.vertical, 8)
+                    } else {
+                        ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
+                            let time = task.date.split(separator: " ").last.map(String.init) ?? "待排期"
+                            taskRow(time, task.date, "\(task.className) · \(task.title)", task.completedCount >= task.totalCount ? "已完成" : "待上课", index == 0 ? ReferenceColor.green : ReferenceColor.blue)
+                        }
+                    }
                 }
             }
             .padding(.horizontal, 12)
             Button { router.push(.teacherTasks) } label: {
                 Label("课后上传测评结果记录与照片", systemImage: "camera.fill")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.system(size: 12, weight: .bold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
                     .foregroundStyle(.white)
@@ -565,12 +550,12 @@ struct TeacherDashboard: View {
             HStack {
                 Text(time).font(.system(size: 12, weight: .bold)).foregroundStyle(color).frame(width: 34)
                 VStack(alignment: .leading) {
-                    Text(duration).font(.system(size: 8)).foregroundStyle(.secondary)
-                    Text(title).font(.system(size: 11, weight: .bold))
+                    Text(duration).font(.system(size: 12)).foregroundStyle(.secondary)
+                    Text(title).font(.system(size: 12, weight: .bold))
                 }
                 Spacer()
-                Text(state).font(.system(size: 9, weight: .bold)).foregroundStyle(color)
-                Image(systemName: "chevron.right").font(.system(size: 8)).foregroundStyle(.secondary)
+                Text(state).font(.system(size: 12, weight: .bold)).foregroundStyle(color)
+                Image(systemName: "chevron.right").font(.system(size: 12)).foregroundStyle(.secondary)
             }
         }.buttonStyle(.plain).accessibilityLabel("查看\(title)任务")
     }
@@ -578,7 +563,7 @@ struct TeacherDashboard: View {
     private func count(_ title: String, _ value: String, _ icon: String, _ color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 4) {
-                Text(title).font(.system(size: 9)).foregroundStyle(.secondary)
+                Text(title).font(.system(size: 12)).foregroundStyle(.secondary)
                 HStack(spacing: 3) {
                     Text(value).font(.system(size: 19, weight: .bold)).foregroundStyle(color)
                     Image(systemName: icon).font(.system(size: 14)).foregroundStyle(color)
@@ -591,6 +576,7 @@ struct TeacherDashboard: View {
     private func action(_ icon: String, _ title: String, _ color: Color, _ route: AppRoute) -> some View {
         Button { router.push(route) } label: { ReferenceAction(icon: icon, title: title, color: color) }
             .buttonStyle(.plain)
+            .accessibilityLabel(title)
     }
 }
 
@@ -600,19 +586,31 @@ struct TeacherClassBoardView: View {
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var dashboardAppeared = false
     @State private var selectedPeriod = 0
+    @SceneStorage("teacher.selectedClassID") private var selectedClassID: String?
+    @SceneStorage("teacher.selectedTaskID") private var selectedTaskID: String?
     @State private var historicalDetailShown = false
-    private var classInfo: ClassInfo? { state.data?.classes.first(where: { $0.name == "三年级2班" }) }
-    private var classStudents: [Student] { state.data?.students.filter { $0.className == "三年级2班" } ?? [] }
+    private var classInfo: ClassInfo? { state.managedTeacherClasses.first(where: { $0.id == selectedClassID }) ?? state.managedTeacherClasses.first }
+    private var className: String { classInfo?.name ?? "我的班级" }
+    private var currentTask: TestTask? { state.data?.tasks.first(where: { $0.id == selectedTaskID }) ?? state.data?.tasks.first }
+    private var classStudents: [Student] { state.data?.students.filter { $0.classID == classInfo?.id } ?? [] }
     private var isHistorical: Bool { selectedPeriod == 1 }
-    private var totalCount: Int { isHistorical ? 20 : classStudents.count }
-    private var measuredCount: Int { isHistorical ? 18 : classStudents.filter { state.taskStatus(for: $0) == .completed }.count }
-    private var riskCount: Int { isHistorical ? 2 : classStudents.filter { ($0.totalScore ?? 35) < 25 || state.taskStatus(for: $0) == .review || state.taskStatus(for: $0) == .retest }.count }
-    private var lowScoreCount: Int { isHistorical ? 1 : classStudents.filter { ($0.totalScore ?? 35) < 25 }.count }
-    private var reviewCount: Int { isHistorical ? 1 : classStudents.filter { state.taskStatus(for: $0) == .review }.count }
-    private var retestCount: Int { isHistorical ? 1 : classStudents.filter { state.taskStatus(for: $0) == .retest }.count }
-    private var processingCount: Int { isHistorical ? 0 : classStudents.filter { [.checkedIn, .waiting, .testing].contains(state.taskStatus(for: $0)) }.count }
-    private var completedCount: Int { isHistorical ? measuredCount : classStudents.filter { state.taskStatus(for: $0) == .completed }.count }
-    private var riskStudents: [Student] { isHistorical ? [] : classStudents.filter { (($0.totalScore ?? 35) < 25) || [.review, .retest].contains(state.taskStatus(for: $0)) } }
+    private var totalCount: Int { isHistorical ? 0 : classStudents.count }
+    private var measuredCount: Int { isHistorical ? 0 : classStudents.filter { state.taskStatus(for: $0, taskID: currentTask?.id) == .completed }.count }
+    private var remoteOverview: TeacherAnalyticsOverview? { isHistorical ? nil : state.teacherOverview }
+    private func officialReport(for student: Student) -> DiagnosisReport? {
+        guard state.hasPublishedSchoolReport(for: student) else { return nil }
+        return state.visibleReport(for: student)
+    }
+    private var lowScoreStudentIDs: Set<String> {
+        Set(classStudents.compactMap(officialReport(for:)).filter { $0.requiresFollowUp }.map(\.student.id))
+    }
+    private var riskCount: Int { isHistorical ? 0 : remoteOverview?.riskCount ?? classStudents.filter { lowScoreStudentIDs.contains($0.id) || state.taskStatus(for: $0, taskID: currentTask?.id) == .review || state.taskStatus(for: $0, taskID: currentTask?.id) == .retest }.count }
+    private var lowScoreCount: Int { isHistorical ? 0 : remoteOverview?.lowScoreCount ?? lowScoreStudentIDs.count }
+    private var reviewCount: Int { isHistorical ? 0 : classStudents.filter { state.taskStatus(for: $0, taskID: currentTask?.id) == .review }.count }
+    private var retestCount: Int { isHistorical ? 0 : classStudents.filter { state.taskStatus(for: $0, taskID: currentTask?.id) == .retest }.count }
+    private var processingCount: Int { isHistorical ? 0 : classStudents.filter { [.checkedIn, .waiting, .testing].contains(state.taskStatus(for: $0, taskID: currentTask?.id)) }.count }
+    private var completedCount: Int { isHistorical ? measuredCount : classStudents.filter { state.taskStatus(for: $0, taskID: currentTask?.id) == .completed }.count }
+    private var riskStudents: [Student] { isHistorical ? [] : classStudents.filter { lowScoreStudentIDs.contains($0.id) || [.review, .retest].contains(state.taskStatus(for: $0, taskID: currentTask?.id)) } }
     private var completion: Double { totalCount == 0 ? 0 : Double(measuredCount) / Double(totalCount) }
     private var reduceMotion: Bool { state.localFeatures.settings.reduceMotion || systemReduceMotion }
 
@@ -627,11 +625,11 @@ struct TeacherClassBoardView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("返回")
-                    .accessibilityHint("返回班主任首页")
+                    .accessibilityHint("返回上一页")
                     Spacer()
                     VStack(spacing: 1) {
-                        Text("三年级2班 · 班级数据看板").font(.system(size: 14, weight: .bold))
-                        Text("向上实验小学 · 三年级2班 · 共\(totalCount)人").font(.system(size: 8)).foregroundStyle(.secondary)
+                        Text("\(className) · 班级数据看板").font(.system(size: 14, weight: .bold))
+                        Text("\(state.profile?.schoolName ?? "学校") · \(className) · 共\(totalCount)人").font(.system(size: 12)).foregroundStyle(.secondary)
                     }
                     Spacer()
                     Button { router.push(.teacherMessages) } label: {
@@ -647,17 +645,32 @@ struct TeacherClassBoardView: View {
                 .padding(.top, 8)
 
                 HStack {
+                    Menu {
+                        ForEach(state.managedTeacherClasses) { item in
+                            Button(item.name) { selectedClassID = item.id }
+                        }
+                    } label: {
+                        Label(className, systemImage: "person.3.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(ReferenceColor.blue)
+                    }
+                    Menu {
+                        ForEach(state.data?.tasks ?? []) { item in Button(item.title) { selectedTaskID = item.id } }
+                    } label: {
+                        Label(currentTask?.title ?? "选择测评任务", systemImage: "list.clipboard")
+                            .font(.system(size: 12, weight: .semibold)).foregroundStyle(ReferenceColor.blue)
+                    }
                     chip("本轮综合测评", selected: selectedPeriod == 0) { selectedPeriod = 0 }
                     chip("2026春季", selected: selectedPeriod == 1) { selectedPeriod = 1 }
                     Spacer()
-                    Text("更新于 07-26 14:27").font(.system(size: 8)).foregroundStyle(.secondary)
+                    Text("更新于 \(BusinessClock.string(format: "MM-dd HH:mm"))").font(.system(size: 12)).foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, 12)
 
                 if isHistorical {
                     Button { historicalDetailShown = true } label: {
                         Label("2026春季为已归档汇总；学生明细请切换回本轮综合测评查看", systemImage: "archivebox.fill")
-                            .font(.system(size: 9)).foregroundStyle(ReferenceColor.purple)
+                            .font(.system(size: 12)).foregroundStyle(ReferenceColor.purple)
                             .frame(maxWidth: .infinity, alignment: .leading).padding(9)
                             .background(ReferenceColor.purple.opacity(0.08), in: RoundedRectangle(cornerRadius: 9))
                     }
@@ -666,19 +679,31 @@ struct TeacherClassBoardView: View {
 
                 boardCard(title: "班级健康概览", trailing: isHistorical ? "归档说明" : "查看明细", action: drillDown { router.push(.studentList(classInfo)) }) {
                     HStack {
-                        boardStat("班级人数", "\(totalCount)", "person.3.fill", ReferenceColor.blue, action: drillDown { router.push(.studentList(classInfo)) })
-                        boardStat("已测评", "\(measuredCount)", "checkmark.circle.fill", ReferenceColor.green, action: drillDown { router.push(.teacherTasks) })
-                        boardStat("测评率", "\(Int(completion * 100))%", "circle", ReferenceColor.green, action: drillDown { router.push(.teacherTasks) })
+                        boardStat("班级人数", "\(remoteOverview?.totalCount ?? totalCount)", "person.3.fill", ReferenceColor.blue, action: drillDown { router.push(.studentList(classInfo)) })
+                        boardStat("已测评", "\(remoteOverview?.completedCount ?? measuredCount)", "checkmark.circle.fill", ReferenceColor.green, action: drillDown { router.push(.teacherTasks) })
+                        boardStat("测评率", "\(remoteOverview.map { $0.totalCount == 0 ? 0 : $0.completedCount * 100 / $0.totalCount } ?? Int(completion * 100))%", "circle", ReferenceColor.green, action: drillDown { router.push(.teacherTasks) })
                         boardStat("待处理预警", "\(riskCount)", "exclamationmark.shield.fill", .red, action: drillDown { router.push(.reviewList) })
                     }
                 }
 
-                boardCard(title: "四维测评健康度", trailing: isHistorical ? "归档说明" : "健康明细", action: drillDown { router.push(.reviewList) }) {
-                    HStack(spacing: 6) {
-                        healthGauge("体质", ReferenceColor.blue, completion: completion, action: drillDown { router.push(.reviewList) })
-                        healthGauge("心理", ReferenceColor.pink, completion: completion, action: drillDown { router.push(.reviewList) })
-                        healthGauge("视力", ReferenceColor.green, completion: completion, action: drillDown { router.push(.reviewList) })
-                        healthGauge("口腔", ReferenceColor.purple, completion: completion, action: drillDown { router.push(.reviewList) })
+                boardCard(title: "7 项运动项目进度", trailing: isHistorical ? "归档说明" : "查看任务", action: drillDown { router.push(.teacherTasks) }) {
+                    Text("仅统计学校场地端的综合运动能力测评任务。")
+                        .font(.system(size: 12)).foregroundStyle(.secondary)
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
+                        ForEach(TestItem.allCases) { item in
+                            Button(action: drillDown { router.push(.teacherTasks) }) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: item.icon).font(.system(size: 20, weight: .semibold)).foregroundStyle(ReferenceColor.blue)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(item.rawValue).font(.system(size: 12, weight: .semibold)).foregroundStyle(ReferenceColor.navy).lineLimit(2)
+                                        if let metric = remoteOverview?.itemStats.first(where: { $0.itemCode == item.rawValue }) {
+                                            Text("\(metric.measuredCount)/\(metric.totalCount)人 · \(metric.averageScore, specifier: "%.1f")分").font(.system(size: 12)).foregroundStyle(.secondary)
+                                        } else { Text(state.usesRemoteDataSource ? "暂无该项目数据" : "单项数据待同步").font(.system(size: 12)).foregroundStyle(.secondary) }
+                                    }
+                                    Spacer(minLength: 0)
+                                }.frame(maxWidth: .infinity, minHeight: 52, alignment: .leading).padding(10).background(ReferenceColor.sky.opacity(0.62), in: RoundedRectangle(cornerRadius: 12))
+                            }.buttonStyle(.plain).accessibilityLabel("查看\(item.rawValue)任务进度")
+                        }
                     }
                 }
 
@@ -705,22 +730,22 @@ struct TeacherClassBoardView: View {
                                 Label("处理中 \(processingCount)", systemImage: "circle.fill").foregroundStyle(ReferenceColor.yellow)
                                 Label("已完成 \(completedCount)", systemImage: "checkmark.circle.fill").foregroundStyle(ReferenceColor.green)
                             }
-                            .font(.system(size: 8, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                         }
                     }
                 }
                 .padding(.horizontal, 12)
 
                 boardCard(title: "测评平均完成趋势", trailing: isHistorical ? "归档说明" : "查看详情", action: drillDown { router.push(.teacherTasks) }) {
-                    CompletionTrendChart()
+                    EmptyStateView(title: isHistorical ? "暂无历史趋势数据" : "暂无趋势数据", detail: "趋势数据同步后显示，不展示演示统计。")
                 }
 
                 boardCard(title: "重点关注学生", trailing: isHistorical ? "归档说明" : "查看全部", action: drillDown { router.push(.reviewList) }) {
                     if isHistorical {
-                        Text("历史周期共有\(riskCount)名重点关注学生，已归档处理；不展示当前学生档案。")
-                            .font(.system(size: 10)).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+                        Text("历史周期数据尚未同步；不展示演示统计或学生明细。")
+                            .font(.system(size: 12)).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
                     } else if riskStudents.isEmpty {
-                        Text("当前没有重点风险学生").font(.system(size: 10)).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+                        Text("当前没有重点风险学生").font(.system(size: 12)).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
                     } else {
                         VStack(spacing: 6) {
                             ForEach(Array(riskStudents.prefix(3))) { student in
@@ -737,14 +762,14 @@ struct TeacherClassBoardView: View {
                 }
 
                 HStack(spacing: 7) {
-                    actionButton("推送班级通知", "bell.fill", ReferenceColor.blue) { router.push(.teacherMessages) }
-                    ShareLink(item: classBoardExport, subject: Text("三年级2班测评数据报告")) {
+                    actionButton("推送班级通知", "bell.fill", ReferenceColor.blue) { router.push(.teacherNoticeComposer) }
+                    ShareLink(item: classBoardExport, subject: Text("\(className)测评数据报告")) {
                         Label("导出班级数据报告", systemImage: "square.and.arrow.up")
-                            .font(.system(size: 8, weight: .bold))
+                            .font(.system(size: 12, weight: .bold))
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 9)
+                            .frame(minHeight: 48)
                             .foregroundStyle(.white)
-                            .background(ReferenceColor.purple, in: RoundedRectangle(cornerRadius: 7))
+                            .background(ReferenceColor.purple, in: RoundedRectangle(cornerRadius: 12))
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("导出班级数据报告")
@@ -753,6 +778,10 @@ struct TeacherClassBoardView: View {
                 .padding(.horizontal, 12)
             }
             .padding(.bottom, 10)
+        }
+        .task(id: "\(selectedClassID ?? "")|\(currentTask?.id ?? "")") {
+            guard let classID = classInfo?.id, let task = currentTask else { return }
+            await state.loadTeacherOverview(classID: classID, task: task)
         }
         .background(ReferenceColor.canvas)
         .overlay {
@@ -769,7 +798,7 @@ struct TeacherClassBoardView: View {
             } else if classStudents.isEmpty {
                 ZStack {
                     ReferenceColor.canvas.ignoresSafeArea()
-                    EmptyStateView(title: "暂无班级数据", detail: "学生名单同步后，班级看板会自动更新。")
+                    EmptyStateView(title: "暂无班级数据", detail: "学生名单同步后，这里会显示班级看板。")
                 }
             }
         }
@@ -781,11 +810,7 @@ struct TeacherClassBoardView: View {
         .sheet(isPresented: $historicalDetailShown) {
             NavigationStack {
                 List {
-                    Section("2026春季归档") {
-                        LabeledContent("班级人数", value: "20 人")
-                        LabeledContent("完成测评", value: "18 人 · 90%")
-                        LabeledContent("重点关注", value: "2 人 · 已归档")
-                    }
+                    Section("2026春季归档") { Text("历史汇总尚未同步，当前不展示演示人数、完成率或风险数。") }
                     Section("查看范围") {
                         Text("该周期仅保留班级汇总。出于学生健康数据保护，历史学生明细需由学校管理端授权后查看；本应用当前只开放本轮测评的学生报告。")
                     }
@@ -798,19 +823,19 @@ struct TeacherClassBoardView: View {
 
     private var classBoardExport: String {
         """
-        向上少年 · 三年级2班测评数据报告
+        向上少年 · \(className)测评数据报告
         测评完成率：\(Int(completion * 100))%
         已完成：\(measuredCount) / \(totalCount) 人
         待处理预警：\(riskCount) 人
         待复核：\(reviewCount) 人；待补测：\(retestCount) 人
-        规则版本：小学综合运动能力标准 v1.0
+        评测标准：小学综合运动能力标准 v1.0
         """
     }
 
     private func chip(_ text: String, selected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(text + "⌄")
-                .font(.system(size: 9, weight: .medium))
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(selected ? ReferenceColor.blue : ReferenceColor.navy)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
@@ -848,10 +873,10 @@ struct TeacherClassBoardView: View {
     private func boardStat(_ title: String, _ value: String, _ icon: String, _ color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 3) {
-                Text(title).font(.system(size: 8)).foregroundStyle(.secondary)
+                Text(title).font(.system(size: 12)).foregroundStyle(.secondary)
                 HStack(spacing: 2) {
                     Text(value).font(.system(size: 18, weight: .bold)).foregroundStyle(color)
-                    Image(systemName: icon).font(.system(size: 10)).foregroundStyle(color)
+                    Image(systemName: icon).font(.system(size: 12)).foregroundStyle(color)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -863,7 +888,7 @@ struct TeacherClassBoardView: View {
     private func healthGauge(_ title: String, _ color: Color, completion: Double, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 2) {
-                Text(title).font(.system(size: 9, weight: .bold))
+                Text(title).font(.system(size: 12, weight: .bold))
                 ZStack {
                     Circle().stroke(color.opacity(0.18), lineWidth: 5)
                     Circle().trim(from: 0, to: dashboardAppeared ? completion : 0)
@@ -872,7 +897,7 @@ struct TeacherClassBoardView: View {
                     Text("\(Int(completion * 100))%").font(.system(size: 12, weight: .bold)).foregroundStyle(color)
                 }
                 .frame(width: 40, height: 40)
-                Text("\(Int((1 - completion) * 100))%未完成").font(.system(size: 7)).foregroundStyle(.secondary)
+                Text("\(Int((1 - completion) * 100))% 未完成").font(.system(size: 12)).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 3)
@@ -884,23 +909,24 @@ struct TeacherClassBoardView: View {
 
     private func smallBar(_ label: String, _ value: Double, _ color: Color, _ count: String) -> some View {
         HStack(spacing: 5) {
-            Text(label).font(.system(size: 8)).frame(width: 34, alignment: .leading)
+            Text(label).font(.system(size: 12)).frame(width: 34, alignment: .leading)
             GeometryReader { proxy in
                 RoundedRectangle(cornerRadius: 3).fill(color).frame(width: proxy.size.width * value, height: 5)
             }
             .frame(height: 5)
-            Text(count).font(.system(size: 8)).foregroundStyle(.secondary)
+            Text(count).font(.system(size: 12)).foregroundStyle(.secondary)
         }
     }
 
     private func studentAlert(_ name: String, _ detail: String, _ state: String, _ color: Color) -> some View {
-        HStack {
-            Circle().fill(color.opacity(0.15)).frame(width: 20, height: 20).overlay(Text(String(name.prefix(1))).font(.system(size: 9, weight: .bold)).foregroundStyle(color))
-            Text(name).font(.system(size: 9, weight: .bold)).frame(width: 42, alignment: .leading)
-            Text(detail).font(.system(size: 8)).foregroundStyle(.secondary)
+        HStack(spacing: 8) {
+            Circle().fill(color.opacity(0.15)).frame(width: 28, height: 28).overlay(Text(String(name.prefix(1))).font(.system(size: 12, weight: .bold)).foregroundStyle(color))
+            Text(name).font(.system(size: 12, weight: .bold)).frame(width: 48, alignment: .leading)
+            Text(detail).font(.system(size: 12)).foregroundStyle(.secondary)
             Spacer()
-            Text(state).font(.system(size: 8, weight: .bold)).foregroundStyle(color)
+            Text(state).font(.system(size: 12, weight: .bold)).foregroundStyle(color)
         }
+        .frame(minHeight: 48)
     }
 
     private func riskDetail(for student: Student) -> String {
@@ -922,11 +948,11 @@ struct TeacherClassBoardView: View {
     private func actionButton(_ title: String, _ icon: String, _ color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Label(title, systemImage: icon)
-                .font(.system(size: 8, weight: .bold))
+                .font(.system(size: 12, weight: .bold))
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 9)
+                .frame(minHeight: 48)
                 .foregroundStyle(.white)
-                .background(color, in: RoundedRectangle(cornerRadius: 7))
+                .background(color, in: RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
     }
@@ -960,7 +986,7 @@ struct CompletionTrendChart: View {
                             .overlay(Circle().stroke(ReferenceColor.blue, lineWidth: 2))
                             .position(x: x, y: y)
                             .opacity(draw ? 1 : 0)
-                        Text("\(Int(item.element * 100))%").font(.system(size: 7, weight: .bold)).foregroundStyle(ReferenceColor.blue)
+                        Text("\(Int(item.element * 100))%").font(.system(size: 12, weight: .bold)).foregroundStyle(ReferenceColor.blue)
                             .position(x: x, y: max(7, y - 10))
                             .opacity(draw ? 1 : 0)
                     }
@@ -969,7 +995,7 @@ struct CompletionTrendChart: View {
             .frame(height: 48)
             HStack {
                 ForEach(labels, id: \.self) { label in
-                    Text(label).font(.system(size: 7)).foregroundStyle(.secondary).frame(maxWidth: .infinity)
+                    Text(label).font(.system(size: 12)).foregroundStyle(.secondary).frame(maxWidth: .infinity)
                 }
             }
         }
@@ -1011,17 +1037,17 @@ struct TeacherClassesView: View {
         ScrollView {
             VStack(spacing: 10) {
                 ParentPageNavigation(title: "我管理的班级", showsBack: true)
-                ReferenceHeader(name: "李老师", school: "向上实验小学 · 三年级2班", initial: "李", avatarAsset: "TeacherAvatar")
-                ReferenceSectionTitle(title: "我管理的班级", trailing: "负责 2 个班级").padding(.horizontal, 12)
+                ReferenceHeader(name: state.activeDisplayName, school: "\(state.profile?.schoolName ?? "学校") · \(state.managedTeacherClasses.map(\.name).joined(separator: "、").isEmpty ? "暂无班级" : state.managedTeacherClasses.map(\.name).joined(separator: "、"))", initial: String(state.activeDisplayName.prefix(1)), avatarAsset: "TeacherAvatar")
+                ReferenceSectionTitle(title: "我管理的班级", trailing: "负责 \(state.managedTeacherClasses.count) 个班级").padding(.horizontal, 12)
                 if let error = state.error, state.data == nil {
                     ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
                 } else if state.loading || state.data == nil {
                     LoadingStateView()
                 } else if let data = state.data, data.classes.isEmpty {
-                    EmptyStateView(title: "暂无管理班级", detail: "学校分班后会自动同步到这里。")
+                    EmptyStateView(title: "暂无管理班级", detail: "学校完成分班后，这里会显示管理班级。")
                 } else if let data = state.data {
-                    ForEach(Array(data.classes.prefix(2))) { item in
-                        let classStudents = data.students.filter { $0.className == item.name }
+                    ForEach(state.managedTeacherClasses) { item in
+                        let classStudents = data.students.filter { $0.classID == item.id }
                         let completedCount = classStudents.filter { student in
                             state.taskStatus(for: student) == .completed
                         }.count
@@ -1033,12 +1059,12 @@ struct TeacherClassesView: View {
                             HStack {
                                 VStack(alignment: .leading) {
                                     Text(item.name).font(.system(size: 14, weight: .bold))
-                                    Text("\(item.studentCount)人 · \(item.teacherName)").font(.system(size: 10)).foregroundStyle(.secondary)
+                                    Text("\(item.studentCount)人 · \(item.teacherName)").font(.system(size: 12)).foregroundStyle(.secondary)
                                 }
                                 Spacer()
                                 VStack(alignment: .trailing) {
                                     Text("\(completionRate)%").font(.system(size: 17, weight: .bold)).foregroundStyle(ReferenceColor.green)
-                                    Text("完成率").font(.system(size: 8)).foregroundStyle(.secondary)
+                                    Text("完成率").font(.system(size: 12)).foregroundStyle(.secondary)
                                 }
                             }
                             .padding(12)
@@ -1086,15 +1112,34 @@ struct StudentListView: View {
                     LoadingStateView()
                 } else {
                     let students = (state.data?.students ?? []).filter {
-                        (classInfo == nil || $0.className == classInfo?.name)
-                        && (mode != .outstanding || (($0.totalScore ?? 0) >= 30 && state.taskStatus(for: $0) == .completed))
+                        (classInfo == nil || $0.classID == classInfo?.id)
+                        && (mode != .outstanding || ((state.hasPublishedSchoolReport(for: $0) && (state.visibleReport(for: $0)?.totalScore ?? 0) >= 30)))
                         && (mode != .unassigned || $0.className.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                     if students.isEmpty {
                         EmptyStateView(title: mode == .outstanding ? "暂无符合条件的学生" : mode == .unassigned ? "暂无待分班学生" : "暂无学生数据", detail: mode.emptyDetail)
                     } else {
-                        ForEach(students.sorted { ($0.totalScore ?? 0) > ($1.totalScore ?? 0) }) { student in
+                        ForEach(students.sorted { (state.visibleReport(for: $0)?.totalScore ?? -1) > (state.visibleReport(for: $1)?.totalScore ?? -1) }) { student in
                             StudentCard(student: student) { router.push(.report(student)) }
+                        }
+                        if let total = state.data?.studentTotal, let loaded = state.data?.students.count, loaded < total {
+                            VStack(spacing: 6) {
+                                if let loadError = state.studentsLoadError {
+                                    Text(loadError).font(.caption).foregroundStyle(.red).multilineTextAlignment(.center)
+                                }
+                                Button {
+                                    Task { await state.loadMoreStudents() }
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        if state.studentsLoadingMore { ProgressView().controlSize(.small) }
+                                        Text(state.studentsLoadingMore ? "正在加载" : "加载更多学生（已显示 \(loaded)/\(total)）")
+                                    }
+                                    .frame(maxWidth: .infinity).padding(.vertical, 10)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .disabled(state.studentsLoadingMore || state.isOffline)
+                                .accessibilityLabel("加载更多学生，已显示 \(loaded) 人，共 \(total) 人")
+                            }.padding(.vertical, 8)
                         }
                     }
                 }
@@ -1110,8 +1155,8 @@ struct TeacherTasksView: View {
         ScrollView {
             VStack(spacing: 10) {
                 ParentPageNavigation(title: "延时课程上传", showsBack: true)
-                ReferenceHeader(name: "李老师", school: "向上实验小学 · 体育组", initial: "李", avatarAsset: "TeacherAvatar")
-                ReferenceSectionTitle(title: "近日测评任务", trailing: "共 3 项任务").padding(.horizontal, 12)
+                ReferenceHeader(name: state.activeDisplayName, school: "\(state.profile?.schoolName ?? "学校") · 体育组", initial: String(state.activeDisplayName.prefix(1)), avatarAsset: "TeacherAvatar")
+                ReferenceSectionTitle(title: "近日测评任务", trailing: "共 \(state.data?.tasks.count ?? 0) 项任务").padding(.horizontal, 12)
                 if let error = state.error, state.data == nil {
                     ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
                 } else if state.loading || state.data == nil {
@@ -1138,32 +1183,49 @@ struct TeacherTaskDetailView: View {
     @EnvironmentObject private var router: AppRouter
     let task: TestTask
     @State private var selectedStudent: Student?
+    @State private var rosterSearch = ""
+    @State private var rosterStatus: TaskStatus?
     var body: some View {
         let currentTask = state.data?.tasks.first(where: { $0.id == task.id }) ?? task
         AppScaffold(title: "任务详情") {
             VStack(spacing: 10) {
                 TestTaskCard(task: currentTask, action: nil)
+                HStack(spacing: 8) {
+                    TextField("搜索学生或班级", text: $rosterSearch)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 13))
+                    Menu {
+                        Button("全部状态") { rosterStatus = nil }
+                        ForEach(TaskStatus.allCases, id: \.self) { status in Button(status.rawValue) { rosterStatus = status } }
+                    } label: {
+                        Label(rosterStatus?.rawValue ?? "状态", systemImage: "line.3.horizontal.decrease.circle")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                }
                 Text("点击学生按现场队列更新签到、候测、测试、复核或补测状态；不支持跨步骤直接完成。")
-                    .font(.system(size: 9)).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+                    .font(.system(size: 12)).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
                 if let error = state.error, state.data == nil {
                     ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
                 } else if state.loading || state.data == nil {
                     LoadingStateView()
-                } else if let data = state.data, data.students.isEmpty {
-                    EmptyStateView(title: "暂无任务学生", detail: "学生名单同步后可更新测评状态。")
-                } else if let data = state.data {
-                    let classNames = Set(currentTask.className.split(separator: "、").map(String.init))
-                    let taskStudents = data.students.filter { $0.grade == currentTask.gradeName && classNames.contains($0.className) }
+                } else if state.taskRosterRecords[currentTask.id] == nil {
+                    LoadingStateView()
+                } else {
+                    let query = rosterSearch.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let taskStudents = state.taskRosterStudents(taskID: currentTask.id, fallbackTask: currentTask).filter { student in
+                        (query.isEmpty || student.name.localizedCaseInsensitiveContains(query) || student.className.localizedCaseInsensitiveContains(query)) && (rosterStatus == nil || state.taskStatus(for: student, taskID: currentTask.id) == rosterStatus)
+                    }
                     if taskStudents.isEmpty {
-                        EmptyStateView(title: "暂无任务学生", detail: "该任务对应的年级或班级名单尚未同步。")
+                        EmptyStateView(title: "暂无任务学生", detail: "该任务目前没有可操作的授权名单。")
                     }
                     ForEach(taskStudents) { student in
-                        TeacherStudentStatusRow(student: student, status: state.taskStatus(for: student), syncState: state.localFeatures.taskStatusSyncStates[student.id]) { selectedStudent = student }
+                        TeacherStudentStatusRow(student: student, status: state.taskStatus(for: student, taskID: currentTask.id), syncState: state.taskStatusSyncState(for: student, taskID: currentTask.id)) { selectedStudent = student }
                     }
                 }
             }
         }
-        .sheet(item: $selectedStudent) { student in TaskStatusSheet(student: student, status: state.taskStatus(for: student)) }
+        .sheet(item: $selectedStudent) { student in TaskStatusSheet(student: student, status: state.taskStatus(for: student, taskID: currentTask.id), taskID: currentTask.id) }
+        .task(id: currentTask.id) { await state.loadTaskStudents(taskID: currentTask.id) }
     }
 }
 
@@ -1175,22 +1237,26 @@ struct ReviewListView: View {
         ScrollView {
             VStack(spacing: 10) {
                 ParentPageNavigation(title: "预警中心", showsBack: true)
-                ReferenceHeader(name: "李老师", school: "向上实验小学 · 三年级2班", initial: "李", avatarAsset: "TeacherAvatar")
+                ReferenceHeader(name: state.activeDisplayName, school: "\(state.profile?.schoolName ?? "学校") · \(state.managedTeacherClasses.map(\.name).joined(separator: "、").isEmpty ? "暂无班级" : state.managedTeacherClasses.map(\.name).joined(separator: "、"))", initial: String(state.activeDisplayName.prefix(1)), avatarAsset: "TeacherAvatar")
                 ReferenceSectionTitle(title: "预警中心", trailing: "待处理列表").padding(.horizontal, 12)
                 if let error = state.error, state.data == nil {
                     ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
                 } else if state.loading || state.data == nil {
                     LoadingStateView()
                 } else {
-                    let students = state.data?.students.filter { [.review, .retest, .absent].contains(state.taskStatus(for: $0)) } ?? []
+                    let managedClassIDs = Set(state.managedTeacherClasses.map(\.id))
+                    let students = state.data?.students.filter { student in
+                        guard let classID = student.classID, managedClassIDs.contains(classID) else { return false }
+                        return [.review, .retest, .absent].contains(state.taskStatus(for: student))
+                    } ?? []
                     Text("待处理 \(students.count) 人 · 点击可更新处理状态")
-                        .font(.system(size: 10, weight: .semibold)).foregroundStyle(.red).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 14)
+                        .font(.system(size: 12, weight: .semibold)).foregroundStyle(.red).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 14)
                     ForEach(students) { student in
                         TeacherStudentStatusRow(student: student, status: state.taskStatus(for: student), syncState: state.localFeatures.taskStatusSyncStates[student.id]) { selectedStudent = student }
                             .padding(.horizontal, 12)
                         if let note = state.localFeatures.reviewNotes[student.id] {
                             Text("复核意见：\(note)")
-                                .font(.system(size: 9)).foregroundStyle(.secondary)
+                                .font(.system(size: 12)).foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 18)
                         }
                     }
@@ -1212,17 +1278,17 @@ private struct TeacherStudentStatusRow: View {
         Button(action: action) {
             HStack(spacing: 10) {
                 Text(String(student.name.prefix(1))).font(.system(size: 13, weight: .bold)).foregroundStyle(.white).frame(width: 32, height: 32).background(ReferenceColor.blue, in: Circle())
-                VStack(alignment: .leading, spacing: 3) { Text(student.name).font(.system(size: 12, weight: .bold)); Text("\(student.grade) · \(student.className)").font(.system(size: 9)).foregroundStyle(.secondary) }
+                VStack(alignment: .leading, spacing: 3) { Text(student.name).font(.system(size: 12, weight: .bold)); Text("\(student.grade) · \(student.className)").font(.system(size: 12)).foregroundStyle(.secondary) }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text(status.rawValue).font(.system(size: 10, weight: .bold)).foregroundStyle(status.color).padding(.horizontal, 8).padding(.vertical, 4).background(status.color.opacity(0.12), in: Capsule())
+                    Text(status.rawValue).font(.system(size: 12, weight: .bold)).foregroundStyle(status.color).padding(.horizontal, 8).padding(.vertical, 4).background(status.color.opacity(0.12), in: Capsule())
                     if let syncState {
                         Text(syncState.taskStatusLabel)
-                            .font(.system(size: 8, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(syncState == .failed ? Color.red : .secondary)
                     }
                 }
-                Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold)).foregroundStyle(.secondary)
+                Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold)).foregroundStyle(.secondary)
             }.padding(11).background(.white, in: RoundedRectangle(cornerRadius: 10))
         }.buttonStyle(.plain)
     }
@@ -1231,12 +1297,20 @@ private struct TeacherStudentStatusRow: View {
 private struct TaskStatusSheet: View {
     let student: Student
     let status: TaskStatus
-    var requiresReviewNote = false
+    let taskID: String?
+    var requiresReviewNote: Bool
     @EnvironmentObject private var state: AppState
     @Environment(\.dismiss) private var dismiss
     @State private var reviewNote = ""
     @State private var validationMessage: String?
     private var draftKey: String { "review-note-\(student.id)" }
+
+    init(student: Student, status: TaskStatus, taskID: String? = nil, requiresReviewNote: Bool = false) {
+        self.student = student
+        self.status = status
+        self.taskID = taskID
+        self.requiresReviewNote = requiresReviewNote
+    }
     var body: some View {
         NavigationStack {
             List {
@@ -1256,17 +1330,17 @@ private struct TaskStatusSheet: View {
                                 return
                             }
                             Task {
-                                if await state.submitTaskStatusCommand(studentID: student.id, status: item, note: reviewNote) {
+                                if await state.submitTaskStatusCommand(taskID: taskID, studentID: student.id, status: item, note: reviewNote) {
                                     state.clearDraft(draftKey)
                                     dismiss()
                                 }
                             }
                         } label: {
-                            HStack { Text(item.rawValue); Spacer(); if state.workflowState(for: "task-status:\(student.id)").isSubmitting { ProgressView() } else if item == status { Image(systemName: "checkmark").foregroundStyle(ReferenceColor.blue) } }
+                            HStack { Text(item.rawValue); Spacer(); if state.workflowState(for: "task-status:\(taskID ?? "unscoped")|\(student.id)").isSubmitting { ProgressView() } else if item == status { Image(systemName: "checkmark").foregroundStyle(ReferenceColor.blue) } }
                         }.foregroundStyle(item == status ? ReferenceColor.blue : ReferenceColor.navy)
-                            .disabled(state.workflowState(for: "task-status:\(student.id)").isSubmitting)
+                            .disabled(state.workflowState(for: "task-status:\(taskID ?? "unscoped")|\(student.id)").isSubmitting)
                     }
-                    if case let .failed(message) = state.workflowState(for: "task-status:\(student.id)") { Text(message).font(.caption).foregroundStyle(.red) }
+                    if case let .failed(message) = state.workflowState(for: "task-status:\(taskID ?? "unscoped")|\(student.id)") { Text(message).font(.caption).foregroundStyle(.red) }
                 }
             }
             .navigationTitle("处理\(student.name)预警")

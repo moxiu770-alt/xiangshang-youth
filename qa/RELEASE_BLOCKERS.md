@@ -2,17 +2,17 @@
 
 本轮已完成的代码级门禁：
 
-- 后端 `npm run check` 与 57 项单元/契约测试通过；OpenAPI 文件已通过 Redocly lint。集成测试仍需独立 `TEST_DATABASE_URL`，不能连接开发库代替。
+- 后端 `npm run check` 与 59 项单元/契约测试通过；OpenAPI 文件已通过 Redocly lint。集成测试仍需独立 `TEST_DATABASE_URL`，不能连接开发库代替。
 - 服务端写入字段已启用严格 JSON 标量校验：文本、手机号、密码拒绝对象/数组强制转字符串，活动、预约、课程、班级动态和客服工作流继续执行长度、权限和幂等校验。
 - 模型跨端契约 225 项不变量通过；84 条黄金样本通过；39,572 个边界 fuzz 用例通过；校准候选生成通过。
 - iOS Swift 源码解析通过；iPhone 17 Pro / iOS 26.5 模拟器已执行 89 个 XCTest（0 失败）和 6 个 UI 测试（0 失败）；覆盖辅助功能超大字号登录、角色切换、教师下钻、家庭绑定、报告返回栈和纯启动海报，xcresult 保留关键页面截图附件；真机矩阵仍待验收。
 - iOS App、XCTest 和 UI test target 已统一 Development Team；真机安装所需的 Runner provisioning profile 仍由 Apple Developer 账号生成。
 - Android 的远程会话刷新、403 权限错误边界、Keystore 不可用时的内存降级已接入；本机已完成 Debug 单元测试 94 项（0 失败）并生成 Debug/Release APK。新增任务版本、语音偏好和业务时钟边界回归测试已纳入该数量。
-- Android Compose instrumentation test APK 已成功编译，新增启动海报截图写入测试沙盒并由 CI 拉取上传；由于当前环境没有 `adb` 设备，仍未宣称真机/AVD 流程通过。
+- Android Compose instrumentation test APK 已成功编译，新增启动海报截图写入测试沙盒并由 CI 拉取上传；本机 Android SDK 的 `adb` 可用但没有连接设备，仍未宣称真机/AVD 流程通过。
 - Android `lintDebug` 已通过，主 CI 现在同时编译 JVM、Debug APK、instrumentation APK 并上传测试 APK artifact；本轮又完成了实时姿态关键点缺失帧的失败闭合保护，并复跑 Debug 单测与 lint。
 - 双端生产源码已移除强制解包路径：Android 不再使用 `!!`/`requireNotNull`/`checkNotNull`，iOS 不再使用 `try!`/`as!`；报告冲突计算、身高参考表、附件 URI、请求 URL 和本地账号名称在异常输入下均失败闭合或使用明确兜底，不把坏数据升级为崩溃。
 - Android Release（`useRemoteDataSource=true`、生产 API 占位地址、R8/minify）构建与 `lintRelease` 已通过；iOS Release Simulator 构建也已通过。两端远程模式继续保持“无权限不切角色、报告仅限已绑定孩子”的深链边界。
-- 主 CI 已加入干净 API 35 Pixel 2 模拟器的 Compose instrumentation 流程；本机仍未连接 `adb`，本地结果不替代该 CI 运行记录。
+- 主 CI 已加入干净 API 35 Pixel 2 模拟器的 Compose instrumentation 流程；本机没有连接 Android 设备，本地结果不替代该 CI 运行记录。
 - 双端身体测评完成记录现在带有独立的远程确认状态；提交失败会进入本机待同步队列，可从“我的/设置 → 立即同步”重试。
 - 双端远程学生目录已接入有界分页：首屏最多 100 条，服务端返回总量/页码，教师学生列表可继续加载，不再无界拉取全校名单。
 - 双端家长报名/专家预约表单已移除演示手机号、日期和咨询文案；打开表单时仅从当前账号带入有效手机号，空值由真实输入、校验和草稿流程承接。
@@ -42,7 +42,7 @@
 5. 完成 iOS/Android 真机矩阵（小屏、平板、横屏、系统字体放大、相机权限、前后台切换）并保存 XCTest/Compose UI、崩溃和性能报告；XCTest/UI target 已补齐 Development Team，但当前 iPhone 真机仍缺少 `com.xiangshang.youth.uitests.xctrunner` 对应的开发 provisioning profile，需要在已登录 Apple Developer 账号的发布机执行签名配置。
 6. 为正式环境配置 Git 远程仓库、分支保护、签名证书、灰度发布、回滚版本和实际告警接收人；本地仓库不擅自推送或伪造这些外部配置。
 
-本次本机验证记录（2026-08-24）：跨端前端契约门禁通过；local 发布预检通过并生成 JSON；设备矩阵预检如实记录 `xcrun` 可用、`adb` 未发现和无连接设备；Android Debug 单测、Lint、Debug/Release APK 与 instrumentation APK 构建通过；iOS 使用可用的 iPhone 17 / iOS 26.5 模拟器执行 89 个 XCTest、6 个 SwiftUI UI 测试均 0 失败；后端 `npm run check`、Redocly OpenAPI lint 与 57 项单元/契约测试通过；班级圈评论删除权限投影、跟练结构化回执、家庭运动打卡远程契约和健康观察结构化答案在本轮重新验证。Android 真机/AVD 仍因本机无 `adb` 和无连接设备未执行；后端集成测试仍因未提供 `TEST_DATABASE_URL` 未执行；iOS 真机测试仍需正式 provisioning profile；场地端 `.NET 8` 核心测试不在本轮重跑范围。剩余未验证项必须在配置签名、真机、联网 CI 和独立测试数据库环境重跑发布命令，详见 [RELEASE_PREFLIGHT.md](RELEASE_PREFLIGHT.md)。
+本次本机验证记录（2026-08-25）：跨端前端契约门禁通过；local 发布预检通过并生成 JSON；设备矩阵预检如实记录 `xcrun` 与 Android SDK 内的 `adb` 可用、但没有连接设备；Android Debug 单测、Lint、Debug/Release APK 与 instrumentation APK 构建通过；iOS 使用可用的 iPhone 17 / iOS 26.5 模拟器执行 89 个 XCTest、6 个 SwiftUI UI 测试均 0 失败；后端 `npm run check`、Redocly OpenAPI lint 与 59 项单元/契约测试通过；班级圈评论删除权限投影、跟练结构化回执、家庭运动打卡远程契约和健康观察结构化答案在本轮重新验证。Android 真机/AVD 仍因无连接设备未执行；后端集成测试仍因未提供 `TEST_DATABASE_URL` 未执行；iOS 真机测试仍需正式 provisioning profile；场地端 `.NET 8` 核心测试不在本轮重跑范围。剩余未验证项必须在配置签名、真机、联网 CI 和独立测试数据库环境重跑发布命令，详见 [RELEASE_PREFLIGHT.md](RELEASE_PREFLIGHT.md)。
 
 验收命令：
 

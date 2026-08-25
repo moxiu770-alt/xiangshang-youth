@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -45,8 +46,18 @@ def https_url(value: str) -> bool:
         return False
 
 
-def command_available(name: str) -> bool:
-    return subprocess.run(["sh", "-c", f"command -v {name} >/dev/null 2>&1"], check=False).returncode == 0
+def command_path(name: str) -> Path | None:
+    """Resolve SDK binaries even if a desktop shell omitted Android SDK PATH."""
+    resolved = shutil.which(name)
+    if resolved:
+        return Path(resolved)
+    if name != "adb":
+        return None
+    for root in (env("ANDROID_HOME"), env("ANDROID_SDK_ROOT"), str(Path.home() / "Library/Android/sdk")):
+        candidate = Path(root) / "platform-tools" / "adb" if root else None
+        if candidate and candidate.is_file() and os.access(candidate, os.X_OK):
+            return candidate
+    return None
 
 
 def main() -> int:
@@ -102,8 +113,9 @@ def main() -> int:
 
     git_remote = subprocess.run(["git", "config", "--get", "remote.origin.url"], cwd=ROOT, text=True, capture_output=True, check=False).stdout.strip()
     add(checks, "git-remote", bool(git_remote) or not strict, "正式发布需要受保护的 Git 远程仓库", blocking=strict)
-    devices = {"xcrun": command_available("xcrun"), "adb": command_available("adb")}
-    device_detail = ", ".join(f"{key}={'可用' if value else '未发现'}" for key, value in devices.items())
+    device_paths = {"xcrun": command_path("xcrun"), "adb": command_path("adb")}
+    devices = {key: value is not None for key, value in device_paths.items()}
+    device_detail = ", ".join(f"{key}={value if value else '未发现'}" for key, value in device_paths.items())
     add(checks, "device-tooling", all(devices.values()) or args.allow_missing_devices, device_detail, blocking=not args.allow_missing_devices)
 
     failed = [item for item in checks if item["blocking"] and not item["ok"]]

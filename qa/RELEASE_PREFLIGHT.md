@@ -14,6 +14,6 @@ python3 scripts/release_preflight.py --target production --json /tmp/youth-produ
 python3 scripts/device_matrix_preflight.py --output /tmp/youth-device-matrix.json
 ```
 
-`release_preflight.py` 会校验：Remote 数据源和 HTTPS 地址、Sentry DSN、生产密钥长度、对象存储、异地备份、CORS、模型人工验证状态、Git 远程以及设备工具。它不会打印密钥值。
+`release_preflight.py` 会校验：Remote 数据源和 HTTPS 地址、Sentry DSN、生产密钥长度、对象存储、异地备份、CORS、私有人工标注集的审批证据、Git 远程以及设备工具。它不会打印密钥值；Android `adb` 会同时检测 PATH、`ANDROID_HOME`、`ANDROID_SDK_ROOT` 和 macOS 默认 SDK 路径。
 
 设备报告只记录工具和已连接设备。模拟器/AVD 不能替代真机；必须把 `qa/DEVICE_MATRIX.md` 的每个 P0 尺寸、字体、权限、离线、杀进程和相机场景附上截图、崩溃与性能证据后，才能将发布项标记为通过。

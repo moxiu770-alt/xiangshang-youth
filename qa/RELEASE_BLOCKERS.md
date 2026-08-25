@@ -44,6 +44,8 @@
 
 本次本机验证记录（2026-08-25）：跨端前端契约门禁通过；local 发布预检通过并生成 JSON；设备矩阵预检如实记录 `xcrun` 与 Android SDK 内的 `adb` 可用、但没有连接设备；Android Debug 单测、Lint、Debug/Release APK 与 instrumentation APK 构建通过；iOS 使用可用的 iPhone 17 / iOS 26.5 模拟器执行 89 个 XCTest、6 个 SwiftUI UI 测试均 0 失败；后端 `npm run check`、Redocly OpenAPI lint 与 59 项单元/契约测试通过；班级圈评论删除权限投影、跟练结构化回执、家庭运动打卡远程契约和健康观察结构化答案在本轮重新验证。Android 真机/AVD 仍因无连接设备未执行；后端集成测试仍因未提供 `TEST_DATABASE_URL` 未执行；iOS 真机测试仍需正式 provisioning profile；场地端 `.NET 8` 核心测试不在本轮重跑范围。剩余未验证项必须在配置签名、真机、联网 CI 和独立测试数据库环境重跑发布命令，详见 [RELEASE_PREFLIGHT.md](RELEASE_PREFLIGHT.md)。
 
+补充记录（2026-08-25）：已启动 `XiangshangYouth_QA_API34` Android 模拟器并执行 `:app:connectedDebugAndroidTest`，4/4 通过。覆盖纯启动图、启动截图、公开登录只能进入家庭端并完成绑定/报告/课程路径，以及安全本地存储往返。该结果是模拟器验收，不替代真实 Android 设备矩阵。
+
 验收命令：
 
 ```bash

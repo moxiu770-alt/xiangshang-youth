@@ -55,7 +55,7 @@ class MainActivityFlowTest {
     }
 
     @Test
-    fun loginFlowsThroughAllRolesAndParentBinding() {
+    fun publicLoginOnlyOffersFamilyAndSupportsParentBinding() {
         // Instrumentation does not guarantee an empty encrypted preference
         // sandbox. Clear the active ViewModel session as well as its store;
         // recreating an Activity alone would retain the old ViewModel.
@@ -87,71 +87,11 @@ class MainActivityFlowTest {
             composeRule.onAllNodesWithText("请选择进入方式").fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithText("家庭端").assertIsDisplayed()
-        composeRule.onNodeWithText("学校端").assertIsDisplayed()
-        // School management analytics are delivered by the backend dashboard;
-        // the mobile role picker must not expose a principal workbench.
+        // Public registration/WeChat fallback creates a family account only.
+        // A parent must never receive a teacher workbench merely because the
+        // app happens to bundle teacher screens for school-provisioned accounts.
+        composeRule.onAllNodesWithText("学校端").assertCountEquals(0)
         composeRule.onAllNodesWithText("校长端").assertCountEquals(0)
-        // Teacher workbench: verify the dashboard is reachable and that the
-        // account switch returns to the full role picker instead of forcing a
-        // parent account.
-        composeRule.onNodeWithText("学校端").performClick()
-        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
-            composeRule.onAllNodesWithText("班级健康概览").fetchSemanticsNodes().isNotEmpty()
-        }
-        // Teacher is a role root, just like principal. It must not inherit a
-        // stale navigation back affordance after an account switch.
-        composeRule.onAllNodesWithContentDescription("返回").assertCountEquals(0)
-        // Historical period selection must affect the board rather than merely
-        // tinting a chip. It intentionally opens a protected aggregate view
-        // instead of leaking current student reports as historical records.
-        composeRule.onNodeWithContentDescription("班级看板").performClick()
-        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
-            composeRule.onAllNodesWithText("2026春季").fetchSemanticsNodes().isNotEmpty()
-        }
-        composeRule.onNodeWithText("2026春季").performClick()
-        // The production board keeps this selection local to its filter state.
-        // Historical values are intentionally not asserted here: the bundled
-        // account has no authoritative archived record and must not be tested
-        // against a fabricated percentage or student trend.
-        composeRule.onNodeWithContentDescription("返回").performClick()
-        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
-            composeRule.onAllNodesWithText("班级健康概览").fetchSemanticsNodes().isNotEmpty()
-        }
-        // Class management is a distinct teacher workflow, not another alias
-        // for the student list. Keep this route covered so its dashboard
-        // shortcut cannot silently become unreachable again.
-        composeRule.onNodeWithContentDescription("班级管理").performClick()
-        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
-            composeRule.onAllNodesWithText("我管理的班级").fetchSemanticsNodes().isNotEmpty()
-        }
-        composeRule.onNodeWithContentDescription("返回").performClick()
-        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
-            composeRule.onAllNodesWithText("班级健康概览").fetchSemanticsNodes().isNotEmpty()
-        }
-        // This is not a generic roster shortcut: the bundled fixture has no
-        // pending placements, so the dedicated route must show its honest
-        // empty state and retain a working secondary-page back action.
-        composeRule.onNodeWithContentDescription("待分班学生").performClick()
-        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
-            composeRule.onAllNodesWithText("暂无待分班学生", substring = true).fetchSemanticsNodes().isNotEmpty()
-        }
-        composeRule.onNodeWithContentDescription("返回").performClick()
-        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
-            composeRule.onAllNodesWithText("班级健康概览").fetchSemanticsNodes().isNotEmpty()
-        }
-        composeRule.onNodeWithContentDescription("消息通知").performClick()
-        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
-            composeRule.onAllNodesWithText("消息中心").fetchSemanticsNodes().isNotEmpty()
-        }
-        composeRule.onNodeWithContentDescription("返回").performClick()
-        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
-            composeRule.onAllNodesWithText("班级健康概览").fetchSemanticsNodes().isNotEmpty()
-        }
-        composeRule.onNodeWithContentDescription("我的").performClick()
-        composeRule.onNodeWithText("切换使用角色").performClick()
-        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
-            composeRule.onAllNodesWithText("请选择进入方式").fetchSemanticsNodes().isNotEmpty()
-        }
 
         // Parent workbench: a new session still requires the child-binding
         // guard, and the school-code help is reachable from the dialog.

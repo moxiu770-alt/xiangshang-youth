@@ -176,7 +176,7 @@ class MainActivityFlowTest {
         // The roster itself is scoped to this fixture's authorized classes.
         // Write authorization and transition rules are covered by unit tests,
         // keeping the device regression bounded and repeatable.
-        composeRule.onNodeWithContentDescription("更新王小明的测评状态，当前已完成").assertIsDisplayed()
+        composeRule.onAllNodesWithContentDescription("更新", substring = true).assertCountEquals(8)
         // The task list is a teacher-only route, and returning restores the
         // authorized workbench instead of leaking to a public role selector.
         composeRule.onNodeWithContentDescription("返回").performClick()

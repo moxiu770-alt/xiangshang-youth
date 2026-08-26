@@ -98,8 +98,11 @@ data class AppUiState(
     /** Authoritative task roster rows, independent from the paged dashboard directory. */
     val taskRosterRecords: Map<String, List<TaskStudentStatusRecord>> = emptyMap()
 ) {
-    fun taskRosterStudents(taskId: String, fallbackTask: TestTask? = null): List<Student> = taskRosterRecords[taskId].orEmpty().map { row ->
-        data?.students?.firstOrNull { it.id == row.studentId } ?: Student(
+    fun taskRosterStudents(taskId: String, fallbackTask: TestTask? = null): List<Student> {
+        val rows = taskRosterRecords[taskId].orEmpty()
+        if (rows.isEmpty() && !repositoryAcknowledged) return fallbackTask?.scopedStudents(data?.students.orEmpty()).orEmpty()
+        return rows.map { row ->
+            data?.students?.firstOrNull { it.id == row.studentId } ?: Student(
             id = row.studentId,
             name = row.studentName,
             grade = row.gradeName ?: fallbackTask?.gradeName.orEmpty(),
@@ -112,6 +115,7 @@ data class AppUiState(
             taskVersion = row.version,
             classId = row.classId
         )
+        }
     }
 
     val managedTeacherClasses: List<ClassInfo>

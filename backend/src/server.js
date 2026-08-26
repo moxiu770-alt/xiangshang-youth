@@ -3587,18 +3587,19 @@ async function handle(req, res) {
       const row = resource?.rows[0];
       const schoolId = row?.school_id || row?.schoolId || null;
       if (!row || (schoolId && !schoolAllowed(user, schoolId))) return fail(res, 404, 'OPERATION_NOT_FOUND', '运营事项不存在或无权访问');
-      if (type === 'privacy' && row.request_type === 'delete' && input.status === 'completed' && !hasRole(user, 'admin')) return fail(res, 403, 'PRIVACY_DELETE_ADMIN_REQUIRED', '删除申请必须由平台管理员最终确认');
+      const anonymizationRequest = type === 'privacy' && ['delete', 'anonymize'].includes(row.request_type);
+      if (anonymizationRequest && input.status === 'completed' && !hasRole(user, 'admin')) return fail(res, 403, 'PRIVACY_DELETE_ADMIN_REQUIRED', '删除申请必须由平台管理员最终确认');
       const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ type, id, status: input.status, note: input.note || '' }));
       if (idempotency === false) return;
       let updated;
       let jobId = null;
       if (type === 'reviews') updated = await query(`UPDATE assessment_scores SET review_status=$1,manual_reviewed=$2,note=COALESCE($3,note),updated_at=now() WHERE id=$4 RETURNING id,review_status AS status,manual_reviewed AS "humanReviewed"`, [input.status, input.status === 'passed', input.note || null, id]);
-      if (type === 'privacy' && row.request_type === 'delete' && input.status === 'completed') {
+      if (anonymizationRequest && input.status === 'completed') {
         const job = await enqueueJob('privacy.anonymize', { requestId: id, studentId: row.student_id, requestedBy: user.id });
         jobId = job.id;
         updated = await query(`UPDATE privacy_requests SET status='processing',reviewed_by=$1,completed_at=NULL WHERE id=$2 RETURNING id,status`, [user.id, id]);
       }
-      if (type === 'privacy' && !(row.request_type === 'delete' && input.status === 'completed')) updated = await query(`UPDATE privacy_requests SET status=$1,reviewed_by=$2,completed_at=CASE WHEN $1 IN ('completed','rejected') THEN now() ELSE completed_at END WHERE id=$3 RETURNING id,status`, [input.status, user.id, id]);
+      if (type === 'privacy' && !(anonymizationRequest && input.status === 'completed')) updated = await query(`UPDATE privacy_requests SET status=$1,reviewed_by=$2,completed_at=CASE WHEN $1 IN ('completed','rejected') THEN now() ELSE completed_at END WHERE id=$3 RETURNING id,status`, [input.status, user.id, id]);
       if (type === 'activities') updated = await query(`UPDATE activity_registrations SET status=$1 WHERE id=$2 RETURNING id,status`, [input.status, id]);
       if (type === 'appointments') updated = await query(`UPDATE expert_appointments SET status=$1 WHERE id=$2 RETURNING id,status`, [input.status, id]);
       if (type === 'courseUploads') updated = await query(`UPDATE course_uploads SET status=$1 WHERE id=$2 RETURNING id,status`, [input.status, id]);

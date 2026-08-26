@@ -5,7 +5,9 @@ RUN npm ci --omit=dev
 
 FROM node:24-alpine
 ENV NODE_ENV=production
-RUN apk add --no-cache postgresql16-client
+ARG ALPINE_MIRROR=dl-cdn.alpinelinux.org
+RUN sed -i "s#dl-cdn.alpinelinux.org#${ALPINE_MIRROR}#g" /etc/apk/repositories \
+    && apk add --no-cache postgresql16-client
 WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY package.json package-lock.json ./

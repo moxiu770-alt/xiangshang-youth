@@ -111,6 +111,7 @@ CREATE TABLE IF NOT EXISTS user_roles (
   role_id TEXT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
   school_id TEXT REFERENCES schools(id) ON DELETE CASCADE,
   class_id TEXT REFERENCES classes(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (user_id, role_id, school_id, class_id)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_user_roles_scope
@@ -371,7 +372,9 @@ CREATE TABLE IF NOT EXISTS files (
 
 CREATE TABLE IF NOT EXISTS courses (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  school_id TEXT REFERENCES schools(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
+  cover TEXT,
   category TEXT NOT NULL DEFAULT '',
   duration TEXT NOT NULL DEFAULT '',
   focus TEXT NOT NULL DEFAULT '',
@@ -437,6 +440,12 @@ CREATE TABLE IF NOT EXISTS activity_registrations (
   cancelled_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- `schema.sql` is also applied to long-lived installations that may contain
+-- the pre-lifecycle activity table.  Bring that table up to the minimum shape
+-- needed by the child-scoped unique index before creating the index.  The
+-- historical migration adds the remaining lifecycle fields idempotently.
+ALTER TABLE activity_registrations
+  ADD COLUMN IF NOT EXISTS child_id TEXT REFERENCES students(id) ON DELETE SET NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_activity_registrations_activity_user_child
   ON activity_registrations(activity_id, user_id, COALESCE(child_id, '__family__'));
 
@@ -668,10 +677,6 @@ CREATE INDEX IF NOT EXISTS idx_auth_rate_limits_updated ON auth_rate_limits(upda
 CREATE INDEX IF NOT EXISTS idx_user_roles_user_scope ON user_roles(user_id, school_id, class_id);
 CREATE INDEX IF NOT EXISTS idx_data_consents_student_active ON data_consents(student_id, parent_user_id, purpose, revoked_at, expires_at);
 
-CREATE TABLE IF NOT EXISTS courses (
-  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text, school_id TEXT REFERENCES schools(id) ON DELETE CASCADE,
-  title TEXT NOT NULL, cover TEXT, status TEXT NOT NULL DEFAULT 'active', created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
 CREATE TABLE IF NOT EXISTS course_modules (id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text, course_id TEXT NOT NULL REFERENCES courses(id) ON DELETE CASCADE, title TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS course_lessons (id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text, course_id TEXT NOT NULL REFERENCES courses(id) ON DELETE CASCADE, module_id TEXT REFERENCES course_modules(id) ON DELETE SET NULL, title TEXT NOT NULL, duration_ms INTEGER NOT NULL DEFAULT 0, video_source TEXT, captions JSONB NOT NULL DEFAULT '[]'::jsonb, sort_order INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'active');
 CREATE TABLE IF NOT EXISTS lesson_progress (student_id TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE, lesson_id TEXT NOT NULL REFERENCES course_lessons(id) ON DELETE CASCADE, last_position_ms INTEGER NOT NULL DEFAULT 0, completed BOOLEAN NOT NULL DEFAULT false, version INTEGER NOT NULL DEFAULT 1, updated_at TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY(student_id, lesson_id));

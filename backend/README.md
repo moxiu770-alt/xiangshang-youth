@@ -287,10 +287,17 @@ npm run smoke:load
 集成测试必须使用独立数据库：
 
 ```bash
-# 先用不带 search_path 的管理连接创建专用 schema；不要使用 public。
-psql "postgres://xiangshang:xiangshang_dev@127.0.0.1:5432/xiangshang_youth" \
+# 使用独立数据库和非 public schema。不要复用开发库：PostgreSQL 对同名
+# `CREATE TABLE IF NOT EXISTS` 的解析会让测试表与开发库表结构串用。
+# 若本机 5432 已被 Postgres.app 占用，以下 Docker 容器使用 15432。
+docker run -d --name xiangshang-youth-integration-postgres \
+  -e POSTGRES_DB=xiangshang_integration_test \
+  -e POSTGRES_USER=xiangshang -e POSTGRES_PASSWORD=xiangshang_dev \
+  -p 127.0.0.1:15432:5432 postgres:16-alpine
+docker exec xiangshang-youth-integration-postgres \
+  psql -U xiangshang -d xiangshang_integration_test \
   -c 'CREATE SCHEMA IF NOT EXISTS xiangshang_integration'
-export TEST_DATABASE_URL="postgres://xiangshang:xiangshang_dev@127.0.0.1:5432/xiangshang_youth?options=-csearch_path%3Dxiangshang_integration%2Cpublic"
+export TEST_DATABASE_URL="postgres://xiangshang:xiangshang_dev@127.0.0.1:15432/xiangshang_integration_test?options=-csearch_path%3Dxiangshang_integration"
 DATABASE_URL="$TEST_DATABASE_URL" npm run migrate
 DATABASE_URL="$TEST_DATABASE_URL" npm run seed
 TEST_DATABASE_URL="$TEST_DATABASE_URL" SEED_PASSWORD=ChangeMe123! npm run test:integration

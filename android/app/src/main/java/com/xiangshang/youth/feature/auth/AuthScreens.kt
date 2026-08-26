@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import com.xiangshang.youth.BuildConfig
 import com.xiangshang.youth.R
 import com.xiangshang.youth.app.*
+import com.xiangshang.youth.core.model.LegalPolicy
 import com.xiangshang.youth.core.model.UserRole
 import com.xiangshang.youth.core.util.AuthIdentity
 import com.xiangshang.youth.shared.component.AppScaffold
@@ -201,11 +202,7 @@ fun LoginScreen(
     }
 }
 
-private fun legalText(document: String): String = when (document) {
-    "用户协议" -> "《用户协议》\n\n向上少年为学校、教师、家长提供学生运动能力记录、测评报告、训练建议和通知服务。账号仅限本人使用，不得转让或批量抓取数据。\n\n请使用真实、可验证的手机号或学校账号，并妥善保管验证码、密码和设备。家长只能查看已绑定孩子的数据。\n\n平台提供运动能力筛查和训练建议，不构成医疗诊断或治疗意见；训练中不适时请立即停止并咨询专业人员。\n\n账号、数据或未成年人权益问题，请联系所属学校管理员或平台客服。"
-    "隐私政策" -> "《隐私政策》\n\n我们仅在提供学校运动管理、测评报告、训练反馈和消息通知所必需的范围内处理账号、学校关系、设备日志及健康测评数据。\n\n健康数据包括身高、体重、BMI、姿态指标、运动成绩和报告。处理前会展示用途并记录家长同意，传输使用加密连接，敏感凭证保存在系统安全存储中。\n\n我们不会出售儿童数据。家长可查看、导出、更正或申请删除已绑定孩子的数据；删除完成后健康记录、成绩和绑定关系会被清理或匿名化。"
-    else -> "《儿童隐私政策》\n\n本平台面向未成年人提供服务。儿童健康测评由家长、学校或依法授权人员管理，我们只收集完成测评、报告和训练所需的最少信息，不使用儿童数据进行个性化广告。\n\n姿态采集用于生成测评指标，原始影像按学校配置的期限处理并设置访问审计。家长可撤回同意、查询处理记录、申请导出或删除；撤回后相关测评功能可能无法继续。发现儿童信息被误用，请联系学校管理员或平台客服。"
-}
+private fun legalText(document: String): String = LegalPolicy.document(document)
 
 @Composable
 fun RegisterScreen(

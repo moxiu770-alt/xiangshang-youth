@@ -307,12 +307,14 @@ private fun NavHostController.replaceRoot(destination: String) {
                 AssessmentFlowScreen(state, nav, category, viewModel::completeAssessment, viewModel::saveDraft, viewModel::clearDraft, viewModel::loadFamilyHealthObservations)
             }
         }
-        composable(Destinations.Courses) { ParentCoursesScreen(state, nav, viewModel::updateCourseProgress, viewModel::sendSupport, viewModel::saveDraft, viewModel::clearDraft, loadCourses = viewModel::loadCourses, saveRemoteProgress = viewModel::saveRemoteLessonProgress, clearRecommendedCourse = viewModel::clearRecommendedCourseTarget, submitSupport = viewModel::submitSupportCommand, clearWorkflow = viewModel::clearWorkflowState) }
+        composable(Destinations.Courses) { ParentCoursesScreen(state, nav, viewModel::updateCourseProgress, viewModel::sendSupport, viewModel::saveDraft, viewModel::clearDraft, loadCourses = viewModel::loadCourses, loadPlayback = viewModel::loadLessonPlayback, clearPlayback = viewModel::clearLessonPlayback, saveRemoteProgress = viewModel::saveRemoteLessonProgress, clearRecommendedCourse = viewModel::clearRecommendedCourseTarget, submitSupport = viewModel::submitSupportCommand, clearWorkflow = viewModel::clearWorkflowState) }
         composable(Destinations.CoursesRoute) { entry ->
             ParentCoursesScreen(
                 state, nav, viewModel::updateCourseProgress, viewModel::sendSupport,
                 viewModel::saveDraft, viewModel::clearDraft,
                 loadCourses = viewModel::loadCourses,
+                loadPlayback = viewModel::loadLessonPlayback,
+                clearPlayback = viewModel::clearLessonPlayback,
                 saveRemoteProgress = viewModel::saveRemoteLessonProgress,
                 clearRecommendedCourse = viewModel::clearRecommendedCourseTarget,
                 openSupport = entry.arguments?.getString("openSupport") == "true",

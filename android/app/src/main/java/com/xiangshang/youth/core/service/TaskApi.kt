@@ -98,10 +98,10 @@ interface WorkflowApi {
     suspend fun cancelExpert(@Path("appointmentId") appointmentId: String, @Body body: CancellationRequest, @Header("Idempotency-Key") idempotencyKey: String? = null): ApiEnvelope<ExpertAppointmentAck>
 
     @POST("v1/courses/uploads")
-    suspend fun uploadCourse(@Body body: CourseUploadRequest): ApiEnvelope<WriteAck>
+    suspend fun uploadCourse(@Body body: CourseUploadRequest, @Header("Idempotency-Key") idempotencyKey: String? = null): ApiEnvelope<WriteAck>
 
     @POST("v1/class-posts")
-    suspend fun publishClassPost(@Body body: ClassPostRequest): ApiEnvelope<WriteAck>
+    suspend fun publishClassPost(@Body body: ClassPostRequest, @Header("Idempotency-Key") idempotencyKey: String? = null): ApiEnvelope<WriteAck>
 
     @POST("v1/support/messages")
     suspend fun sendSupportMessage(@Body body: SupportMessageRequest): ApiEnvelope<WriteAck>

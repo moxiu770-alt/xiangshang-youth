@@ -1,6 +1,6 @@
 /** Course catalogue, playback and progress routes. */
 export async function handleCourseRoutes(context) {
-  const { req, res, user, parts, query, hasRole, schoolAllowed, guardianStudentForUser, body, fail, requiredString, beginIdempotentRequest, requestBodyHash, failIdempotently, createdIdempotently, okIdempotently, ok } = context;
+  const { req, res, user, parts, query, hasRole, schoolAllowed, guardianStudentForUser, body, fail, requiredString, beginIdempotentRequest, requestBodyHash, failIdempotently, createdIdempotently, okIdempotently, ok, randomToken } = context;
   if (req.method === 'GET' && parts[0] === 'v1' && parts[1] === 'students' && parts[3] === 'courses') {
     const student = await guardianStudentForUser(user, parts[2]);
     if (!student) return fail(res, 404, 'STUDENT_NOT_FOUND', '学生不存在或无权访问');
@@ -16,7 +16,8 @@ export async function handleCourseRoutes(context) {
     const lesson = await query(`SELECT l.id AS "lessonId",l.course_id AS "courseId",c.school_id AS "schoolId",l.video_source AS "videoSource",l.captions,l.duration_ms AS "durationMs" FROM course_lessons l JOIN courses c ON c.id=l.course_id WHERE l.id=$1 AND l.status='active' AND c.status='active'`, [parts[2]]);
     if (!lesson.rowCount || (lesson.rows[0].schoolId && !schoolAllowed(user, lesson.rows[0].schoolId))) return fail(res, 404, 'LESSON_NOT_FOUND', '课节不存在或无权访问');
     if (!lesson.rows[0].videoSource) return fail(res, 404, 'VIDEO_NOT_AVAILABLE', '课程视频暂不可用');
-    return ok(res, lesson.rows[0]);
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    return ok(res, { ...lesson.rows[0], playbackSessionId: randomToken(), expiresAt, refreshAfterSeconds: 12 * 60 });
   }
   if (req.method === 'PUT' && parts[0] === 'v1' && parts[1] === 'students' && parts[3] === 'lessons' && parts[5] === 'progress') {
     const student = await guardianStudentForUser(user, parts[2]);

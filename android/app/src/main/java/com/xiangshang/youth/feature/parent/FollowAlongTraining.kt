@@ -3,11 +3,7 @@ package com.xiangshang.youth.feature.parent
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.speech.tts.TextToSpeech
-import android.view.ViewGroup
-import android.widget.MediaController
-import android.widget.VideoView
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -52,7 +48,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
-import androidx.core.net.toUri
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.pose.Pose
@@ -178,8 +173,9 @@ fun FollowAlongTrainingDialog(
     var completed by rememberSaveable { mutableStateOf(false) }
     val completionScale by animateFloatAsState(if (completed) 1f else .92f, label = "completionPulse")
     var speakerEnabled by rememberSaveable(day.id, voiceGuidanceEnabled) { mutableStateOf(voiceGuidanceEnabled) }
-    var videoView by remember { mutableStateOf<VideoView?>(null) }
-    var templateBeat by rememberSaveable { mutableIntStateOf(1) }
+    var templatePositionMs by rememberSaveable(day.id) { mutableLongStateOf(0L) }
+    var templatePlaybackStatus by remember { mutableStateOf(CoursePlaybackStatus.Preparing) }
+    var templateVideoRetryToken by rememberSaveable(day.id) { mutableIntStateOf(0) }
     var exerciseProgress by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     var poseFeedback by remember { mutableStateOf(FollowAlongPoseFeedback.Waiting) }
     var lastSpokenGuide by rememberSaveable { mutableStateOf("") }
@@ -244,14 +240,9 @@ fun FollowAlongTrainingDialog(
             }
         }
     }
-    LaunchedEffect(videoView, selectedExercise) {
-        while (true) {
-            val exercise = day.exercises.getOrNull(selectedExercise)
-            val cadence = exercise?.cadenceSeconds?.coerceAtLeast(.4f) ?: 1f
-            templateBeat = (((videoView?.currentPosition ?: 0) / 1000f / cadence).toInt() % 4) + 1
-            delay(250)
-        }
-    }
+    val templateBeat = day.exercises.getOrNull(selectedExercise)?.let { exercise ->
+        (((templatePositionMs / 1000f) / exercise.cadenceSeconds.coerceAtLeast(.4f)).toInt() % 4) + 1
+    } ?: 1
     DisposableEffect(cameraEnabled, cameraFront, cameraPreview, lifecycleOwner, selectedExercise) {
         if (cameraEnabled) {
             cameraPreview?.let { preview ->
@@ -264,7 +255,6 @@ fun FollowAlongTrainingDialog(
     }
     DisposableEffect(Unit) {
         onDispose {
-            videoView?.stopPlayback()
             coach.close()
             poseAnalyzer.close()
             unbindFollowAlongCamera(context)
@@ -318,19 +308,36 @@ fun FollowAlongTrainingDialog(
                                     Text("跟做模式", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.background(Blue, RoundedCornerShape(50)).padding(horizontal = 9.dp, vertical = 5.dp))
                                 }
                                 Box(Modifier.fillMaxWidth().aspectRatio(9f / 16f).clip(RoundedCornerShape(16.dp)).background(Color(0xFF101828))) {
-                                    AndroidView(
-                                        factory = { videoContext ->
-                                            VideoView(videoContext).apply {
-                                                layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-                                                setMediaController(MediaController(videoContext))
-                                                setVideoURI("android.resource://${videoContext.packageName}/${R.raw.follow_along_training}".toUri())
-                                                setOnPreparedListener { mediaPlayer -> mediaPlayer.isLooping = true; start() }
-                                                setOnErrorListener { _, _, _ -> true }
-                                                videoView = this
-                                            }
+                                    CourseVideoPlayer(
+                                        source = "android.resource://${context.packageName}/${R.raw.follow_along_training}",
+                                        captions = emptyList(),
+                                        initialPositionMs = 0,
+                                        playRequested = true,
+                                        retryToken = templateVideoRetryToken,
+                                        onSnapshot = { snapshot ->
+                                            templatePositionMs = snapshot.positionMs
+                                            templatePlaybackStatus = snapshot.status
                                         },
+                                        onCheckpoint = { _, _ -> },
+                                        onEnded = {},
+                                        repeat = true,
+                                        showController = false,
+                                        snapshotIntervalMs = 250,
+                                        accessibilityLabel = "训练动作示范视频，循环播放",
                                         modifier = Modifier.fillMaxSize()
                                     )
+                                    if (templatePlaybackStatus == CoursePlaybackStatus.Failed) {
+                                        Surface(
+                                            modifier = Modifier.align(Alignment.Center),
+                                            color = Color.Black.copy(alpha = .72f),
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            Column(Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Text("示范视频暂时无法播放", color = Color.White, fontSize = 12.sp)
+                                                TextButton(onClick = { templateVideoRetryToken += 1 }) { Text("重新加载") }
+                                            }
+                                        }
+                                    }
                                     if (cameraEnabled) {
                                         Box(
                                             modifier = Modifier.padding(10.dp).size(width = 118.dp, height = 166.dp).clip(RoundedCornerShape(12.dp))

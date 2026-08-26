@@ -413,6 +413,22 @@ CREATE TABLE IF NOT EXISTS messages (
   expires_at TIMESTAMPTZ
 );
 
+-- Voluntary product-improvement events deliberately have no user, child,
+-- school, device or health-data foreign key. The startup-only client session
+-- identifier is persisted solely as a one-way hash.
+CREATE TABLE IF NOT EXISTS product_events (
+  event_id UUID PRIMARY KEY,
+  event_name TEXT NOT NULL CHECK (event_name IN ('growth_report_opened','growth_report_period_changed','adaptive_plan_opened_courses')),
+  coarse_value TEXT CHECK (coarse_value IS NULL OR coarse_value IN ('本周','本月')),
+  platform TEXT NOT NULL CHECK (platform IN ('ios','android')),
+  app_version TEXT NOT NULL CHECK (char_length(app_version) BETWEEN 1 AND 40),
+  client_session_hash TEXT NOT NULL CHECK (char_length(client_session_hash) = 64),
+  occurred_at TIMESTAMPTZ NOT NULL,
+  received_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_product_events_name_received ON product_events(event_name, received_at DESC);
+CREATE INDEX IF NOT EXISTS idx_product_events_retention ON product_events(received_at);
+
 CREATE TABLE IF NOT EXISTS notification_receipts (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   campaign_id TEXT NOT NULL,
@@ -523,6 +539,53 @@ CREATE TABLE IF NOT EXISTS activities (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS content_releases (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  school_id TEXT REFERENCES schools(id) ON DELETE CASCADE,
+  channel TEXT NOT NULL DEFAULT 'mobile',
+  version INTEGER NOT NULL DEFAULT 1,
+  status TEXT NOT NULL DEFAULT 'draft',
+  notes TEXT NOT NULL DEFAULT '',
+  effective_at TIMESTAMPTZ,
+  published_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+  published_at TIMESTAMPTZ,
+  withdrawn_at TIMESTAMPTZ,
+  created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (channel IN ('mobile', 'teacher', 'family')),
+  CHECK (status IN ('draft', 'published', 'withdrawn')),
+  UNIQUE (school_id, channel, version)
+);
+
+CREATE TABLE IF NOT EXISTS content_release_items (
+  release_id TEXT NOT NULL REFERENCES content_releases(id) ON DELETE CASCADE,
+  content_type TEXT NOT NULL,
+  content_id TEXT NOT NULL,
+  content_version INTEGER NOT NULL DEFAULT 1,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (release_id, content_type, content_id),
+  CHECK (content_type IN ('course', 'activity', 'expert', 'notification_template', 'scoring_rule'))
+);
+
+CREATE TABLE IF NOT EXISTS notification_templates (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  school_id TEXT REFERENCES schools(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  content TEXT NOT NULL,
+  recipient_scope TEXT NOT NULL DEFAULT 'all_guardians',
+  status TEXT NOT NULL DEFAULT 'draft',
+  version INTEGER NOT NULL DEFAULT 1,
+  created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (status IN ('draft', 'active', 'archived'))
+);
+CREATE INDEX IF NOT EXISTS idx_content_releases_scope ON content_releases(school_id, channel, status, version DESC);
+CREATE INDEX IF NOT EXISTS idx_content_release_items_type ON content_release_items(content_type, content_id);
 
 CREATE TABLE IF NOT EXISTS class_posts (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,

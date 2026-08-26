@@ -138,7 +138,7 @@ class RemoteRepository(
         classPostApi.delete(postId, "class-post-delete-$postId")
     }
     override suspend fun reportClassPost(postId: String, reason: String) {
-        classPostApi.report(postId, com.xiangshang.youth.core.service.ClassPostReportRequest(reason), "class-post-report-${postId}-${reason.hashCode().let { kotlin.math.abs(it) }}")
+        classPostApi.report(postId, com.xiangshang.youth.core.service.ClassPostReportRequest(reason), "class-post-report-${("$postId:$reason").sha256()}")
     }
     override suspend fun setClassPostPinned(postId: String, pinned: Boolean) {
         classPostApi.pin(postId, com.xiangshang.youth.core.service.ClassPostPinRequest(pinned), "class-post-pin-$postId-$pinned")
@@ -227,7 +227,8 @@ class RemoteRepository(
             ?: throw ApiError.InvalidResponse
         val receipt = fileApi.upload(ticket.id, attachment.requestBody()).data ?: throw ApiError.InvalidResponse
         if (receipt.status != "uploaded") throw ApiError.ModelContract("附件上传未完成")
-        workflowApi.uploadCourse(CourseUploadRequest(value.taskId, value.attendanceCount, value.notes, value.attachmentName, receipt.id))
+        val operationKey = "${value.taskId}|${value.attendanceCount}|${value.notes}|${receipt.id}".sha256()
+        workflowApi.uploadCourse(CourseUploadRequest(value.taskId, value.attendanceCount, value.notes, value.attachmentName, receipt.id), "course-upload-$operationKey")
     }
     override suspend fun courses(childId: String): List<RemoteLesson> =
         courseApi.courses(childId).requireData()
@@ -276,7 +277,11 @@ class RemoteRepository(
             }
             ClassPostAttachmentRequest(attachment.id, attachment.type, objectId, attachment.thumbnailObjectId)
         }
-        return workflowApi.publishClassPost(ClassPostRequest(author, content, schoolId, classId, uploaded)).data?.postId
+        val operationKey = listOf(
+            schoolId.orEmpty(), classId.orEmpty(), author, content,
+            uploaded.map { it.objectId }.sorted().joinToString(",")
+        ).joinToString("|").sha256()
+        return workflowApi.publishClassPost(ClassPostRequest(author, content, schoolId, classId, uploaded), "class-post-create-$operationKey").data?.postId
     }
     override suspend fun listNotificationDrafts(schoolId: String): List<com.xiangshang.youth.core.service.NotificationCampaign> {
         return notificationApi.drafts(schoolId).requireData()

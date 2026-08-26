@@ -151,7 +151,9 @@ data class LocalAppSettings(
     val notificationsEnabled: Boolean = true,
     val reduceMotion: Boolean = false,
     /** Shared speech preference for posture capture and guided training. */
-    val voiceGuidanceEnabled: Boolean = true
+    val voiceGuidanceEnabled: Boolean = true,
+    /** Disabled until the account holder explicitly opts in. */
+    val analyticsEnabled: Boolean = false
 )
 data class FollowAlongSessionRecord(
     val id: String = java.util.UUID.randomUUID().toString(),
@@ -219,7 +221,8 @@ class LocalFeatureStore(context: Context) {
         settings = LocalAppSettings(
             notificationsEnabled = prefs.getBoolean("notifications_enabled", true),
             reduceMotion = prefs.getBoolean("reduce_motion", false),
-            voiceGuidanceEnabled = prefs.getBoolean("voice_guidance_enabled", true)
+            voiceGuidanceEnabled = prefs.getBoolean("voice_guidance_enabled", true),
+            analyticsEnabled = prefs.getBoolean("analytics_enabled", false)
         )
     ).migrateTaskScopedState()
 
@@ -283,7 +286,8 @@ class LocalFeatureStore(context: Context) {
         .putStringSet("read_message_ids", value.readMessageIds)
         .putBoolean("notifications_enabled", value.settings.notificationsEnabled)
         .putBoolean("reduce_motion", value.settings.reduceMotion)
-        .putBoolean("voice_guidance_enabled", value.settings.voiceGuidanceEnabled).apply()
+        .putBoolean("voice_guidance_enabled", value.settings.voiceGuidanceEnabled)
+        .putBoolean("analytics_enabled", value.settings.analyticsEnabled).apply()
     }
     fun clear() { prefs.edit().clear().apply() }
     private fun decodeProgress(raw: String?): Map<String, Float> = runCatching { JSONObject(raw ?: "{}").keys().asSequence().associateWith { JSONObject(raw ?: "{}").optDouble(it).toFloat() } }.getOrDefault(emptyMap())

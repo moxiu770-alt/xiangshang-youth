@@ -71,7 +71,10 @@ def main() -> int:
     ios_auth_api = read("ios/XiangshangYouth/Core/Services/AuthApi.swift")
     ios_parent_forms = read("ios/XiangshangYouth/Features/Parent/ParentExtendedViews.swift")
     ios_local_store = read("ios/XiangshangYouth/Core/Services/LocalFeatureStore.swift")
-    ios_teacher_forms = read("ios/XiangshangYouth/Features/Teacher/TeacherViews.swift")
+    ios_teacher_forms = read_all(
+        "ios/XiangshangYouth/Features/Teacher/TeacherViews.swift",
+        "ios/XiangshangYouth/Features/Teacher/TeacherDashboardViews.swift",
+    )
     ios_teacher_root = read("ios/XiangshangYouth/Features/Teacher/TeacherHomeView.swift")
     ios_teacher_upload = read("ios/XiangshangYouth/Features/Teacher/TeacherCourseUploadViews.swift")
     ios_business_clock = read("ios/XiangshangYouth/Core/Extensions/BusinessClock.swift")
@@ -101,9 +104,16 @@ def main() -> int:
     android_follow_along = read("android/app/src/main/java/com/xiangshang/youth/feature/parent/FollowAlongTraining.kt")
     android_auth = read("android/app/src/main/java/com/xiangshang/youth/feature/auth/AuthScreens.kt")
     android_auth_api = read("android/app/src/main/java/com/xiangshang/youth/core/service/AuthApi.kt")
-    android_parent_forms = read("android/app/src/main/java/com/xiangshang/youth/feature/parent/ParentScreens.kt")
+    android_parent_forms = read_all(
+        "android/app/src/main/java/com/xiangshang/youth/feature/parent/ParentScreens.kt",
+        "android/app/src/main/java/com/xiangshang/youth/feature/parent/ParentCommunityAccountScreens.kt",
+        "android/app/src/main/java/com/xiangshang/youth/feature/parent/ParentEngagementScreens.kt",
+    )
     android_local_store = read("android/app/src/main/java/com/xiangshang/youth/core/service/LocalFeatureStore.kt")
-    android_teacher_forms = read("android/app/src/main/java/com/xiangshang/youth/feature/teacher/TeacherScreens.kt")
+    android_teacher_forms = read_all(
+        "android/app/src/main/java/com/xiangshang/youth/feature/teacher/TeacherScreens.kt",
+        "android/app/src/main/java/com/xiangshang/youth/feature/teacher/TeacherManagementScreens.kt",
+    )
     android_business_clock = read("android/app/src/main/java/com/xiangshang/youth/core/util/BusinessClock.kt")
     android_student_model = read("android/app/src/main/java/com/xiangshang/youth/core/model/Student.kt")
     android_student_api = read("android/app/src/main/java/com/xiangshang/youth/core/service/StudentApi.kt")

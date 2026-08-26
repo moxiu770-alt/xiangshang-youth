@@ -1,3 +1,5 @@
+import { config } from '../config.js';
+
 /**
  * Notification campaign lifecycle: scoped teacher drafts, delivery, and
  * guardian receipts. Server middleware and generic response helpers remain
@@ -133,7 +135,7 @@ if (req.method === 'POST' && draftAction) {
 if (req.method === 'POST' && (url.pathname === '/v1/admin/notifications/campaigns' || url.pathname === '/v1/classes/notifications' || draftAction)) {
   if (!hasRole(user, 'admin', 'principal', 'teacher')) return fail(res, 403, 'NO_PERMISSION', '无权发送学校通知');
   const draft = draftAction ? (await query('SELECT * FROM notification_campaigns WHERE id=$1', [draftAction[1]])).rows[0] : null;
-  const input = draft ? { ...(draft.audience_filter || {}), schoolId: draft.school_id, title: draft.title, content: draft.content, audienceType: draft.audience_type, channel: draft.channel, parentReceiptEnabled: draft.parent_receipt_enabled } : await body(req);
+  const input = draft ? { ...(draft.audience_filter || {}), schoolId: draft.school_id, title: draft.title, content: draft.content, audienceType: draft.audience_type, channel: draft.channel, scheduledAt: draft.scheduled_at, parentReceiptEnabled: draft.parent_receipt_enabled } : await body(req);
   if (!input.title || !input.content) return fail(res, 400, 'INVALID_ARGUMENT', '通知标题和内容不能为空');
   const schoolId = input.schoolId || user.roles.find((role) => role.school_id)?.school_id;
   if (!schoolId || !schoolAllowed(user, schoolId)) return fail(res, 403, 'NO_PERMISSION', '无权向该学校发送通知');
@@ -156,7 +158,7 @@ if (req.method === 'POST' && (url.pathname === '/v1/admin/notifications/campaign
   if (teacherOnly(user) && !classIds.every((classId) => teacherClassIds(user, schoolId).includes(classId))) return fail(res, 403, 'TEACHER_CLASS_SCOPE_INVALID', '教师只能向本人管理的班级发送通知');
   const channel = input.channel || 'in_app';
   if (!['in_app', 'push', 'sms', 'wechat'].includes(channel)) return fail(res, 400, 'INVALID_ARGUMENT', '通知渠道不支持');
-  if (channel !== 'in_app') return fail(res, 503, 'DELIVERY_PROVIDER_NOT_CONFIGURED', '当前环境尚未配置短信、微信或推送服务商');
+  if (input.scheduledAt && Number.isNaN(Date.parse(input.scheduledAt))) return fail(res, 400, 'INVALID_ARGUMENT', '定时发送时间格式无效');
   if (input.status === 'draft') {
     const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ ...input, status: 'draft' }));
     if (idempotency === false) return;
@@ -165,6 +167,7 @@ if (req.method === 'POST' && (url.pathname === '/v1/admin/notifications/campaign
     await audit(user, req, 'notification.draft.create', 'notification_campaign', draft.rows[0].notificationId, null, draft.rows[0], schoolId);
     return createdIdempotently(res, user, idempotency, draft.rows[0]);
   }
+  if (channel !== 'in_app' && !config.notificationWebhookUrl) return fail(res, 503, 'DELIVERY_PROVIDER_NOT_CONFIGURED', '当前环境尚未配置短信、微信或推送服务商网关');
   let audience;
   if (audienceType === 'users') {
     const ids = Array.isArray(input.userIds) ? input.userIds : [];
@@ -177,6 +180,7 @@ if (req.method === 'POST' && (url.pathname === '/v1/admin/notifications/campaign
   } else {
     audience = await query(`SELECT DISTINCT u.id FROM users u JOIN user_roles ur ON ur.user_id=u.id WHERE ur.school_id=$1 UNION SELECT DISTINCT pb.parent_user_id FROM parent_student_bindings pb JOIN students st ON st.id=pb.student_id WHERE st.school_id=$1`, [schoolId]);
   }
+  if (!audience.rowCount) return fail(res, 409, 'NOTIFICATION_AUDIENCE_EMPTY', '当前接收范围内没有可投递用户，请修改接收范围');
   const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash(input));
   if (idempotency === false) return;
   const client = await pool.connect();
@@ -184,25 +188,20 @@ if (req.method === 'POST' && (url.pathname === '/v1/admin/notifications/campaign
     await client.query('BEGIN');
     const audienceFilter = { ...input, classId: classIds[0], classIds, targetClassIds: classIds, recipientScope: input.recipientScope || audienceType };
     const campaign = draft
-      ? await client.query(`UPDATE notification_campaigns SET status='sent',failure_reason=NULL,sent_at=now(),updated_at=now() WHERE id=$1 RETURNING id,title,status`, [draft.id])
-      : await client.query(`INSERT INTO notification_campaigns(school_id,created_by,title,content,audience_type,audience_filter,channel,status,sender_teacher_id,parent_receipt_enabled,idempotency_key) VALUES($1,$2,$3,$4,$5,$6,$7,'sent',$2,$8,$9) RETURNING id,title,status`, [schoolId, user.id, input.title, input.content, audienceType, audienceFilter, channel, input.parentReceiptEnabled === true, req.headers['idempotency-key'] || null]);
+      ? await client.query(`UPDATE notification_campaigns SET status='queued',failure_reason=NULL,sent_count=0,failed_count=0,sent_at=NULL,updated_at=now() WHERE id=$1 RETURNING id,title,status`, [draft.id])
+      : await client.query(`INSERT INTO notification_campaigns(school_id,created_by,title,content,audience_type,audience_filter,channel,status,sender_teacher_id,parent_receipt_enabled,idempotency_key,scheduled_at) VALUES($1,$2,$3,$4,$5,$6,$7,'queued',$2,$8,$9,$10) RETURNING id,title,status`, [schoolId, user.id, input.title, input.content, audienceType, audienceFilter, channel, input.parentReceiptEnabled === true, req.headers['idempotency-key'] || null, input.scheduledAt || null]);
+    const requestedAt = input.scheduledAt ? new Date(input.scheduledAt) : new Date();
+    const availableAt = requestedAt.getTime() > Date.now() ? requestedAt : new Date();
     for (const receiver of audience.rows) {
-      await client.query(`INSERT INTO notification_deliveries(campaign_id,receiver_user_id,channel,status,delivered_at) VALUES($1,$2,$3,'sent',now()) ON CONFLICT DO NOTHING`, [campaign.rows[0].id, receiver.id, channel]);
-      await client.query(`INSERT INTO messages(receiver_user_id,title,content,category,message_type,business_id,business_route,action_label,expires_at) VALUES($1,$2,$3,'campaign','classNotice',$4,'classNotice','查看通知',NULL)`, [receiver.id, input.title, input.content, campaign.rows[0].id]);
-      if (input.parentReceiptEnabled === true) {
-        await client.query(`INSERT INTO notification_receipts(campaign_id,receiver_user_id,status)
-          SELECT $1,$2,'pending'
-          WHERE EXISTS (
-            SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id
-            WHERE ur.user_id=$2 AND r.code='parent'
-          )
-          ON CONFLICT(campaign_id,receiver_user_id) DO NOTHING`, [campaign.rows[0].id, receiver.id]);
-      }
+      const delivery = await client.query(`INSERT INTO notification_deliveries(campaign_id,receiver_user_id,channel,status,error_message,delivered_at)
+        VALUES($1,$2,$3,'queued',NULL,NULL)
+        ON CONFLICT(campaign_id,receiver_user_id,channel) DO UPDATE SET status='queued',error_message=NULL,delivered_at=NULL
+        RETURNING id`, [campaign.rows[0].id, receiver.id, channel]);
+      await client.query(`INSERT INTO job_queue(job_type,payload,available_at) VALUES('notification.deliver',$1,$2)`, [{ deliveryId: delivery.rows[0].id }, availableAt]);
     }
-    await client.query(`UPDATE notification_campaigns SET sent_count=$1,sent_at=now() WHERE id=$2`, [audience.rowCount, campaign.rows[0].id]);
     await client.query('COMMIT');
-    await audit(user, req, 'notification.campaign.send', 'notification_campaign', campaign.rows[0].id, null, { audienceType, sentCount: audience.rowCount }, schoolId);
-    return createdIdempotently(res, user, idempotency, { ...campaign.rows[0], sentCount: audience.rowCount, channel });
+    await audit(user, req, 'notification.campaign.queue', 'notification_campaign', campaign.rows[0].id, null, { audienceType, queuedCount: audience.rowCount, channel, scheduledAt: input.scheduledAt || null }, schoolId);
+    return createdIdempotently(res, user, idempotency, { ...campaign.rows[0], sentCount: 0, queuedCount: audience.rowCount, channel, scheduledAt: input.scheduledAt || null });
   } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
 }
 }

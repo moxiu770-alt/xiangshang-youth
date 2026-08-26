@@ -182,9 +182,13 @@ POST  /v1/field/sync/batches
 
 列表接口默认返回数组；需要分页时追加 `paged=1&page=1&pageSize=20`。学生导入同时支持 CSV 和 `.xlsx`（JSON 请求中传 `csvText` 或 `fileBase64`），先调用 preview 再正式写入；导入记录、学生转班/停用/恢复历史都会保留。创建类写接口支持 `Idempotency-Key`，重复提交会复用第一次响应。数据库结构由 `db/schema.sql` 和 `db/migrations/` 管理，演示基础数据必须单独执行 `npm run seed`。
 
+### 通知投递网关
+
+站内通知和外部通知都先写入 `notification_deliveries` 与 `job_queue`，由 Worker 按 `deliveryId` 投递。定时通知在 `scheduled_at` 到达前不会出现在收件箱；Worker 重试不会生成重复站内消息。`in_app` 不依赖外部服务，`push`、`sms`、`wechat` 需要配置 `NOTIFICATION_WEBHOOK_URL`，并可通过 `NOTIFICATION_WEBHOOK_AUTHORIZATION` 注入网关凭证。生产地址必须为 HTTPS；网关会收到 `deliveryId` 作为 `Idempotency-Key`，必须按该键去重，并根据 `receiverUserId` 在受控服务内解析 APNs、FCM、短信或微信目标。App 健康数据和摄像头数据不得进入通知负载。
+
 ### 生产部署入口
 
-生产环境使用 `docker-compose.prod.yml`：API 和 PostgreSQL 不对公网发布端口，Caddy 是唯一公网入口，负责自动 HTTPS、HTTP→HTTPS 跳转和 API 健康探测。`worker` 是独立后台执行器，处理隐私导出、场地会话后的报告刷新、设备失联回收与重试任务；API 可以独立扩容，不能再把作业轮询嵌入每个 API 副本。每个 Worker 用 `FOR UPDATE SKIP LOCKED` 安全领取至多 `JOB_WORKER_CONCURRENCY`（默认 4）条任务并发执行，不同 Worker 不会重复处理同一记录；收到停止信号后先停止领取，再在 `JOB_WORKER_SHUTDOWN_TIMEOUT_MS`（默认 25 秒、小于容器 30 秒宽限期）内排空已领取任务。`backup` 是独立、只读文件系统的备份执行器：启动后立即执行并按 `BACKUP_INTERVAL_SECONDS`（默认每天）归档到独立 S3 bucket，健康心跳、最近成功时间和失败状态均暴露给监控。应根据数据库连接池、对象存储和学校峰值导出量调优。复制 `.env.production.example` 到受管密钥系统或不入库的 `.env.production`，填入真实域名、数据库、S3/KMS 访问凭据和随机指标令牌；DNS 必须先解析到部署主机，80/443 必须可从公网访问。
+生产环境使用 `docker-compose.prod.yml`：API 和 PostgreSQL 不对公网发布端口，Caddy 是唯一公网入口，负责自动 HTTPS、HTTP→HTTPS 跳转和 API 健康探测。`worker` 是独立后台执行器，处理隐私导出、通知投递、场地会话后的报告刷新、设备失联回收与重试任务；API 可以独立扩容，不能再把作业轮询嵌入每个 API 副本。每个 Worker 用 `FOR UPDATE SKIP LOCKED` 安全领取至多 `JOB_WORKER_CONCURRENCY`（默认 4）条任务并发执行，不同 Worker 不会重复处理同一记录；收到停止信号后先停止领取，再在 `JOB_WORKER_SHUTDOWN_TIMEOUT_MS`（默认 25 秒、小于容器 30 秒宽限期）内排空已领取任务。`backup` 是独立、只读文件系统的备份执行器：启动后立即执行并按 `BACKUP_INTERVAL_SECONDS`（默认每天）归档到独立 S3 bucket，健康心跳、最近成功时间和失败状态均暴露给监控。应根据数据库连接池、对象存储和学校峰值导出量调优。复制 `.env.production.example` 到受管密钥系统或不入库的 `.env.production`，填入真实域名、数据库、S3/KMS 访问凭据和随机指标令牌；DNS 必须先解析到部署主机，80/443 必须可从公网访问。
 
 ```bash
 cd backend

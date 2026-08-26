@@ -10,13 +10,18 @@ const classPostRoutes = await fs.readFile(new URL('../src/routes/classPosts.js',
 const familyHealthRoutes = await fs.readFile(new URL('../src/routes/familyHealth.js', import.meta.url), 'utf8');
 const courseRoutes = await fs.readFile(new URL('../src/routes/courses.js', import.meta.url), 'utf8');
 const notificationRoutes = await fs.readFile(new URL('../src/routes/notifications.js', import.meta.url), 'utf8');
+const notificationDelivery = await fs.readFile(new URL('../src/notificationDelivery.js', import.meta.url), 'utf8');
 const privacyRoutes = await fs.readFile(new URL('../src/routes/privacy.js', import.meta.url), 'utf8');
 const messageRoutes = await fs.readFile(new URL('../src/routes/messages.js', import.meta.url), 'utf8');
 const supportRoutes = await fs.readFile(new URL('../src/routes/support.js', import.meta.url), 'utf8');
+const productEventRoutes = await fs.readFile(new URL('../src/routes/productEvents.js', import.meta.url), 'utf8');
+const contentOperationRoutes = await fs.readFile(new URL('../src/routes/contentOperations.js', import.meta.url), 'utf8');
+const teacherTaskRoutes = await fs.readFile(new URL('../src/routes/teacherTasks.js', import.meta.url), 'utf8');
+const { validateProductEventBatch } = await import('../src/routes/productEvents.js');
 // Workflow assertions intentionally inspect the composed HTTP surface. Route
 // modules may move independently of the entrypoint, but their validation and
 // authorization rules must remain part of the same shipped service.
-const routeHandlers = `${server}\n${activityRoutes}\n${expertAppointmentRoutes}\n${classPostRoutes}\n${familyHealthRoutes}\n${courseRoutes}\n${notificationRoutes}\n${privacyRoutes}\n${messageRoutes}\n${supportRoutes}`;
+const routeHandlers = `${server}\n${activityRoutes}\n${expertAppointmentRoutes}\n${classPostRoutes}\n${familyHealthRoutes}\n${courseRoutes}\n${notificationRoutes}\n${privacyRoutes}\n${messageRoutes}\n${supportRoutes}\n${productEventRoutes}\n${contentOperationRoutes}\n${teacherTaskRoutes}`;
 const jobs = await fs.readFile(new URL('../src/jobs.js', import.meta.url), 'utf8');
 const schema = await fs.readFile(new URL('../db/schema.sql', import.meta.url), 'utf8');
 
@@ -50,6 +55,32 @@ test('workflow handlers enforce the same server-side validation as the API contr
   assert.match(routeHandlers, /const attendanceCount = Number\(input\.attendanceCount\)/);
   assert.match(routeHandlers, /const content = requiredString\(input\.content, '动态内容'/);
   assert.match(routeHandlers, /const content = requiredString\(input\.content, '咨询内容'/);
+});
+
+test('product events are explicit opt-in compatible and reject identity or health fields', () => {
+  const body = section('/v1/mobile/events');
+  assert.notEqual(body, '', 'product event endpoint must be documented');
+  assert.match(body, /additionalProperties: false/);
+  const now = new Date('2026-08-26T08:00:00.000Z');
+  const accepted = validateProductEventBatch({ events: [{
+    eventId: '11111111-1111-4111-8111-111111111111',
+    eventName: 'growth_report_opened',
+    coarseValue: '本周',
+    platform: 'ios',
+    appVersion: '1.0.0',
+    clientSessionId: '22222222-2222-4222-8222-222222222222',
+    occurredAt: now.toISOString()
+  }] }, now);
+  assert.equal(accepted.length, 1);
+  assert.equal(accepted[0].clientSessionHash.length, 64);
+  assert.equal('clientSessionId' in accepted[0], false);
+  assert.throws(() => validateProductEventBatch({ events: [{
+    eventId: '11111111-1111-4111-8111-111111111111', eventName: 'growth_report_opened',
+    platform: 'android', appVersion: '1.0', clientSessionId: '22222222-2222-4222-8222-222222222222',
+    occurredAt: now.toISOString(), childId: 'child-private'
+  }] }, now), /不允许的字段/);
+  assert.doesNotMatch(schema.split('CREATE TABLE IF NOT EXISTS product_events')[1].split(');')[0], /user_id|child_id|student_id|health/i);
+  assert.match(productEventRoutes, /product-events:\$\{user\.id\}/);
 });
 
 test('consent endpoint exposes an auditable withdrawal path', () => {
@@ -127,6 +158,11 @@ test('class notification drafts expose remote lifecycle and scoped delivery', ()
   assert.match(routeHandlers, /notification\.draft\.discard/);
   assert.match(routeHandlers, /ur\.class_id=ANY\(\$2\)/);
   assert.match(routeHandlers, /teacherClassIds\(user, schoolId\)\.includes\(classId\)/);
+  assert.match(notificationRoutes, /notification\.deliver/, 'notification delivery must use the durable job outbox');
+  assert.match(notificationDelivery, /idempotency-key/, 'provider delivery must be idempotent');
+  assert.match(notificationDelivery, /channel !== 'in_app'/, 'in-app delivery must not depend on an external provider');
+  assert.match(notificationDelivery, /WHERE NOT EXISTS/, 'worker retries must not duplicate inbox messages');
+  assert.doesNotMatch(notificationRoutes, /channel !== 'in_app'\) return fail\(res, 503/, 'configured external channels must not be rejected unconditionally');
 });
 
 test('class circle exposes paged comments with ownership and attachment moderation hooks', () => {
@@ -244,10 +280,25 @@ test('guided training sessions are structured, child-scoped, and never accept ra
     assert.match(route, new RegExp(field), `${field} must be documented`);
   }
   assert.match(routeHandlers, /training_sessions/);
-  assert.match(routeHandlers, /studentForUser\(user, parts\[2\]\)/);
+  assert.match(routeHandlers, /guardianStudentForUser\(user, parts\[2\]\)/);
   assert.match(routeHandlers, /跟练记录编号已被占用/);
   assert.match(routeHandlers, /training_session\.upsert/);
   assert.doesNotMatch(server, /cameraFrame|rawVideo|rawPhoto/);
+});
+
+test('content operations publish immutable mobile manifests with scoped versions', () => {
+  for (const route of [
+    '/v1/mobile/content-manifest',
+    '/v1/admin/content/releases',
+    '/v1/admin/content/releases/{releaseId}/items',
+    '/v1/admin/content/releases/{releaseId}/publish',
+    '/v1/admin/content/releases/{releaseId}/withdraw'
+  ]) assert.notEqual(section(route), '', `${route} must be documented`);
+  assert.match(contentOperationRoutes, /content_release_items/);
+  assert.match(contentOperationRoutes, /CONTENT_RELEASE_EMPTY/);
+  assert.match(contentOperationRoutes, /schoolAllowed\(user, schoolId\)/);
+  assert.match(contentOperationRoutes, /beginIdempotentRequest/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS content_releases/);
 });
 
 test('family exercise check-ins are date-scoped, versioned, and child-authorized', () => {

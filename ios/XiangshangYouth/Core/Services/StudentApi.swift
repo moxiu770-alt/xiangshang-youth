@@ -37,8 +37,8 @@ private struct ConsentRequest: Encodable {
     let dataRetentionNoticeAccepted: Bool
     init(consentVersion: String, purpose: String, granted: Bool) {
         self.consentVersion = consentVersion; self.purpose = purpose; self.granted = granted
-        consentID = UUID().uuidString; privacyPolicyVersion = consentVersion; cameraConsentVersion = consentVersion
-        algorithmNoticeVersion = "posture-screening-v1"; deviceInfoHash = ""; appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"; dataRetentionNoticeAccepted = true
+        consentID = UUID().uuidString; privacyPolicyVersion = consentVersion; cameraConsentVersion = LegalPolicy.cameraConsentVersion
+        algorithmNoticeVersion = LegalPolicy.algorithmNoticeVersion; deviceInfoHash = ""; appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"; dataRetentionNoticeAccepted = true
     }
     init(consent: HealthConsentRecord) {
         consentVersion = consent.privacyPolicyVersion; purpose = "body_assessment"; granted = true

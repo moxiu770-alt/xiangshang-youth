@@ -20,7 +20,7 @@ data class AuthSessionClaims(val claimsVersion: Int, val activeRole: String, val
 data class MeResponse(val id: String, val name: String, val phone: String? = null, val roleCode: String, val schoolId: String? = null, val schoolName: String = "", val roles: List<MeRole> = emptyList()) {
     val displayPhone: String get() = phone?.takeIf { it.isNotBlank() } ?: "未绑定手机号"
 }
-data class MeRole(val code: String, @Json(name = "school_id") val schoolId: String? = null, @Json(name = "class_id") val classId: String? = null)
+data class MeRole(val code: String, @param:Json(name = "school_id") val schoolId: String? = null, @param:Json(name = "class_id") val classId: String? = null)
 
 interface AuthApi {
     @POST("v1/auth/login")

@@ -11,6 +11,7 @@ struct CourseApi {
 }
 struct RemoteLesson: Decodable { let courseID: String; let moduleID: String?; let lessonID: String; let title: String; let lessonTitle: String; let durationMs: Int; let videoSource: String?; let lastPositionMs: Int; let completed: Bool; let version: Int; enum CodingKeys: String, CodingKey { case title, lessonTitle, durationMs, videoSource, lastPositionMs, completed, version; case courseID = "courseId"; case moduleID = "moduleId"; case lessonID = "lessonId" } }
 extension RemoteLesson: Identifiable { var id: String { lessonID } }
-struct PlaybackSource: Decodable { let lessonID: String; let courseID: String; let videoSource: String; let durationMs: Int; enum CodingKeys: String, CodingKey { case videoSource, durationMs; case lessonID = "lessonId"; case courseID = "courseId" } }
+struct CaptionTrack: Decodable { let url: String?; let uri: String?; let language: String?; let label: String?; let mimeType: String? }
+struct PlaybackSource: Decodable { let lessonID: String; let courseID: String; let videoSource: String; let durationMs: Int; let captions: [CaptionTrack]?; let playbackSessionID: String?; let expiresAt: String?; let refreshAfterSeconds: Int?; enum CodingKeys: String, CodingKey { case videoSource, durationMs, captions, expiresAt, refreshAfterSeconds; case lessonID = "lessonId"; case courseID = "courseId"; case playbackSessionID = "playbackSessionId" } }
 private struct LessonProgressWrite: Encodable { let lastPositionMs: Int; let completed: Bool; let expectedVersion: Int? }
 struct LessonProgressAck: Decodable { let lessonID: String; let lastPositionMs: Int; let completed: Bool; let version: Int; enum CodingKeys: String, CodingKey { case lastPositionMs, completed, version; case lessonID = "lessonId" } }

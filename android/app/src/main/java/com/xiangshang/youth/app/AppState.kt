@@ -34,6 +34,7 @@ import com.xiangshang.youth.core.service.WechatExchangeRequest
 import com.xiangshang.youth.core.util.ChildBindingValidator
 import com.xiangshang.youth.core.util.BusinessClock
 import com.xiangshang.youth.BuildConfig
+import com.xiangshang.youth.core.sync.PendingSyncScheduler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -49,6 +50,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             "course|$childId|$courseId|$moduleId|$lessonId"
     }
     private val connectivityManager = application.getSystemService(ConnectivityManager::class.java)
+    private var networkCallbackRegistered = false
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) { setOffline(false) }
         override fun onLost(network: Network) { setOffline(!hasValidatedNetwork()) }
@@ -67,6 +69,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     init {
         setOffline(!hasValidatedNetwork())
         runCatching { connectivityManager.registerDefaultNetworkCallback(networkCallback) }
+            .onSuccess { networkCallbackRegistered = true }
         if (_state.value.local.sessionActive) restoreSession()
     }
     fun login(identifier: String = "", verificationCode: String? = null, password: String? = null, displayName: String? = null, accountRole: UserRole? = null, onSuccess: () -> Unit = {}) = viewModelScope.launch {
@@ -372,7 +375,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun selectPrincipalTask(taskId: String) = mutate { it.copy(selectedPrincipalTaskId = taskId) }
     fun setTeacherSportsWorkbench(enabled: Boolean) = mutate { it.copy(teacherUsesSportsWorkbench = enabled) }
-    fun recordHealthConsent(studentId: String, privacyVersion: String = "v1", cameraVersion: String = "v1", algorithmVersion: String = "posture-screening-v1") {
+    fun recordHealthConsent(
+        studentId: String,
+        privacyVersion: String = com.xiangshang.youth.core.model.LegalPolicy.PRIVACY_POLICY_VERSION,
+        cameraVersion: String = com.xiangshang.youth.core.model.LegalPolicy.CAMERA_CONSENT_VERSION,
+        algorithmVersion: String = com.xiangshang.youth.core.model.LegalPolicy.ALGORITHM_NOTICE_VERSION
+    ) {
         val guardian = _state.value.profile ?: return
         val consent = com.xiangshang.youth.core.service.HealthConsentRecord(
             consentId = java.util.UUID.randomUUID().toString(), guardianUserId = guardian.id, childId = studentId,
@@ -431,6 +439,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         sessionRestoreJob?.cancel()
         sessionRestoreJob = null
         ApiClient.clearToken()
+        com.xiangshang.youth.core.util.FrontendTelemetry.configure(false)
         featureStore.clear()
         _state.value = AppUiState()
     }
@@ -571,8 +580,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     val consent = _state.value.local.healthConsents[studentId]
                         ?: throw ApiError.Client("请先完成监护人授权后再提交身体测评")
                     if (consent.revokedAt != null) throw ApiError.Client("监护人授权已撤回，请重新确认后再提交身体测评")
+                    if (consent.privacyPolicyVersion != com.xiangshang.youth.core.model.LegalPolicy.PRIVACY_POLICY_VERSION ||
+                        consent.cameraConsentVersion != com.xiangshang.youth.core.model.LegalPolicy.CAMERA_CONSENT_VERSION ||
+                        consent.algorithmNoticeVersion != com.xiangshang.youth.core.model.LegalPolicy.ALGORITHM_NOTICE_VERSION
+                    ) throw ApiError.Client("授权说明已更新，请重新确认后再同步身体测评")
                     repository.grantHealthConsent(consent)
-                    val canonicalReport = repository.submitBodyAssessment(studentId, record, "v1")
+                    val canonicalReport = repository.submitBodyAssessment(studentId, record, consent.privacyPolicyVersion)
                     if (canonicalReport != null) {
                         mutate { local ->
                             val current = local.bodyAssessments[studentId] ?: return@mutate local
@@ -694,136 +707,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }, onFailure = { markTaskStatusSyncFailed(studentId, taskId) }, onError = { error -> if (error is ApiError.Conflict) resetTaskStatusProjectionAfterConflict(studentId, taskId) })
     }
 
-    fun completeAssessment(category: String, entries: Map<String, String> = emptyMap(), structuredAnswers: List<com.xiangshang.youth.core.service.HealthObservationAnswer>? = null) = mutate { local ->
-        val childId = _state.value.selectedChild?.id ?: "anonymous"
-        val completed = local.completedAssessments + "$childId-$category"
-        if (category == "fitness") local.copy(completedAssessments = completed)
-        else {
-            val previous = local.familyHealthRecords["$childId-$category"]
-            val answers = structuredAnswers ?: makeStructuredObservationAnswers(category, entries)
-            val record = com.xiangshang.youth.core.service.FamilyHealthRecord(childId, category, BusinessClock.format("yyyy-MM-dd HH:mm"), entries, formVersion = "family-observation-v2", submittedAt = BusinessClock.format("yyyy-MM-dd HH:mm"), version = (previous?.version ?: 0) + 1, frequency = entries["频率"], severity = entries["严重程度"], structuredAnswers = answers)
-            local.copy(completedAssessments = completed, familyHealthRecords = local.familyHealthRecords + ("$childId-$category" to record), healthObservationSyncStates = local.healthObservationSyncStates + ("$childId|$category" to if (repository.supportsRemoteAcknowledgement) LocalSubmissionStatus.PendingSync else LocalSubmissionStatus.Submitted))
-        }
-    }.also {
-        if (repository.supportsRemoteAcknowledgement && category != "fitness") {
-            val childId = _state.value.selectedChild?.id ?: return@also
-            val record = _state.value.local.familyHealthRecords["$childId-$category"] ?: return@also
-            executeWorkflow("health-observation:$childId:$category", operation = {
-                val canonical = repository.submitHealthObservation(childId, category, record)
-                if (_state.value.selectedChild?.id == childId) {
-                    mutate { local -> local.copy(completedAssessments = local.completedAssessments + "$childId-$category", familyHealthRecords = local.familyHealthRecords + ("$childId-$category" to canonical), healthObservationSyncStates = local.healthObservationSyncStates + ("$childId|$category" to LocalSubmissionStatus.Submitted)) }
-                }
-            }, onFailure = { mutate { local -> local.copy(healthObservationSyncStates = local.healthObservationSyncStates + ("$childId|$category" to LocalSubmissionStatus.Failed)) } })
-        }
-    }
-
-    private fun makeStructuredObservationAnswers(category: String, entries: Map<String, String>): List<com.xiangshang.youth.core.service.HealthObservationAnswer> {
-        val questionIds = mapOf(
-            "基础信息" to "profile-confirmed",
-            "用眼习惯" to "vision-screen-time",
-            "视力筛查" to "vision-screening",
-            "口腔习惯" to "oral-hygiene",
-            "口腔筛查" to "oral-screening",
-            "开始说明" to "mental-consent",
-            "家庭感受记录" to "mental-observations",
-            "家庭观察结果" to "mental-follow-up",
-            "频率" to "observation-frequency",
-            "严重程度" to "observation-severity",
-            "补充说明" to "observation-note"
-        )
-        return entries.keys.sortedBy { questionIds[it] ?: it }.mapNotNull { key ->
-            val raw = entries[key]?.trim().orEmpty()
-            if (raw.isBlank()) return@mapNotNull null
-            val parts = raw.split("｜", limit = 2)
-            val selection = parts.firstOrNull()?.trim().orEmpty()
-            val note = parts.getOrNull(1)?.trim()?.takeIf { it.isNotBlank() }
-            val type = when (key) {
-                "频率" -> "frequency"
-                "严重程度" -> "severity"
-                "补充说明" -> "text"
-                "家庭感受记录" -> "multiple"
-                else -> "single"
-            }
-            val required = type !in setOf("frequency", "severity", "text")
-            val selected = if (type == "text") emptyList() else selection.split('、', ',', '，').map { it.trim() }.filter { it.isNotBlank() }
-            com.xiangshang.youth.core.service.HealthObservationAnswer(
-                questionId = questionIds[key] ?: "$category-$key",
-                questionType = type,
-                selectedOptionIds = selected,
-                note = if (type == "text") selection.ifBlank { note } else note,
-                required = required
-            )
-        }
-    }
-
-    fun loadFamilyHealthObservations(studentId: String) = viewModelScope.launch {
-        if (!repository.supportsRemoteAcknowledgement) return@launch
-        runCatching { repository.loadHealthObservations(studentId) }
-            .onSuccess { records ->
-                if (_state.value.selectedChild?.id != studentId) return@onSuccess
-                mutate { local ->
-                    val updatedRecords = local.familyHealthRecords.toMutableMap()
-                    val completed = local.completedAssessments.toMutableSet()
-                    records.forEach { record ->
-                        updatedRecords["$studentId-${record.category}"] = record
-                        completed += "$studentId-${record.category}"
-                    }
-                    local.copy(familyHealthRecords = updatedRecords, completedAssessments = completed)
-                }
-            }
-            .onFailure { error ->
-                _state.value = _state.value.copy(workflowStates = _state.value.workflowStates + ("health-observation-load:$studentId" to WorkflowCommandState(WorkflowCommandStatus.Failed, error.localizedMessage ?: "健康记录加载失败")))
-            }
-    }
-    fun loadHealthCheckins(studentId: String) = viewModelScope.launch {
-        if (!repository.supportsRemoteAcknowledgement) return@launch
-        runCatching { repository.loadHealthCheckins(studentId) }
-            .onSuccess { records ->
-                if (_state.value.selectedChild?.id != studentId) return@onSuccess
-                mutate { local ->
-                    val merged = records + local.healthCheckins.filterNot { localRecord -> records.any { it.id == localRecord.id || (it.childId == studentId && it.checkInDate == localRecord.checkInDate) } }
-                    local.copy(healthCheckins = merged, checkedInDates = local.checkedInDates + records.map { it.checkInDate }, checkedInToday = records.any { it.checkInDate == BusinessClock.day() })
-                }
-            }
-            .onFailure { error -> if (error is ApiError.Unauthorized) handleDashboardFailure(error) }
-    }
-
-    fun publishPost(author: String, content: String, attachments: List<com.xiangshang.youth.core.service.ClassPostAttachment> = emptyList()): String? {
-        if (content.isBlank()) return null
-        val id = java.util.UUID.randomUUID().toString()
-        val classId = _state.value.profile?.authorizedClassIds?.firstOrNull() ?: _state.value.selectedChild?.classId
-        mutate { it.copy(classPosts = listOf(ClassPost(id = id, author = author, content = content, status = LocalSubmissionStatus.PendingSync, classId = classId, displayName = privacyDisplayName(author), visibilityScope = "class", moderationStatus = "pending_review", pinned = false, attachments = attachments, authorRole = if (_state.value.role == UserRole.Teacher) "teacher" else "parent")) + it.classPosts) }
-        return id
-    }
-    fun updatePost(id: String, content: String) { if (content.isBlank()) return; mutate { local -> local.copy(classPosts = local.classPosts.map { if (it.id == id) it.copy(content = content, status = LocalSubmissionStatus.PendingSync) else it }) } }
-    internal fun updatePostSyncStatus(id: String, status: LocalSubmissionStatus, serverPostId: String? = null) = mutate { local ->
-        local.copy(classPosts = local.classPosts.map { post ->
-            if (post.id == id) post.copy(status = status, postId = serverPostId ?: post.postId, ownedByCurrentUser = post.ownedByCurrentUser || !serverPostId.isNullOrBlank()) else post
-        })
-    }
-    fun togglePostLike(postId: String) = mutate { local -> local.copy(likedPostIds = if (postId in local.likedPostIds) local.likedPostIds - postId else local.likedPostIds + postId) }
-    fun addPostComment(postId: String, content: String) {
-        val trimmed = content.trim()
-        if (trimmed.isBlank()) return
-        val post = _state.value.local.classPosts.firstOrNull { it.id == postId || it.postId == postId }
-        val serverPostId = post?.postId
-        mutate { local -> local.copy(postComments = local.postComments + (postId to (local.postComments[postId].orEmpty() + trimmed))) }
-        if (!repository.supportsRemoteAcknowledgement || serverPostId.isNullOrBlank()) return
-        executeWorkflow("class-post:comment:$serverPostId", operation = {
-            repository.addClassPostComment(serverPostId, trimmed)
-        }, onFailure = {
-            mutate { local ->
-                val updated = local.postComments[postId].orEmpty().dropLast(1) + "$trimmed（同步失败）"
-                local.copy(postComments = local.postComments + (postId to updated))
-            }
-        })
-    }
-    fun saveDraft(key: String, content: String) = mutate { it.copy(drafts = it.drafts + (key to content)) }
-    fun clearDraft(key: String) = mutate { it.copy(drafts = it.drafts - key) }
-    private fun privacyDisplayName(value: String): String {
-        val first = value.trim().firstOrNull() ?: return "本班家长"
-        return "${first}同学家长"
-    }
     private fun markTaskStatusSynced(studentId: String, taskId: String? = null) = updateTaskStatusSyncStatus(studentId, taskId, LocalSubmissionStatus.Submitted)
     private fun markTaskStatusSyncPending(studentId: String, taskId: String? = null) = updateTaskStatusSyncStatus(studentId, taskId, LocalSubmissionStatus.PendingSync)
     private fun markTaskStatusSyncSubmitting(studentId: String, taskId: String? = null) = updateTaskStatusSyncStatus(studentId, taskId, LocalSubmissionStatus.Submitting)
@@ -864,7 +747,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (!current.allowsTransitionTo(status)) return
         mutate { local -> local.copy(taskScopedStatuses = local.taskScopedStatuses + (_state.value.taskKey(taskId, studentId) to status), taskScopedReviewNotes = local.taskScopedReviewNotes + (_state.value.taskKey(taskId, studentId) to trimmed)) }
     }
-    fun updateSettings(notificationsEnabled: Boolean? = null, reduceMotion: Boolean? = null, voiceGuidanceEnabled: Boolean? = null) = mutate { local -> local.copy(settings = local.settings.copy(notificationsEnabled = notificationsEnabled ?: local.settings.notificationsEnabled, reduceMotion = reduceMotion ?: local.settings.reduceMotion, voiceGuidanceEnabled = voiceGuidanceEnabled ?: local.settings.voiceGuidanceEnabled)) }
+    fun updateSettings(notificationsEnabled: Boolean? = null, reduceMotion: Boolean? = null, voiceGuidanceEnabled: Boolean? = null, analyticsEnabled: Boolean? = null) {
+        mutate { local -> local.copy(settings = local.settings.copy(notificationsEnabled = notificationsEnabled ?: local.settings.notificationsEnabled, reduceMotion = reduceMotion ?: local.settings.reduceMotion, voiceGuidanceEnabled = voiceGuidanceEnabled ?: local.settings.voiceGuidanceEnabled, analyticsEnabled = analyticsEnabled ?: local.settings.analyticsEnabled)) }
+        com.xiangshang.youth.core.util.FrontendTelemetry.configure(_state.value.local.settings.analyticsEnabled && _state.value.repositoryAcknowledged)
+    }
     /** Submission data must come from the validated upload form. */
     fun submitUpload(taskId: String, attendance: Int, notes: String, attachment: String, attachmentReference: String? = null) = saveCourseUpload(taskId, attendance, notes, attachment, attachmentReference, submit = true)
     fun checkInToday(activityType: String = "家庭运动", durationMinutes: Int = 20, intensity: String = "moderate", feeling: String? = null, completedRecommended: Boolean = false, parentNote: String? = null) {
@@ -883,10 +769,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     fun clearError() { _state.value = _state.value.copy(error = null) }
-    override fun onCleared() {
-        runCatching { connectivityManager.unregisterNetworkCallback(networkCallback) }
-        super.onCleared()
-    }
     private fun hasValidatedNetwork(): Boolean = connectivityManager.activeNetwork?.let { network ->
         connectivityManager.getNetworkCapabilities(network)?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
     } ?: false
@@ -926,7 +808,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         // Restore/relaunch can report an online path without a preceding
         // offline transition. Retry persisted writes whenever a session is
         // usable and the sync command is not already running.
-        if (!value && _state.value.profile != null && _state.value.pendingSyncCount > 0 && !workflowState("sync-pending").isSubmitting) syncPendingRecords()
+        if (!value && _state.value.profile == null && _state.value.local.sessionActive && !_state.value.restoringSession) {
+            restoreSession()
+        } else if (!value && _state.value.profile != null && _state.value.data == null && !_state.value.loading) {
+            refreshDashboard()
+        } else if (!value && _state.value.profile != null && _state.value.pendingSyncCount > 0 && !workflowState("sync-pending").isSubmitting) {
+            syncPendingRecords()
+        }
     }
     private fun restoreSession() {
         sessionRestoreJob?.cancel()
@@ -967,12 +855,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     featureStore.clear()
                     _state.value = AppUiState(error = error.message, restoringSession = false)
                 } else {
-                    // A persisted session whose dashboard cannot be refreshed is not
-                    // a usable authenticated state. Clear it before returning to the
-                    // login screen so the next launch cannot loop through RoleSelect
-                    // with a nil dashboard or keep retrying stale credentials.
-                    featureStore.clear()
-                    _state.value = AppUiState(error = error.message, restoringSession = false)
+                    // A transient network/backend failure is not proof that the
+                    // credentials are invalid. Preserve the durable session and
+                    // offline writes; only an explicit 401 clears authentication.
+                    _state.value = _state.value.copy(
+                        loading = false,
+                        restoringSession = false,
+                        error = error.message ?: "暂时无法恢复数据，请检查网络后重试"
+                    )
                 }
             }
         }
@@ -983,7 +873,23 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             _state.value = AppUiState(error = error.message)
         } else _state.value = _state.value.copy(loading = false, error = error.message)
     }
-    internal fun mutate(transform: (LocalFeatureState) -> LocalFeatureState) { val local = transform(_state.value.local); featureStore.save(local); _state.value = _state.value.copy(local = local) }
+    internal fun mutate(transform: (LocalFeatureState) -> LocalFeatureState) {
+        val local = transform(_state.value.local)
+        featureStore.save(local)
+        _state.value = _state.value.copy(local = local)
+        if (_state.value.pendingSyncCount > 0) PendingSyncScheduler.enqueue(getApplication())
+    }
+
+    internal fun releaseBackgroundResources() {
+        if (!networkCallbackRegistered) return
+        runCatching { connectivityManager.unregisterNetworkCallback(networkCallback) }
+        networkCallbackRegistered = false
+    }
+
+    override fun onCleared() {
+        releaseBackgroundResources()
+        super.onCleared()
+    }
     /** Narrow state seam for the remote-content domain extensions. */
     internal fun updateRemoteTargetState(transform: (AppUiState) -> AppUiState) {
         _state.value = transform(_state.value)

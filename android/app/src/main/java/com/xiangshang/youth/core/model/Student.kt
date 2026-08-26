@@ -49,5 +49,5 @@ data class Student(
     /** Monotonic server-side task row version for conflict-safe teacher edits. */
     val taskVersion: Int? = null,
     /** Stable class scope; className is display-only. */
-    @Json(name = "classId") val classId: String? = null
+    @param:Json(name = "classId") val classId: String? = null
 )

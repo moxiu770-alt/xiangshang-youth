@@ -4,6 +4,7 @@ import { config } from './config.js';
 import { reconcileFieldLiveness } from './fieldLiveness.js';
 import { auditEvent } from './audit.js';
 import { refreshReportForStudentId } from './reportRefresh.js';
+import { deliverNotificationDelivery, markNotificationDeliveryFailed } from './notificationDelivery.js';
 
 const state = { enabled: false, running: false, stopping: false, active: 0, lastRunAt: null, lastError: null, processed: 0 };
 let timer;
@@ -136,6 +137,7 @@ async function processJob(job) {
   if (job.job_type === 'privacy.anonymize') return anonymizeStudent(job.payload.requestId, job.payload);
   if (job.job_type === 'account.anonymize') return anonymizeAccount(job.payload.requestId, job.payload);
   if (job.job_type === 'report.refresh') return refreshReportForStudentId({ studentId: job.payload.studentId, taskId: job.payload.taskId || null, requestId: `worker:report-refresh:${job.id}` });
+  if (job.job_type === 'notification.deliver') return deliverNotificationDelivery(job.payload.deliveryId);
   throw Object.assign(new Error(`未知任务类型: ${job.job_type}`), { code: 'JOB_TYPE_UNKNOWN' });
 }
 
@@ -186,6 +188,9 @@ async function processClaimedJob(job) {
       if (request.rows[0]) {
         await auditEvent({ operatorId: request.rows[0].requestedBy || null, action: 'account.delete.failed', resourceType: 'account_deletion_request', resourceId: request.rows[0].id, before: { status: 'processing', userId: request.rows[0].userId }, after: { status: 'failed', userId: request.rows[0].userId, error: error.message.slice(0, 500) }, requestId: `worker:${job.job_type}:${request.rows[0].id}` }).catch((auditError) => logger.error('job.audit_failed', { jobId: job.id, error: auditError.message }));
       }
+    }
+    if (nextStatus === 'failed' && job.job_type === 'notification.deliver' && job.payload?.deliveryId) {
+      await markNotificationDeliveryFailed(job.payload.deliveryId, error.message).catch((deliveryError) => logger.error('notification.delivery_mark_failed', { deliveryId: job.payload.deliveryId, error: deliveryError.message }));
     }
     logger.error('job.process_failed', { jobId: job.id, jobType: job.job_type, error: error.message, status: nextStatus });
     return error;

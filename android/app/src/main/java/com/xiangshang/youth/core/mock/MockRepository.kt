@@ -52,6 +52,6 @@ class MockRepository : YouthRepository {
             ScoreResult(item, scoreValues[i], if (scoreValues[i] < 3.5) "建议重点练习" else "表现良好", confidence, if (confidence < 0.8) ScoreReviewStatus.PendingReview else ScoreReviewStatus.Passed)
         }
         val risks = if (scoreValues.any { it < 3 }) listOf("倒退平衡项目偏弱，建议4周后复测") else listOf("暂无高风险提示")
-        return DiagnosisReport("r-" + student.id, student, "2026-08-20", scores, listOf("协调性良好","敏捷性优秀","平衡能力待提升"), risks, listOf("每周进行3次平衡与核心训练，每次15分钟","练习脚步变向时注意控制重心"), listOf(CourseSuggestion("course-1", "儿童协调性提升课", "12分钟/节", "平衡与敏捷", true), CourseSuggestion("course-2", "球类基础控球练习", "15分钟/节", "手脚协调", true)), student.grade + "运动能力标准 v1.0", RegionPolicy("policy-${student.grade}", student.region, if (student.isPovertyArea) "贫困地区专项帮扶" else null, student.grade + "运动能力标准 v1.0", "2026-08-01"))
+        return DiagnosisReport("r-" + student.id, student, "2026-08-20", scores, listOf("协调性良好","敏捷性优秀","平衡能力待提升"), risks, listOf("每周进行3次平衡与核心训练，每次15分钟","练习脚步变向时注意控制重心"), listOf(CourseSuggestion("course-1", "儿童协调性提升课", "12分钟/节", "平衡与敏捷", true, "course-1", "course-1-lesson-1"), CourseSuggestion("course-2", "球类基础控球练习", "15分钟/节", "手脚协调", true, "course-2", "course-2-lesson-1")), student.grade + "运动能力标准 v1.0", RegionPolicy("policy-${student.grade}", student.region, if (student.isPovertyArea) "贫困地区专项帮扶" else null, student.grade + "运动能力标准 v1.0", "2026-08-01"))
     }
 }

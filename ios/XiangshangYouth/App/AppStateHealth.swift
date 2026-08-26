@@ -23,14 +23,18 @@ import Foundation
         return succeeded
     }
 
-    func revokeHealthConsent(studentID: String, version: String = "v1") async -> Bool {
+    func revokeHealthConsent(studentID: String, version: String? = nil) async -> Bool {
         let key = "privacy:\(studentID):consent-revoke"
         guard data?.students.contains(where: { $0.id == studentID }) == true else {
             workflowStates[key] = .failed("未找到孩子信息，请重新选择后再试。")
             return false
         }
+        guard let resolvedVersion = version?.nilIfBlank ?? localFeatures.healthConsents[studentID]?.privacyPolicyVersion.nilIfBlank else {
+            workflowStates[key] = .failed("未找到有效的监护人授权版本，请重新完成授权。")
+            return false
+        }
         let succeeded = await executeWorkflow(key) {
-            try await self.repository.revokeHealthConsent(studentID: studentID, version: version)
+            try await self.repository.revokeHealthConsent(studentID: studentID, version: resolvedVersion)
         }
         if succeeded {
             mutateLocal { values in
@@ -152,8 +156,13 @@ import Foundation
             guard let self else { return }
             do {
                 guard let consent = localFeatures.healthConsents[student.id], consent.revokedAt == nil else { throw ApiError.message("请先完成监护人授权后再提交身体测评") }
+                guard consent.privacyPolicyVersion == LegalPolicy.privacyPolicyVersion,
+                      consent.cameraConsentVersion == LegalPolicy.cameraConsentVersion,
+                      consent.algorithmNoticeVersion == LegalPolicy.algorithmNoticeVersion else {
+                    throw ApiError.message("授权说明已更新，请返回监护人授权步骤重新确认")
+                }
                 try await repository.grantHealthConsent(consent)
-                if let report = try await repository.submitBodyAssessment(studentID: student.id, record: record, consentVersion: "v1") {
+                if let report = try await repository.submitBodyAssessment(studentID: student.id, record: record, consentVersion: consent.privacyPolicyVersion) {
                     mutateLocal { values in
                         guard var latest = values.bodyAssessments[student.id] else { return }
                         latest.postureReport = report; values.bodyAssessments[student.id] = latest

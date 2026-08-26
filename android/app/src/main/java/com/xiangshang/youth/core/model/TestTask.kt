@@ -13,8 +13,8 @@ data class TestTask(
     val status: TaskStatus,
     val ruleVersion: String,
     val items: List<TestItem> = TestItem.entries,
-    @Json(name = "classIds") val classIds: List<String> = emptyList(),
-    @Json(name = "studentIds") val studentIds: List<String> = emptyList()
+    @param:Json(name = "classIds") val classIds: List<String> = emptyList(),
+    @param:Json(name = "studentIds") val studentIds: List<String> = emptyList()
 ) {
     /** API aggregates are untrusted display data; never expose impossible
      * negative or over-complete progress to dashboard calculations. */

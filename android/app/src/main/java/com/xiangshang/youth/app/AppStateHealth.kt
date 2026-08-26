@@ -26,13 +26,19 @@ fun AppViewModel.submitPrivacyRequest(studentId: String, requestType: String) {
     })
 }
 
-fun AppViewModel.revokeHealthConsent(studentId: String, version: String = "v1") {
+fun AppViewModel.revokeHealthConsent(studentId: String, version: String? = null) {
     val key = "privacy:$studentId:consent-revoke"
     if (_state.value.data?.students?.none { it.id == studentId } != false) {
         setWorkflow(key, WorkflowCommandState(WorkflowCommandStatus.Failed, "未找到孩子信息，请重新选择后再试。"))
         return
     }
-    executeWorkflow(key, { repository.revokeHealthConsent(studentId, version) }, onSuccess = {
+    val resolvedVersion = version?.takeIf { it.isNotBlank() }
+        ?: _state.value.local.healthConsents[studentId]?.privacyPolicyVersion?.takeIf { it.isNotBlank() }
+    if (resolvedVersion == null) {
+        setWorkflow(key, WorkflowCommandState(WorkflowCommandStatus.Failed, "未找到有效的监护人授权版本，请重新完成授权。"))
+        return
+    }
+    executeWorkflow(key, { repository.revokeHealthConsent(studentId, resolvedVersion) }, onSuccess = {
         val existing = _state.value.local.healthConsents[studentId] ?: return@executeWorkflow
         mutate { it.copy(healthConsents = it.healthConsents + (studentId to existing.copy(revokedAt = BusinessClock.format("yyyy-MM-dd'T'HH:mm:ssXXX")))) }
     }, successMessage = {
@@ -60,8 +66,12 @@ fun AppViewModel.saveBodyAssessment(student: Student, record: BodyAssessmentReco
         runCatching {
             val consent = _state.value.local.healthConsents[student.id] ?: throw ApiError.Client("请先完成监护人授权后再同步身体测评")
             if (consent.revokedAt != null) throw ApiError.Client("监护人授权已撤回，请重新确认后再同步身体测评")
+            if (consent.privacyPolicyVersion != com.xiangshang.youth.core.model.LegalPolicy.PRIVACY_POLICY_VERSION ||
+                consent.cameraConsentVersion != com.xiangshang.youth.core.model.LegalPolicy.CAMERA_CONSENT_VERSION ||
+                consent.algorithmNoticeVersion != com.xiangshang.youth.core.model.LegalPolicy.ALGORITHM_NOTICE_VERSION
+            ) throw ApiError.Client("授权说明已更新，请返回监护人授权步骤重新确认")
             repository.grantHealthConsent(consent)
-            repository.submitBodyAssessment(student.id, record, "v1")
+            repository.submitBodyAssessment(student.id, record, consent.privacyPolicyVersion)
         }.onSuccess { report ->
             if (report != null) mutate { local ->
                 val current = local.bodyAssessments[student.id] ?: return@mutate local

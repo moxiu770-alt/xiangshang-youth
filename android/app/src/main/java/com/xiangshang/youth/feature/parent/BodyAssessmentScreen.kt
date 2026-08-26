@@ -49,6 +49,19 @@ private fun restoredBodyAssessmentStage(draft: BodyAssessmentDraft?): Int {
     }
 }
 
+internal fun initialBodyAssessmentStage(
+    draft: BodyAssessmentDraft?,
+    hasPreviousRecord: Boolean,
+    consentIsCurrent: Boolean
+): Int {
+    val restored = restoredBodyAssessmentStage(draft).coerceIn(0, 8)
+    return when {
+        draft == null && hasPreviousRecord -> 7
+        draft != null && restored >= 2 && !consentIsCurrent -> 1
+        else -> restored
+    }
+}
+
 /**
  * The BMI step is the fourth step in the user-facing nine-step flow. Keep the
  * transition in one small pure function so a UI refactor cannot accidentally
@@ -64,11 +77,18 @@ fun BodyAssessmentScreen(state: AppUiState, nav: NavHostController, save: (Stude
     if (child == null) { Scaffold(containerColor = Canvas) { Box(Modifier.padding(it).fillMaxSize(), contentAlignment = Alignment.Center) { Button(onClick = { nav.navigate(Destinations.ChildrenBinding) }) { Text("请先绑定孩子") } } }; return }
     val persistedDraft = state.local.bodyAssessmentDrafts[child.id]
     val previous = state.local.bodyAssessments[child.id]
+    val currentConsent = state.local.healthConsents[child.id]
+    val consentIsCurrent = currentConsent != null && currentConsent.revokedAt == null &&
+        currentConsent.privacyPolicyVersion == LegalPolicy.PRIVACY_POLICY_VERSION &&
+        currentConsent.cameraConsentVersion == LegalPolicy.CAMERA_CONSENT_VERSION &&
+        currentConsent.algorithmNoticeVersion == LegalPolicy.ALGORITHM_NOTICE_VERSION
     // A completed record is a long-term family health asset. Re-entering this
     // page should show the saved result first, rather than forcing a parent
     // through consent and four capture tasks again. An in-progress draft still
     // wins so unfinished work resumes at the exact step where it was left.
-    var stage by rememberSaveable { mutableIntStateOf(restoredBodyAssessmentStage(persistedDraft).coerceIn(0, 6).let { if (persistedDraft == null && previous != null) 7 else it }) }
+    var stage by rememberSaveable {
+        mutableIntStateOf(initialBodyAssessmentStage(persistedDraft, previous != null, consentIsCurrent))
+    }
     var height by rememberSaveable { mutableDoubleStateOf(persistedDraft?.heightCm ?: previous?.heightCm ?: 0.0) }
     var weight by rememberSaveable { mutableDoubleStateOf(persistedDraft?.weightKg ?: previous?.weightKg ?: 0.0) }
     var fatherHeight by rememberSaveable { mutableDoubleStateOf(persistedDraft?.fatherHeightCm ?: previous?.fatherHeightCm ?: 0.0) }
@@ -77,9 +97,9 @@ fun BodyAssessmentScreen(state: AppUiState, nav: NavHostController, save: (Stude
     val captures = captureNames.mapNotNull { runCatching { BodyCaptureTask.valueOf(it) }.getOrNull() }.toSet()
     var asymmetric by rememberSaveable { mutableStateOf(persistedDraft?.asymmetric ?: previous?.asymmetric ?: false) }
     var gait by rememberSaveable { mutableStateOf(persistedDraft?.gaitConcern ?: previous?.gaitConcern ?: false) }
-    var adultReady by rememberSaveable { mutableStateOf(persistedDraft?.guardianReady ?: false) }
+    var adultReady by rememberSaveable { mutableStateOf(if (persistedDraft != null && !consentIsCurrent) false else persistedDraft?.guardianReady ?: false) }
     var spaceReady by rememberSaveable { mutableStateOf(persistedDraft?.environmentReady ?: false) }
-    var consentAcknowledged by rememberSaveable { mutableStateOf(persistedDraft?.consentAcknowledged ?: false) }
+    var consentAcknowledged by rememberSaveable { mutableStateOf(if (persistedDraft != null && !consentIsCurrent) false else persistedDraft?.consentAcknowledged ?: false) }
     // A completed record opens as a read-only history entry. Back exits the
     // feature instead of walking into the old parent-confirmation step.
     var viewingSavedRecord by rememberSaveable { mutableStateOf(persistedDraft == null && previous != null) }

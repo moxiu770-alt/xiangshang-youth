@@ -33,6 +33,11 @@ import { handleNotificationRoutes } from './routes/notifications.js';
 import { handlePrivacyRoutes } from './routes/privacy.js';
 import { handleMessageRoutes } from './routes/messages.js';
 import { handleSupportRoutes } from './routes/support.js';
+import { handleProductEventRoutes } from './routes/productEvents.js';
+import { handleContentOperationRoutes } from './routes/contentOperations.js';
+import { handleTeacherTaskRoutes } from './routes/teacherTasks.js';
+import { handleFieldDeviceRoutes } from './routes/fieldDevice.js';
+import { handleFieldAdminRoutes } from './routes/fieldAdmin.js';
 
 const { port, isProduction, accessTokenTtlMinutes, refreshTokenTtlDays, maxSessionsPerUser, mfaEncryptionKey, verificationCodePepper, requireMfaForPrivileged, auditLogSigningKey, requireHealthConsent, healthRetentionDays, allowPublicRegistration, smsWebhookUrl, smsWebhookAuthorization, wechatAppId, wechatAppSecret, wechatRedirectUri, oauthStateTtlSeconds, corsOrigin, trustProxy, metricsToken, jobWorkerEnabled, jobWorkerMode, jobWorkerIntervalMs, jobWorkerShutdownTimeoutMs, fieldDeviceKeyTtlDays, fieldDeviceSigningEncryptionKey, fieldDeviceSignedRequestsRequired, fieldDeviceSignatureMaxAgeSeconds, fieldEvidenceVideoRetentionDays, fieldEvidenceDerivedRetentionDays, workerHeartbeatMaxAgeSeconds, backupEnabled, backupIntervalSeconds, backupHeartbeatMaxAgeSeconds } = config;
 assertServerRuntimeConfig();
@@ -1645,7 +1650,7 @@ async function handle(req, res) {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(html);
     }
-    if (req.method === 'GET' && ['/admin.css', '/admin.js', '/admin-enhancements.js'].includes(url.pathname)) {
+    if (req.method === 'GET' && ['/admin.css', '/admin.js', '/admin-enhancements.js', '/content-operations.css', '/content-operations.js'].includes(url.pathname)) {
       const assetName = url.pathname.slice(1);
       const asset = await fs.readFile(new URL(`../public/${assetName}`, import.meta.url));
       const contentType = assetName.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/javascript; charset=utf-8';
@@ -1908,128 +1913,15 @@ async function handle(req, res) {
       return ok(res, { ...(await issueAuthSession(account, req, res)), mfaEnrollmentCompleted: true, recoveryCodes });
     }
 
-    // The Windows field client deliberately uses a device credential instead
-    // of an operator access token.  It stays usable when teachers are busy or
-    // the network reconnects later, while each write remains attributable to
-    // one registered edge host.
-    if (url.pathname.startsWith('/v1/field/')) {
-      const device = await currentFieldDevice(req);
-      if (!device) return fail(res, 401, 'FIELD_DEVICE_UNAUTHORIZED', '场地设备身份无效、已停用或已过期');
-      if (req.method === 'POST' && url.pathname === '/v1/field/heartbeat') {
-        const input = await body(req);
-        const health = fieldObject(input.health);
-        const capabilities = fieldObject(input.capabilities);
-        const updated = await query(`UPDATE test_devices SET status='online',software_version=$1,health_json=$2,
-          capabilities_json=CASE WHEN $3::jsonb='{}'::jsonb THEN capabilities_json ELSE $3::jsonb END,last_heartbeat_at=now(),updated_at=now()
-          WHERE id=$4 RETURNING id,status,software_version AS "softwareVersion",last_heartbeat_at AS "lastHeartbeatAt"`,
-        [String(input.softwareVersion || device.software_version || '').slice(0, 120), health, capabilities, device.id]);
-        // A display, speaker or card reader heartbeat cannot make a testing
-        // station eligible. Only its registered edge host controls the online
-        // state used by the formal-score gate.
-        if (device.station_id && device.device_type === 'edge_host') await query(`UPDATE test_stations SET status=CASE WHEN status='disabled' THEN status ELSE 'online' END,last_seen_at=now(),updated_at=now() WHERE id=$1`, [device.station_id]);
-        void publishFieldUpdate(device.school_id, 'device.heartbeat', { deviceId: device.id, stationId: device.station_id || null, status: 'online', health });
-        return ok(res, { ...updated.rows[0], serverTime: new Date().toISOString() });
-      }
-      if (req.method === 'GET' && url.pathname === '/v1/field/bootstrap') return ok(res, await fieldBootstrap(device, queryValue(url, 'taskId')));
-      if (req.method === 'GET' && url.pathname === '/v1/field/commands') {
-        const commands = await query(`UPDATE device_commands SET status='delivered'
-          WHERE device_id=$1 AND status='pending' AND (expires_at IS NULL OR expires_at>now())
-          RETURNING id,command_type AS "commandType",payload_json AS payload,status,created_at AS "createdAt",expires_at AS "expiresAt"`, [device.id]);
-        const delivered = await query(`SELECT id,command_type AS "commandType",payload_json AS payload,status,created_at AS "createdAt",expires_at AS "expiresAt"
-          FROM device_commands WHERE device_id=$1 AND status='delivered' AND (expires_at IS NULL OR expires_at>now()) ORDER BY created_at LIMIT 50`, [device.id]);
-        return ok(res, { commands: [...commands.rows, ...delivered.rows.filter((row) => !commands.rows.some((item) => item.id === row.id))] });
-      }
-      if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'field' && parts[2] === 'commands' && parts[3] && parts[4] === 'ack') {
-        const input = await body(req);
-        const acknowledged = await query(`UPDATE device_commands SET status=$1,acknowledged_at=now()
-          WHERE id=$2 AND device_id=$3 AND status IN ('pending','delivered')
-          RETURNING id,command_type AS "commandType",status,acknowledged_at AS "acknowledgedAt"`,
-        [input.failed === true ? 'failed' : 'acknowledged', parts[3], device.id]);
-        if (!acknowledged.rows[0]) return fail(res, 404, 'FIELD_COMMAND_NOT_FOUND', '设备指令不存在或已处理');
-        return ok(res, acknowledged.rows[0]);
-      }
-      if (req.method === 'POST' && url.pathname === '/v1/field/files/presign') {
-        const input = await body(req);
-        const name = safeFileName(input.fileName || input.name || 'evidence.bin');
-        const contentType = String(input.contentType || 'application/octet-stream');
-        const fileSize = Number(input.fileSize || 0);
-        if (!allowedContentTypes.has(contentType)) return fail(res, 400, 'FILE_TYPE_NOT_ALLOWED', '证据文件类型不受支持');
-        if (!Number.isInteger(fileSize) || fileSize < 0 || fileSize > maxUploadBytes) return fail(res, 400, 'FILE_SIZE_INVALID', '证据文件大小不合法或超过 20MB');
-        const fileId = crypto.randomUUID();
-        const result = await query(`INSERT INTO files(id,owner_id,object_key,file_type,purpose,content_type,file_size,expires_at)
-          VALUES($1,NULL,$2,$3,'field_evidence',$4,$5,now()+interval '30 minutes')
-          RETURNING id,object_key AS "objectKey",content_type AS "contentType",status,expires_at AS "expiresAt"`,
-        [fileId, `field/${device.id}/${fileId}-${name}`, path.extname(name).slice(1) || 'bin', contentType, fileSize]);
-        return created(res, { ...result.rows[0], uploadUrl: `/v1/field/files/${fileId}/content` });
-      }
-      if (req.method === 'PUT' && parts[0] === 'v1' && parts[1] === 'field' && parts[2] === 'files' && parts[4] === 'content') {
-        const fileResult = await query(`SELECT * FROM files WHERE id=$1 AND purpose='field_evidence' AND object_key LIKE $2`, [parts[3], `field/${device.id}/%`]);
-        const file = fileResult.rows[0];
-        if (!file) return fail(res, 404, 'FILE_NOT_FOUND', '证据文件不存在或不属于本设备');
-        if (file.status !== 'pending') return fail(res, 409, 'FILE_UPLOAD_STATE_INVALID', '证据文件已上传或正在清理，不能重复写入');
-        if (file.expires_at && new Date(file.expires_at) < new Date()) return fail(res, 410, 'FILE_UPLOAD_EXPIRED', '证据上传凭证已过期');
-        const bytes = await rawBody(req);
-        if (bytes.length > maxUploadBytes || (Number(file.file_size) > 0 && bytes.length > Number(file.file_size))) return fail(res, 413, 'FILE_SIZE_INVALID', '实际文件大小超过限制');
-        if (!fileSignatureMatches(bytes, file.content_type)) return fail(res, 400, 'FILE_SIGNATURE_INVALID', '文件内容与声明类型不匹配');
-        await storage.put(file.object_key, bytes, file.content_type);
-        const uploaded = await query(`UPDATE files SET file_size=$1,checksum_sha256=$2,status='uploaded',uploaded_at=now() WHERE id=$3
-          RETURNING id,file_size AS "fileSize",checksum_sha256 AS "checksumSha256",status,uploaded_at AS "uploadedAt"`, [bytes.length, sha256(bytes), file.id]);
-        return ok(res, uploaded.rows[0]);
-      }
-      if (req.method === 'POST' && url.pathname === '/v1/field/queue/transition') return ok(res, await transitionFieldQueue(device, await body(req), { type: 'device', id: device.id }));
-      if (req.method === 'POST' && url.pathname === '/v1/field/sessions') return created(res, await openFieldSession(device, await body(req)));
-      if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'field' && parts[2] === 'sessions' && parts[3] && parts[4] === 'events') {
-        const input = await body(req);
-        return accepted(res, await appendFieldSessionEvents(device, parts[3], input.events));
-      }
-      if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'field' && parts[2] === 'sessions' && parts[3] && parts[4] === 'complete') return ok(res, await completeFieldSession(device, parts[3], await body(req)));
-      if (req.method === 'POST' && url.pathname === '/v1/field/sync/batches') {
-        const input = await body(req);
-        const clientBatchId = fieldInputString(input.clientBatchId, '客户端批次 ID');
-        const events = Array.isArray(input.events) ? input.events : [];
-        if (!events.length || events.length > 200) return fail(res, 400, 'FIELD_BATCH_INVALID', '同步批次事件数量必须在 1 到 200 条之间');
-        const existing = await query(`SELECT status,response_json AS response,received_at AS "receivedAt" FROM field_sync_batches WHERE device_id=$1 AND client_batch_id=$2`, [device.id, clientBatchId]);
-        if (existing.rows[0]?.status === 'completed') return ok(res, { ...existing.rows[0].response, idempotent: true });
-        if (existing.rows[0]?.status === 'processing' && Date.now() - new Date(existing.rows[0].receivedAt).getTime() < 5 * 60_000) return fail(res, 409, 'FIELD_BATCH_IN_PROGRESS', '同步批次正在处理中，请稍后重试');
-        await query(`INSERT INTO field_sync_batches(device_id,client_batch_id,event_count,status) VALUES($1,$2,$3,'processing')
-          ON CONFLICT(device_id,client_batch_id) DO UPDATE SET event_count=EXCLUDED.event_count,status='processing',received_at=now(),response_json='{}'::jsonb`, [device.id, clientBatchId, events.length]);
-        const outcomes = [];
-        try {
-          for (const event of events) {
-            const clientEventId = fieldInputString(event?.clientEventId, '客户端事件 ID');
-            const eventType = fieldInputString(event?.eventType, '同步事件类型', 64);
-            const payload = fieldObject(event?.payload);
-            const payloadHash = requestBodyHash(payload);
-            const replay = await query('SELECT event_type AS "eventType",payload_hash AS "payloadHash" FROM field_sync_events WHERE device_id=$1 AND client_event_id=$2', [device.id, clientEventId]);
-            if (replay.rows[0]) {
-              if (replay.rows[0].eventType !== eventType || replay.rows[0].payloadHash !== payloadHash) {
-                recordMetric('xiangshang_field_sync_conflicts_total', { reason: 'replay_mismatch' });
-                logger.warn('field.sync_replay_mismatch', { deviceId: device.id, clientEventId, eventType, originalEventType: replay.rows[0].eventType, requestId: requestId(req) });
-                throw Object.assign(new Error('客户端事件 ID 与已接收内容不一致，已拒绝覆盖中央记录'), { status: 409, code: 'FIELD_EVENT_REPLAY_MISMATCH' });
-              }
-              outcomes.push({ clientEventId, eventType, replayed: true });
-              continue;
-            }
-            let data;
-            if (eventType === 'queue.transition') data = await transitionFieldQueue(device, { ...payload, clientEventId, happenedAt: event.happenedAt }, { type: 'device', id: device.id });
-            else if (eventType === 'session.open') data = await openFieldSession(device, payload);
-            else if (eventType === 'session.events') data = await appendFieldSessionEvents(device, fieldInputString(payload.sessionId, '会话 ID'), payload.events);
-            else if (eventType === 'session.complete') data = await completeFieldSession(device, fieldInputString(payload.sessionId, '会话 ID'), payload);
-            else throw Object.assign(new Error('同步事件类型不受支持'), { status: 400, code: 'FIELD_SYNC_EVENT_UNSUPPORTED' });
-            await query(`INSERT INTO field_sync_events(device_id,client_event_id,event_type,session_id,happened_at,payload_hash)
-              VALUES($1,$2,$3,$4,$5,$6)`, [device.id, clientEventId, eventType, data?.id || payload.sessionId || null, fieldIsoDate(event?.happenedAt), payloadHash]);
-            outcomes.push({ clientEventId, eventType, data });
-          }
-          const response = { clientBatchId, accepted: outcomes.length, outcomes };
-          await query(`UPDATE field_sync_batches SET status='completed',response_json=$1,completed_at=now() WHERE device_id=$2 AND client_batch_id=$3`, [response, device.id, clientBatchId]);
-          return ok(res, response);
-        } catch (error) {
-          await query(`UPDATE field_sync_batches SET status='failed',response_json=$1,completed_at=now() WHERE device_id=$2 AND client_batch_id=$3`, [{ code: error.code || 'FIELD_SYNC_FAILED', message: error.message }, device.id, clientBatchId]);
-          throw error;
-        }
-      }
-      return fail(res, 404, 'FIELD_ROUTE_NOT_FOUND', '场地端接口不存在');
-    }
+    const fieldDeviceResult = await handleFieldDeviceRoutes({
+      req, res, url, parts, currentFieldDevice, fail, body, fieldObject, query,
+      publishFieldUpdate, ok, fieldBootstrap, queryValue, safeFileName,
+      allowedContentTypes, maxUploadBytes, crypto, path, created, rawBody,
+      fileSignatureMatches, storage, sha256, transitionFieldQueue,
+      openFieldSession, appendFieldSessionEvents, accepted, completeFieldSession,
+      fieldInputString, requestBodyHash, recordMetric, logger, requestId, fieldIsoDate
+    });
+    if (fieldDeviceResult !== false) return fieldDeviceResult;
 
     const user = await requireUser(req, res);
     if (!user) return;
@@ -2123,228 +2015,17 @@ async function handle(req, res) {
         return ok(res, { enabled: false });
       } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
     }
-    if (req.method === 'GET' && url.pathname === '/v1/admin/field/stream') {
-      if (!hasRole(user, 'admin', 'principal', 'teacher')) return fail(res, 403, 'NO_PERMISSION', '无权订阅场地实时状态');
-      const schoolId = fieldInputString(queryValue(url, 'schoolId'), '学校 ID');
-      if (!schoolAllowed(user, schoolId)) return fail(res, 403, 'NO_PERMISSION', '无权订阅该学校场地状态');
-      res.writeHead(200, {
-        'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive',
-        ...(corsOrigin ? { 'Access-Control-Allow-Origin': corsOrigin } : {})
-      });
-      res.write(': field realtime connected\n\n');
-      const subscribers = fieldStreamSubscribers.get(schoolId) || new Set();
-      subscribers.add(res); fieldStreamSubscribers.set(schoolId, subscribers);
-      writeFieldStream(res, 'ready', { schoolId, at: new Date().toISOString() });
-      const heartbeat = setInterval(() => res.write(': keepalive\n\n'), 25_000);
-      req.once('close', () => {
-        clearInterval(heartbeat); subscribers.delete(res);
-        if (!subscribers.size) fieldStreamSubscribers.delete(schoolId);
-      });
-      return;
-    }
-    if (req.method === 'GET' && url.pathname === '/v1/admin/test-stations') {
-      if (!hasRole(user, 'admin', 'principal', 'teacher')) return fail(res, 403, 'NO_PERMISSION', '无权查看场地测试点');
-      const schoolId = queryValue(url, 'schoolId');
-      if (!schoolId || !schoolAllowed(user, schoolId)) return fail(res, 403, 'NO_PERMISSION', '无权查看该学校场地测试点');
-      const stations = await query(`SELECT s.id,s.school_id AS "schoolId",s.station_code AS "stationCode",s.name,s.item_code AS "itemCode",s.queue_capacity AS "queueCapacity",s.status,
-        s.metadata_json AS metadata,s.last_seen_at AS "lastSeenAt",s.updated_at AS "updatedAt",cal.version AS "activeCalibrationVersion",cal.effective_at AS "calibrationEffectiveAt",COUNT(d.id)::int AS "deviceCount",
-        COUNT(d.id) FILTER(WHERE d.status='online')::int AS "onlineDeviceCount"
-        FROM test_stations s LEFT JOIN test_devices d ON d.station_id=s.id
-        LEFT JOIN LATERAL (SELECT version,effective_at FROM station_calibrations WHERE station_id=s.id AND status='active' ORDER BY effective_at DESC LIMIT 1) cal ON TRUE
-        WHERE s.school_id=$1 GROUP BY s.id,cal.version,cal.effective_at ORDER BY s.station_code`, [schoolId]);
-      return ok(res, stations.rows);
-    }
-    if (req.method === 'POST' && url.pathname === '/v1/admin/test-stations') {
-      if (!hasRole(user, 'admin', 'principal')) return fail(res, 403, 'NO_PERMISSION', '无权创建场地测试点');
-      const input = await body(req);
-      const schoolId = fieldInputString(input.schoolId, '学校 ID');
-      if (!schoolAllowed(user, schoolId)) return fail(res, 403, 'NO_PERMISSION', '无权操作该学校');
-      const stationCode = fieldInputString(input.stationCode, '测试点编码', 64);
-      const name = fieldInputString(input.name, '测试点名称', 120);
-      const queueCapacity = input.queueCapacity == null ? 20 : Number(input.queueCapacity);
-      if (!Number.isInteger(queueCapacity) || queueCapacity < 1 || queueCapacity > 500) return fail(res, 400, 'FIELD_STATION_INVALID', '队列容量必须在 1 到 500 之间');
-      const status = input.status == null ? 'offline' : String(input.status);
-      if (!['online', 'offline', 'maintenance', 'paused', 'disabled'].includes(status)) return fail(res, 400, 'FIELD_STATION_INVALID', '测试点状态不合法');
-      const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash(input));
-      if (idempotency === false) return;
-      const station = await query(`INSERT INTO test_stations(school_id,station_code,name,item_code,queue_capacity,status,metadata_json)
-        VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id,school_id AS "schoolId",station_code AS "stationCode",name,item_code AS "itemCode",queue_capacity AS "queueCapacity",status,metadata_json AS metadata`,
-      [schoolId, stationCode, name, String(input.itemCode || '').slice(0, 64) || null, queueCapacity, status, fieldObject(input.metadata)]);
-      await audit(user, req, 'field.station.create', 'test_station', station.rows[0].id, null, station.rows[0], schoolId);
-      return createdIdempotently(res, user, idempotency, station.rows[0]);
-    }
-    if (req.method === 'PATCH' && parts[0] === 'v1' && parts[1] === 'admin' && parts[2] === 'test-stations' && parts[3]) {
-      if (!hasRole(user, 'admin', 'principal')) return fail(res, 403, 'NO_PERMISSION', '无权修改场地测试点');
-      const input = await body(req);
-      const existing = await query('SELECT * FROM test_stations WHERE id=$1', [parts[3]]);
-      const row = existing.rows[0];
-      if (!row || !schoolAllowed(user, row.school_id)) return fail(res, 404, 'FIELD_STATION_NOT_FOUND', '场地测试点不存在或无权访问');
-      const status = input.status == null ? row.status : String(input.status);
-      if (!['online', 'offline', 'maintenance', 'paused', 'disabled'].includes(status)) return fail(res, 400, 'FIELD_STATION_INVALID', '测试点状态不合法');
-      const queueCapacity = input.queueCapacity == null ? Number(row.queue_capacity) : Number(input.queueCapacity);
-      if (!Number.isInteger(queueCapacity) || queueCapacity < 1 || queueCapacity > 500) return fail(res, 400, 'FIELD_STATION_INVALID', '队列容量必须在 1 到 500 之间');
-      const updated = await query(`UPDATE test_stations SET name=$1,item_code=$2,queue_capacity=$3,status=$4,metadata_json=$5,updated_at=now() WHERE id=$6
-        RETURNING id,school_id AS "schoolId",station_code AS "stationCode",name,item_code AS "itemCode",queue_capacity AS "queueCapacity",status,metadata_json AS metadata,updated_at AS "updatedAt"`,
-      [input.name == null ? row.name : fieldInputString(input.name, '测试点名称', 120), input.itemCode == null ? row.item_code : (String(input.itemCode).slice(0, 64) || null), queueCapacity, status, input.metadata == null ? row.metadata_json : fieldObject(input.metadata), row.id]);
-      await audit(user, req, 'field.station.update', 'test_station', row.id, row, updated.rows[0], row.school_id);
-      return ok(res, updated.rows[0]);
-    }
-    if (req.method === 'GET' && url.pathname === '/v1/admin/test-devices') {
-      if (!hasRole(user, 'admin', 'principal', 'teacher')) return fail(res, 403, 'NO_PERMISSION', '无权查看场地设备');
-      const schoolId = queryValue(url, 'schoolId');
-      if (!schoolId || !schoolAllowed(user, schoolId)) return fail(res, 403, 'NO_PERMISSION', '无权查看该学校场地设备');
-      const devices = await query(`SELECT d.id,d.school_id AS "schoolId",d.station_id AS "stationId",s.station_code AS "stationCode",s.status AS "stationStatus",d.device_code AS "deviceCode",d.name,d.device_type AS "deviceType",
-        d.serial_number AS "serialNumber",d.software_version AS "softwareVersion",d.status,d.capabilities_json AS capabilities,d.health_json AS health,
-        d.last_heartbeat_at AS "lastHeartbeatAt",d.api_key_expires_at AS "apiKeyExpiresAt",(d.signing_secret_encrypted IS NOT NULL) AS "signedRequestReady",
-        cal.version AS "activeCalibrationVersion",cal."checksumSha256" AS "activeCalibrationChecksumSha256",
-        CASE WHEN d.signing_secret_encrypted IS NULL THEN 'rotation_required' WHEN d.api_key_expires_at IS NULL THEN 'legacy_unbounded' WHEN d.api_key_expires_at<=now() THEN 'expired'
-          WHEN d.api_key_expires_at<=now()+interval '14 days' THEN 'expiring' ELSE 'valid' END AS "apiKeyStatus",d.updated_at AS "updatedAt"
-        FROM test_devices d LEFT JOIN test_stations s ON s.id=d.station_id
-        LEFT JOIN LATERAL (SELECT version,checksum_sha256 AS "checksumSha256" FROM station_calibrations WHERE station_id=s.id AND status='active' ORDER BY effective_at DESC LIMIT 1) cal ON TRUE
-        WHERE d.school_id=$1 ORDER BY d.device_code`, [schoolId]);
-      return ok(res, devices.rows.map((device) => ({
-        ...device,
-        readiness: fieldReadiness({ ...device, health_json: device.health }, device.stationId ? { id: device.stationId, status: device.stationStatus } : null, device.activeCalibrationVersion ? { version: device.activeCalibrationVersion, checksumSha256: device.activeCalibrationChecksumSha256 } : null)
-      })));
-    }
-    if (req.method === 'POST' && url.pathname === '/v1/admin/test-devices') {
-      if (!hasRole(user, 'admin', 'principal')) return fail(res, 403, 'NO_PERMISSION', '无权注册场地设备');
-      const input = await body(req);
-      const schoolId = fieldInputString(input.schoolId, '学校 ID');
-      if (!schoolAllowed(user, schoolId)) return fail(res, 403, 'NO_PERMISSION', '无权操作该学校');
-      const deviceType = fieldInputString(input.deviceType, '设备类型', 32);
-      if (!['edge_host', 'depth_camera', 'rgb_camera', 'display', 'speaker', 'reader', 'ups', 'network'].includes(deviceType)) return fail(res, 400, 'FIELD_DEVICE_INVALID', '设备类型不合法');
-      const stationId = input.stationId ? fieldInputString(input.stationId, '测试点 ID') : null;
-      if (stationId) {
-        const station = await query('SELECT id FROM test_stations WHERE id=$1 AND school_id=$2', [stationId, schoolId]);
-        if (!station.rows[0]) return fail(res, 400, 'FIELD_STATION_NOT_FOUND', '测试点不存在或不属于该学校');
-      }
-      const deviceKey = randomToken();
-      const device = await query(`INSERT INTO test_devices(school_id,station_id,device_code,name,device_type,serial_number,software_version,api_key_hash,signing_secret_encrypted,api_key_expires_at,status,capabilities_json)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'offline',$11)
-        RETURNING id,school_id AS "schoolId",station_id AS "stationId",device_code AS "deviceCode",name,device_type AS "deviceType",status,api_key_expires_at AS "apiKeyExpiresAt"`,
-      [schoolId, stationId, fieldInputString(input.deviceCode, '设备编码', 64), fieldInputString(input.name, '设备名称', 120), deviceType, String(input.serialNumber || '').slice(0, 120) || null, String(input.softwareVersion || '').slice(0, 120), sha256(deviceKey), encryptFieldDeviceSigningSecret(deviceKey, fieldDeviceSigningEncryptionKey), fieldDeviceKeyExpiresAt(input.apiKeyExpiresAt), fieldObject(input.capabilities)]);
-      await audit(user, req, 'field.device.create', 'test_device', device.rows[0].id, null, { ...device.rows[0], apiKeyIssued: true }, schoolId);
-      return created(res, { ...device.rows[0], deviceKey });
-    }
-    if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'admin' && parts[2] === 'test-devices' && parts[3] && parts[4] === 'rotate-key') {
-      if (!hasRole(user, 'admin', 'principal')) return fail(res, 403, 'NO_PERMISSION', '无权轮换设备密钥');
-      const input = await body(req);
-      const row = await query('SELECT * FROM test_devices WHERE id=$1', [parts[3]]);
-      if (!row.rows[0] || !schoolAllowed(user, row.rows[0].school_id)) return fail(res, 404, 'FIELD_DEVICE_NOT_FOUND', '场地设备不存在或无权访问');
-      const deviceKey = randomToken();
-      const result = await query(`UPDATE test_devices SET api_key_hash=$1,signing_secret_encrypted=$2,api_key_expires_at=$3,status='offline',updated_at=now() WHERE id=$4
-        RETURNING id,device_code AS "deviceCode",status,api_key_expires_at AS "apiKeyExpiresAt"`, [sha256(deviceKey), encryptFieldDeviceSigningSecret(deviceKey, fieldDeviceSigningEncryptionKey), fieldDeviceKeyExpiresAt(input.apiKeyExpiresAt), parts[3]]);
-      await audit(user, req, 'field.device.rotate_key', 'test_device', parts[3], null, { deviceKeyRotated: true }, row.rows[0].school_id);
-      return ok(res, { ...result.rows[0], deviceKey });
-    }
-    if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'admin' && parts[2] === 'test-stations' && parts[3] && parts[4] === 'calibrations') {
-      if (!hasRole(user, 'admin', 'principal')) return fail(res, 403, 'NO_PERMISSION', '无权维护标定配置');
-      const input = await body(req);
-      const station = await query('SELECT * FROM test_stations WHERE id=$1', [parts[3]]);
-      if (!station.rows[0] || !schoolAllowed(user, station.rows[0].school_id)) return fail(res, 404, 'FIELD_STATION_NOT_FOUND', '场地测试点不存在或无权访问');
-      const version = fieldInputString(input.version, '标定版本', 64);
-      const checksum = fieldInputString(input.checksumSha256, '标定校验和', 128);
-      if (!/^[a-f0-9]{64}$/i.test(checksum)) return fail(res, 400, 'FIELD_CALIBRATION_INVALID', '标定校验和必须是 64 位 SHA-256 十六进制值');
-      const calibrationConfig = fieldObject(input.config);
-      if (!Object.keys(calibrationConfig).length) return fail(res, 400, 'FIELD_CALIBRATION_INVALID', '标定配置不能为空');
-      const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ stationId: parts[3], ...input }));
-      if (idempotency === false) return;
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
-        if (input.activate !== false) await client.query(`UPDATE station_calibrations SET status='archived' WHERE station_id=$1 AND status='active'`, [station.rows[0].id]);
-        const calibration = await client.query(`INSERT INTO station_calibrations(station_id,version,checksum_sha256,config_json,status,verified_by,verified_at,effective_at)
-          VALUES($1,$2,$3,$4,$5,$6,CASE WHEN $5='active' THEN now() ELSE NULL END,now())
-          RETURNING id,station_id AS "stationId",version,checksum_sha256 AS "checksumSha256",config_json AS config,status,effective_at AS "effectiveAt"`,
-        [station.rows[0].id, version, checksum, calibrationConfig, input.activate === false ? 'draft' : 'active', user.id]);
-        await client.query('COMMIT');
-        await audit(user, req, 'field.calibration.create', 'station_calibration', calibration.rows[0].id, null, calibration.rows[0], station.rows[0].school_id);
-        return createdIdempotently(res, user, idempotency, calibration.rows[0]);
-      } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
-    }
-    if (req.method === 'GET' && url.pathname === '/v1/admin/test-sessions') {
-      if (!hasRole(user, 'admin', 'principal', 'teacher')) return fail(res, 403, 'NO_PERMISSION', '无权查看场地测试会话');
-      const schoolId = queryValue(url, 'schoolId');
-      if (!schoolId || !schoolAllowed(user, schoolId)) return fail(res, 403, 'NO_PERMISSION', '无权查看该学校测试会话');
-      const page = pagination(url);
-      const scopedClasses = teacherOnly(user) ? teacherClassIds(user, schoolId) : null;
-      const sessions = await query(`SELECT s.id,s.client_session_id AS "clientSessionId",s.task_id AS "taskId",t.title AS "taskTitle",s.student_id AS "studentId",st.name AS "studentName",
-        s.station_id AS "stationId",station.station_code AS "stationCode",s.edge_device_id AS "deviceId",device.device_code AS "deviceCode",s.attempt_no AS "attemptNo",s.status,
-        s.rule_version AS "ruleVersion",s.standard_id AS "standardId",s.standard_version AS "standardVersion",s.calibration_version AS "calibrationVersion",s.algorithm_version AS "algorithmVersion",s.started_at AS "startedAt",s.ended_at AS "endedAt",s.summary_json AS summary
-        FROM test_sessions s JOIN assessment_tasks t ON t.id=s.task_id JOIN students st ON st.id=s.student_id LEFT JOIN test_stations station ON station.id=s.station_id
-        LEFT JOIN test_devices device ON device.id=s.edge_device_id WHERE s.school_id=$1 AND ($2::text IS NULL OR s.task_id=$2) AND ($3::text IS NULL OR s.station_id=$3) AND ($4::text IS NULL OR s.status=$4)
-        AND ($5::text[] IS NULL OR st.class_id=ANY($5)) ORDER BY s.created_at DESC LIMIT $6 OFFSET $7`, [schoolId, queryValue(url, 'taskId') || null, queryValue(url, 'stationId') || null, queryValue(url, 'status') || null, scopedClasses, page.pageSize, page.offset]);
-      return ok(res, sessions.rows);
-    }
-    if (req.method === 'GET' && parts[0] === 'v1' && parts[1] === 'admin' && parts[2] === 'test-sessions' && parts[3]) {
-      if (!hasRole(user, 'admin', 'principal', 'teacher')) return fail(res, 403, 'NO_PERMISSION', '无权查看场地测试会话');
-      const session = await query(`SELECT s.*,s.standard_id AS "standardId",s.standard_version AS "standardVersion",s.standard_snapshot_json AS "standardSnapshot",st.name AS "studentName",st.class_id,t.title AS "taskTitle",station.station_code AS "stationCode",device.device_code AS "deviceCode"
-        FROM test_sessions s JOIN students st ON st.id=s.student_id JOIN assessment_tasks t ON t.id=s.task_id LEFT JOIN test_stations station ON station.id=s.station_id
-        LEFT JOIN test_devices device ON device.id=s.edge_device_id WHERE s.id=$1`, [parts[3]]);
-      if (!session.rows[0] || !schoolAllowed(user, session.rows[0].school_id)) return fail(res, 404, 'FIELD_SESSION_NOT_FOUND', '测试会话不存在或无权访问');
-      if (teacherOnly(user) && !teacherClassIds(user, session.rows[0].school_id).includes(session.rows[0].class_id)) return fail(res, 404, 'FIELD_SESSION_NOT_FOUND', '测试会话不存在或无权访问');
-      const [events, evidence, scores] = await Promise.all([
-        query(`SELECT client_event_id AS "clientEventId",sequence_no AS "sequenceNo",event_type AS "eventType",happened_at AS "happenedAt",payload_json AS payload FROM session_action_events WHERE session_id=$1 ORDER BY sequence_no`, [parts[3]]),
-        query(`SELECT e.id,e.evidence_type AS "evidenceType",e.ordinal,e.checksum_sha256 AS "checksumSha256",e.metadata_json AS metadata,e.file_id AS "fileId",e.retention_until AS "retentionUntil",e.purged_at AS "purgedAt",e.purge_reason AS "purgeReason",f.content_type AS "contentType",f.file_size AS "fileSize" FROM session_evidence e LEFT JOIN files f ON f.id=e.file_id WHERE e.session_id=$1 ORDER BY e.evidence_type,e.ordinal`, [parts[3]]),
-        query(`SELECT id,item_code AS item,score,confidence,review_status AS "reviewStatus",note,source,algorithm_version AS "algorithmVersion" FROM assessment_scores WHERE session_id=$1 ORDER BY item_code`, [parts[3]])
-      ]);
-      return ok(res, { ...session.rows[0], events: events.rows, evidence: evidence.rows, scores: normalizeScoreRows(scores.rows) });
-    }
-    if (req.method === 'GET' && url.pathname === '/v1/admin/test-queues') {
-      if (!hasRole(user, 'admin', 'principal', 'teacher')) return fail(res, 403, 'NO_PERMISSION', '无权查看场地排队');
-      const taskId = fieldInputString(queryValue(url, 'taskId'), '任务 ID');
-      const task = await query('SELECT school_id FROM assessment_tasks WHERE id=$1', [taskId]);
-      if (!task.rows[0] || !schoolAllowed(user, task.rows[0].school_id)) return fail(res, 404, 'FIELD_TASK_NOT_FOUND', '测评任务不存在或无权访问');
-      const scopedClasses = teacherOnly(user) ? teacherClassIds(user, task.rows[0].school_id) : null;
-      const queues = await query(`SELECT q.id,q.student_id AS "studentId",st.name AS "studentName",c.name AS "className",q.station_id AS "stationId",station.station_code AS "stationCode",q.status,q.priority,q.queue_order AS "queueOrder",q.retest_count AS "retestCount",q.state_version AS "stateVersion",q.note,q.updated_at AS "updatedAt"
-        FROM test_queue_entries q JOIN students st ON st.id=q.student_id JOIN classes c ON c.id=st.class_id LEFT JOIN test_stations station ON station.id=q.station_id
-        WHERE q.task_id=$1 AND ($2::text IS NULL OR q.station_id=$2) AND ($3::text[] IS NULL OR st.class_id=ANY($3)) ORDER BY q.priority DESC,q.queue_order`, [taskId, queryValue(url, 'stationId') || null, scopedClasses]);
-      return ok(res, queues.rows);
-    }
-    if (req.method === 'POST' && url.pathname === '/v1/admin/test-queues/rebalance') {
-      if (!hasRole(user, 'admin', 'principal')) return fail(res, 403, 'NO_PERMISSION', '只有管理员或校长可以重新分流场地队列');
-      const input = await body(req);
-      const taskId = fieldInputString(input.taskId, '任务 ID');
-      const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ action: 'field.queue.rebalance', taskId }));
-      if (idempotency === false) return;
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
-        const task = await client.query(`SELECT * FROM assessment_tasks WHERE id=$1 FOR UPDATE`, [taskId]);
-        const row = task.rows[0];
-        if (!row || !schoolAllowed(user, row.school_id)) throw Object.assign(new Error('测评任务不存在或无权操作'), { status: 404, code: 'FIELD_TASK_NOT_FOUND' });
-        if (row.status !== 'published') throw Object.assign(new Error('只有已发布的任务可以分流'), { status: 409, code: 'FIELD_TASK_INACTIVE' });
-        const dispatch = await rebalanceFieldQueue(client, row);
-        await client.query('COMMIT');
-        await audit(user, req, 'field.queue.rebalance', 'assessment_task', row.id, null, dispatch, row.school_id);
-        void publishFieldUpdate(row.school_id, 'queue.rebalanced', { taskId: row.id, ...dispatch });
-        return okIdempotently(res, user, idempotency, dispatch);
-      } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
-    }
-    if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'admin' && parts[2] === 'test-queues' && parts[3] && parts[4] === 'transition') {
-      if (!hasRole(user, 'admin', 'principal', 'teacher')) return fail(res, 403, 'NO_PERMISSION', '无权调度场地队列');
-      const input = await body(req);
-      const queueSchool = await query(`SELECT t.school_id,st.class_id FROM test_queue_entries q JOIN assessment_tasks t ON t.id=q.task_id JOIN students st ON st.id=q.student_id WHERE q.id=$1`, [parts[3]]);
-      if (!queueSchool.rows[0] || !schoolAllowed(user, queueSchool.rows[0].school_id)) return fail(res, 404, 'FIELD_QUEUE_NOT_FOUND', '队列记录不存在或无权访问');
-      if (teacherOnly(user) && !teacherClassIds(user, queueSchool.rows[0].school_id).includes(queueSchool.rows[0].class_id)) return fail(res, 403, 'NO_PERMISSION', '教师只能调度所负责班级');
-      return ok(res, await transitionFieldQueue({ school_id: queueSchool.rows[0].school_id, station_id: input.stationId || null }, { ...input, queueEntryId: parts[3] }, { type: hasRole(user, 'admin', 'principal') ? 'admin' : 'teacher', id: user.id }));
-    }
-    if (req.method === 'POST' && url.pathname === '/v1/admin/device-commands') {
-      if (!hasRole(user, 'admin', 'principal')) return fail(res, 403, 'NO_PERMISSION', '只有管理员或校长可以下发设备级指令');
-      const input = await body(req);
-      const deviceId = fieldInputString(input.deviceId, '设备 ID');
-      const device = await query('SELECT * FROM test_devices WHERE id=$1', [deviceId]);
-      if (!device.rows[0] || !schoolAllowed(user, device.rows[0].school_id)) return fail(res, 404, 'FIELD_DEVICE_NOT_FOUND', '场地设备不存在或无权访问');
-      const commandType = fieldInputString(input.commandType, '指令类型', 32);
-      if (!['pause', 'resume', 'stop', 'call_next', 'recall', 'skip', 'retest', 'refresh_config'].includes(commandType)) return fail(res, 400, 'FIELD_COMMAND_INVALID', '场地指令不合法');
-      const command = await query(`INSERT INTO device_commands(school_id,station_id,device_id,command_type,payload_json,issued_by,expires_at)
-        VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id,command_type AS "commandType",payload_json AS payload,status,created_at AS "createdAt",expires_at AS "expiresAt"`,
-      [device.rows[0].school_id, device.rows[0].station_id, device.rows[0].id, commandType, fieldObject(input.payload), user.id, input.expiresAt ? fieldIsoDate(input.expiresAt) : null]);
-      await audit(user, req, 'field.command.create', 'device_command', command.rows[0].id, null, command.rows[0], device.rows[0].school_id);
-      void publishFieldUpdate(device.rows[0].school_id, 'command.issued', { commandId: command.rows[0].id, deviceId: device.rows[0].id, stationId: device.rows[0].station_id, commandType });
-      return created(res, command.rows[0]);
-    }
+    const fieldAdminResult = await handleFieldAdminRoutes({
+      req, res, user, url, parts, hasRole, fail, fieldInputString, queryValue,
+      schoolAllowed, corsOrigin, fieldStreamSubscribers, writeFieldStream, query,
+      ok, body, beginIdempotentRequest, requestBodyHash, fieldObject, audit,
+      createdIdempotently, fieldReadiness, randomToken, sha256,
+      encryptFieldDeviceSigningSecret, fieldDeviceSigningEncryptionKey,
+      fieldDeviceKeyExpiresAt, created, pool, teacherOnly, teacherClassIds,
+      pagination, normalizeScoreRows, rebalanceFieldQueue, okIdempotently,
+      publishFieldUpdate, transitionFieldQueue, fieldIsoDate
+    });
+    if (fieldAdminResult !== false) return fieldAdminResult;
     if (req.method === 'POST' && url.pathname === '/v1/auth/password') {
       const input = await body(req);
       if (!input.currentPassword || !input.newPassword || String(input.newPassword).length < 8) return fail(res, 400, 'PASSWORD_INVALID', '新密码至少需要 8 位');
@@ -3200,334 +2881,18 @@ async function handle(req, res) {
       } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
     }
 
-    if (req.method === 'GET' && url.pathname === '/v1/teacher/analytics/overview') {
-      if (!teacherOnly(user) || !await userHasCapability(user, 'VIEW_CLASS_DASHBOARD')) return fail(res, 403, 'CAPABILITY_DENIED', '当前账号无查看班级看板权限');
-      const schoolId = queryValue(url, 'schoolId');
-      const classId = queryValue(url, 'classId');
-      const taskId = queryValue(url, 'taskId');
-      if (!schoolId || !classId || !taskId) return fail(res, 400, 'ANALYTICS_FILTER_REQUIRED', '请选择学校、班级和测评任务');
-      if (!schoolAllowed(user, schoolId) || !teacherClassIds(user, schoolId).includes(classId)) return fail(res, 403, 'NO_PERMISSION', '无权查看该班级看板');
-      const task = await query('SELECT id,rule_version FROM assessment_tasks WHERE id=$1 AND school_id=$2', [taskId, schoolId]);
-      if (!task.rows[0]) return fail(res, 404, 'TASK_NOT_FOUND', '测评任务不存在或不属于该学校');
-      const standardVersion = queryValue(url, 'standardVersion');
-      if (standardVersion && standardVersion !== task.rows[0].rule_version) return fail(res, 409, 'STANDARD_VERSION_MISMATCH', '评分标准已更新，请刷新看板');
-      const summary = await query(`SELECT COUNT(ts.id)::int AS "totalCount",
-        COUNT(ts.id) FILTER(WHERE ts.status='已完成')::int AS "completedCount",
-        COUNT(ts.id) FILTER(WHERE ts.status='未签到')::int AS "notCheckedInCount",
-        COUNT(ts.id) FILTER(WHERE ts.status='已签到')::int AS "checkedInCount",
-        COUNT(ts.id) FILTER(WHERE ts.status='候测')::int AS "waitingCount",
-        COUNT(ts.id) FILTER(WHERE ts.status='测试中')::int AS "testingCount",
-        COUNT(ts.id) FILTER(WHERE ts.status='待复核')::int AS "reviewCount",
-        COUNT(ts.id) FILTER(WHERE ts.status='待补测')::int AS "retestCount",
-        COUNT(ts.id) FILTER(WHERE ts.status='缺席')::int AS "absentCount",
-        COUNT(DISTINCT ts.student_id) FILTER(WHERE ts.status IN ('待复核','待补测') OR EXISTS (
-          SELECT 1 FROM assessment_scores risk_score WHERE risk_score.task_id=ts.task_id AND risk_score.student_id=ts.student_id
-            AND (risk_score.score < 3 OR risk_score.review_status='pendingReview')
-        ))::int AS "riskCount",
-        COUNT(DISTINCT ts.student_id) FILTER(WHERE EXISTS (
-          SELECT 1 FROM assessment_scores low_score WHERE low_score.task_id=ts.task_id AND low_score.student_id=ts.student_id AND low_score.score < 3
-        ))::int AS "lowScoreCount"
-        FROM task_students ts JOIN students st ON st.id=ts.student_id WHERE ts.task_id=$1 AND st.class_id=$2`, [taskId, classId]);
-      // Cross join the canonical seven-item catalogue with this class's task
-      // roster. This deliberately returns zero-measurement rows instead of
-      // removing an item that has not started yet; clients can distinguish
-      // absence of data from a missing component of the standard.
-      const items = await query(`WITH item_codes(item_code) AS (SELECT unnest($3::text[]))
-        SELECT code.item_code AS "itemCode",COUNT(DISTINCT ts.student_id)::int AS "totalCount",
-          COUNT(DISTINCT ts.student_id) FILTER(WHERE score.id IS NOT NULL)::int AS "measuredCount",
-          COALESCE(ROUND(AVG(score.score)::numeric,2),0)::float AS "averageScore",
-          COUNT(DISTINCT ts.student_id) FILTER(WHERE score.review_status IN ('risk','retest','review','pendingReview'))::int AS "riskCount"
-        FROM item_codes code
-        LEFT JOIN task_students ts ON ts.task_id=$1
-        LEFT JOIN students st ON st.id=ts.student_id AND st.class_id=$2
-        LEFT JOIN assessment_scores score ON score.task_id=ts.task_id AND score.student_id=ts.student_id AND score.item_code=code.item_code
-        WHERE st.id IS NOT NULL
-        GROUP BY code.item_code ORDER BY code.item_code`, [taskId, classId, MOVEMENT_ITEM_CODES]);
-      const byItem = new Map(items.rows.map((item) => [item.itemCode, item]));
-      const normalizedItems = MOVEMENT_ITEM_CODES.map((itemCode) => {
-        const item = byItem.get(itemCode) || { itemCode, totalCount: Number(summary.rows[0].totalCount || 0), measuredCount: 0, averageScore: 0, riskCount: 0 };
-        return { ...item, completionRate: item.totalCount ? Math.round(item.measuredCount * 100 / item.totalCount) : 0 };
-      });
-      return ok(res, { ...summary.rows[0], schoolId, classId, taskId, standardVersion: task.rows[0].rule_version, itemStats: normalizedItems, dataAvailable: summary.rows[0].totalCount > 0, history: [] });
-    }
-    if (req.method === 'GET' && parts[0] === 'v1' && parts[1] === 'schools' && parts[3] === 'dashboard') {
-      return ok(res, await dashboard(user, parts[2], { studentPage: queryValue(url, 'studentPage'), studentPageSize: queryValue(url, 'studentPageSize') }));
-    }
-    if (req.method === 'GET' && parts[0] === 'v1' && parts[1] === 'schools' && parts[3] === 'students') {
-      const schoolId = parts[2];
-      if (!schoolAllowed(user, schoolId)) return fail(res, 403, 'NO_PERMISSION', '无权访问该学校');
-      const requestedClass = queryValue(url, 'classId') || null;
-      const search = queryValue(url, 'search') || null;
-      const page = pagination(url);
-      const params = [schoolId];
-      let classFilter = '';
-      let searchFilter = '';
-      if (parentOnly(user)) { params.push(user.id); classFilter = ` AND EXISTS (SELECT 1 FROM parent_student_bindings pb WHERE pb.parent_user_id=$2 AND pb.student_id=st.id AND pb.status='active')`; }
-      else if (hasRole(user, 'teacher') && !hasRole(user, 'principal', 'admin')) {
-        const allowedClassIds = teacherClassIds(user, schoolId);
-        params.push(requestedClass ? (allowedClassIds.includes(requestedClass) ? requestedClass : '__none__') : (allowedClassIds.length ? allowedClassIds : ['__none__']));
-        classFilter = requestedClass ? ' AND st.class_id=$2' : ' AND st.class_id=ANY($2)';
-      } else if (requestedClass) { params.push(requestedClass); classFilter = ' AND st.class_id=$2'; }
-      if (search) { params.push(`%${search}%`); searchFilter = ` AND (st.name ILIKE $${params.length} OR COALESCE(st.student_no,'') ILIKE $${params.length})`; }
-      const count = await query(`SELECT COUNT(*)::int AS total FROM students st WHERE st.school_id=$1 AND st.status='active'${classFilter}${searchFilter}`, params);
-      params.push(page.pageSize, page.offset);
-      const result = await query(`SELECT st.*,g.name AS grade_name,c.name AS class_name FROM students st JOIN grades g ON g.id=st.grade_id JOIN classes c ON c.id=st.class_id
-        WHERE st.school_id=$1 AND st.status='active'${classFilter}${searchFilter} ORDER BY st.name LIMIT $${params.length - 1} OFFSET $${params.length}`, params);
-      return ok(res, listResult(url, result.rows.map(studentRow), count.rows[0].total));
-    }
-    if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'admin' && parts[2] === 'students' && parts[4] === 'binding-code') {
-      if (!hasRole(user, 'admin', 'principal')) return fail(res, 403, 'NO_PERMISSION', '只有管理员或校长可以生成绑定码');
-      const student = await query('SELECT id,school_id,name FROM students WHERE id=$1 AND status=\'active\'', [parts[3]]);
-      if (!student.rows[0] || !schoolAllowed(user, student.rows[0].school_id)) return fail(res, 404, 'STUDENT_NOT_FOUND', '学生不存在或无权访问');
-      const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ studentId: parts[3], action: 'binding-code' }));
-      if (idempotency === false) return;
-      const bindingCode = randomToken().slice(0, 12).toUpperCase();
-      const expiresAt = new Date(Date.now() + 30 * 60_000);
-      await query('UPDATE student_binding_codes SET used_at=COALESCE(used_at,now()) WHERE student_id=$1 AND used_at IS NULL', [parts[3]]);
-      const result = await query(`INSERT INTO student_binding_codes(student_id,code_hash,expires_at,created_by)
-        VALUES($1,$2,$3,$4) RETURNING id,student_id AS "studentId",expires_at AS "expiresAt"`, [parts[3], sha256(bindingCode), expiresAt, user.id]);
-      await audit(user, req, 'student.binding_code.create', 'student', parts[3], null, { ...result.rows[0], codeIssued: true }, student.rows[0].school_id);
-      return createdIdempotently(res, user, idempotency, { ...result.rows[0], bindingCode, studentName: student.rows[0].name });
-    }
-    if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'students' && parts[3] === 'bind') {
-      if (!hasRole(user, 'parent')) return fail(res, 403, 'NO_PERMISSION', '只有家长可以绑定孩子');
-      const student = await query('SELECT * FROM students WHERE id=$1 AND status=\'active\'', [parts[2]]);
-      const code = queryValue(url, 'code');
-      if (!student.rows[0] || !code) return fail(res, 400, 'BINDING_CODE_INVALID', '绑定码无效');
-      const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ studentId: parts[2], code: String(code).trim().toUpperCase() }));
-      if (idempotency === false) return;
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
-        const issued = await client.query(`SELECT id FROM student_binding_codes WHERE student_id=$1 AND code_hash=$2 AND used_at IS NULL AND expires_at>now() FOR UPDATE`, [parts[2], sha256(String(code).trim().toUpperCase())]);
-        if (!issued.rows[0] && !( !isProduction && code === student.rows[0].student_no)) {
-          await client.query('ROLLBACK');
-          return fail(res, 400, 'BINDING_CODE_INVALID', '绑定码无效或已过期');
-        }
-        const result = await client.query(`INSERT INTO parent_student_bindings(parent_user_id,student_id,relation,binding_code) VALUES($1,$2,$3,NULL)
-          ON CONFLICT(parent_user_id,student_id) DO UPDATE SET status='active',expires_at=NULL RETURNING id,parent_user_id AS "parentId",student_id,relation`, [user.id, parts[2], '监护人']);
-        if (issued.rows[0]) await client.query('UPDATE student_binding_codes SET used_at=now(),used_by=$1 WHERE id=$2', [user.id, issued.rows[0].id]);
-        await client.query('COMMIT');
-        await audit(user, req, 'student.bind', 'student', parts[2], null, result.rows[0], student.rows[0].school_id);
-        const detail = await studentForUser(user, parts[2]);
-        return createdIdempotently(res, user, idempotency, { ...result.rows[0], student: studentRow(detail) });
-      } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
-    }
-    if (req.method === 'POST' && url.pathname === '/v1/students/bind') {
-      if (!hasRole(user, 'parent')) return fail(res, 403, 'NO_PERMISSION', '只有家长可以绑定孩子');
-      const input = await body(req);
-      const studentName = requiredString(input.studentName, '学生姓名', { max: 80 });
-      const code = requiredString(input.code, '绑定码', { max: 128 }).toUpperCase();
-      const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ studentName, code }));
-      if (idempotency === false) return;
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
-        const studentResult = await client.query(`SELECT st.*, g.name AS grade_name, c.name AS class_name
-          FROM students st JOIN grades g ON g.id=st.grade_id JOIN classes c ON c.id=st.class_id
-          WHERE st.name=$1 AND st.status='active' ORDER BY st.created_at DESC LIMIT 10 FOR UPDATE OF st`, [studentName]);
-        let matched = null;
-        for (const candidate of studentResult.rows) {
-          const issued = await client.query(`SELECT id FROM student_binding_codes WHERE student_id=$1 AND code_hash=$2 AND used_at IS NULL AND expires_at>now() FOR UPDATE`, [candidate.id, sha256(code)]);
-          if (issued.rows[0] || (!isProduction && candidate.student_no === code)) { matched = { student: candidate, issued: issued.rows[0] || null }; break; }
-        }
-        if (!matched) { await client.query('ROLLBACK'); return failIdempotently(req, res, 400, 'BINDING_CODE_INVALID', '姓名或绑定码无效或已过期'); }
-        const result = await client.query(`INSERT INTO parent_student_bindings(parent_user_id,student_id,relation,binding_code)
-          VALUES($1,$2,$3,NULL) ON CONFLICT(parent_user_id,student_id) DO UPDATE SET status='active',expires_at=NULL
-          RETURNING id,parent_user_id AS "parentId",student_id`, [user.id, matched.student.id, '监护人']);
-        if (matched.issued) await client.query('UPDATE student_binding_codes SET used_at=now(),used_by=$1 WHERE id=$2', [user.id, matched.issued.id]);
-        await client.query('COMMIT');
-        await audit(user, req, 'student.bind', 'student', matched.student.id, null, result.rows[0], matched.student.school_id);
-        const detail = await studentForUser(user, matched.student.id);
-        return createdIdempotently(res, user, idempotency, { ...result.rows[0], student: studentRow(detail) });
-      } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
-    }
-    if (req.method === 'GET' && parts[0] === 'v1' && parts[1] === 'schools' && parts[3] === 'tasks') {
-      const schoolId = parts[2];
-      if (!schoolAllowed(user, schoolId)) return fail(res, 403, 'NO_PERMISSION', '无权访问该学校');
-      const page = pagination(url);
-      const gradeId = queryValue(url, 'gradeId') || null;
-      const classId = queryValue(url, 'classId') || null;
-      const parentScope = parentOnly(user);
-      const scopeJoin = parentScope ? ` JOIN task_students visible_ts ON visible_ts.task_id=t.id
-        JOIN parent_student_bindings visible_pb ON visible_pb.student_id=visible_ts.student_id AND visible_pb.parent_user_id=$4 AND visible_pb.status='active'` : '';
-      const countParams = parentScope ? [schoolId, gradeId, classId, user.id] : [schoolId, gradeId, classId];
-      const count = await query(`SELECT COUNT(DISTINCT t.id)::int AS total FROM assessment_tasks t${scopeJoin}
-        WHERE t.school_id=$1 AND ($2::text IS NULL OR t.grade_id=$2) AND ($3::text IS NULL OR t.class_id=$3)`, countParams);
-      const taskParams = parentScope ? [schoolId, gradeId, classId, user.id, page.pageSize, page.offset] : [schoolId, gradeId, classId, page.pageSize, page.offset];
-      const parentGroup = parentScope ? ',visible_pb.parent_user_id' : '';
-      const limitIndex = parentScope ? 5 : 4;
-      const offsetIndex = parentScope ? 6 : 5;
-      const visibleTaskAlias = parentScope ? 'visible_ts' : 'ts';
-      const visibleTaskId = `${visibleTaskAlias}.id`;
-      const result = await query(`SELECT t.id,t.title,t.test_date AS date,t.location,COALESCE(g.name,'全校') AS "gradeName",COALESCE(c.name,'全校') AS "className",t.items,t.rule_version AS "ruleVersion",t.status,
-        CASE WHEN t.class_id IS NULL THEN ARRAY[]::text[] ELSE ARRAY[t.class_id] END AS "classIds",COALESCE(ARRAY_AGG(DISTINCT ${visibleTaskAlias}.student_id) FILTER(WHERE ${visibleTaskAlias}.student_id IS NOT NULL), ARRAY[]::text[]) AS "studentIds",COUNT(DISTINCT ${visibleTaskId})::int AS "totalCount",COUNT(DISTINCT ${visibleTaskId}) FILTER(WHERE ${visibleTaskAlias}.status='已完成')::int AS "completedCount" FROM assessment_tasks t LEFT JOIN grades g ON g.id=t.grade_id LEFT JOIN classes c ON c.id=t.class_id LEFT JOIN task_students ts ON ts.task_id=t.id${scopeJoin}
-        WHERE t.school_id=$1 AND ($2::text IS NULL OR t.grade_id=$2) AND ($3::text IS NULL OR t.class_id=$3) GROUP BY t.id,g.name,c.name,t.class_id${parentGroup} ORDER BY t.test_date DESC LIMIT $${limitIndex} OFFSET $${offsetIndex}`, taskParams);
-      return ok(res, listResult(url, result.rows.map((row) => ({ ...row, items: row.items || [], status: row.completedCount === row.totalCount && row.totalCount > 0 ? '已完成' : row.status === 'published' ? '未签到' : row.status === 'closed' ? '已完成' : row.status })), count.rows[0].total));
-    }
-    if (req.method === 'GET' && parts[0] === 'v1' && parts[1] === 'tasks' && parts[2] && parts[3] === 'students' && parts.length === 4) {
-      const taskResult = await query('SELECT id,school_id FROM assessment_tasks WHERE id=$1', [parts[2]]);
-      const task = taskResult.rows[0];
-      if (!task || !schoolAllowed(user, task.school_id)) return fail(res, 404, 'TASK_NOT_FOUND', '任务不存在或无权访问');
-      if (teacherOnly(user) && !await userHasCapability(user, 'VIEW_TEST_TASKS', task.school_id)) return fail(res, 403, 'CAPABILITY_DENIED', '当前账号无查看测评任务权限');
-      const params = [parts[2]];
-      const page = pagination(url, 200);
-      const statusFilter = queryValue(url, 'status');
-      const keyword = queryValue(url, 'keyword');
-      let scope = '';
-      if (hasRole(user, 'teacher') && !hasRole(user, 'principal', 'admin')) {
-        const classIds = teacherClassIds(user, task.school_id);
-        params.push(classIds.length ? classIds : ['__none__']);
-        scope = ` AND st.class_id=ANY($2)`;
-      }
-      if (parentOnly(user)) {
-        params.push(user.id);
-        scope = ` AND EXISTS (SELECT 1 FROM parent_student_bindings visible_pb WHERE visible_pb.parent_user_id=$${params.length} AND visible_pb.student_id=st.id AND visible_pb.status='active')`;
-      }
-      if (statusFilter) { params.push(statusFilter); scope += ` AND ts.status=$${params.length}`; }
-      if (keyword) { params.push(`%${keyword}%`); scope += ` AND (st.name ILIKE $${params.length} OR c.name ILIKE $${params.length})`; }
-      const limitIndex = params.length + 1;
-      const offsetIndex = params.length + 2;
-      const result = await query(`SELECT ts.id,ts.task_id AS "taskId",ts.student_id AS "studentId",ts.status,ts.version,st.name AS "studentName",st.gender AS "studentGender",st.grade_id AS "gradeId",g.name AS "gradeName",st.class_id AS "classId",c.name AS "className"
-        FROM task_students ts JOIN students st ON st.id=ts.student_id JOIN classes c ON c.id=st.class_id LEFT JOIN grades g ON g.id=st.grade_id
-        WHERE ts.task_id=$1${scope} ORDER BY c.name,st.name LIMIT $${limitIndex} OFFSET $${offsetIndex}`, [...params, page.pageSize, page.offset]);
-      if (!page.paged) return ok(res, result.rows);
-      const count = await query(`SELECT COUNT(*)::int AS total FROM task_students ts JOIN students st ON st.id=ts.student_id JOIN classes c ON c.id=st.class_id WHERE ts.task_id=$1${scope}`, params);
-      return ok(res, { items: result.rows, page: page.page, pageSize: page.pageSize, total: count.rows[0]?.total || 0 });
-    }
-    if (req.method === 'PATCH' && parts[0] === 'v1' && parts[1] === 'tasks' && parts[3] === 'students' && parts[5] === 'status') {
-      if (!hasRole(user, 'teacher', 'principal', 'admin')) return fail(res, 403, 'NO_PERMISSION', '无权修改测评状态');
-      const input = await body(req);
-      const result = await query(`SELECT ts.*,t.school_id,st.class_id FROM task_students ts JOIN assessment_tasks t ON t.id=ts.task_id JOIN students st ON st.id=ts.student_id WHERE ts.task_id=$1 AND ts.student_id=$2`, [parts[2], parts[4]]);
-      const row = result.rows[0];
-      if (!row || !schoolAllowed(user, row.school_id)) return fail(res, 404, 'TASK_STUDENT_NOT_FOUND', '任务学生不存在');
-      if (hasRole(user, 'teacher') && !hasRole(user, 'principal', 'admin') && !teacherClassIds(user, row.school_id).includes(row.class_id)) return fail(res, 403, 'NO_PERMISSION', '无权修改该班级测评状态');
-      if (teacherOnly(user) && !await userHasCapability(user, 'UPDATE_TEST_STATUS', row.school_id, row.class_id)) return fail(res, 403, 'CAPABILITY_DENIED', '当前账号无更新测评状态权限');
-      if (!taskStatusAllowed(row.status, input.status)) return fail(res, 409, 'TASK_STATUS_INVALID', `不能从${row.status}变更为${input.status}`);
-      const expectedVersion = input.expectedVersion == null ? null : Number(input.expectedVersion);
-      if (expectedVersion != null && (!Number.isInteger(expectedVersion) || expectedVersion < 1)) return fail(res, 400, 'VERSION_INVALID', '版本号不合法');
-      const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ taskId: parts[2], studentId: parts[4], ...input }));
-      if (idempotency === false) return;
-      const updated = await query(`UPDATE task_students SET status=$1,note=$2,check_in_at=CASE WHEN $1='已签到' THEN COALESCE(check_in_at,now()) ELSE check_in_at END,
-        completed_at=CASE WHEN $1='已完成' THEN COALESCE(completed_at,now()) ELSE completed_at END,version=version+1 WHERE task_id=$3 AND student_id=$4 AND ($5::int IS NULL OR version=$5) RETURNING *`, [input.status, input.note || null, parts[2], parts[4], expectedVersion]);
-      if (!updated.rowCount) return failIdempotently(req, res, 409, 'VERSION_CONFLICT', '记录已被其他人更新，请刷新后重试');
-      await query(`INSERT INTO task_student_status_events(task_id,student_id,from_status,to_status,note,reason_code,operator_teacher_id,expected_version,resulting_version,client_operation_id)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [parts[2], parts[4], row.status, input.status, input.note || null, input.reasonCode || null, user.id, expectedVersion, updated.rows[0].version, input.clientOperationId || null]);
-      await audit(user, req, 'task.status.update', 'task_student', row.id, row, updated.rows[0], row.school_id);
-      return okIdempotently(res, user, idempotency, updated.rows[0]);
-    }
-    if (req.method === 'POST' && (url.pathname === '/v1/admin/tasks/batch-status' || (parts[0] === 'v1' && parts[1] === 'tasks' && parts[2] && parts[3] === 'students' && parts[4] === 'batch-status'))) {
-      if (!hasRole(user, 'teacher', 'principal', 'admin')) return fail(res, 403, 'NO_PERMISSION', '无权批量修改测评状态');
-      const input = await body(req);
-      if (!Array.isArray(input.updates) || input.updates.length < 1 || input.updates.length > 100) return fail(res, 400, 'BATCH_INVALID', '批量更新数量必须在 1 到 100 条之间');
-      const scopedTaskId = parts[0] === 'v1' && parts[1] === 'tasks' ? parts[2] : null;
-      if (scopedTaskId && input.updates.some((item) => item.taskId && item.taskId !== scopedTaskId)) return fail(res, 400, 'BATCH_TASK_MISMATCH', '批量操作只能包含当前任务的学生');
-      if (scopedTaskId) input.updates = input.updates.map((item) => ({ ...item, taskId: scopedTaskId }));
-      const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash(input));
-      if (idempotency === false) return;
-      const client = await pool.connect();
-      const saved = [];
-      try {
-        await client.query('BEGIN');
-        for (const item of input.updates) {
-          const rowResult = await client.query(`SELECT ts.*,t.school_id,st.class_id FROM task_students ts
-            JOIN assessment_tasks t ON t.id=ts.task_id JOIN students st ON st.id=ts.student_id
-            WHERE ts.task_id=$1 AND ts.student_id=$2 FOR UPDATE`, [item.taskId, item.studentId]);
-          const row = rowResult.rows[0];
-          if (!row || !schoolAllowed(user, row.school_id)) throw Object.assign(new Error('任务学生不存在或无权访问'), { status: 404, code: 'TASK_STUDENT_NOT_FOUND' });
-          if (hasRole(user, 'teacher') && !hasRole(user, 'principal', 'admin') && !teacherClassIds(user, row.school_id).includes(row.class_id)) throw Object.assign(new Error('无权修改该班级测评状态'), { status: 403, code: 'NO_PERMISSION' });
-          if (teacherOnly(user) && !await userHasCapability(user, 'UPDATE_TEST_STATUS', row.school_id, row.class_id)) throw Object.assign(new Error('当前账号无更新测评状态权限'), { status: 403, code: 'CAPABILITY_DENIED' });
-          if (!taskStatusAllowed(row.status, item.status)) throw Object.assign(new Error(`不能从${row.status}变更为${item.status}`), { status: 409, code: 'TASK_STATUS_INVALID' });
-          const expectedVersion = item.expectedVersion == null ? null : Number(item.expectedVersion);
-          const updated = await client.query(`UPDATE task_students SET status=$1,note=$2,version=version+1,
-            check_in_at=CASE WHEN $1='已签到' THEN COALESCE(check_in_at,now()) ELSE check_in_at END,
-            completed_at=CASE WHEN $1='已完成' THEN COALESCE(completed_at,now()) ELSE completed_at END
-            WHERE task_id=$3 AND student_id=$4 AND ($5::int IS NULL OR version=$5) RETURNING *`, [item.status, item.note || null, item.taskId, item.studentId, expectedVersion]);
-          if (!updated.rowCount) throw Object.assign(new Error('记录已被其他人更新，请刷新后重试'), { status: 409, code: 'VERSION_CONFLICT' });
-          await client.query(`INSERT INTO task_student_status_events(task_id,student_id,from_status,to_status,note,reason_code,operator_teacher_id,expected_version,resulting_version,client_operation_id)
-            VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [item.taskId, item.studentId, row.status, item.status, item.note || null, item.reasonCode || null, user.id, expectedVersion, updated.rows[0].version, item.clientOperationId || null]);
-          saved.push({ ...updated.rows[0], schoolId: row.school_id });
-        }
-        await client.query('COMMIT');
-        for (const item of saved) await audit(user, req, 'task.status.batch_update', 'task_student', item.id, null, item, item.schoolId);
-        return createdIdempotently(res, user, idempotency, { updated: saved.length, items: saved });
-      } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
-    }
-    if (req.method === 'GET' && parts[0] === 'v1' && parts[1] === 'tasks' && parts[3] === 'students' && parts[5] === 'status-history') {
-      const taskStudent = await taskStudentForUser(user, parts[2], parts[4]);
-      if (!taskStudent) return fail(res, 404, 'TASK_STUDENT_NOT_FOUND', '任务学生不存在或无权访问');
-      if (teacherOnly(user) && !await userHasCapability(user, 'VIEW_TEST_TASKS', taskStudent.school_id, taskStudent.class_id)) return fail(res, 403, 'CAPABILITY_DENIED', '当前账号无查看测评任务权限');
-      const history = await query(`SELECT id,task_id AS "taskId",student_id AS "studentId",from_status AS "fromStatus",to_status AS "toStatus",note,
-          reason_code AS "reasonCode",operator_teacher_id AS "operatorTeacherId",expected_version AS "expectedVersion",resulting_version AS "resultingVersion",
-          client_operation_id AS "clientOperationId",created_at AS "createdAt"
-        FROM task_student_status_events WHERE task_id=$1 AND student_id=$2 ORDER BY created_at DESC,id DESC LIMIT 100`, [parts[2], parts[4]]);
-      return ok(res, history.rows);
-    }
-    if (req.method === 'GET' && parts[0] === 'v1' && parts[1] === 'tasks' && parts[3] === 'students' && parts[5] === 'scores') {
-      const taskStudent = await taskStudentForUser(user, parts[2], parts[4]);
-      if (!taskStudent) return fail(res, 404, 'TASK_STUDENT_NOT_FOUND', '任务学生不存在或无权访问');
-      const result = await query(`SELECT id,item_code AS item,score,note,confidence,review_status AS "reviewStatus",manual_reviewed AS "humanReviewed",source,created_at AS "createdAt",updated_at AS "updatedAt"
-        FROM assessment_scores WHERE task_id=$1 AND student_id=$2 ORDER BY item_code`, [parts[2], parts[4]]);
-      return ok(res, normalizeScoreRows(result.rows));
-    }
-    if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'tasks' && parts[3] === 'students' && parts[5] === 'scores') {
-      if (!hasRole(user, 'teacher', 'principal', 'admin')) return fail(res, 403, 'NO_PERMISSION', '只有学校工作人员可以录入成绩');
-      const taskStudent = await taskStudentForUser(user, parts[2], parts[4]);
-      if (!taskStudent) return fail(res, 404, 'TASK_STUDENT_NOT_FOUND', '任务学生不存在或无权访问');
-      const input = await body(req);
-      if (!Array.isArray(input.scores) || input.scores.length === 0) return fail(res, 400, 'SCORES_REQUIRED', '至少需要提交一项成绩');
-      if (input.scores.length > MOVEMENT_SCORE_RULES.itemCount) return fail(res, 400, 'SCORES_TOO_MANY', `最多提交${MOVEMENT_SCORE_RULES.itemCount}项成绩`);
-      const itemCodes = new Set();
-      for (const item of input.scores) {
-        if (!MOVEMENT_ITEM_CODES.includes(String(item?.item || '').trim())) throw Object.assign(new Error('体测项目不合法'), { status: 400, code: 'SCORE_ITEM_INVALID' });
-        const itemCode = String(item.item).trim();
-        if (itemCodes.has(itemCode)) throw Object.assign(new Error('同一请求不能重复提交体测项目'), { status: 400, code: 'SCORE_ITEM_DUPLICATE' });
-        itemCodes.add(itemCode);
-      }
-      const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash(input));
-      if (idempotency === false) return;
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
-        const saved = [];
-        for (const item of input.scores) {
-          const score = normalizeScore(item.score);
-          const confidence = normalizeConfidence(item.confidence == null ? 0 : item.confidence);
-          if (score == null || confidence == null) {
-            throw Object.assign(new Error('成绩或置信度不合法'), { status: 400, code: 'SCORE_INVALID' });
-          }
-          const reviewStatus = normalizeReviewStatus(item.reviewStatus, confidence);
-          const result = await client.query(`INSERT INTO assessment_scores(task_id,student_id,item_code,score,confidence,note,source,review_status,manual_reviewed,created_by)
-            VALUES($1,$2,$3,$4,$5,$6,$7,$8,FALSE,$9)
-            ON CONFLICT(task_id,student_id,item_code) DO UPDATE SET score=EXCLUDED.score,confidence=EXCLUDED.confidence,note=EXCLUDED.note,source=EXCLUDED.source,review_status=EXCLUDED.review_status,manual_reviewed=FALSE,updated_at=now()
-            RETURNING id,item_code AS item,score,note,confidence,review_status AS "reviewStatus"`, [parts[2], parts[4], item.item, score, confidence, item.note || '', item.source || 'teacher', reviewStatus, user.id]);
-          saved.push({ ...result.rows[0], score: Number(result.rows[0].score), confidence: Number(result.rows[0].confidence) });
-        }
-        if (input.markCompleted === true) await client.query(`UPDATE task_students SET status='已完成',completed_at=COALESCE(completed_at,now()),version=version+1 WHERE task_id=$1 AND student_id=$2`, [parts[2], parts[4]]);
-        await client.query('COMMIT');
-        await audit(user, req, 'scores.upsert', 'task_student', `${parts[2]}:${parts[4]}`, null, saved, taskStudent.school_id);
-        return createdIdempotently(res, user, idempotency, saved);
-      } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
-    }
-    if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'scores' && parts[3] === 'review') {
-      if (!hasRole(user, 'teacher', 'principal', 'admin')) return fail(res, 403, 'NO_PERMISSION', '只有学校工作人员可以复核成绩');
-      const scoreResult = await query(`SELECT s.*,t.school_id,st.class_id FROM assessment_scores s JOIN assessment_tasks t ON t.id=s.task_id JOIN students st ON st.id=s.student_id WHERE s.id=$1`, [parts[2]]);
-      const scoreRow = scoreResult.rows[0];
-      if (!scoreRow || !schoolAllowed(user, scoreRow.school_id)) return fail(res, 404, 'SCORE_NOT_FOUND', '成绩不存在或无权访问');
-      if (hasRole(user, 'teacher') && !hasRole(user, 'principal', 'admin') && !teacherClassIds(user, scoreRow.school_id).includes(scoreRow.class_id)) return fail(res, 403, 'NO_PERMISSION', '无权复核该班级成绩');
-      const input = await body(req);
-      const newScore = input.score == null ? normalizeScore(scoreRow.score) : normalizeScore(input.score);
-      if (newScore == null) return fail(res, 400, 'SCORE_INVALID', '成绩必须在 0 到 5 之间');
-      if (input.action != null && !['approve', 'reject'].includes(String(input.action))) return fail(res, 400, 'REVIEW_ACTION_INVALID', '复核动作不合法');
-      const reviewStatus = input.action === 'reject' ? 'pendingReview' : 'passed';
-      const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ scoreId: parts[2], ...input }));
-      if (idempotency === false) return;
-      const humanReviewed = input.action !== 'reject';
-      const updated = await query(`UPDATE assessment_scores SET score=$1,review_status=$2,manual_reviewed=$3,note=$4,updated_at=now() WHERE id=$5 RETURNING id,item_code AS item,score,note,confidence,review_status AS "reviewStatus",manual_reviewed AS "humanReviewed"`, [newScore, reviewStatus, humanReviewed, input.reason || scoreRow.note || '', parts[2]]);
-      await query(`INSERT INTO score_reviews(score_id,reviewer_id,action,old_score,new_score,reason) VALUES($1,$2,$3,$4,$5,$6)`, [parts[2], user.id, input.action || 'approve', scoreRow.score, newScore, input.reason || '']);
-      await audit(user, req, 'score.review', 'assessment_score', parts[2], scoreRow, updated.rows[0], scoreRow.school_id);
-      return okIdempotently(res, user, idempotency, { ...updated.rows[0], score: Number(updated.rows[0].score), confidence: Number(updated.rows[0].confidence) });
-    }
+    await handleTeacherTaskRoutes({
+      req, res, user, url, parts, query, pool, teacherOnly,
+      userHasCapability, fail, schoolAllowed, teacherClassIds, queryValue,
+      movementItemCodes: MOVEMENT_ITEM_CODES, ok, dashboard, pagination,
+      parentOnly, hasRole, listResult, studentRow, beginIdempotentRequest,
+      requestBodyHash, randomToken, sha256, audit, createdIdempotently,
+      failIdempotently, body, requiredString, isProduction,
+      taskStatusAllowed, okIdempotently, taskStudentForUser,
+      movementScoreRules: MOVEMENT_SCORE_RULES, normalizeScoreRows,
+      normalizeScore, normalizeConfidence, normalizeReviewStatus
+    });
+    if (res.writableEnded) return;
     if (req.method === 'GET' && url.pathname === '/v1/admin/operations/items') {
       if (!hasRole(user, 'admin', 'principal')) return fail(res, 403, 'NO_PERMISSION', '无权查看运营队列');
       const schoolId = queryValue(url, 'schoolId') || user.roles.find((role) => role.school_id)?.school_id;
@@ -3614,7 +2979,7 @@ async function handle(req, res) {
       audit, createdIdempotently, okIdempotently, ok
     });
     if (res.writableEnded) return;
-    await handleCourseRoutes({ req, res, user, parts, query, hasRole, schoolAllowed, guardianStudentForUser, body, fail, requiredString, beginIdempotentRequest, requestBodyHash, failIdempotently, createdIdempotently, okIdempotently, ok });
+    await handleCourseRoutes({ req, res, user, parts, query, hasRole, schoolAllowed, guardianStudentForUser, body, fail, requiredString, beginIdempotentRequest, requestBodyHash, failIdempotently, createdIdempotently, okIdempotently, ok, randomToken });
     if (res.writableEnded) return;
     await handleActivityRoutes({
       req, res, user, url, parts,
@@ -3653,6 +3018,14 @@ async function handle(req, res) {
     });
     if (res.writableEnded) return;
     await handleSupportRoutes({ req, res, user, parts, query, body, requiredString, schoolAllowed, fail, beginIdempotentRequest, requestBodyHash, createdIdempotently, audit });
+    if (res.writableEnded) return;
+    await handleProductEventRoutes({ req, res, user, url, body, query, fail, ok, consumePersistentRateLimit });
+    if (res.writableEnded) return;
+    await handleContentOperationRoutes({
+      req, res, user, url, parts, query, pool, hasRole, schoolAllowed,
+      body, fail, requiredString, beginIdempotentRequest, requestBodyHash,
+      failIdempotently, audit, createdIdempotently, okIdempotently, ok
+    });
     if (res.writableEnded) return;
     if (req.method === 'GET' && url.pathname === '/v1/reports') {
       const schoolId = queryValue(url, 'schoolId');

@@ -175,7 +175,8 @@ struct WorkflowApi {
             throw CourseAttachmentError.unavailable
         }
         let fileID = try await FileApi(client: client).uploadCourseAttachment(localReference: reference, displayName: value.attachmentName)
-        try await client.send(path: "v1/courses/uploads", body: CourseUploadRequest(taskID: value.taskID, attendanceCount: value.attendanceCount, notes: value.notes, attachmentName: value.attachmentName, attachmentFileID: fileID))
+        let operationKey = StableWriteFingerprint.make("\(value.taskID)|\(value.attendanceCount)|\(value.notes)|\(fileID)")
+        try await client.send(path: "v1/courses/uploads", body: CourseUploadRequest(taskID: value.taskID, attendanceCount: value.attendanceCount, notes: value.notes, attachmentName: value.attachmentName, attachmentFileID: fileID), idempotencyKey: "course-upload-\(operationKey)")
     }
 
     func publishClassPost(author: String, content: String, schoolID: String?, classID: String?, attachments: [ClassPostAttachment] = []) async throws -> String? {
@@ -187,7 +188,11 @@ struct WorkflowApi {
             let fileID = try await FileApi(client: client).uploadClassPostAttachment(localReference: reference, displayName: attachment.id)
             return ClassPostAttachmentRequest(id: attachment.id, type: attachment.type, objectID: fileID, thumbnailObjectID: attachment.thumbnailObjectID)
         }
-        let receipt: ClassPostCreateReceipt = try await client.request(path: "v1/class-posts", method: "POST", body: ClassPostRequest(author: author, content: content, schoolID: schoolID, classID: classID, attachments: uploadedAttachments), type: ClassPostCreateReceipt.self)
+        let fingerprint = StableWriteFingerprint.make([
+            schoolID ?? "", classID ?? "", author, content,
+            uploadedAttachments.map(\.objectID).sorted().joined(separator: ",")
+        ].joined(separator: "|"))
+        let receipt: ClassPostCreateReceipt = try await client.request(path: "v1/class-posts", method: "POST", body: ClassPostRequest(author: author, content: content, schoolID: schoolID, classID: classID, attachments: uploadedAttachments), type: ClassPostCreateReceipt.self, idempotencyKey: "class-post-create-\(fingerprint)")
         return receipt.postID
     }
 
@@ -257,13 +262,13 @@ struct ClassPostApi {
         _ = try await client.request(path: "v1/class-posts/\(postID)", method: "DELETE", type: RemoteClassPostActionAck.self, idempotencyKey: "class-post-delete-\(postID)")
     }
     func report(postID: String, reason: String) async throws {
-        _ = try await client.request(path: "v1/class-posts/\(postID)/report", method: "POST", body: ClassPostReportRequest(reason: reason), type: RemoteClassPostActionAck.self, idempotencyKey: "class-post-report-\(postID)-\(abs(reason.hashValue))")
+        _ = try await client.request(path: "v1/class-posts/\(postID)/report", method: "POST", body: ClassPostReportRequest(reason: reason), type: RemoteClassPostActionAck.self, idempotencyKey: "class-post-report-\(postID)-\(StableWriteFingerprint.make(reason))")
     }
     func setPinned(postID: String, pinned: Bool) async throws {
         _ = try await client.request(path: "v1/class-posts/\(postID)/pin", method: "POST", body: ClassPostPinRequest(pinned: pinned), type: RemoteClassPostActionAck.self, idempotencyKey: "class-post-pin-\(postID)-\(pinned)")
     }
     func addComment(postID: String, content: String) async throws -> RemoteClassPostCommentAck {
-        try await client.request(path: "v1/class-posts/\(postID)/comments", method: "POST", body: ClassPostCommentRequest(content: content), type: RemoteClassPostCommentAck.self, idempotencyKey: "class-post-comment-\(postID)-\(abs(content.hashValue))")
+        try await client.request(path: "v1/class-posts/\(postID)/comments", method: "POST", body: ClassPostCommentRequest(content: content), type: RemoteClassPostCommentAck.self, idempotencyKey: "class-post-comment-\(postID)-\(StableWriteFingerprint.make(content))")
     }
     func comments(postID: String, cursor: String?, pageSize: Int = 20) async throws -> RemoteClassPostCommentPage {
         let query = [
@@ -274,6 +279,20 @@ struct ClassPostApi {
     }
     func deleteComment(postID: String, commentID: String) async throws {
         _ = try await client.request(path: "v1/class-posts/\(postID)/comments/\(commentID)", method: "DELETE", type: RemoteClassPostCommentAck.self, idempotencyKey: "class-post-comment-delete-\(postID)-\(commentID)")
+    }
+}
+
+/// Swift intentionally randomizes `hashValue` between processes. Network
+/// idempotency keys must remain stable after an app restart, so use a compact
+/// deterministic FNV-1a fingerprint for non-sensitive request content.
+enum StableWriteFingerprint {
+    static func make(_ value: String) -> String {
+        var hash: UInt64 = 14_695_981_039_346_656_037
+        for byte in value.utf8 {
+            hash ^= UInt64(byte)
+            hash &*= 1_099_511_628_211
+        }
+        return String(hash, radix: 16)
     }
 }
 

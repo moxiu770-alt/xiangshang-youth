@@ -535,6 +535,18 @@ struct BodyAssessmentView: View {
             visualHints = draft.captureObservationHints
             postureSnapshots = draft.postureSnapshots
             if visualHints.isEmpty, let hint = draft.visualObservationHint, let task = draft.completedCaptures.first { visualHints[task] = hint }
+            let currentConsent = student.flatMap { state.localFeatures.healthConsents[$0.id] }
+            let consentIsCurrent = currentConsent?.revokedAt == nil
+                && currentConsent?.privacyPolicyVersion == LegalPolicy.privacyPolicyVersion
+                && currentConsent?.cameraConsentVersion == LegalPolicy.cameraConsentVersion
+                && currentConsent?.algorithmNoticeVersion == LegalPolicy.algorithmNoticeVersion
+            if restoredStep >= Step.profile.rawValue, !consentIsCurrent {
+                // A draft created under an older policy must not resume beyond
+                // the consent gate after the bundled policy versions change.
+                step = .consent
+                adultReady = false
+                consentAcknowledged = false
+            }
             return
         }
         guard let record else { return }

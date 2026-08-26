@@ -35,7 +35,7 @@ interface StudentApi {
 }
 
 data class BindingRequest(val studentName: String, val code: String)
-data class ConsentRequest(val consentVersion: String, val purpose: String = "body_assessment", val granted: Boolean = true, val consentId: String = java.util.UUID.randomUUID().toString(), val privacyPolicyVersion: String = consentVersion, val cameraConsentVersion: String = consentVersion, val algorithmNoticeVersion: String = "posture-screening-v1", val deviceInfoHash: String? = null, val appVersion: String? = null, val dataRetentionNoticeAccepted: Boolean = true)
+data class ConsentRequest(val consentVersion: String, val purpose: String = "body_assessment", val granted: Boolean = true, val consentId: String = java.util.UUID.randomUUID().toString(), val privacyPolicyVersion: String = consentVersion, val cameraConsentVersion: String = com.xiangshang.youth.core.model.LegalPolicy.CAMERA_CONSENT_VERSION, val algorithmNoticeVersion: String = com.xiangshang.youth.core.model.LegalPolicy.ALGORITHM_NOTICE_VERSION, val deviceInfoHash: String? = null, val appVersion: String? = null, val dataRetentionNoticeAccepted: Boolean = true)
 data class PrivacyRequestBody(val requestType: String)
 data class PrivacyRequestReceipt(val id: String, val requestType: String, val status: String, val createdAt: String, val jobId: String? = null)
 data class BodySnapshotRequest(val captureTask: String, val sampleCount: Int, val confidence: Double, val metrics: PostureMetricSnapshot)

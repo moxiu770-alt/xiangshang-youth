@@ -17,6 +17,7 @@ import com.xiangshang.youth.core.service.NotificationCampaign
 import com.xiangshang.youth.core.service.RemoteActivity
 import com.xiangshang.youth.core.service.RemoteExpert
 import com.xiangshang.youth.core.service.RemoteLesson
+import com.xiangshang.youth.core.service.PlaybackSource
 import com.xiangshang.youth.core.service.TaskStudentStatusRecord
 import com.xiangshang.youth.core.service.TeacherAnalyticsOverview
 
@@ -87,6 +88,14 @@ data class AppUiState(
     val coursesLoading: Boolean = false,
     val coursesError: String? = null,
     val coursesChildId: String? = null,
+    val coursePlayback: PlaybackSource? = null,
+    val coursePlaybackLessonId: String? = null,
+    val coursePlaybackLoading: Boolean = false,
+    val coursePlaybackError: String? = null,
+    val courseProgressSaveLessonId: String? = null,
+    val courseProgressSaving: Boolean = false,
+    val courseProgressSaveError: String? = null,
+    val courseProgressSaveConflict: Boolean = false,
     val notificationDrafts: List<NotificationCampaign> = emptyList(),
     val notificationDraftsLoading: Boolean = false,
     val notificationDraftsError: String? = null,

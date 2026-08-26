@@ -47,7 +47,7 @@ struct ParentLandingView: View {
     }
     var body: some View { ScrollView { VStack(spacing: 9) {
         ReferenceHeader(name: state.selectedChild?.name ?? "未选择孩子", school: "\(state.selectedChild?.className ?? "尚未绑定班级") · 点击切换孩子", initial: String((state.selectedChild?.name ?? "孩").prefix(1)), avatarAsset: "ChildAvatar", identityAction: { router.push(.children(returnAfterBinding: false)) })
-        ReferenceCard { VStack(spacing: 12) { HStack { VStack(alignment: .leading, spacing: 3) { Text("孩子本周健康任务").font(.system(size: 17, weight: .bold)).foregroundStyle(ReferenceColor.navy); Text("优先完成身体测评，其他家庭记录可稍后填写").font(.system(size: 12)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }; Spacer(); Image(systemName: "figure.run.circle.fill").font(.system(size: 24)).foregroundStyle(ReferenceColor.blue) }; LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) { assessmentMetric(.fitness); assessmentMetric(.mental); assessmentMetric(.vision); assessmentMetric(.oral) }; Button("开始身体测评") { router.push(.bodyAssessment) }.font(.system(size: 14, weight: .bold)).frame(maxWidth: .infinity, minHeight: 46).background(ReferenceColor.blue, in: RoundedRectangle(cornerRadius: 12)).foregroundStyle(.white) }.padding(2) }.padding(.horizontal, 12)
+        ReferenceCard { VStack(spacing: 12) { HStack { VStack(alignment: .leading, spacing: 3) { Text("孩子本周健康任务").font(.system(size: 17, weight: .bold)).foregroundStyle(ReferenceColor.navy); Text(bodyAssessmentCardDetail).font(.system(size: 12)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }; Spacer(); Image(systemName: "figure.run.circle.fill").font(.system(size: 24)).foregroundStyle(ReferenceColor.blue) }; LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) { assessmentMetric(.fitness); assessmentMetric(.mental); assessmentMetric(.vision); assessmentMetric(.oral) }; Button(bodyAssessmentActionTitle) { router.push(.bodyAssessment) }.font(.system(size: 14, weight: .bold)).frame(maxWidth: .infinity, minHeight: 46).background(ReferenceColor.blue, in: RoundedRectangle(cornerRadius: 12)).foregroundStyle(.white) }.padding(2) }.padding(.horizontal, 12)
         LazyVGrid(columns: quickActionColumns, spacing: 8) {
             Button { if let child = state.selectedChild { router.push(.report(child)) } else { router.push(.children(returnAfterBinding: true)) } } label: { ReferenceAction(icon: "calendar", title: "测评报告", color: ReferenceColor.blue) }.buttonStyle(.plain)
             Button { router.push(.parentMessages) } label: { ReferenceAction(icon: "exclamationmark.circle.fill", title: "健康提醒", color: .red) }.buttonStyle(.plain)
@@ -141,6 +141,21 @@ struct ParentLandingView: View {
         }.buttonStyle(.plain).accessibilityLabel("查看\(title)报告")
     }
     private func assessmentMetric(_ category: AssessmentCategory) -> some View { Button { category == .fitness ? router.push(.bodyAssessment) : router.push(.assessment(category)) } label: { ReferenceMetric(icon: category.icon, title: category.rawValue, value: category == .fitness ? "身体测评" : "开始测评", color: category.color) }.buttonStyle(.plain) }
+
+    private var bodyAssessmentActionTitle: String {
+        guard let childID = state.selectedChild?.id else { return "开始身体测评" }
+        if state.localFeatures.bodyAssessmentDrafts[childID] != nil { return "继续身体测评" }
+        if state.localFeatures.bodyAssessments[childID] != nil { return "查看身体测评结果" }
+        return "开始身体测评"
+    }
+
+    private var bodyAssessmentCardDetail: String {
+        switch bodyAssessmentActionTitle {
+        case "继续身体测评": "已保存本次进度，可从上次步骤继续"
+        case "查看身体测评结果": "测评已完成，可查看结果与训练计划"
+        default: "优先完成身体测评，其他家庭记录可稍后填写"
+        }
+    }
 }
 
 struct ParentCampaignCard: View {

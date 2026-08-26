@@ -31,6 +31,8 @@ import com.xiangshang.youth.app.AppUiState
 import com.xiangshang.youth.app.AppViewModel
 import com.xiangshang.youth.app.CourseRecommendationTarget
 import com.xiangshang.youth.app.TeacherOverviewContext
+import com.xiangshang.youth.feature.parent.courseProgressFraction
+import com.xiangshang.youth.feature.parent.shouldCheckpoint
 import com.xiangshang.youth.core.util.ChildBindingValidator
 import com.xiangshang.youth.core.util.AuthIdentity
 import com.xiangshang.youth.core.util.BusinessClock
@@ -133,6 +135,17 @@ class LocalFeatureStateTest {
         assertNotEquals(first, AppViewModel.courseProgressKey("child-b", "course-1", lessonId = "lesson-1"))
         assertNotEquals(first, AppViewModel.courseProgressKey("child-a", "course-1", lessonId = "lesson-2"))
     }
+
+    @Test
+    fun coursePlayerProgressIsBoundedAndCheckpointedByPlaybackTime() {
+        assertEquals(0f, courseProgressFraction(5_000, 0, completed = false))
+        assertEquals(.5f, courseProgressFraction(15_000, 30_000, completed = false))
+        assertEquals(1f, courseProgressFraction(90_000, 30_000, completed = false))
+        assertEquals(1f, courseProgressFraction(0, 0, completed = true))
+        assertFalse(shouldCheckpoint(0, 14_999))
+        assertTrue(shouldCheckpoint(0, 15_000))
+        assertTrue(shouldCheckpoint(30_000, 15_000))
+    }
     @Test
     fun businessClockKeepsSchoolDayStableAcrossDeviceMidnight() {
         // 16:30 UTC is already the next school day in Shanghai, while it is
@@ -146,6 +159,7 @@ class LocalFeatureStateTest {
     fun voiceGuidancePreferenceIsOptOutAndSurvivesStateCopies() {
         val defaults = LocalAppSettings()
         assertTrue(defaults.voiceGuidanceEnabled)
+        assertFalse(defaults.analyticsEnabled)
         val muted = defaults.copy(voiceGuidanceEnabled = false)
         assertFalse(muted.voiceGuidanceEnabled)
         assertTrue(muted.notificationsEnabled)

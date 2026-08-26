@@ -176,6 +176,9 @@ struct LocalAppSettings: Codable, Equatable {
     /// Voice prompts apply to body capture and follow-along training. Persist
     /// the choice so a new session does not silently re-enable speech.
     var voiceGuidanceEnabled = true
+    /// Optional product-improvement events are disabled until the account
+    /// holder explicitly enables them in Settings.
+    var analyticsEnabled = false
 }
 
 struct FollowAlongSessionRecord: Codable, Identifiable, Equatable {
@@ -369,9 +372,10 @@ final class LocalFeatureStore: ObservableObject {
             if settings["notificationsEnabled"] == nil { settings["notificationsEnabled"] = true }
             if settings["reduceMotion"] == nil { settings["reduceMotion"] = false }
             if settings["voiceGuidanceEnabled"] == nil { settings["voiceGuidanceEnabled"] = true }
+            if settings["analyticsEnabled"] == nil { settings["analyticsEnabled"] = false }
             legacy["settings"] = settings
         } else {
-            legacy["settings"] = ["notificationsEnabled": true, "reduceMotion": false, "voiceGuidanceEnabled": true]
+            legacy["settings"] = ["notificationsEnabled": true, "reduceMotion": false, "voiceGuidanceEnabled": true, "analyticsEnabled": false]
         }
         if let messages = legacy["supportMessages"] as? [[String: Any]] {
             legacy["supportMessages"] = messages.map { message in

@@ -36,9 +36,9 @@ import SwiftUI
     @Published var classPostAttachmentData: [String: Data] = [:]
     @Published var classPostAttachmentErrors: [String: String] = [:]
     @Published var remoteCourses: [RemoteLesson] = []
-    @Published private(set) var notificationDrafts: [NotificationCampaign] = []
-    @Published private(set) var notificationDraftsLoading = false
-    @Published private(set) var notificationDraftsError: String?
+    @Published var notificationDrafts: [NotificationCampaign] = []
+    @Published var notificationDraftsLoading = false
+    @Published var notificationDraftsError: String?
     @Published var coursesLoading = false
     @Published var coursesError: String?
     @Published var remoteCoursesChildID: String?
@@ -131,22 +131,16 @@ import SwiftUI
                     self.data = try await repository.loadDashboard()
                     self.selectedChild = self.data?.students.first(where: { $0.id == self.localFeatures.selectedChildID && self.localFeatures.boundChildIDs.contains($0.id) })
                     self.refreshSelectedChildRemoteData()
+                    if self.repository.supportsRemoteAcknowledgement, !self.isOffline, self.pendingSyncCount > 0 {
+                        await self.syncPendingRecords()
+                    }
             } catch {
                 if case ApiError.unauthorized = error {
                     self.handleDashboardError(error)
                 } else {
-                    // A persisted session is only useful when its dashboard can be
-                    // refreshed.  Do not send the user into role selection with a
-                    // nil dashboard (which would leave every workbench loading
-                    // forever); return to login with an actionable error instead.
-                    self.mutateLocal { values in
-                        values.sessionProfile = nil
-                        values.sessionRole = nil
-                    }
-                    self.profile = nil
-                    self.selectedRole = nil
-                    self.selectedChild = nil
-                    self.data = nil
+                    // A transient network/backend failure is not evidence that
+                    // the credentials are invalid. Keep the secure token,
+                    // session profile and offline writes; only 401 logs out.
                     self.error = error.localizedDescription
                 }
             }
@@ -398,13 +392,13 @@ import SwiftUI
     func chooseAnotherRole() { selectedRole = nil; taskRosterRecords.removeAll() }
     func selectPrincipalTask(_ taskID: String) { mutateLocal { $0.selectedPrincipalTaskID = taskID } }
     func setTeacherSportsWorkbench(_ enabled: Bool) { mutateLocal { $0.teacherUsesSportsWorkbench = enabled } }
-    func recordHealthConsent(studentID: String, privacyVersion: String = "v1", cameraVersion: String = "v1", algorithmVersion: String = "posture-screening-v1") {
+    func recordHealthConsent(studentID: String, privacyVersion: String = LegalPolicy.privacyPolicyVersion, cameraVersion: String = LegalPolicy.cameraConsentVersion, algorithmVersion: String = LegalPolicy.algorithmNoticeVersion) {
         guard let profile else { return }
         mutateLocal { values in
             values.healthConsents[studentID] = HealthConsentRecord(consentID: UUID().uuidString, guardianUserID: profile.id, childID: studentID, privacyPolicyVersion: privacyVersion, cameraConsentVersion: cameraVersion, algorithmNoticeVersion: algorithmVersion, agreedAt: .now, revokedAt: nil, deviceInfo: UIDevice.current.model, dataRetentionNoticeAccepted: true)
         }
     }
-    func switchAccount() { ApiClient.shared.clearSession(); featureStore.reset(); localFeatures = featureStore.state; profile = nil; selectedRole = nil; selectedChild = nil; data = nil; error = nil; reportLoading = false; reportError = nil; workflowStates.removeAll(); refreshedReports.removeAll(); taskRosterRecords.removeAll() }
+    func switchAccount() { ApiClient.shared.clearSession(); featureStore.reset(); localFeatures = featureStore.state; FrontendTelemetry.configure(enabled: false); profile = nil; selectedRole = nil; selectedChild = nil; data = nil; error = nil; reportLoading = false; reportError = nil; workflowStates.removeAll(); refreshedReports.removeAll(); taskRosterRecords.removeAll() }
     private var refreshedReports: [String: DiagnosisReport] = [:]
     func report(for student: Student) -> DiagnosisReport { refreshedReports[student.id] ?? repository.report(for: student) }
     /// Remote dashboards must never paint a bundled demonstration result before
@@ -494,83 +488,6 @@ import SwiftUI
         }
     }
 
-    func submitClassNotice(classID: String, title: String, content: String) async -> Bool {
-        let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let normalizedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let schoolID = profile?.schoolID, !classID.isEmpty, !normalizedTitle.isEmpty, !normalizedContent.isEmpty else {
-            workflowStates["notice:\(classID)"] = .failed("请填写标题、正文并选择授权班级。")
-            return false
-        }
-        return await executeWorkflow("notice:\(classID)") { _ = try await self.repository.sendClassNotice(schoolID: schoolID, classID: classID, title: normalizedTitle, content: normalizedContent) }
-    }
-
-    func loadNotificationDrafts() async {
-        guard let schoolID = profile?.schoolID else { return }
-        notificationDraftsLoading = true
-        notificationDraftsError = nil
-        do {
-            notificationDrafts = try await repository.listNotificationDrafts(schoolID: schoolID)
-        } catch {
-            notificationDraftsError = error.localizedDescription
-        }
-        notificationDraftsLoading = false
-    }
-
-    func saveNotificationDraft(notificationID: String?, classIDs: [String], title: String, content: String, draftVersion: Int?, parentReceiptEnabled: Bool, scheduledAt: String? = nil) async -> NotificationCampaign? {
-        let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let normalizedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
-        let targets = Array(Set(classIDs.filter { !$0.isEmpty })).sorted()
-        guard let schoolID = profile?.schoolID, !targets.isEmpty, normalizedTitle.count >= 2, normalizedContent.count >= 4 else {
-            workflowStates["notice:draft"] = .failed("请填写标题、正文并选择授权班级。")
-            return nil
-        }
-        workflowStates["notice:draft"] = .submitting
-        do {
-            let draft: NotificationCampaign
-            if let notificationID, let draftVersion {
-                draft = try await repository.updateNotificationDraft(notificationID: notificationID, schoolID: schoolID, classIDs: targets, title: normalizedTitle, content: normalizedContent, draftVersion: draftVersion, recipientScope: "class", scheduledAt: scheduledAt, parentReceiptEnabled: parentReceiptEnabled)
-            } else {
-                draft = try await repository.createNotificationDraft(schoolID: schoolID, classIDs: targets, title: normalizedTitle, content: normalizedContent, recipientScope: "class", scheduledAt: scheduledAt, parentReceiptEnabled: parentReceiptEnabled)
-            }
-            notificationDrafts = [draft] + notificationDrafts.filter { $0.notificationID != draft.notificationID }
-            workflowStates["notice:draft"] = .succeeded("通知草稿已保存。")
-            return draft
-        } catch {
-            workflowStates["notice:draft"] = .failed(error.localizedDescription)
-            return nil
-        }
-    }
-
-    func sendNotificationDraft(notificationID: String) async -> Bool {
-        let succeeded = await executeWorkflow("notice:send:\(notificationID)") {
-            _ = try await self.repository.sendNotification(notificationID: notificationID)
-        }
-        if succeeded { notificationDrafts.removeAll { $0.notificationID == notificationID } }
-        return succeeded
-    }
-
-    func discardNotificationDraft(notificationID: String) async -> Bool {
-        let succeeded = await executeWorkflow("notice:discard:\(notificationID)") {
-            try await self.repository.discardNotificationDraft(notificationID: notificationID)
-        }
-        if succeeded { notificationDrafts.removeAll { $0.notificationID == notificationID } }
-        return succeeded
-    }
-
-    func loadClassNoticeDetail(notificationID: String) async -> NotificationCampaignDetail? {
-        do {
-            return try await repository.loadClassNotice(notificationID: notificationID)
-        } catch {
-            workflowStates["notice:detail:\(notificationID)"] = .failed(error.localizedDescription)
-            return nil
-        }
-    }
-
-    func acknowledgeClassNotice(notificationID: String) async -> Bool {
-        await executeWorkflow("notice:receipt:\(notificationID)") {
-            _ = try await self.repository.acknowledgeClassNotice(notificationID: notificationID)
-        }
-    }
 
     func selectChild(_ student: Student) {
         // Clear the previous child's visible record before loading the new
@@ -696,8 +613,13 @@ import SwiftUI
             mutateLocal { $0.bodyAssessmentSyncStates[studentID] = .submitting }
             do {
                 guard let consent = localFeatures.healthConsents[studentID], consent.revokedAt == nil else { throw ApiError.message("请先完成监护人授权后再同步身体测评") }
+                guard consent.privacyPolicyVersion == LegalPolicy.privacyPolicyVersion,
+                      consent.cameraConsentVersion == LegalPolicy.cameraConsentVersion,
+                      consent.algorithmNoticeVersion == LegalPolicy.algorithmNoticeVersion else {
+                    throw ApiError.message("授权说明已更新，请重新确认后再同步身体测评")
+                }
                 try await repository.grantHealthConsent(consent)
-                let canonicalReport = try await repository.submitBodyAssessment(studentID: studentID, record: record, consentVersion: "v1")
+                let canonicalReport = try await repository.submitBodyAssessment(studentID: studentID, record: record, consentVersion: consent.privacyPolicyVersion)
                 if let canonicalReport {
                     mutateLocal { values in
                         guard var latest = values.bodyAssessments[studentID] else { return }
@@ -971,19 +893,23 @@ import SwiftUI
             $0.taskScopedSyncStates[key] = .failed
         }
     }
-    func updateSettings(notificationsEnabled: Bool? = nil, reduceMotion: Bool? = nil, voiceGuidanceEnabled: Bool? = nil) {
+    func updateSettings(notificationsEnabled: Bool? = nil, reduceMotion: Bool? = nil, voiceGuidanceEnabled: Bool? = nil, analyticsEnabled: Bool? = nil) {
         mutateLocal { values in
             if let notificationsEnabled { values.settings.notificationsEnabled = notificationsEnabled }
             if let reduceMotion { values.settings.reduceMotion = reduceMotion }
             if let voiceGuidanceEnabled { values.settings.voiceGuidanceEnabled = voiceGuidanceEnabled }
+            if let analyticsEnabled { values.settings.analyticsEnabled = analyticsEnabled }
         }
+        FrontendTelemetry.configure(enabled: localFeatures.settings.analyticsEnabled && usesRemoteDataSource)
     }
     func setOffline(_ value: Bool) {
         isOffline = value
         // Restore/relaunch can report an online path without a preceding
         // offline transition.  Retry persisted writes whenever the app has a
         // usable session and the sync command is not already running.
-        if !value && profile != nil && pendingSyncCount > 0 && !workflowState(for: "sync-pending").isSubmitting {
+        if !value && profile != nil && data == nil && !loading {
+            Task { await refreshDashboard() }
+        } else if !value && profile != nil && pendingSyncCount > 0 && !workflowState(for: "sync-pending").isSubmitting {
             Task { await syncPendingRecords() }
         }
     }
@@ -1038,6 +964,7 @@ import SwiftUI
         _ = featureStore.update(body)
         localFeatures = featureStore.state
         localPersistenceError = featureStore.persistenceError
+        if pendingSyncCount > 0 { BackgroundSyncScheduler.schedule() }
     }
     func clearLocalPersistenceError() { localPersistenceError = nil }
     /// School records use the product's business day rather than the device

@@ -9,6 +9,46 @@ private final class IncompleteRemoteRepository: YouthRepository {
 
 @MainActor
 final class LocalFeatureStateTests: XCTestCase {
+    private func authorizeTeacherFixture(_ state: AppState) {
+        state.profile = UserProfile(
+            id: "teacher-test", name: "测试教师", phone: "13800138000", role: .teacher,
+            schoolName: "向上实验小学", avatarInitials: "教",
+            authorizedClassIDs: ["c31", "c32"],
+            capabilities: ["VIEW_CLASS_DASHBOARD", "VIEW_TEST_TASKS", "UPDATE_TEST_STATUS", "REVIEW_RESULT", "REQUEST_RETEST"]
+        )
+        state.selectedRole = .teacher
+    }
+
+    func testLegalPolicyVersionsAreConcreteAndCameraWordingMatchesLocalProcessing() {
+        XCTAssertNotEqual(LegalPolicy.privacyPolicyVersion, "v1")
+        XCTAssertNotEqual(LegalPolicy.cameraConsentVersion, "v1")
+        XCTAssertTrue(LegalDocument.privacy.content.contains("不保存原始照片或视频"))
+        XCTAssertTrue(LegalDocument.childPrivacy.content.contains("照片、视频和帧不保存、不上传"))
+        XCTAssertFalse(LegalDocument.childPrivacy.content.contains("原始影像按学校配置"))
+        XCTAssertTrue(LegalDocument.privacy.content.contains("发送匿名使用情况"))
+    }
+
+    func testProductEventContractContainsNoIdentityOrHealthFields() throws {
+        XCTAssertFalse(LocalAppSettings().analyticsEnabled)
+        let event = ProductEventInput(
+            eventID: UUID(uuidString: "11111111-1111-4111-8111-111111111111")!,
+            eventName: FrontendEvent.growthReportOpened.rawValue,
+            coarseValue: "本周", platform: "ios", appVersion: "1.0",
+            clientSessionID: UUID(uuidString: "22222222-2222-4222-8222-222222222222")!,
+            occurredAt: "2026-08-26T08:00:00Z"
+        )
+        let json = String(decoding: try JSONEncoder().encode(event), as: UTF8.self)
+        XCTAssertTrue(json.contains("clientSessionId"))
+        XCTAssertFalse(json.contains("childId"))
+        XCTAssertFalse(json.contains("studentId"))
+        XCTAssertFalse(json.contains("userId"))
+        XCTAssertFalse(json.contains("health"))
+    }
+    func testWriteFingerprintIsDeterministicAndContentSensitive() {
+        XCTAssertEqual(StableWriteFingerprint.make("内容举报"), StableWriteFingerprint.make("内容举报"))
+        XCTAssertNotEqual(StableWriteFingerprint.make("内容举报"), StableWriteFingerprint.make("其他原因"))
+        XCTAssertEqual(StableWriteFingerprint.make("hello"), "a430d84680aabd0b")
+    }
     func testMissingRemoteEnvelopePayloadIsNotRenderedAsEmptyContent() throws {
         let missing = #"{"code":"OK","message":"ok"}"#.data(using: .utf8)!
         XCTAssertThrowsError(try ApiClient.decodePayload(missing, type: [String].self)) { error in
@@ -1134,7 +1174,7 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertTrue(restored.restoringSession, "Session restoration must be visible synchronously so the launch poster cannot transition to a half-restored role screen.")
     }
 
-    func testSessionRestoreFailureReturnsToLoginWithRetryableError() async throws {
+    func testTransientSessionRestoreFailurePreservesCredentialsAndOfflineWritesForRetry() async throws {
         let suite = "xiangshang.youth.restore-failure-tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defaults.removePersistentDomain(forName: suite)
@@ -1150,13 +1190,13 @@ final class LocalFeatureStateTests: XCTestCase {
             try await Task.sleep(for: .milliseconds(10))
         }
 
-        XCTAssertNil(state.profile)
+        XCTAssertEqual(state.profile?.id, "u1")
         XCTAssertNil(state.selectedRole)
         XCTAssertNil(state.data)
         XCTAssertNotNil(state.error)
         state.clearError()
         XCTAssertNil(state.error)
-        XCTAssertNil(LocalFeatureStore(defaults: defaults).state.sessionProfile)
+        XCTAssertEqual(LocalFeatureStore(defaults: defaults).state.sessionProfile?.id, "u1")
     }
 
     func testMessageReadStatePersistsAndUpdatesUnreadCount() async {
@@ -1235,6 +1275,7 @@ final class LocalFeatureStateTests: XCTestCase {
         defaults.removePersistentDomain(forName: suite)
         let state = AppState(repository: MockRepository.shared, featureStore: LocalFeatureStore(defaults: defaults))
         await state.login(phone: "13800138000")
+        authorizeTeacherFixture(state)
 
         let activityResult = await state.submitActivityCommand("health-growth-season-2026", contactName: "王女士", phone: "13800138000")
         XCTAssertTrue(activityResult)
@@ -1257,7 +1298,11 @@ final class LocalFeatureStateTests: XCTestCase {
         defaults.removePersistentDomain(forName: suite)
         let state = AppState(repository: TaskStatusFailingRepository(), featureStore: LocalFeatureStore(defaults: defaults))
         await state.login(phone: "13800138000")
-        let student = try XCTUnwrap(state.data?.students.first(where: { $0.id == "s06" }))
+        authorizeTeacherFixture(state)
+        // s19 belongs to the fixture's authorized c31 scope and can legally
+        // transition from absent to checked-in. The old s06 fixture is in c52
+        // and correctly fails the production authorization guard.
+        let student = try XCTUnwrap(state.data?.students.first(where: { $0.id == "s19" }))
 
         let succeeded = await state.submitTaskStatusCommand(taskID: "task-retry", studentID: student.id, status: .checkedIn, note: "已到场")
 
@@ -1274,7 +1319,8 @@ final class LocalFeatureStateTests: XCTestCase {
         defaults.removePersistentDomain(forName: suite)
         let state = AppState(repository: TaskStatusConflictRepository(), featureStore: LocalFeatureStore(defaults: defaults))
         await state.login(phone: "13800138000")
-        let student = try XCTUnwrap(state.data?.students.first(where: { $0.id == "s06" }))
+        authorizeTeacherFixture(state)
+        let student = try XCTUnwrap(state.data?.students.first(where: { $0.id == "s19" }))
 
         let succeeded = await state.submitTaskStatusCommand(taskID: "task-conflict", studentID: student.id, status: .checkedIn, note: "已到场")
 
@@ -1324,6 +1370,16 @@ final class LocalFeatureStateTests: XCTestCase {
         let otherLesson = AppState.courseProgressKey(childID: "child-a", courseID: "course-1", lessonID: "lesson-2")
         XCTAssertNotEqual(first, otherChild)
         XCTAssertNotEqual(first, otherLesson)
+    }
+
+    func testPlaybackSourceDecodesSignedMediaAndOptionalCaptionTracks() throws {
+        let payload = Data(#"{"lessonId":"lesson-1","courseId":"course-1","videoSource":"https://media.example.test/signed.m3u8","durationMs":30000,"captions":[{"url":"https://media.example.test/zh.vtt","language":"zh-CN","label":"中文","mimeType":"text/vtt"}]}"#.utf8)
+        let source = try JSONDecoder().decode(PlaybackSource.self, from: payload)
+
+        XCTAssertEqual(source.lessonID, "lesson-1")
+        XCTAssertEqual(source.videoSource, "https://media.example.test/signed.m3u8")
+        XCTAssertEqual(source.captions?.first?.language, "zh-CN")
+        XCTAssertEqual(source.captions?.first?.mimeType, "text/vtt")
     }
 
     func testMockSupportMessageIsSavedLocallyWithoutInventingAServiceReply() async {

@@ -17,6 +17,7 @@ try {
   const runtimeHeartbeats = await pool.query(`DELETE FROM runtime_heartbeats WHERE last_seen_at < now() - interval '7 days' RETURNING instance_id`);
   const healthRetention = await pool.query(`DELETE FROM body_assessments WHERE retention_until IS NOT NULL AND retention_until < now() RETURNING id`);
   const auditRetention = await pool.query(`DELETE FROM audit_logs WHERE retention_until IS NOT NULL AND retention_until < now() RETURNING id`);
+  const productEvents = await pool.query(`DELETE FROM product_events WHERE received_at < now() - ($1::int * interval '1 day') RETURNING event_id`, [config.productEventRetentionDays]);
   const files = await pool.query(`SELECT id,object_key,purpose,status,retention_until AS "retentionUntil" FROM files
     WHERE (purpose='field_evidence' AND (
       (status <> 'uploaded' AND expires_at < now())
@@ -46,7 +47,7 @@ try {
       console.error(JSON.stringify({ event: 'file.cleanup_failed', fileId: file.id, purpose: file.purpose, error: error.message }));
     }
   }
-  console.log(JSON.stringify({ expiredIdempotencyKeys: expired.rowCount, expiredRateLimits: rateLimits.rowCount, expiredSessions: sessions.rowCount, expiredPasswordResets: passwordResets.rowCount, expiredBindingCodes: bindingCodes.rowCount, expiredDeviceRequestNonces: deviceRequestNonces.rowCount, expiredOauthStates: oauthStates.rowCount, removedJobs: jobs.rowCount, removedRuntimeHeartbeats: runtimeHeartbeats.rowCount, removedHealthAssessments: healthRetention.rowCount, removedAuditLogs: auditRetention.rowCount, removedFiles, purgedFieldEvidence, failedFileRemovals }));
+  console.log(JSON.stringify({ expiredIdempotencyKeys: expired.rowCount, expiredRateLimits: rateLimits.rowCount, expiredSessions: sessions.rowCount, expiredPasswordResets: passwordResets.rowCount, expiredBindingCodes: bindingCodes.rowCount, expiredDeviceRequestNonces: deviceRequestNonces.rowCount, expiredOauthStates: oauthStates.rowCount, removedJobs: jobs.rowCount, removedRuntimeHeartbeats: runtimeHeartbeats.rowCount, removedHealthAssessments: healthRetention.rowCount, removedAuditLogs: auditRetention.rowCount, removedProductEvents: productEvents.rowCount, removedFiles, purgedFieldEvidence, failedFileRemovals }));
 } finally {
   await pool.end();
 }

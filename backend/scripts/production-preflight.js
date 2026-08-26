@@ -23,6 +23,9 @@ add(config.backupHeartbeatMaxAgeSeconds < config.backupHeartbeatIntervalSeconds 
 add(config.storageDriver !== 's3', '生产环境必须使用 FILE_STORAGE_DRIVER=s3，不能使用本地证据存储');
 const storageEndpoint = validateUrl(config.storageEndpoint, 'S3_STORAGE_ENDPOINT');
 const origin = validateUrl(config.corsOrigin, 'CORS_ORIGIN');
+validateUrl(config.smsWebhookUrl, 'SMS_WEBHOOK_URL');
+validateUrl(config.notificationWebhookUrl, 'NOTIFICATION_WEBHOOK_URL');
+add(!config.wechatAppId || !config.wechatAppSecret || !config.wechatRedirectUri, '生产登录页已提供微信登录，必须配置完整微信开放平台参数');
 if (origin && publicHost && origin.hostname.toLowerCase() !== publicHost) errors.push('CORS_ORIGIN 必须是与 PUBLIC_HOST 相同的 HTTPS Origin');
 if (config.storageDriver === 's3' && storageEndpoint) {
   try { createStorage(config); } catch (error) { errors.push(`对象存储配置无效：${error.message}`); }

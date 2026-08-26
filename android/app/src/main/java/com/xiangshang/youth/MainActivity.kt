@@ -16,9 +16,6 @@ import com.xiangshang.youth.app.AppViewModel
 import com.xiangshang.youth.app.XiangshangYouthTheme
 import com.xiangshang.youth.app.AppNavHost
 import com.xiangshang.youth.core.model.BodyCaptureQualityGate
-import com.xiangshang.youth.core.service.ApiClient
-import com.xiangshang.youth.core.monitoring.CrashMonitoring
-import com.xiangshang.youth.core.service.FeatureRollout
 import com.xiangshang.youth.feature.parent.ChildFollowAlongTuning
 
 class MainActivity : ComponentActivity() {
@@ -28,9 +25,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        CrashMonitoring.initialize(this)
-        FeatureRollout.initialize(this)
-        ApiClient.initialize(this)
         preloadPostureCaptureProfiles()
         preloadFollowAlongProfiles()
         // The visual spec uses full-bleed artwork on the launch/login surfaces.
@@ -75,7 +69,10 @@ class MainActivity : ComponentActivity() {
         // Refresh only when an authenticated session exists; AppViewModel safely
         // no-ops during the splash/login flow. This keeps dashboards current after
         // returning from Settings, WeChat, file pickers, or another app.
-        if (::appViewModel.isInitialized && !appViewModel.state.value.isOffline) appViewModel.refreshDashboard()
+        if (::appViewModel.isInitialized && !appViewModel.state.value.isOffline) {
+            appViewModel.refreshDashboard()
+            if (appViewModel.state.value.pendingSyncCount > 0) appViewModel.syncPendingRecords()
+        }
     }
 
     override fun onNewIntent(intent: Intent) {

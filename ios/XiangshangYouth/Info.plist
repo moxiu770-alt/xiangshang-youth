@@ -46,6 +46,15 @@
 	<string>$(USE_REMOTE_DATA_SOURCE)</string>
 	<key>RolloutConfigURL</key>
 	<string>$(ROLLOUT_CONFIG_URL)</string>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.xiangshang.youth.pending-sync</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>processing</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
     <string>LaunchScreen</string>
 	<key>UIUserInterfaceStyle</key>

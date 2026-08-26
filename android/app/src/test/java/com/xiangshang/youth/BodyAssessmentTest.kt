@@ -35,6 +35,20 @@ class BodyAssessmentTest {
         assertEquals(4, com.xiangshang.youth.feature.parent.bodyAssessmentStepAfterMetrics(true))
         assertEquals(3, com.xiangshang.youth.feature.parent.bodyAssessmentStepAfterMetrics(false))
     }
+
+    @Test
+    fun nineStepDraftRestoresResultAndPlanWithoutLegacyClamping() {
+        val resultDraft = BodyAssessmentDraft(stage = 7, guardianReady = true, consentAcknowledged = true)
+        val planDraft = BodyAssessmentDraft(stage = 8, guardianReady = true, consentAcknowledged = true)
+        assertEquals(7, com.xiangshang.youth.feature.parent.initialBodyAssessmentStage(resultDraft, false, true))
+        assertEquals(8, com.xiangshang.youth.feature.parent.initialBodyAssessmentStage(planDraft, false, true))
+    }
+
+    @Test
+    fun outdatedConsentReturnsResumedDraftToConsentGate() {
+        val cameraDraft = BodyAssessmentDraft(stage = 5, guardianReady = true, consentAcknowledged = true)
+        assertEquals(1, com.xiangshang.youth.feature.parent.initialBodyAssessmentStage(cameraDraft, false, false))
+    }
     private fun resolveBodyCaptureProfileJson(): String {
         val candidates = listOf(
             File(requireNotNull(System.getProperty("user.dir"))).resolve("android/app/src/main/assets/body_pose_capture_profiles.json"),

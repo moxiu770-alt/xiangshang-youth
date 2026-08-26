@@ -20,6 +20,10 @@ export const config = {
   /** HTTPS webhook owned by the selected SMS provider or notification gateway. */
   smsWebhookUrl: process.env.SMS_WEBHOOK_URL || '',
   smsWebhookAuthorization: process.env.SMS_WEBHOOK_AUTHORIZATION || '',
+  /** Provider-neutral APNs/FCM/SMS/WeChat gateway used by the durable outbox worker. */
+  notificationWebhookUrl: process.env.NOTIFICATION_WEBHOOK_URL || '',
+  notificationWebhookAuthorization: process.env.NOTIFICATION_WEBHOOK_AUTHORIZATION || '',
+  notificationWebhookTimeoutMs: Math.min(30_000, Math.max(1_000, Number(process.env.NOTIFICATION_WEBHOOK_TIMEOUT_MS || 10_000) || 10_000)),
   wechatAppId: process.env.WECHAT_APP_ID || '',
   wechatAppSecret: process.env.WECHAT_APP_SECRET || '',
   wechatRedirectUri: process.env.WECHAT_REDIRECT_URI || '',
@@ -28,6 +32,7 @@ export const config = {
   trustProxy: process.env.TRUST_PROXY === 'true',
   requireHealthConsent: process.env.REQUIRE_HEALTH_CONSENT === 'true' || (process.env.REQUIRE_HEALTH_CONSENT === undefined && isProduction),
   healthRetentionDays: Math.max(30, Number(process.env.HEALTH_DATA_RETENTION_DAYS || 2555) || 2555),
+  productEventRetentionDays: Math.min(365, Math.max(30, Number(process.env.PRODUCT_EVENT_RETENTION_DAYS || 90) || 90)),
   metricsToken: process.env.METRICS_TOKEN || '',
   storageDriver: process.env.FILE_STORAGE_DRIVER || 'local',
   storageRoot: process.env.STORAGE_ROOT || '',

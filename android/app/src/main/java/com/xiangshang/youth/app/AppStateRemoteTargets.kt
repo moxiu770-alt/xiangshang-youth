@@ -1,9 +1,15 @@
 package com.xiangshang.youth.app
 
+import android.app.Application
 import androidx.lifecycle.viewModelScope
+import com.xiangshang.youth.core.service.ApiClient
 import com.xiangshang.youth.core.service.ApiError
+import com.xiangshang.youth.core.service.ContentManifestApi
+import com.xiangshang.youth.core.service.ContentManifestVersionStore
+import com.xiangshang.youth.core.service.requireData
 import com.xiangshang.youth.core.model.UserRole
 import com.xiangshang.youth.core.service.RemoteLesson
+import com.xiangshang.youth.core.service.PlaybackSource
 import com.xiangshang.youth.core.service.ClassPost
 import com.xiangshang.youth.core.service.ClassPostAttachment
 import com.xiangshang.youth.core.service.LocalSubmissionStatus
@@ -26,11 +32,27 @@ fun AppViewModel.clearActivityTarget() = updateRemoteTargetState { it.copy(pendi
 fun AppViewModel.openExpertAppointmentTarget(appointmentId: String) = updateRemoteTargetState { it.copy(pendingExpertAppointmentId = appointmentId) }
 fun AppViewModel.clearExpertAppointmentTarget() = updateRemoteTargetState { it.copy(pendingExpertAppointmentId = null) }
 
+private suspend fun AppViewModel.refreshPublishedContentManifest() {
+    if (!repository.supportsRemoteAcknowledgement) return
+    val schoolId = _state.value.profile?.schoolId?.takeIf(String::isNotBlank)
+    val roleChannel = if (_state.value.role == UserRole.Teacher) "teacher" else "family"
+    val store = ContentManifestVersionStore(getApplication<Application>())
+    val api = ApiClient.retrofit.create(ContentManifestApi::class.java)
+    listOf("mobile", roleChannel).distinct().forEach { channel ->
+        val knownVersion = store.version(schoolId, channel)
+        val manifest = api.manifest(schoolId, channel, knownVersion).requireData()
+        if (manifest.dataAvailable) store.acknowledge(schoolId, channel, manifest.version)
+    }
+}
+
 /** Activity and appointment catalogues are one remote-content domain. */
 fun AppViewModel.loadActivities() {
     _state.value = _state.value.copy(activitiesLoading = true, activitiesError = null)
     viewModelScope.launch {
-        runCatching { repository.activities(_state.value.selectedChild?.id) to repository.activityRegistrationHistory() }
+        runCatching {
+            runCatching { refreshPublishedContentManifest() }
+            repository.activities(_state.value.selectedChild?.id) to repository.activityRegistrationHistory()
+        }
             .onSuccess { (activities, history) ->
                 _state.value = _state.value.copy(activitiesLoading = false, remoteActivities = activities, activityRegistrationHistory = history)
             }
@@ -44,7 +66,10 @@ fun AppViewModel.loadActivities() {
 fun AppViewModel.loadExperts() {
     _state.value = _state.value.copy(expertsLoading = true, expertsError = null)
     viewModelScope.launch {
-        runCatching { repository.experts() to repository.expertAppointmentHistory() }
+        runCatching {
+            runCatching { refreshPublishedContentManifest() }
+            repository.experts() to repository.expertAppointmentHistory()
+        }
             .onSuccess { (experts, history) ->
                 _state.value = _state.value.copy(expertsLoading = false, remoteExperts = experts, expertAppointmentHistory = history)
             }
@@ -104,9 +129,12 @@ fun AppViewModel.loadClassPostAttachment(fileId: String) {
 /** Course catalogue and progress use stable child/course/module/lesson identifiers. */
 fun AppViewModel.loadCourses(childId: String) {
     if (!repository.supportsRemoteAcknowledgement) return
-    _state.value = _state.value.copy(coursesLoading = true, coursesError = null, remoteCourses = emptyList(), coursesChildId = childId)
+    _state.value = _state.value.copy(coursesLoading = true, coursesError = null, remoteCourses = emptyList(), coursesChildId = childId, courseProgressSaveError = null, courseProgressSaveConflict = false)
     viewModelScope.launch {
-        runCatching { repository.courses(childId) }
+        runCatching {
+            runCatching { refreshPublishedContentManifest() }
+            repository.courses(childId)
+        }
             .onSuccess { courses -> if (_state.value.coursesChildId == childId) _state.value = _state.value.copy(coursesLoading = false, remoteCourses = courses) }
             .onFailure { error ->
                 if (error is ApiError.Unauthorized) handleDashboardFailure(error)
@@ -115,15 +143,46 @@ fun AppViewModel.loadCourses(childId: String) {
     }
 }
 
+fun AppViewModel.loadLessonPlayback(lessonId: String) {
+    if (!repository.supportsRemoteAcknowledgement) return
+    _state.value = _state.value.copy(coursePlayback = null, coursePlaybackLessonId = lessonId, coursePlaybackLoading = true, coursePlaybackError = null)
+    viewModelScope.launch {
+        runCatching { repository.lessonPlayback(lessonId) }
+            .onSuccess { playback ->
+                if (_state.value.coursePlaybackLessonId == lessonId) {
+                    _state.value = _state.value.copy(coursePlayback = playback, coursePlaybackLoading = false)
+                }
+            }
+            .onFailure { error ->
+                if (error is ApiError.Unauthorized) handleDashboardFailure(error)
+                else if (_state.value.coursePlaybackLessonId == lessonId) {
+                    _state.value = _state.value.copy(coursePlaybackLoading = false, coursePlaybackError = error.message ?: "课程视频加载失败")
+                }
+            }
+    }
+}
+
+fun AppViewModel.clearLessonPlayback() {
+    _state.value = _state.value.copy(coursePlayback = null, coursePlaybackLessonId = null, coursePlaybackLoading = false, coursePlaybackError = null)
+}
+
 fun AppViewModel.saveRemoteLessonProgress(childId: String, lesson: RemoteLesson, lastPositionMs: Int, completed: Boolean) = viewModelScope.launch {
     if (!repository.supportsRemoteAcknowledgement) return@launch
+    _state.value = _state.value.copy(courseProgressSaveLessonId = lesson.lessonId, courseProgressSaving = true, courseProgressSaveError = null, courseProgressSaveConflict = false)
     runCatching { repository.saveLessonProgress(childId, lesson.lessonId, lastPositionMs, completed, lesson.version) }
         .onSuccess { ack ->
             val key = AppViewModel.courseProgressKey(childId, lesson.courseId, lesson.moduleId ?: "default", lesson.lessonId)
             mutate { it.copy(courseProgress = it.courseProgress + (key to if (ack.completed) 1f else (ack.lastPositionMs.toFloat() / lesson.durationMs.coerceAtLeast(1)).coerceIn(0f, 1f))) }
-            _state.value = _state.value.copy(remoteCourses = _state.value.remoteCourses.map { current -> if (current.lessonId == ack.lessonId) current.copy(lastPositionMs = ack.lastPositionMs, completed = ack.completed, version = ack.version) else current })
+            _state.value = _state.value.copy(remoteCourses = _state.value.remoteCourses.map { current -> if (current.lessonId == ack.lessonId) current.copy(lastPositionMs = ack.lastPositionMs, completed = ack.completed, version = ack.version) else current }, courseProgressSaving = false, courseProgressSaveError = null, courseProgressSaveConflict = false)
         }
-        .onFailure { if (it is ApiError.Unauthorized) handleDashboardFailure(it) }
+        .onFailure { error ->
+            if (error is ApiError.Unauthorized) handleDashboardFailure(error)
+            else _state.value = _state.value.copy(
+                courseProgressSaving = false,
+                courseProgressSaveError = if (error is ApiError.Conflict) "播放进度已在其他设备更新，请刷新课程后重试。" else (error.message ?: "播放进度暂未同步，请重试。"),
+                courseProgressSaveConflict = error is ApiError.Conflict
+            )
+        }
 }
 
 /** Class-circle writes are isolated from the notification and support-message domains. */

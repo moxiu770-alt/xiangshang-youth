@@ -324,20 +324,13 @@ struct LoginView: View {
     }
 }
 
-private enum LegalDocument: String, Identifiable {
-    case userAgreement = "用户协议"
-    case privacy = "隐私政策"
-    case childPrivacy = "儿童隐私政策"
-    var id: String { rawValue }
-}
-
 private struct LegalDocumentView: View {
     let document: LegalDocument
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         NavigationStack {
             ScrollView {
-                Text(content)
+                Text(document.content)
                     .font(.body).foregroundStyle(ReferenceColor.navy).frame(maxWidth: .infinity, alignment: .leading).padding(20)
             }
             .navigationTitle(document.rawValue)
@@ -345,16 +338,6 @@ private struct LegalDocumentView: View {
         }
     }
 
-    private var content: String {
-        switch document {
-        case .userAgreement:
-            return "《用户协议》\n\n一、服务范围\n向上少年为学校、教师、家长提供学生运动能力记录、测评报告、训练建议和通知服务。账号仅限本人使用，不得转让、出租或用于批量抓取数据。\n\n二、账号与安全\n请使用真实、可验证的手机号或学校提供的账号。你应妥善保管验证码、密码和设备，发现异常登录应立即联系学校管理员。\n\n三、学校数据\n学校体测成绩、报告及任务状态由学校授权人员和合规体测场地端录入。家长可以查看已绑定孩子的数据，不得访问其他学生信息。\n\n四、服务边界\n平台提供运动能力筛查和训练建议，不构成医疗诊断、治疗或急救意见。出现身体不适时应停止训练并咨询专业人员。\n\n五、联系我们\n账号、数据或未成年人权益问题，请联系所属学校管理员或平台客服。"
-        case .privacy:
-            return "《隐私政策》\n\n我们仅在提供学校运动管理、测评报告、训练反馈和消息通知所必需的范围内处理账号、学校关系、设备日志及健康测评数据。\n\n健康数据包括身高、体重、BMI、姿态指标、运动成绩和报告。处理前会展示用途并记录家长同意；数据按学校授权范围访问，传输使用加密连接，敏感凭证保存在系统安全存储中。\n\n我们不会出售儿童数据。服务商仅在完成存储、消息或运维任务所需范围内处理数据，并受合同和访问审计约束。\n\n家长可查看、导出、更正或申请删除已绑定孩子的数据。删除申请会先完成身份与学校关系核验，完成后健康记录、成绩和绑定关系会被清理或匿名化。"
-        case .childPrivacy:
-            return "《儿童隐私政策》\n\n本平台面向未成年人提供服务。儿童账号和健康测评由家长、学校或依法授权的工作人员管理，儿童本人不需要独立提供可识别信息。\n\n我们只收集完成运动测评、报告和训练所需的最少信息，不使用儿童数据进行个性化广告或与服务无关的画像。姿态采集用于生成测评指标，原始影像按学校配置的保存期限处理，并设置访问审计。\n\n家长可以随时撤回同意、查询处理记录、申请导出或删除。若撤回同意，相关测评和训练功能可能无法继续，但不会影响已完成服务之外的其他权益。\n\n如发现儿童信息被误用，请联系学校管理员或平台客服，我们会优先处理。"
-        }
-    }
 }
 
 private enum LoginMethod: String, CaseIterable {

@@ -1,13 +1,62 @@
 import Foundation
 
+private struct MobileContentManifest: Decodable {
+    let dataAvailable: Bool
+    let changed: Bool
+    let version: Int
+}
+
+/// Persists only the last acknowledged publication version. The catalogue
+/// itself remains repository-owned so a manifest failure can never make stale
+/// or bundled content look authoritative in Remote mode.
+private final class MobileContentManifestStore {
+    private let client: ApiClient
+    private let defaults: UserDefaults
+
+    init(client: ApiClient = .shared, defaults: UserDefaults = .standard) {
+        self.client = client
+        self.defaults = defaults
+    }
+
+    func refresh(schoolID: String?, channel: String) async throws -> MobileContentManifest {
+        let scope = schoolID?.isEmpty == false ? schoolID! : "global"
+        let key = "content-manifest.\(scope).\(channel)"
+        let knownVersion = max(0, defaults.integer(forKey: key))
+        var query = [
+            URLQueryItem(name: "channel", value: channel),
+            URLQueryItem(name: "knownVersion", value: String(knownVersion))
+        ]
+        if let schoolID, !schoolID.isEmpty { query.insert(URLQueryItem(name: "schoolId", value: schoolID), at: 0) }
+        let manifest = try await client.request(
+            path: "v1/mobile/content-manifest",
+            query: query,
+            type: MobileContentManifest.self
+        )
+        if manifest.dataAvailable, manifest.version >= knownVersion {
+            defaults.set(manifest.version, forKey: key)
+        }
+        return manifest
+    }
+}
+
 /// Server-catalogue and deep-link state.  Keeping this out of the session and
 /// task command store makes it explicit that Remote mode never falls back to
 /// bundled records when a server catalogue is empty.
 @MainActor extension AppState {
+    private func refreshPublishedContentManifest() async throws {
+        guard repository.supportsRemoteAcknowledgement else { return }
+        let schoolID = profile?.schoolID?.isEmpty == false ? profile?.schoolID : nil
+        let roleChannel = selectedRole == .teacher ? "teacher" : "family"
+        let store = MobileContentManifestStore()
+        _ = try await store.refresh(schoolID: schoolID, channel: "mobile")
+        _ = try await store.refresh(schoolID: schoolID, channel: roleChannel)
+    }
+
     func loadActivities() async {
         activitiesLoading = true; activitiesError = nil
         defer { activitiesLoading = false }
         do {
+            _ = try? await refreshPublishedContentManifest()
             remoteActivities = try await repository.loadActivities(childID: selectedChild?.id)
             activityRegistrationHistory = try await repository.loadActivityRegistrationHistory()
         } catch {
@@ -20,6 +69,7 @@ import Foundation
         expertsLoading = true; expertsError = nil
         defer { expertsLoading = false }
         do {
+            _ = try? await refreshPublishedContentManifest()
             remoteExperts = try await repository.loadExperts()
             expertAppointmentHistory = try await repository.loadExpertAppointmentHistory()
         } catch {
@@ -78,6 +128,7 @@ import Foundation
             if remoteCoursesChildID == childID { coursesLoading = false }
         }
         do {
+            _ = try? await refreshPublishedContentManifest()
             let courses = try await repository.loadCourses(childID: childID)
             guard remoteCoursesChildID == childID else { return }
             remoteCourses = courses
@@ -86,6 +137,11 @@ import Foundation
             if case ApiError.unauthorized = error { handleDashboardError(error) }
             else { coursesError = error.localizedDescription }
         }
+    }
+
+    func loadLessonPlayback(lessonID: String) async throws -> PlaybackSource {
+        guard repository.supportsRemoteAcknowledgement else { throw ApiError.notConfigured }
+        return try await repository.loadLessonPlayback(lessonID: lessonID)
     }
 
     func saveRemoteLessonProgress(childID: String, lessonID: String, lastPositionMs: Int, completed: Bool, expectedVersion: Int?) async throws {

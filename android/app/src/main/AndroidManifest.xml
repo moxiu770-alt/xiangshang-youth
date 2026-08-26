@@ -16,7 +16,7 @@
     </queries>
     <!-- Student health records, drafts and session state must not be copied to
          an unmanaged device backup. Remote sync will remain the source of truth. -->
-    <application android:allowBackup="false" android:fullBackupContent="@xml/backup_rules" android:dataExtractionRules="@xml/data_extraction_rules" android:enableOnBackInvokedCallback="true" tools:targetApi="tiramisu" android:label="向上少年" android:icon="@drawable/ic_launcher" android:roundIcon="@drawable/ic_launcher" android:theme="@style/Theme.XiangshangYouth" android:supportsRtl="true" android:usesCleartextTraffic="false">
+    <application android:name=".XiangshangYouthApplication" android:allowBackup="false" android:fullBackupContent="@xml/backup_rules" android:dataExtractionRules="@xml/data_extraction_rules" android:enableOnBackInvokedCallback="true" tools:targetApi="tiramisu" android:label="向上少年" android:icon="@drawable/ic_launcher" android:roundIcon="@drawable/ic_launcher" android:theme="@style/Theme.XiangshangYouth" android:supportsRtl="true" android:usesCleartextTraffic="false">
         <!-- Sentry's library provider tries to initialize even when a local or
              test build intentionally has no DSN. Initialization is owned by
              CrashMonitoring so production still starts it only after CI injects
@@ -35,6 +35,8 @@
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
+            android:supportsPictureInPicture="true"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
             android:resizeableActivity="true"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>

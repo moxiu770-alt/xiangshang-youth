@@ -1,10 +1,25 @@
 import SwiftUI
 
 @main struct XiangshangYouthApp: App {
-    @StateObject private var state = AppState()
+    @StateObject private var state: AppState
     @StateObject private var router = AppRouter()
     @StateObject private var featureRollout = FeatureRollout()
-    init() { CrashMonitoring.configure(); BodyCaptureQualityGate.loadCanonicalProfilesIfAvailable(); ChildFollowAlongTuning.loadCanonicalProfilesIfAvailable() }
+    init() {
+        let appState = AppState()
+        _state = StateObject(wrappedValue: appState)
+        FrontendTelemetry.configure(enabled: appState.localFeatures.settings.analyticsEnabled && appState.usesRemoteDataSource)
+        CrashMonitoring.configure()
+        BodyCaptureQualityGate.loadCanonicalProfilesIfAvailable()
+        ChildFollowAlongTuning.loadCanonicalProfilesIfAvailable()
+        BackgroundSyncScheduler.register {
+            guard appState.repository.supportsRemoteAcknowledgement else { return true }
+            guard appState.profile != nil else { return appState.pendingSyncCount == 0 }
+            if appState.data == nil { await appState.refreshDashboard() }
+            guard appState.data != nil else { return false }
+            await appState.syncPendingRecords()
+            return appState.pendingSyncCount == 0
+        }
+    }
     var body: some Scene { WindowGroup { RootView().environmentObject(state).environmentObject(router).environmentObject(featureRollout).tint(AppTheme.primary).dynamicTypeSize(.xSmall ... .accessibility5).preferredColorScheme(.light) } }
 }
 
@@ -59,11 +74,17 @@ struct RootView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase != .active {
                 privacyShielded = !state.isShowingSplash
+                if phase == .background, state.pendingSyncCount > 0 {
+                    BackgroundSyncScheduler.schedule()
+                }
                 return
             }
             privacyShielded = false
             guard !networkMonitor.isOffline, state.profile != nil, state.data != nil else { return }
-            Task { await state.refreshDashboard() }
+            Task {
+                await state.refreshDashboard()
+                if state.pendingSyncCount > 0 { await state.syncPendingRecords() }
+            }
         }
         .transaction { transaction in
             if state.localFeatures.settings.reduceMotion || systemReduceMotion {

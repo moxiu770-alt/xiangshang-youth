@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#347CF1" />
+    <title>向上少年 · 数据工作台</title>
+    <link rel="stylesheet" href="/admin.css" />
+    <link rel="stylesheet" href="/content-operations.css" />
+  </head>
+  <body>
+    <div id="loginView" class="login-shell">
+      <section class="login-visual">
+        <div class="brand-lockup">
+          <span class="brand-mark" data-icon="spark"></span
+          ><span>向上少年</span>
+        </div>
+        <div class="login-copy">
+          <div class="eyebrow">运动健康管理平台</div>
+          <h1>让每一次测评，<br />都成为成长的坐标。</h1>
+          <p>
+            面向学校、教师与家庭的运动能力数据工作台。把测评组织、学生档案、报告洞察和成长干预放在同一张桌面上。
+          </p>
+        </div>
+        <div class="login-points">
+          <span class="login-point"
+            ><span data-icon="shield"></span>数据安全可追溯</span
+          ><span class="login-point"
+            ><span data-icon="chart"></span>实时掌握完成情况</span
+          ><span class="login-point"
+            ><span data-icon="layers"></span>连接学校与家庭</span
+          >
+        </div>
+      </section>
+      <section class="login-panel">
+        <div class="login-card">
+          <div class="eyebrow">Workspace sign in</div>
+          <h2>欢迎回来</h2>
+          <p class="muted">登录学校管理工作台，继续查看今日进展。</p>
+          <form id="loginForm">
+            <div class="field">
+              <label for="account">账号</label
+              ><input
+                id="account"
+                name="account"
+                autocomplete="username"
+                placeholder="请输入手机号"
+              />
+            </div>
+            <div class="field">
+              <label for="password">密码</label
+              ><input
+                id="password"
+                name="password"
+                type="password"
+                autocomplete="current-password"
+                placeholder="请输入密码"
+              />
+            </div>
+            <div id="mfaCodeField" class="field hidden">
+              <label for="mfaCode">双重验证码或恢复码</label>
+              <input id="mfaCode" name="mfaCode" autocomplete="one-time-code" inputmode="numeric" placeholder="6 位验证码或恢复码" />
+              <span class="hint">请输入身份验证器动态口令；恢复码仅可使用一次。</span>
+            </div>
+            <div id="mfaEnrollmentNotice" class="account-modal-note hidden"></div>
+            <button id="loginSubmit" class="primary-btn wide" type="submit">
+              <span data-icon="arrow"></span>进入数据工作台
+            </button>
+            <div id="loginError" class="error"></div>
+          </form>
+          <p class="hint">请使用平台管理员分配的账户登录。</p>
+        </div>
+      </section>
+    </div>
+    <div id="appView" class="app-shell hidden">
+      <aside id="sidebar" class="sidebar">
+        <div>
+          <div class="brand-lockup">
+            <span class="brand-mark" data-icon="spark"></span
+            ><span>向上少年</span>
+          </div>
+          <div class="brand-sub">YOUTH MOVEMENT HEALTH</div>
+          <div class="nav">
+            <div class="nav-label">工作台</div>
+            <button class="nav-item active" data-section="overview">
+              <span data-icon="dashboard"></span>数据总览</button
+            ><button class="nav-item" data-section="tasks">
+              <span data-icon="clipboard"></span>测评任务</button
+            ><button class="nav-item" data-section="students">
+              <span data-icon="users"></span>学生档案</button
+            ><button class="nav-item" data-section="reports">
+              <span data-icon="report"></span>报告中心</button
+            ><button class="nav-item" data-section="analysis">
+              <span data-icon="chart"></span>数据分析
+            </button><button class="nav-item" data-section="content">
+              <span data-icon="layers"></span>内容运营
+            </button>
+            <div class="nav-label">系统</div>
+            <button class="nav-item" data-section="settings">
+              <span data-icon="settings"></span>工作台设置
+            </button>
+          </div>
+        </div>
+        <div class="sidebar-bottom">
+          <div class="operator">
+            <div id="sideAvatar" class="avatar">演</div>
+            <div>
+              <strong id="sideName">演示管理员</strong
+              ><span id="sideRole">平台管理员</span>
+            </div>
+            <button id="logoutBtn" class="ghost-btn" title="退出登录">
+              <span data-icon="logout"></span>
+            </button>
+          </div>
+        </div>
+      </aside>
+      <main class="main">
+        <header class="topbar">
+          <div class="crumb">
+            <button id="menuBtn" class="icon-btn mobile-menu">
+              <span data-icon="menu"></span></button
+            ><span>工作台</span><span>／</span><strong>数据总览</strong>
+          </div>
+          <div class="top-actions">
+            <label class="top-search"
+              ><span data-icon="search"></span
+              ><input
+                id="globalSearch"
+                placeholder="搜索学生、任务..." /></label
+            ><button id="refreshBtn" class="icon-btn" title="刷新数据">
+              <span data-icon="refresh"></span></button
+            ><button class="icon-btn" title="消息提醒">
+              <span data-icon="bell"></span>
+            </button>
+            <div id="topAvatar" class="avatar">演</div>
+          </div>
+        </header>
+        <div class="content" id="overviewSection">
+          <div class="page-heading">
+            <div>
+              <div class="eyebrow">2026 · 运动健康管理平台</div>
+              <h1>学校数据总览</h1>
+              <p id="updatedAt">正在同步最新数据...</p>
+            </div>
+            <div class="heading-actions">
+              <label class="school-filter"
+                ><span data-icon="school"></span
+                ><input
+                  id="schoolId"
+                  value="school-1"
+                  aria-label="学校 ID" /></label
+              ><button id="refreshTextBtn" class="secondary-btn">
+                <span data-icon="refresh"></span>刷新数据</button
+              ><button id="createTaskBtn" class="primary-btn">
+                <span data-icon="plus"></span>新建测评任务
+              </button>
+            </div>
+          </div>
+          <section class="dashboard-hero">
+            <div class="hero-copy">
+              <div class="eyebrow">今日工作台</div>
+              <h2 id="schoolTitle">向上实验小学</h2>
+              <p id="schoolDescription">正在加载学校信息...</p>
+              <div class="hero-meta">
+                <span class="hero-chip"
+                  ><span data-icon="location"></span
+                  ><span id="schoolRegion">—</span></span
+                ><span class="hero-chip"
+                  ><span data-icon="calendar"></span>数据更新于今天</span
+                >
+              </div>
+            </div>
+            <div class="hero-metrics">
+              <div class="hero-metric">
+                <span>测评完成度</span><strong id="heroCompletion">—</strong>
+              </div>
+              <div class="hero-metric">
+                <span>待处理事项</span><strong id="heroPending">—</strong>
+              </div>
+            </div>
+          </section>
+          <section class="metric-grid" aria-label="关键指标">
+            <article class="metric-card">
+              <div class="metric-icon"><span data-icon="users"></span></div>
+              <div>
+                <span>在册学生</span><strong id="metricStudents">—</strong
+                ><small class="metric-note">覆盖当前学校</small>
+              </div>
+            </article>
+            <article class="metric-card">
+              <div class="metric-icon"><span data-icon="clipboard"></span></div>
+              <div>
+                <span>测评任务</span><strong id="metricTasks">—</strong
+                ><small class="metric-note">已发布与进行中</small>
+              </div>
+            </article>
+            <article class="metric-card">
+              <div class="metric-icon"><span data-icon="school"></span></div>
+              <div>
+                <span>班级数量</span><strong id="metricClasses">—</strong
+                ><small class="metric-note">学校教学组织</small>
+              </div>
+            </article>
+            <article class="metric-card">
+              <div class="metric-icon"><span data-icon="flag"></span></div>
+              <div>
+                <span>待复核报告</span><strong id="metricReports">—</strong
+                ><small class="metric-note">需要重点关注</small>
+              </div>
+            </article>
+          </section>
+          <section class="layout-main">
+            <article class="panel chart-panel" id="analysisSection">
+              <div class="panel-head">
+                <div>
+                  <h3>各年级测评完成率</h3>
+                  <p>按当前学校最新任务状态汇总</p>
+                </div>
+                <button class="panel-action" data-section="analysis">
+                  查看分析 <span data-icon="chevron"></span>
+                </button>
+              </div>
+              <div id="gradeChart" class="bar-chart">
+                <div class="loading-skeleton">正在加载年级数据...</div>
+              </div>
+            </article>
+            <article class="panel">
+              <div class="panel-head">
+                <div>
+                  <h3>风险分布</h3>
+                  <p>已生成诊断报告的风险等级</p>
+                </div>
+                <button class="panel-action" data-section="reports">
+                  报告中心 <span data-icon="chevron"></span>
+                </button>
+              </div>
+              <div id="riskDistribution" class="distribution">
+                <div class="loading-skeleton">正在加载报告...</div>
+              </div>
+            </article>
+          </section>
+          <section class="section-grid" id="tasksSection">
+            <div>
+              <div class="section-title">
+                <h2>近期测评任务</h2>
+                <div class="section-tools">
+                  <span class="date-label">共 <b id="taskCount">—</b> 项</span
+                  ><button class="ghost-btn" data-section="tasks">
+                    查看全部 <span data-icon="chevron"></span>
+                  </button>
+                </div>
+              </div>
+              <div class="panel table-panel">
+                <div class="table-scroll">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>任务名称</th>
+                        <th>测评范围</th>
+                        <th>进度</th>
+                        <th>状态</th>
+                        <th>日期</th>
+                      </tr>
+                    </thead>
+                    <tbody id="taskTable"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <aside class="panel">
+              <div class="panel-head">
+                <div>
+                  <h3>快捷操作</h3>
+                  <p>把常用工作放在手边</p>
+                </div>
+              </div>
+              <div class="quick-grid">
+                <button class="quick-action" data-action="create">
+                  <span data-icon="plus"></span
+                  ><span
+                    ><strong>创建测评任务</strong
+                    ><span>发布新的测评安排</span></span
+                  ></button
+                ><button class="quick-action" data-section="students">
+                  <span data-icon="users"></span
+                  ><span
+                    ><strong>查看学生档案</strong
+                    ><span>快速定位学生数据</span></span
+                  ></button
+                ><button class="quick-action" data-section="reports">
+                  <span data-icon="report"></span
+                  ><span
+                    ><strong>处理报告</strong
+                    ><span>查看风险与发布状态</span></span
+                  ></button
+                ><button class="quick-action" data-section="analysis">
+                  <span data-icon="chart"></span
+                  ><span
+                    ><strong>查看班级分析</strong
+                    ><span>对比年级与班级表现</span></span
+                  >
+                </button>
+              </div>
+            </aside>
+          </section>
+          <section class="section-grid" id="studentsSection">
+            <div>
+              <div class="section-title">
+                <h2>学生档案</h2>
+                <div class="section-tools">
+                  <input
+                    id="studentSearch"
+                    class="table-search"
+                    placeholder="搜索学生姓名"
+                  /><button class="ghost-btn" data-section="students">
+                    全部学生 <span data-icon="chevron"></span>
+                  </button>
+                </div>
+              </div>
+              <div class="panel table-panel">
+                <div class="table-scroll">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>学生</th>
+                        <th>班级</th>
+                        <th>测评状态</th>
+                        <th>综合得分</th>
+                        <th>地区标记</th>
+                      </tr>
+                    </thead>
+                    <tbody id="studentTable"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <aside class="panel" id="reportsSection">
+              <div class="panel-head">
+                <div>
+                  <h3>班级完成排行</h3>
+                  <p>以当前任务完成率排序</p>
+                </div>
+                <button class="panel-action" data-section="analysis">
+                  分析 <span data-icon="chevron"></span>
+                </button>
+              </div>
+              <div id="classRanking" class="bar-chart">
+                <div class="loading-skeleton">正在加载班级数据...</div>
+              </div>
+            </aside>
+          </section>
+          <section class="panel" id="settingsSection">
+            <div class="panel-head">
+              <div>
+                <h3>运营提醒</h3>
+                <p>根据当前数据自动整理的工作建议</p>
+              </div>
+              <span
+                class="hero-chip"
+                style="color: var(--blue); background: #eaf4ff; border: 0"
+                >实时</span
+              >
+            </div>
+            <div id="noticeList" class="notice-list"></div>
+          </section>
+        </div>
+      </main>
+    </div>
+    <div id="taskModal" class="modal-backdrop hidden">
+      <div class="modal">
+        <div class="modal-head">
+          <div>
+            <h2>新建测评任务</h2>
+            <p>发布后将自动为匹配范围内的学生创建测评记录。</p>
+          </div>
+          <button id="closeTaskBtn" class="modal-close" aria-label="关闭">
+            <span data-icon="close"></span>
+          </button>
+        </div>
+        <form id="taskForm">
+          <div class="form-grid">
+            <div class="field full">
+              <label for="taskTitleInput">任务名称</label
+              ><input
+                id="taskTitleInput"
+                name="title"
+                required
+                placeholder="例如：2026 秋季综合运动能力测评"
+              />
+            </div>
+            <div class="field">
+              <label for="taskDateInput">测评日期</label
+              ><input id="taskDateInput" name="testDate" type="date" required />
+            </div>
+            <div class="field">
+              <label for="taskLocationInput">测评地点</label
+              ><input
+                id="taskLocationInput"
+                name="location"
+                placeholder="例如：学校操场"
+              />
+            </div>
+            <div class="field">
+              <label for="taskGradeInput">年级范围</label
+              ><select id="taskGradeInput" name="gradeId">
+                <option value="">全校</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="taskClassInput">班级范围</label
+              ><select id="taskClassInput" name="classId">
+                <option value="">全校</option>
+              </select>
+            </div>
+            <div class="field full">
+              <label for="taskItemsInput">测评项目</label
+              ><input
+                id="taskItemsInput"
+                name="items"
+                value="连续双脚障碍跳,侧向滑步,倒退平衡,接球-上手掷准,手运球绕杆,脚运球变向,定点踢准"
+              /><span class="hint"
+                >多个项目用逗号分隔，默认使用运动能力标准项目。</span
+              >
+            </div>
+          </div>
+          <div id="taskFormError" class="error"></div>
+          <div class="modal-footer">
+            <button type="button" id="cancelTaskBtn" class="secondary-btn">
+              取消</button
+            ><button type="submit" class="primary-btn">
+              <span data-icon="send"></span>创建并发布
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div id="toast" class="toast hidden"></div>
+    <script src="/admin.js" defer></script>
+    <script src="/admin-enhancements.js" defer></script>
+    <script src="/content-operations.js" defer></script>
+  </body>
+</html>

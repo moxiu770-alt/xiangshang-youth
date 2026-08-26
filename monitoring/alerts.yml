@@ -1,0 +1,84 @@
+groups:
+  - name: xiangshang-central-backend
+    interval: 30s
+    rules:
+      - alert: XiangshangApiUnavailable
+        expr: up{job="xiangshang-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: 向上少年中央 API 无法抓取
+          description: Prometheus 连续两分钟无法访问中央 API 指标端点。
+
+      - alert: XiangshangWorkerUnhealthy
+        expr: xiangshang_worker_healthy{mode="external"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: 向上少年后台 worker 不健康
+          description: 独立 worker 心跳缺失或已超过允许年龄，隐私导出和设备失联回收可能停滞。
+
+      - alert: XiangshangBackupExecutorUnhealthy
+        expr: xiangshang_backup_healthy{enabled="true"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: 向上少年数据库备份执行器不健康
+          description: 备份执行器心跳缺失、超过允许年龄或最近一次备份运行失败，请立即检查备份容器和归档凭据。
+
+      - alert: XiangshangBackupStale
+        expr: xiangshang_backup_last_success_within_slo{enabled="true"} == 0
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: 向上少年数据库备份未在服务目标内成功完成
+          description: 最近一次成功备份已超过两个调度周期（至少一小时），请验证归档对象、恢复能力和存储侧告警。
+
+      - alert: XiangshangApiHighErrorRate
+        expr: sum(rate(xiangshang_http_requests_total{status=~"5.."}[5m])) / clamp_min(sum(rate(xiangshang_http_requests_total[5m])), 1) > 0.02
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 向上少年中央 API 5xx 比例超过 2%
+          description: 请结合请求日志、数据库连接池错误和最近部署记录排查。
+
+      - alert: XiangshangDatabasePoolErrors
+        expr: increase(xiangshang_db_pool_errors_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: 向上少年数据库连接池出现错误
+          description: 请检查数据库可用性、连接上限和网络连接。
+
+      - alert: XiangshangDatabaseSchemaBehind
+        expr: xiangshang_database_schema_healthy == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: 向上少年 API 与数据库迁移版本不一致
+          description: 当前 API 镜像要求的数据库迁移尚未全部应用。服务已拒绝 ready 状态，请执行受控迁移并复核 schema_migrations。
+
+      - alert: XiangshangBackgroundJobFailed
+        expr: xiangshang_job_queue_jobs{status="failed"} > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: 向上少年后台任务进入失败队列
+          description: 请在后台任务列表查看失败原因，确认后执行受审计的人工重试。
+
+      - alert: XiangshangBackgroundJobBacklog
+        expr: xiangshang_job_queue_jobs{status="queued"} > 0 and xiangshang_job_queue_oldest_age_seconds{status="queued"} > 300
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 向上少年后台任务积压超过五分钟
+          description: 请检查 Worker 实例、JOB_WORKER_CONCURRENCY、对象存储和数据库连接池；队列虽未失败但服务时效已受影响。

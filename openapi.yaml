@@ -1,0 +1,2631 @@
+openapi: 3.1.0
+info:
+  title: 向上少年 API
+  version: 1.0.0
+  description: 学校运动健康管理平台核心接口。创建、审批和密码恢复等关键写操作支持 Idempotency-Key；状态更新可携带 expectedVersion。
+  license:
+    name: Proprietary
+    identifier: Proprietary
+servers:
+  - url: /
+    description: 当前部署的 API 主机
+tags:
+  - name: System
+    description: 服务健康检查与运行指标
+  - name: Auth
+    description: 登录、会话和账户安全
+  - name: School
+    description: 学校、学生和测评业务
+  - name: Admin
+    description: 平台管理和数据治理
+  - name: Field
+    description: Windows 场地端设备、离线同步和采集会话
+  - name: Product
+    description: 用户主动开启的匿名产品体验改进事件
+paths:
+  /livez:
+    get:
+      summary: "GET /livez"
+      operationId: getLivez
+      tags: [System]
+      security: []
+      responses:
+        '400': { $ref: '#/components/responses/Conflict' }
+        '200': { description: Service process is alive }
+  /readyz:
+    get:
+      summary: "GET /readyz"
+      operationId: getReadyz
+      tags: [System]
+      security: []
+      responses:
+        '400': { $ref: '#/components/responses/Conflict' }
+        '200': { description: Database is ready }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /metrics:
+    get:
+      summary: "GET /metrics"
+      operationId: getMetrics
+      tags: [System]
+      security: []
+      responses:
+        '400': { $ref: '#/components/responses/Conflict' }
+        '200': { description: Prometheus text exposition }
+        '401': { $ref: '#/components/responses/AuthError' }
+  /v1/auth/login:
+    post:
+      summary: "POST /v1/auth/login"
+      operationId: postV1AuthLogin
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '400': { $ref: '#/components/responses/Conflict' }
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/AuthError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /v1/auth/oauth/wechat/start:
+    post:
+      summary: "POST /v1/auth/oauth/wechat/start"
+      description: 创建一次性、短时微信授权 state，并返回已配置的开放平台授权地址。
+      operationId: postV1AuthOAuthWechatStart
+      tags: [Auth]
+      security: []
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServerError' }
+  /v1/auth/oauth/wechat/callback:
+    get:
+      summary: "GET /v1/auth/oauth/wechat/callback"
+      description: 微信开放平台 HTTPS 回调中转到原生 App 的自定义 scheme；不在 URL 中放置会话或用户资料。
+      operationId: getV1AuthOAuthWechatCallback
+      tags: [Auth]
+      security: []
+      parameters:
+        - { name: code, in: query, required: true, schema: { type: string } }
+        - { name: state, in: query, required: true, schema: { type: string } }
+      responses:
+        '302': { description: Redirect to the native app callback scheme }
+        '200': { description: Callback acknowledged when the native scheme cannot be opened by the user agent }
+        '400': { $ref: '#/components/responses/Conflict' }
+        '503': { $ref: '#/components/responses/ServerError' }
+  /v1/auth/oauth/wechat/exchange:
+    post:
+      summary: "POST /v1/auth/oauth/wechat/exchange"
+      description: 使用一次性 code/state 换取平台会话；首次授权创建家长账户，手机号在绑定流程中补齐。
+      operationId: postV1AuthOAuthWechatExchange
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, state]
+              properties:
+                code: { type: string, minLength: 1 }
+                state: { type: string, minLength: 1 }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/AuthError' }
+        '503': { $ref: '#/components/responses/ServerError' }
+  /v1/auth/verification-codes:
+    post:
+      summary: "POST /v1/auth/verification-codes"
+      description: 向已配置的短信网关请求一次性验证码；明文验证码不在平台数据库或接口响应中留存。
+      operationId: postV1AuthVerificationCodes
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VerificationCodeRequest' }
+      responses:
+        '202': { $ref: '#/components/responses/Accepted' }
+        '400': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServerError' }
+  /v1/auth/mfa/totp:
+    post:
+      summary: "POST /v1/auth/mfa/totp"
+      description: 完成密码登录后返回的短时 TOTP/恢复码挑战；成功后才创建访问和刷新会话。
+      operationId: postV1AuthMfaTotp
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challengeToken, code]
+              properties:
+                challengeToken: { type: string }
+                code: { type: string, description: 6 位动态口令或一次性恢复码 }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/Conflict' }
+        '401': { $ref: '#/components/responses/AuthError' }
+        '503': { $ref: '#/components/responses/ServerError' }
+  /v1/auth/mfa/enroll/setup:
+    post:
+      summary: "POST /v1/auth/mfa/enroll/setup"
+      description: 管理员或校长首次登录时的受控 TOTP 注册步骤，必须使用密码登录返回的 enrollment challenge。
+      operationId: postV1AuthMfaEnrollSetup
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [challengeToken], properties: { challengeToken: { type: string } } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '401': { $ref: '#/components/responses/AuthError' }, '503': { $ref: '#/components/responses/ServerError' } }
+  /v1/auth/mfa/enroll/confirm:
+    post:
+      summary: "POST /v1/auth/mfa/enroll/confirm"
+      operationId: postV1AuthMfaEnrollConfirm
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [challengeToken, code], properties: { challengeToken: { type: string }, code: { type: string } } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '401': { $ref: '#/components/responses/AuthError' } }
+  /v1/auth/refresh:
+    post:
+      summary: "POST /v1/auth/refresh"
+      operationId: postV1AuthRefresh
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        '400': { $ref: '#/components/responses/Conflict' }
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/AuthError' }
+  /v1/auth/password:
+    post:
+      summary: "POST /v1/auth/password"
+      operationId: postV1AuthPassword
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string, format: password }
+                newPassword: { type: string, format: password, minLength: 8 }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/Conflict' }
+  /v1/auth/reset-password:
+    post:
+      summary: "POST /v1/auth/reset-password"
+      operationId: postV1AuthResetPassword
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              oneOf:
+                - required: [token, newPassword]
+                - required: [phone, verificationCode, newPassword]
+              properties:
+                token: { type: string }
+                phone: { type: string, pattern: '^1\\d{10}$' }
+                verificationCode: { type: string, pattern: '^\\d{6}$' }
+                newPassword: { type: string, format: password, minLength: 8 }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/Conflict' }
+  /v1/me/sessions:
+    get:
+      summary: "GET /v1/me/sessions"
+      operationId: getV1MeSessions
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '400': { $ref: '#/components/responses/Conflict' }
+        '200': { $ref: '#/components/responses/Success' }
+  /v1/me/sessions/{sessionId}:
+    delete:
+      summary: "DELETE /v1/me/sessions/{sessionId}"
+      operationId: deleteV1MeSessionsSessionId
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: sessionId, required: true, schema: { type: string } }
+      responses:
+        '400': { $ref: '#/components/responses/Conflict' }
+        '200': { $ref: '#/components/responses/Success' }
+        '404': { $ref: '#/components/responses/Conflict' }
+  /v1/me/deletion-request:
+    get:
+      summary: "GET /v1/me/deletion-request"
+      description: 查询当前账户最近一次注销申请及处理状态。
+      operationId: getV1MeDeletionRequest
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/AuthError' }
+
+    post:
+      summary: "POST /v1/me/deletion-request"
+      description: 申请注销账户。申请需要平台管理员审核，批准后异步匿名化账户、撤销会话并清理直接身份信息。
+      operationId: postV1MeDeletionRequest
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses:
+        '202': { $ref: '#/components/responses/Accepted' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/schools/{schoolId}/dashboard:
+    get:
+      summary: "GET /v1/schools/{schoolId}/dashboard"
+      operationId: getV1SchoolsSchoolIdDashboard
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/SchoolId' }
+        - { in: query, name: studentPage, schema: { type: integer, minimum: 1 }, description: "按页返回学生目录；学校级统计仍为全量聚合" }
+        - { in: query, name: studentPageSize, schema: { type: integer, minimum: 1, maximum: 100, default: 100 }, description: "学生目录每页条数" }
+      responses:
+        '400': { $ref: '#/components/responses/Conflict' }
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/schools/{schoolId}/students:
+    get:
+      summary: "GET /v1/schools/{schoolId}/students"
+      operationId: getV1SchoolsSchoolIdStudents
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/SchoolId' }
+        - { in: query, name: classId, schema: { type: string } }
+        - { in: query, name: paged, schema: { type: integer, enum: [0, 1] } }
+        - { in: query, name: page, schema: { type: integer, minimum: 1 } }
+        - { in: query, name: pageSize, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses:
+        '400': { $ref: '#/components/responses/Conflict' }
+        '200': { $ref: '#/components/responses/Success' }
+  /v1/admin/accounts:
+    get:
+      summary: "GET /v1/admin/accounts"
+      operationId: getV1AdminAccounts
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: query, name: schoolId, schema: { type: string } }
+        - { in: query, name: role, schema: { type: string, enum: [admin, principal, teacher, parent] } }
+        - { in: query, name: status, schema: { type: string, enum: [active, disabled] } }
+        - { in: query, name: search, schema: { type: string, maxLength: 100 } }
+      responses:
+        '400': { $ref: '#/components/responses/Conflict' }
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      summary: "POST /v1/admin/accounts"
+      operationId: postV1AdminAccounts
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: '#/components/schemas/AccountCreateRequest' } }
+      responses:
+        '201': { $ref: '#/components/responses/Created' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/admin/audit-logs:
+    get:
+      summary: "GET /v1/admin/audit-logs"
+      operationId: getV1AdminAuditLogs
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: query, name: schoolId, schema: { type: string } }
+        - { in: query, name: action, schema: { type: string } }
+        - { in: query, name: paged, schema: { type: integer, enum: [0, 1] } }
+        - { in: query, name: page, schema: { type: integer, minimum: 1 } }
+        - { in: query, name: pageSize, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/admin/account-deletion-requests:
+    get:
+      summary: "GET /v1/admin/account-deletion-requests"
+      description: 平台管理员查看账户注销申请队列。
+      operationId: getV1AdminAccountDeletionRequests
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: query, name: status, schema: { type: string, enum: [pending, approved, processing, completed, rejected, failed] } }
+        - { in: query, name: paged, schema: { type: integer, enum: [0, 1] } }
+        - { in: query, name: page, schema: { type: integer, minimum: 1 } }
+        - { in: query, name: pageSize, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/admin/account-deletion-requests/{requestId}:
+    patch:
+      summary: "PATCH /v1/admin/account-deletion-requests/{requestId}"
+      description: 批准或拒绝账户注销申请；批准后由后台任务异步完成匿名化。
+      operationId: patchV1AdminAccountDeletionRequestsRequestId
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: requestId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [approved, rejected] }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/Conflict' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/admin/audit-integrity:
+    get:
+      summary: "GET /v1/admin/audit-integrity"
+      description: 校验当前签名密钥下新产生审计事件的学校级或平台级哈希链；旧记录是历史基线，不计入链条。
+      operationId: getV1AdminAuditIntegrity
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: query, name: schoolId, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/ServerError' }
+  /v1/admin/jobs:
+    get:
+      summary: "GET /v1/admin/jobs"
+      operationId: getV1AdminJobs
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: query, name: status, schema: { type: string, enum: [queued, processing, completed, failed], default: failed } }
+        - { in: query, name: paged, schema: { type: integer, enum: [0, 1] } }
+        - { in: query, name: page, schema: { type: integer, minimum: 1 } }
+        - { in: query, name: pageSize, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /v1/admin/jobs/{jobId}/retry:
+    post:
+      summary: "POST /v1/admin/jobs/{jobId}/retry"
+      description: 仅平台管理员可重试失败任务；操作会记录失败上下文与重试人。
+      operationId: postV1AdminJobsJobIdRetry
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: jobId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/Conflict' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/accounts/{accountId}:
+    patch:
+      summary: "PATCH /v1/admin/accounts/{accountId}"
+      operationId: patchV1AdminAccountsAccountId
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: accountId, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, role]
+              properties:
+                name: { type: string }
+                role: { type: string, enum: [admin, principal, teacher, parent] }
+                schoolId: { type: string }
+                classId: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/admin/accounts/{accountId}/reset-password:
+    post:
+      summary: "POST /v1/admin/accounts/{accountId}/reset-password"
+      operationId: postV1AdminAccountsAccountIdResetPassword
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: accountId, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/Conflict' }
+  /v1/admin/accounts/{accountId}/reset-mfa:
+    post:
+      summary: "POST /v1/admin/accounts/{accountId}/reset-mfa"
+      description: 仅平台管理员可在身份验证器遗失时恢复账户 MFA；操作会撤销目标账户全部会话并记入审计链。
+      operationId: postV1AdminAccountsAccountIdResetMfa
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: accountId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [reason], properties: { reason: { type: string, minLength: 8, maxLength: 500 } } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/Conflict' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/admin/students/{studentId}/binding-code:
+    post:
+      summary: "POST /v1/admin/students/{studentId}/binding-code"
+      operationId: postV1AdminStudentsStudentIdBindingCode
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: studentId, required: true, schema: { type: string } }
+      responses:
+        '201': { $ref: '#/components/responses/Created' }
+        '400': { $ref: '#/components/responses/Conflict' }
+  /v1/files/{fileId}/content:
+    get:
+      summary: "GET /v1/files/{fileId}/content"
+      operationId: getV1FilesFileIdContent
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: fileId, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Authenticated file content }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      summary: "PUT /v1/files/{fileId}/content"
+      operationId: putV1FilesFileIdContent
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: fileId, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/octet-stream: { schema: { type: string, format: binary } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/Conflict' }
+  /v1/admin/data-retention:
+    get:
+      summary: "GET /v1/admin/data-retention（含场地视频/图像与派生证据的分级保留策略及清理概况）"
+      operationId: getV1AdminDataRetention
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/Conflict' }
+  /v1/admin/operations/summary:
+    get:
+      summary: "GET /v1/admin/operations/summary"
+      operationId: getV1AdminOperationsSummary
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: query, name: schoolId, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/Conflict' }
+  /v1/admin/students/{studentId}/export:
+    post:
+      summary: "POST /v1/admin/students/{studentId}/export"
+      operationId: postV1AdminStudentsStudentIdExport
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: studentId, required: true, schema: { type: string } }
+      responses:
+        '202': { $ref: '#/components/responses/Accepted' }
+        '400': { $ref: '#/components/responses/Conflict' }
+  /v1/students/{studentId}/privacy-requests:
+    get:
+      summary: "GET /v1/students/{studentId}/privacy-requests"
+      operationId: getV1StudentsStudentIdPrivacyRequests
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: studentId, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/Conflict' }
+    post:
+      summary: "POST /v1/students/{studentId}/privacy-requests"
+      description: 已绑定家长发起数据导出或删除申请；删除申请必须经过学校/平台审批，不能由客户端直接执行。
+      operationId: postV1StudentsStudentIdPrivacyRequests
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: studentId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestType]
+              properties:
+                requestType: { type: string, enum: [export, delete] }
+      responses:
+        '202': { $ref: '#/components/responses/Accepted' }
+        '400': { $ref: '#/components/responses/Conflict' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/Conflict' }
+  /v1/admin/privacy-requests/{requestId}:
+    get:
+      summary: "GET /v1/admin/privacy-requests/{requestId}"
+      operationId: getV1AdminPrivacyRequestsRequestId
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: requestId, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/Conflict' }
+  /v1/admin/students/{studentId}/anonymize:
+    post:
+      summary: "POST /v1/admin/students/{studentId}/anonymize"
+      operationId: postV1AdminStudentsStudentIdAnonymize
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: studentId, required: true, schema: { type: string } }
+      responses:
+        '201': { $ref: '#/components/responses/Created' }
+        '400': { $ref: '#/components/responses/Conflict' }
+  /v1/admin/tasks/batch-status:
+    post:
+      summary: "POST /v1/admin/tasks/batch-status"
+      operationId: postV1AdminTasksBatchStatus
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [updates]
+              properties:
+                updates:
+                  type: array
+                  maxItems: 100
+                  items:
+                    type: object
+                    required: [taskId, studentId, status]
+                    properties:
+                      taskId: { type: string }
+                      studentId: { type: string }
+                      status: { type: string }
+                      expectedVersion: { type: integer, minimum: 1 }
+      responses:
+        '201': { $ref: '#/components/responses/Created' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/tasks/{taskId}/students:
+    get:
+      summary: "GET /v1/tasks/{taskId}/students"
+      operationId: getV1TasksTaskIdStudents
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: taskId, required: true, schema: { type: string } }
+        - { in: query, name: page, required: false, schema: { type: integer, minimum: 1, default: 1 } }
+        - { in: query, name: pageSize, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 20 } }
+        - { in: query, name: status, required: false, schema: { type: string } }
+        - { in: query, name: keyword, required: false, schema: { type: string, maxLength: 80 } }
+        - { in: query, name: paged, required: false, schema: { type: integer, enum: [0, 1], default: 0 } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/Conflict' }
+  /v1/tasks/{taskId}/students/{studentId}/status:
+    patch:
+      summary: "PATCH /v1/tasks/{taskId}/students/{studentId}/status"
+      operationId: patchV1TasksTaskIdStudentsStudentIdStatus
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: taskId, required: true, schema: { type: string } }
+        - { in: path, name: studentId, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string }
+                note: { type: string, maxLength: 500 }
+                reasonCode: { type: string, maxLength: 80 }
+                expectedVersion: { type: integer, minimum: 1 }
+                clientOperationId: { type: string, maxLength: 128 }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/tasks/{taskId}/students/batch-status:
+    post:
+      summary: "POST /v1/tasks/{taskId}/students/batch-status"
+      operationId: postV1TasksTaskIdStudentsBatchStatus
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: taskId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [updates]
+              properties:
+                updates:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items:
+                    type: object
+                    required: [studentId, status]
+                    properties:
+                      studentId: { type: string }
+                      status: { type: string }
+                      note: { type: string, maxLength: 500 }
+                      reasonCode: { type: string, maxLength: 80 }
+                      expectedVersion: { type: integer, minimum: 1 }
+                      clientOperationId: { type: string, maxLength: 128 }
+      responses:
+        '201': { $ref: '#/components/responses/Created' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/tasks/{taskId}/students/{studentId}/status-history:
+    get:
+      summary: "GET /v1/tasks/{taskId}/students/{studentId}/status-history"
+      operationId: getV1TasksTaskIdStudentsStudentIdStatusHistory
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: taskId, required: true, schema: { type: string } }
+        - { in: path, name: studentId, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/students/{studentId}/consent:
+    get:
+      summary: "GET /v1/students/{studentId}/consent"
+      operationId: getV1StudentsStudentIdConsent
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: studentId, required: true, schema: { type: string } }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+    post:
+      summary: "POST /v1/students/{studentId}/consent"
+      operationId: postV1StudentsStudentIdConsent
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: studentId, required: true, schema: { type: string } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                consentVersion: { type: string }
+                purpose: { type: string }
+                granted: { type: boolean }
+                expiresAt: { type: string, format: date-time }
+                consentId: { type: string, format: uuid }
+                privacyPolicyVersion: { type: string }
+                cameraConsentVersion: { type: string }
+                algorithmNoticeVersion: { type: string }
+                deviceInfoHash: { type: string }
+                appVersion: { type: string }
+                dataRetentionNoticeAccepted: { type: boolean }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/teacher/analytics/overview:
+    get:
+      summary: "GET /v1/teacher/analytics/overview"
+      operationId: getV1TeacherAnalyticsOverview
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: query, name: schoolId, required: true, schema: { type: string } }
+        - { in: query, name: classId, required: true, schema: { type: string } }
+        - { in: query, name: taskId, required: true, schema: { type: string } }
+        - { in: query, name: standardVersion, required: false, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/Conflict' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/students/{studentId}/courses:
+    get:
+      summary: "GET /v1/students/{studentId}/courses"
+      operationId: getV1StudentsStudentIdCourses
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: studentId, required: true, schema: { type: string } }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /v1/courses/{courseId}:
+    get:
+      summary: "GET /v1/courses/{courseId}"
+      operationId: getV1CoursesCourseId
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: courseId, required: true, schema: { type: string } }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /v1/lessons/{lessonId}/playback:
+    get:
+      summary: "GET /v1/lessons/{lessonId}/playback"
+      operationId: getV1LessonsLessonIdPlayback
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: lessonId, required: true, schema: { type: string } }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /v1/students/{studentId}/lessons/{lessonId}/progress:
+    put:
+      summary: "PUT /v1/students/{studentId}/lessons/{lessonId}/progress"
+      operationId: putV1StudentsStudentIdLessonsLessonIdProgress
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: studentId, required: true, schema: { type: string } }
+        - { in: path, name: lessonId, required: true, schema: { type: string } }
+        - { in: header, name: Idempotency-Key, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lastPositionMs]
+              properties:
+                lastPositionMs: { type: integer, minimum: 0 }
+                completed: { type: boolean }
+                expectedVersion: { type: integer, minimum: 1 }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/mobile/content-manifest:
+    get:
+      summary: 获取当前账号可见的已发布内容版本
+      operationId: getMobileContentManifest
+      tags: [Content]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: query, name: schoolId, required: false, schema: { type: string } }
+        - { in: query, name: channel, required: false, schema: { type: string, enum: [mobile, teacher, family] } }
+        - { in: query, name: knownVersion, required: false, schema: { type: integer, minimum: 0 } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/admin/content/catalog:
+    get:
+      summary: 获取运营内容目录
+      operationId: getAdminContentCatalog
+      tags: [Content]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: query, name: type, required: true, schema: { type: string, enum: [course, activity, expert, notification_template] } }
+        - { in: query, name: schoolId, required: false, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/admin/content/releases:
+    get:
+      summary: 查询内容发布版本
+      operationId: getAdminContentReleases
+      tags: [Content]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: query, name: schoolId, required: false, schema: { type: string } }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' } }
+    post:
+      summary: 创建内容发布草稿
+      operationId: createAdminContentRelease
+      tags: [Content]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                schoolId: { type: [string, 'null'] }
+                channel: { type: string, enum: [mobile, teacher, family] }
+                notes: { type: string, maxLength: 2000 }
+                effectiveAt: { type: [string, 'null'], format: date-time }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/content/releases/{releaseId}:
+    get:
+      summary: 获取内容发布版本及其编排项目
+      operationId: getAdminContentRelease
+      tags: [Content]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: releaseId, required: true, schema: { type: string } }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /v1/admin/content/releases/{releaseId}/items:
+    put:
+      summary: 替换内容版本项目
+      operationId: replaceAdminContentReleaseItems
+      tags: [Content]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: releaseId, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  items: { $ref: '#/components/schemas/ContentReleaseItem' }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/content/releases/{releaseId}/publish:
+    post:
+      summary: 发布内容版本
+      operationId: publishAdminContentRelease
+      tags: [Content]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: releaseId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/content/releases/{releaseId}/withdraw:
+    post:
+      summary: 撤回内容版本
+      operationId: withdrawAdminContentRelease
+      tags: [Content]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: releaseId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /health:
+    get:
+      summary: "GET /health"
+      operationId: getHealth
+      tags: [System]
+      security: []
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/auth/register:
+    post:
+      summary: "POST /v1/auth/register"
+      operationId: postV1AuthRegister
+      tags: [Auth]
+      security: []
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ParentRegistrationRequest' }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/auth/logout:
+    post:
+      summary: "POST /v1/auth/logout"
+      operationId: postV1AuthLogout
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/auth/session:
+    get:
+      summary: "GET /v1/auth/session"
+      description: 返回移动端唯一可信的账户、角色范围和能力声明；客户端不得自行补充演示权限或班级。
+      operationId: getV1AuthSession
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: 当前账户的有效权限声明
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/MobileAuthClaims' }
+        '401': { $ref: '#/components/responses/AuthError' }
+  /v1/me:
+    get:
+      summary: "GET /v1/me"
+      operationId: getV1Me
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/me/mfa:
+    get:
+      summary: "GET /v1/me/mfa"
+      operationId: getV1MeMfa
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '401': { $ref: '#/components/responses/AuthError' } }
+  /v1/me/mfa/totp/setup:
+    post:
+      summary: "POST /v1/me/mfa/totp/setup"
+      description: 使用当前密码重新确认身份后，生成 10 分钟内有效的身份验证器密钥。
+      operationId: postV1MeMfaTotpSetup
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [currentPassword], properties: { currentPassword: { type: string, format: password } } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '503': { $ref: '#/components/responses/ServerError' } }
+  /v1/me/mfa/totp/confirm:
+    post:
+      summary: "POST /v1/me/mfa/totp/confirm"
+      description: 确认动态口令并返回只显示一次的恢复码。
+      operationId: postV1MeMfaTotpConfirm
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [code], properties: { code: { type: string } } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/me/mfa/totp/disable:
+    post:
+      summary: "POST /v1/me/mfa/totp/disable"
+      operationId: postV1MeMfaTotpDisable
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [currentPassword, code], properties: { currentPassword: { type: string, format: password }, code: { type: string } } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/schools/{schoolId}/tasks:
+    get:
+      summary: "GET /v1/schools/{schoolId}/tasks"
+      operationId: getV1SchoolsSchoolIdTasks
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/SchoolId' }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/schools/{schoolId}/grade-stats:
+    get:
+      summary: "GET /v1/schools/{schoolId}/grade-stats"
+      operationId: getV1SchoolsSchoolIdGradeStats
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/SchoolId' }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/schools/{schoolId}/class-stats:
+    get:
+      summary: "GET /v1/schools/{schoolId}/class-stats"
+      operationId: getV1SchoolsSchoolIdClassStats
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/SchoolId' }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/schools:
+    get:
+      summary: "GET /v1/admin/schools"
+      operationId: getV1AdminSchools
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+    post:
+      summary: "POST /v1/admin/schools"
+      operationId: postV1AdminSchools
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/schools/{schoolId}/status:
+    patch:
+      summary: "PATCH /v1/admin/schools/{schoolId}/status"
+      operationId: patchV1AdminSchoolsSchoolIdStatus
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: schoolId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/grades:
+    get:
+      summary: "GET /v1/admin/grades"
+      operationId: getV1AdminGrades
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: query, name: schoolId, schema: { type: string } }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+    post:
+      summary: "POST /v1/admin/grades"
+      operationId: postV1AdminGrades
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/grades/{gradeId}:
+    patch:
+      summary: "PATCH /v1/admin/grades/{gradeId}"
+      operationId: patchV1AdminGradesGradeId
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: gradeId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/assessment-standards:
+    get:
+      summary: "GET /v1/admin/assessment-standards"
+      operationId: getV1AdminAssessmentStandards
+      tags: [Admin]
+      description: 按学校、年级和状态查询生效日期化的体测标准。返回学校专属与可继承的中央标准。
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: query, name: schoolId, schema: { type: string } }
+        - { in: query, name: gradeId, schema: { type: string } }
+        - { in: query, name: status, schema: { type: string, enum: [draft, active, archived] } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' } }
+    post:
+      summary: "POST /v1/admin/assessment-standards"
+      operationId: postV1AdminAssessmentStandards
+      tags: [Admin]
+      description: 创建不可变标准版本；历史测试会话会保留当时解析出的快照。
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssessmentStandardCreateRequest' }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /v1/admin/assessment-standards/{standardId}/status:
+    patch:
+      summary: "PATCH /v1/admin/assessment-standards/{standardId}/status"
+      operationId: patchV1AdminAssessmentStandardsStandardIdStatus
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: standardId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [active, archived] }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '404': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/classes:
+    get:
+      summary: "GET /v1/admin/classes"
+      operationId: getV1AdminClasses
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: query, name: schoolId, schema: { type: string } }
+        - { in: query, name: gradeId, schema: { type: string } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+    post:
+      summary: "POST /v1/admin/classes"
+      operationId: postV1AdminClasses
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/classes/{classId}:
+    patch:
+      summary: "PATCH /v1/admin/classes/{classId}"
+      operationId: patchV1AdminClassesClassId
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: classId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/students:
+    post:
+      summary: "POST /v1/admin/students"
+      operationId: postV1AdminStudents
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/tasks:
+    post:
+      summary: "POST /v1/admin/tasks"
+      operationId: postV1AdminTasks
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/school-periods:
+    get:
+      summary: "GET /v1/admin/school-periods"
+      operationId: getV1AdminSchoolPeriods
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: query, name: schoolId, schema: { type: string } }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+    post:
+      summary: "POST /v1/admin/school-periods"
+      operationId: postV1AdminSchoolPeriods
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/school-periods/{periodId}/status:
+    patch:
+      summary: "PATCH /v1/admin/school-periods/{periodId}/status"
+      operationId: patchV1AdminSchoolPeriodsPeriodIdStatus
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: periodId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/students/import/template:
+    get:
+      summary: "GET /v1/admin/students/import/template"
+      operationId: getV1AdminStudentsImportTemplate
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/students/import/preview:
+    post:
+      summary: "POST /v1/admin/students/import/preview"
+      operationId: postV1AdminStudentsImportPreview
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '422': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/students/import:
+    post:
+      summary: "POST /v1/admin/students/import"
+      operationId: postV1AdminStudentsImport
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/students/imports:
+    get:
+      summary: "GET /v1/admin/students/imports"
+      operationId: getV1AdminStudentsImports
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: query, name: schoolId, schema: { type: string } }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/students/{studentId}:
+    patch:
+      summary: "PATCH /v1/admin/students/{studentId}"
+      operationId: patchV1AdminStudentsStudentId
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: studentId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/students/{studentId}/status:
+    patch:
+      summary: "PATCH /v1/admin/students/{studentId}/status"
+      operationId: patchV1AdminStudentsStudentIdStatus
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: studentId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/students/{studentId}/history:
+    get:
+      summary: "GET /v1/admin/students/{studentId}/history"
+      operationId: getV1AdminStudentsStudentIdHistory
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: studentId, required: true, schema: { type: string } }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/students/batch-promote:
+    post:
+      summary: "POST /v1/admin/students/batch-promote"
+      operationId: postV1AdminStudentsBatchPromote
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/tasks/{taskId}:
+    patch:
+      summary: "PATCH /v1/admin/tasks/{taskId}"
+      operationId: patchV1AdminTasksTaskId
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: taskId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/tasks/{taskId}/status:
+    patch:
+      summary: "PATCH /v1/admin/tasks/{taskId}/status"
+      operationId: patchV1AdminTasksTaskIdStatus
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: taskId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/tasks/{taskId}/sync-students:
+    post:
+      summary: "POST /v1/admin/tasks/{taskId}/sync-students"
+      operationId: postV1AdminTasksTaskIdSyncStudents
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: taskId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/tasks/{taskId}/clone:
+    post:
+      summary: "POST /v1/admin/tasks/{taskId}/clone"
+      operationId: postV1AdminTasksTaskIdClone
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: taskId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/operations/items:
+    get:
+      summary: "GET /v1/admin/operations/items"
+      operationId: getV1AdminOperationsItems
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: query, name: schoolId, schema: { type: string } }
+        - { in: query, name: type, schema: { type: string } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/operations/{type}/{itemId}/status:
+    patch:
+      summary: "PATCH /v1/admin/operations/{type}/{itemId}/status"
+      operationId: patchV1AdminOperationsTypeItemIdStatus
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: type, required: true, schema: { type: string } }
+        - { in: path, name: itemId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/notifications/campaigns:
+    get:
+      summary: "GET /v1/admin/notifications/campaigns"
+      operationId: getV1AdminNotificationsCampaigns
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: query, name: schoolId, schema: { type: string } }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+    post:
+      summary: "POST /v1/admin/notifications/campaigns"
+      operationId: postV1AdminNotificationsCampaigns
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/classes/notifications:
+    post:
+      summary: "POST /v1/classes/notifications"
+      operationId: postV1ClassesNotifications
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [schoolId, classId, title, content]
+              properties:
+                schoolId: { type: string }
+                classId: { type: string }
+                targetClassIds: { type: array, items: { type: string }, minItems: 1 }
+                recipientScope: { type: string, enum: [class] }
+                title: { type: string, minLength: 2, maxLength: 120 }
+                content: { type: string, minLength: 4, maxLength: 5000 }
+                status: { type: string, enum: [draft, sent] }
+                scheduledAt: { type: [string, 'null'], format: date-time }
+                parentReceiptEnabled: { type: boolean }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /v1/classes/notifications/drafts:
+    get:
+      summary: "GET /v1/classes/notifications/drafts"
+      operationId: getV1ClassesNotificationsDrafts
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: query, name: schoolId, schema: { type: string } }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /v1/classes/notifications/{notificationId}:
+    get:
+      summary: "GET /v1/classes/notifications/{notificationId}"
+      operationId: getV1ClassesNotificationsNotificationId
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: notificationId, required: true, schema: { type: string } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+    put:
+      summary: "PUT /v1/classes/notifications/{notificationId}"
+      operationId: putV1ClassesNotificationsNotificationId
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: notificationId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [schoolId, targetClassIds, title, content, draftVersion]
+              properties:
+                schoolId: { type: string }
+                classId: { type: string }
+                targetClassIds: { type: array, items: { type: string }, minItems: 1 }
+                recipientScope: { type: string, enum: [class] }
+                title: { type: string, minLength: 2, maxLength: 120 }
+                content: { type: string, minLength: 4, maxLength: 5000 }
+                draftVersion: { type: integer, minimum: 1 }
+                scheduledAt: { type: [string, 'null'], format: date-time }
+                parentReceiptEnabled: { type: boolean }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' } }
+    delete:
+      summary: "DELETE /v1/classes/notifications/{notificationId}"
+      operationId: deleteV1ClassesNotificationsNotificationId
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: notificationId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /v1/classes/notifications/{notificationId}/send:
+    post:
+      summary: "POST /v1/classes/notifications/{notificationId}/send"
+      operationId: postV1ClassesNotificationsNotificationIdSend
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: notificationId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/classes/notifications/{notificationId}/retry:
+    post:
+      summary: "POST /v1/classes/notifications/{notificationId}/retry"
+      operationId: postV1ClassesNotificationsNotificationIdRetry
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: notificationId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/classes/notifications/{notificationId}/receipt:
+    post:
+      summary: "POST /v1/classes/notifications/{notificationId}/receipt"
+      operationId: postV1ClassesNotificationsNotificationIdReceipt
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: notificationId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/tasks/{taskId}/students/{studentId}/scores:
+    get:
+      summary: "GET /v1/tasks/{taskId}/students/{studentId}/scores"
+      operationId: getV1TasksTaskIdStudentsStudentIdScores
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: taskId, required: true, schema: { type: string } }
+        - { in: path, name: studentId, required: true, schema: { type: string } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+    post:
+      summary: "POST /v1/tasks/{taskId}/students/{studentId}/scores"
+      operationId: postV1TasksTaskIdStudentsStudentIdScores
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: taskId, required: true, schema: { type: string } }
+        - { in: path, name: studentId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/scores/{scoreId}/review:
+    post:
+      summary: "POST /v1/scores/{scoreId}/review"
+      operationId: postV1ScoresScoreIdReview
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: scoreId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/activities:
+    get:
+      summary: "GET /v1/activities"
+      operationId: getV1Activities
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: query, name: childId, required: false, schema: { type: string }, description: "按当前已绑定孩子返回报名状态；不传时仅返回家庭级记录" }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /v1/activities/registrations/history:
+    get:
+      summary: "GET /v1/activities/registrations/history"
+      operationId: getV1ActivitiesRegistrationsHistory
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /v1/activities/{activityId}:
+    get:
+      summary: "GET /v1/activities/{activityId}"
+      operationId: getV1ActivitiesActivityId
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: activityId, required: true, schema: { type: string } }
+        - { in: query, name: childId, required: false, schema: { type: string }, description: "按当前已绑定孩子返回报名状态" }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /v1/activities/{activityId}/registrations:
+    post:
+      summary: "POST /v1/activities/{activityId}/registrations"
+      operationId: postV1ActivitiesActivityIdRegistrations
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: activityId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contactName, phone]
+              properties:
+                childId: { type: string }
+                contactName: { type: string, minLength: 1, maxLength: 80 }
+                phone: { type: string, pattern: '^1\\d{10}$' }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/activities/{activityId}/registrations/{registrationId}:
+    put:
+      summary: "PUT /v1/activities/{activityId}/registrations/{registrationId}"
+      operationId: putV1ActivitiesActivityIdRegistrationsRegistrationId
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: activityId, required: true, schema: { type: string } }
+        - { in: path, name: registrationId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contactName, phone]
+              properties:
+                childId: { type: string }
+                contactName: { type: string, minLength: 1, maxLength: 80 }
+                phone: { type: string, pattern: '^1\\d{10}$' }
+                expectedVersion: { type: integer }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/activities/{activityId}/registrations/{registrationId}/cancel:
+    post:
+      summary: "POST /v1/activities/{activityId}/registrations/{registrationId}/cancel"
+      operationId: postV1ActivitiesActivityIdRegistrationsRegistrationIdCancel
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: activityId, required: true, schema: { type: string } }
+        - { in: path, name: registrationId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expectedVersion: { type: integer, minimum: 0 }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/experts:
+    get:
+      summary: "GET /v1/experts"
+      operationId: getV1Experts
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /v1/experts/{expertId}:
+    get:
+      summary: "GET /v1/experts/{expertId}"
+      operationId: getV1ExpertsExpertId
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: expertId, required: true, schema: { type: string } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /v1/experts/{expertId}/available-slots:
+    get:
+      summary: "GET /v1/experts/{expertId}/available-slots"
+      operationId: getV1ExpertsExpertIdAvailableSlots
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: expertId, required: true, schema: { type: string } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /v1/expert-appointments/history:
+    get:
+      summary: "GET /v1/expert-appointments/history"
+      operationId: getV1ExpertAppointmentsHistory
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /v1/expert-appointments:
+    post:
+      summary: "POST /v1/expert-appointments"
+      operationId: postV1ExpertAppointments
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expertId: { type: string }
+                serviceId: { type: string }
+                slotId: { type: string }
+                childId: { type: string }
+                expertName: { type: string, minLength: 1, maxLength: 80 }
+                preferredDate: { type: string, minLength: 1, maxLength: 120 }
+                note: { type: string, maxLength: 1000 }
+                schoolId: { type: string }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/expert-appointments/{appointmentId}/reschedule:
+    put:
+      summary: "PUT /v1/expert-appointments/{appointmentId}/reschedule"
+      operationId: putV1ExpertAppointmentsAppointmentIdReschedule
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: appointmentId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slotId]
+              properties:
+                slotId: { type: string }
+                expectedVersion: { type: integer }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/expert-appointments/{appointmentId}/cancel:
+    post:
+      summary: "POST /v1/expert-appointments/{appointmentId}/cancel"
+      operationId: postV1ExpertAppointmentsAppointmentIdCancel
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: appointmentId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expectedVersion: { type: integer, minimum: 0 }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/courses/uploads:
+    post:
+      summary: "POST /v1/courses/uploads"
+      operationId: postV1CoursesUploads
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [attachmentName, attendanceCount]
+              properties:
+                taskId: { type: string }
+                schoolId: { type: string }
+                attachmentFileId: { type: string }
+                attachmentName: { type: string, minLength: 1, maxLength: 180 }
+                attendanceCount: { type: integer, minimum: 0, maximum: 10000 }
+                notes: { type: string, maxLength: 2000 }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/class-posts:
+    get:
+      summary: "GET /v1/class-posts"
+      description: "返回经过权限和隐私过滤的班级动态；每条动态包含稳定的 authorRole 和 ownedByCurrentUser。客户端不得通过展示名判断教师、家长或内容所有权。"
+      operationId: getV1ClassPosts
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: query, name: schoolId, schema: { type: string } }
+        - { in: query, name: classId, schema: { type: string } }
+        - { in: query, name: cursor, schema: { type: string } }
+        - { in: query, name: pageSize, schema: { type: integer, maximum: 50 } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' } }
+    post:
+      summary: "POST /v1/class-posts"
+      description: "家长必须携带已绑定孩子所属的 classId；服务端会校验该绑定关系，不能通过修改请求向其他班级发布。"
+      operationId: postV1ClassPosts
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string, minLength: 1, maxLength: 2000 }
+                author: { type: string, maxLength: 80 }
+                schoolId: { type: string }
+                classId: { type: string }
+                displayName: { type: string, maxLength: 80 }
+                visibilityScope: { type: string, enum: [class, school_staff, teacher_only] }
+                attachments:
+                  type: array
+                  maxItems: 9
+                  items:
+                    type: object
+                    properties:
+                      id: { type: string }
+                      type: { type: string, enum: [image, video] }
+                      objectId: { type: string, minLength: 1 }
+                      thumbnailObjectId: { type: string }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/class-posts/{postId}:
+    delete:
+      summary: "DELETE /v1/class-posts/{postId}"
+      operationId: deleteV1ClassPostsPostId
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: postId, required: true, schema: { type: string } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /v1/class-posts/{postId}/comments:
+    get:
+      summary: "GET /v1/class-posts/{postId}/comments"
+      operationId: getV1ClassPostsPostIdComments
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: postId, required: true, schema: { type: string } }
+        - { in: query, name: cursor, schema: { type: string } }
+        - { in: query, name: pageSize, schema: { type: integer, maximum: 50 } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+    post:
+      summary: "POST /v1/class-posts/{postId}/comments"
+      operationId: postV1ClassPostsPostIdComments
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: postId, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string, minLength: 1, maxLength: 500 }
+                displayName: { type: string, maxLength: 80 }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /v1/class-posts/{postId}/comments/{commentId}:
+    delete:
+      summary: "DELETE /v1/class-posts/{postId}/comments/{commentId}"
+      operationId: deleteV1ClassPostsPostIdCommentsCommentId
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: postId, required: true, schema: { type: string } }
+        - { in: path, name: commentId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /v1/class-posts/{postId}/report:
+    post:
+      summary: "POST /v1/class-posts/{postId}/report"
+      operationId: postV1ClassPostsPostIdReport
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: postId, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 1, maxLength: 300 }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /v1/class-posts/{postId}/pin:
+    post:
+      summary: "POST /v1/class-posts/{postId}/pin"
+      operationId: postV1ClassPostsPostIdPin
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: postId, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pinned: { type: boolean }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /v1/admin/class-posts/{postId}/moderation:
+    patch:
+      summary: "PATCH /v1/admin/class-posts/{postId}/moderation"
+      operationId: patchV1AdminClassPostsPostIdModeration
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: postId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [approved, rejected] }
+                reason: { type: string, maxLength: 500 }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /v1/students/{studentId}/training-sessions:
+    get:
+      summary: "GET /v1/students/{studentId}/training-sessions"
+      operationId: getV1StudentsStudentIdTrainingSessions
+      tags: [Students]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: studentId, required: true, schema: { type: string } }
+        - { in: query, name: from, required: false, schema: { type: string, format: date-time } }
+        - { in: query, name: to, required: false, schema: { type: string, format: date-time } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+    post:
+      summary: "POST /v1/students/{studentId}/training-sessions"
+      operationId: postV1StudentsStudentIdTrainingSessions
+      tags: [Students]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: studentId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionId, dayId, completedAt, durationSeconds, completionRatio, qualityScore, modelVersion]
+              properties:
+                sessionId: { type: string, minLength: 1, maxLength: 120 }
+                dayId: { type: integer, minimum: 0, maximum: 89 }
+                completedAt: { type: string, format: date-time }
+                durationSeconds: { type: integer, minimum: 0, maximum: 86400 }
+                completionRatio: { type: number, minimum: 0, maximum: 1 }
+                qualityScore: { type: integer, minimum: 0, maximum: 100 }
+                cameraVerified: { type: boolean }
+                visualUnits: { type: object, additionalProperties: { type: integer, minimum: 0 } }
+                manualUnits: { type: integer, minimum: 0, maximum: 100000 }
+                modelVersion: { type: string, minLength: 1, maxLength: 120 }
+                mode: { type: string, maxLength: 60 }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/students/{studentId}/health-observations:
+    get:
+      summary: "GET /v1/students/{studentId}/health-observations"
+      description: "仅限已绑定该学生的家庭监护人读取。教师的班级授权不适用于家庭视力、口腔或心理观察记录。"
+      operationId: getV1StudentsStudentIdHealthObservations
+      tags: [Students]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: studentId, required: true, schema: { type: string } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '404': { $ref: '#/components/responses/NotFound' } }
+    post:
+      summary: "POST /v1/students/{studentId}/health-observations"
+      description: "仅限已绑定该学生的家庭监护人提交；记录为家庭观察，不构成医学诊断。"
+      operationId: postV1StudentsStudentIdHealthObservations
+      tags: [Students]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: studentId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [category, answers]
+              properties:
+                category: { type: string, enum: [vision, oral, mental] }
+                formVersion: { type: string }
+                answers:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    properties:
+                      questionId: { type: string }
+                      questionType: { type: string, enum: [single, multiple, frequency, severity, text] }
+                      selectedOptionIds: { type: array, items: { type: string } }
+                      note: { type: string, maxLength: 500 }
+                      required: { type: boolean }
+                frequency: { type: string }
+                severity: { type: string }
+                note: { type: string, maxLength: 1000 }
+                expectedVersion: { type: integer, minimum: 0, description: "客户端读取到的上一版本；新建记录使用0" }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/students/{studentId}/health-checkins:
+    get:
+      summary: "GET /v1/students/{studentId}/health-checkins"
+      operationId: getV1StudentsStudentIdHealthCheckins
+      tags: [Students]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: studentId, required: true, schema: { type: string } }
+        - { in: query, name: from, required: false, schema: { type: string, format: date } }
+        - { in: query, name: to, required: false, schema: { type: string, format: date } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+    post:
+      summary: "POST /v1/students/{studentId}/health-checkins"
+      operationId: postV1StudentsStudentIdHealthCheckins
+      tags: [Students]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: studentId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [checkInDate, activityType, durationMinutes, intensity]
+              properties:
+                checkInDate: { type: string, format: date }
+                activityType: { type: string, minLength: 1, maxLength: 60 }
+                durationMinutes: { type: integer, minimum: 1, maximum: 1440 }
+                intensity: { type: string, enum: [low, moderate, high] }
+                feeling: { type: string, maxLength: 120 }
+                completedRecommended: { type: boolean }
+                parentNote: { type: string, maxLength: 1000 }
+                expectedVersion: { type: integer, minimum: 0 }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/support/messages:
+    post:
+      summary: "POST /v1/support/messages"
+      operationId: postV1SupportMessages
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string, minLength: 1, maxLength: 2000 }
+                schoolId: { type: string }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/reports:
+    get:
+      summary: "GET /v1/reports"
+      operationId: getV1Reports
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/reports/{reportId}/publish:
+    post:
+      summary: "POST /v1/reports/{reportId}/publish"
+      operationId: postV1ReportsReportIdPublish
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: reportId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/reports/{reportId}/withdraw:
+    post:
+      summary: "POST /v1/reports/{reportId}/withdraw"
+      operationId: postV1ReportsReportIdWithdraw
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: reportId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/students/{studentId}/bind:
+    post:
+      summary: "POST /v1/students/{studentId}/bind"
+      operationId: postV1StudentsStudentIdBind
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: studentId, required: true, schema: { type: string } }
+        - { in: query, name: code, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/students/bind:
+    post:
+      summary: "POST /v1/students/bind"
+      operationId: postV1StudentsBind
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [studentName, code]
+              properties:
+                studentName: { type: string, maxLength: 80 }
+                code: { type: string, maxLength: 128 }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/students/{studentId}/report:
+    get:
+      summary: "GET /v1/students/{studentId}/report"
+      operationId: getV1StudentsStudentIdReport
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: studentId, required: true, schema: { type: string } }
+      responses: { '200': { $ref: '#/components/responses/ReportSuccess' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/students/{studentId}/report/refresh:
+    post:
+      summary: "POST /v1/students/{studentId}/report/refresh"
+      operationId: postV1StudentsStudentIdReportRefresh
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: studentId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '200': { $ref: '#/components/responses/ReportSuccess' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/students/{studentId}/body-assessments:
+    post:
+      summary: "POST /v1/students/{studentId}/body-assessments"
+      operationId: postV1StudentsStudentIdBodyAssessments
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: studentId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/students/{studentId}/body-assessments/latest:
+    get:
+      summary: "GET /v1/students/{studentId}/body-assessments/latest"
+      operationId: getV1StudentsStudentIdBodyAssessmentsLatest
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: studentId, required: true, schema: { type: string } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/files/presign:
+    post:
+      summary: "POST /v1/files/presign"
+      operationId: postV1FilesPresign
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/files/{fileId}:
+    get:
+      summary: "GET /v1/files/{fileId}"
+      operationId: getV1FilesFileId
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: fileId, required: true, schema: { type: string } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/users/{userId}/messages:
+    get:
+      summary: "GET /v1/users/{userId}/messages"
+      operationId: getV1UsersUserIdMessages
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: userId, required: true, schema: { type: string } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/messages/{messageId}/read:
+    post:
+      summary: "POST /v1/messages/{messageId}/read"
+      operationId: postV1MessagesMessageIdRead
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: messageId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/test-stations:
+    get:
+      operationId: getAdminTestStations
+      summary: 查询学校场地测试点
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: query, name: schoolId, required: true, schema: { type: string } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' } }
+    post:
+      operationId: postAdminTestStations
+      summary: 注册场地测试点
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [schoolId, stationCode, name], properties: { schoolId: { type: string }, stationCode: { type: string }, name: { type: string }, itemCode: { type: string }, queueCapacity: { type: integer } } } } } }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/test-stations/{stationId}/calibrations:
+    post:
+      operationId: postAdminTestStationCalibration
+      summary: 下发并激活测试点标定；新激活版本会归档同测试点的旧有效标定
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: stationId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version, checksumSha256, config]
+              properties:
+                version: { type: string, maxLength: 64 }
+                checksumSha256: { type: string, pattern: '^[A-Fa-f0-9]{64}$' }
+                config: { type: object, minProperties: 1, additionalProperties: true }
+                activate: { type: boolean, default: true }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /v1/admin/test-stations/{stationId}:
+    patch:
+      operationId: patchAdminTestStation
+      summary: 修改场地测试点容量、状态与元数据
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: stationId, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { name: { type: string, maxLength: 120 }, itemCode: { type: [string, 'null'], maxLength: 64 }, queueCapacity: { type: integer, minimum: 1, maximum: 500 }, status: { type: string, enum: [online, offline, maintenance, paused, disabled] }, metadata: { type: object, additionalProperties: true } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /v1/admin/test-devices:
+    get:
+      operationId: getAdminTestDevices
+      summary: 查询场地设备、心跳状态与密钥到期健康状态
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: query, name: schoolId, required: true, schema: { type: string } }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' } }
+    post:
+      operationId: postAdminTestDevices
+      summary: 注册场地设备并仅返回一次有有效期的设备密钥
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [schoolId, deviceCode, name, deviceType], properties: { schoolId: { type: string }, stationId: { type: string }, deviceCode: { type: string }, name: { type: string }, deviceType: { type: string, enum: [edge_host, depth_camera, rgb_camera, display, speaker, reader, ups, network] }, serialNumber: { type: string }, softwareVersion: { type: string }, apiKeyExpiresAt: { type: string, format: date-time }, capabilities: { type: object } } } } } }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/test-devices/{deviceId}/rotate-key:
+    post:
+      operationId: postAdminTestDeviceRotateKey
+      summary: 立即使旧密钥失效并仅返回一次新设备密钥
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: deviceId, required: true, schema: { type: string } }]
+      requestBody: { required: false, content: { application/json: { schema: { type: object, properties: { apiKeyExpiresAt: { type: string, format: date-time } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /v1/admin/test-queues:
+    get:
+      operationId: getAdminTestQueues
+      summary: 查询任务的场地候测队列与测试点分配
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: query, name: taskId, required: true, schema: { type: string } }, { in: query, name: stationId, required: false, schema: { type: string } }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /v1/admin/test-queues/rebalance:
+    post:
+      operationId: postAdminTestQueuesRebalance
+      summary: 仅重新分配未开始的学生到已通过正式开测门禁的测试点
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [taskId], properties: { taskId: { type: string } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/test-queues/{queueEntryId}/transition:
+    post:
+      operationId: postAdminTestQueueTransition
+      summary: 由后台受权人员调度单个候测队列条目
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: queueEntryId, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [status], properties: { status: { type: string, enum: [waiting, called, checked_in, testing, completed, retest, skipped, paused, cancelled] }, stationId: { type: [string, 'null'] }, expectedVersion: { type: integer, minimum: 0 }, reason: { type: string, maxLength: 500 } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/test-sessions:
+    get:
+      operationId: getAdminTestSessions
+      summary: 分页查询场地会话，支持任务、测试点和状态筛选
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: query, name: schoolId, required: true, schema: { type: string } }, { in: query, name: taskId, schema: { type: string } }, { in: query, name: stationId, schema: { type: string } }, { in: query, name: status, schema: { type: string } }, { in: query, name: page, schema: { type: integer, minimum: 1 } }, { in: query, name: pageSize, schema: { type: integer, minimum: 1, maximum: 100 } }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /v1/admin/test-sessions/{sessionId}:
+    get:
+      operationId: getAdminTestSession
+      summary: 查看可复核的采集会话、动作事件、证据和成绩
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: sessionId, required: true, schema: { type: string } }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /v1/admin/field/stream:
+    get:
+      operationId: getAdminFieldStream
+      summary: 订阅设备、队列、会话和指令的 SSE 实时状态流
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: query, name: schoolId, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: text/event-stream 响应；事件类型包括 ready、device.heartbeat、device.offline、queue.updated、session.opened、session.completed、command.issued }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/admin/device-commands:
+    post:
+      operationId: postAdminDeviceCommand
+      summary: 向已注册的场地设备下发受审计的远程命令
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [deviceId, commandType], properties: { deviceId: { type: string }, commandType: { type: string, enum: [pause, resume, stop, call_next, recall, skip, retest, refresh_config] }, payload: { type: object, additionalProperties: true }, expiresAt: { type: string, format: date-time } } } } } }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /v1/field/bootstrap:
+    get:
+      operationId: getFieldBootstrap
+      summary: 下发场地端任务、队列、标定与待执行指令
+      tags: [Field]
+      security: [{ fieldDeviceId: [], fieldDeviceTimestamp: [], fieldDeviceNonce: [], fieldDeviceBodyHash: [], fieldDeviceSignature: [] }]
+      parameters: [{ in: query, name: taskId, required: false, schema: { type: string } }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '401': { $ref: '#/components/responses/AuthError' } }
+  /v1/field/heartbeat:
+    post:
+      operationId: postFieldHeartbeat
+      summary: 上报设备状态、能力与正式采集自检；未通过自检的边缘主机不得开启正式测试会话
+      tags: [Field]
+      security: [{ fieldDeviceId: [], fieldDeviceTimestamp: [], fieldDeviceNonce: [], fieldDeviceBodyHash: [], fieldDeviceSignature: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [health]
+              properties:
+                softwareVersion: { type: string, maxLength: 120 }
+                capabilities: { type: object, additionalProperties: true }
+                health:
+                  type: object
+                  required: [schemaVersion, selfTest, capture, storage, calibration]
+                  properties:
+                    schemaVersion: { type: string, enum: [field-health/v1] }
+                    emergencyStop: { type: boolean, default: false }
+                    selfTest:
+                      type: object
+                      required: [passed, completedAt]
+                      properties:
+                        passed: { type: boolean }
+                        completedAt: { type: string, format: date-time }
+                        message: { type: string }
+                    capture:
+                      type: object
+                      required: [adapterReady, adapterName, depthCameraCount, rgbCameraCount, gpuReady, frameSyncOffsetMs]
+                      properties:
+                        adapterReady: { type: boolean }
+                        adapterName: { type: string }
+                        depthCameraCount: { type: integer, minimum: 0 }
+                        rgbCameraCount: { type: integer, minimum: 0 }
+                        gpuReady: { type: boolean }
+                        frameSyncOffsetMs: { type: [number, 'null'], minimum: 0 }
+                    storage:
+                      type: object
+                      required: [freeMb]
+                      properties:
+                        freeMb: { type: integer, minimum: 0 }
+                    calibration:
+                      type: object
+                      required: [passed, version, checksumSha256, errorCm]
+                      properties:
+                        passed: { type: boolean }
+                        version: { type: [string, 'null'] }
+                        checksumSha256: { type: [string, 'null'], pattern: '^[A-Fa-f0-9]{64}$' }
+                        errorCm: { type: [number, 'null'], minimum: 0 }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '401': { $ref: '#/components/responses/AuthError' } }
+  /v1/field/commands:
+    get:
+      operationId: getFieldCommands
+      summary: 领取当前设备待执行的远程指令
+      tags: [Field]
+      security: [{ fieldDeviceId: [], fieldDeviceTimestamp: [], fieldDeviceNonce: [], fieldDeviceBodyHash: [], fieldDeviceSignature: [] }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '401': { $ref: '#/components/responses/AuthError' } }
+  /v1/field/commands/{commandId}/ack:
+    post:
+      operationId: postFieldCommandAck
+      summary: 确认或失败回执设备指令；同一设备只能处理自身指令一次
+      tags: [Field]
+      security: [{ fieldDeviceId: [], fieldDeviceTimestamp: [], fieldDeviceNonce: [], fieldDeviceBodyHash: [], fieldDeviceSignature: [] }]
+      parameters: [{ in: path, name: commandId, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { failed: { type: boolean, default: false } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '401': { $ref: '#/components/responses/AuthError' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /v1/field/files/presign:
+    post:
+      operationId: postFieldFilePresign
+      summary: 为当前设备创建短时、一次性的场地证据上传记录
+      tags: [Field]
+      security: [{ fieldDeviceId: [], fieldDeviceTimestamp: [], fieldDeviceNonce: [], fieldDeviceBodyHash: [], fieldDeviceSignature: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [fileName, contentType, fileSize], properties: { fileName: { type: string, maxLength: 255 }, contentType: { type: string }, fileSize: { type: integer, minimum: 0, maximum: 20000000 } } } } } }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' }, '401': { $ref: '#/components/responses/AuthError' } }
+  /v1/field/files/{fileId}/content:
+    put:
+      operationId: putFieldFileContent
+      summary: 上传已创建的场地证据原始字节；服务端校验大小、文件签名、设备所有权和一次性状态
+      tags: [Field]
+      security: [{ fieldDeviceId: [], fieldDeviceTimestamp: [], fieldDeviceNonce: [], fieldDeviceBodyHash: [], fieldDeviceSignature: [] }]
+      parameters: [{ in: path, name: fileId, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/pdf: { schema: { type: string, format: binary } }
+          text/plain: { schema: { type: string, format: binary } }
+          image/jpeg: { schema: { type: string, format: binary } }
+          image/png: { schema: { type: string, format: binary } }
+          video/mp4: { schema: { type: string, format: binary } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '401': { $ref: '#/components/responses/AuthError' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' }, '410': { $ref: '#/components/responses/Conflict' }, '413': { $ref: '#/components/responses/Conflict' } }
+  /v1/field/queue/transition:
+    post:
+      operationId: postFieldQueueTransition
+      summary: 由当前设备按版本号推进场地候测队列
+      tags: [Field]
+      security: [{ fieldDeviceId: [], fieldDeviceTimestamp: [], fieldDeviceNonce: [], fieldDeviceBodyHash: [], fieldDeviceSignature: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [queueEntryId, status], properties: { queueEntryId: { type: string }, status: { type: string, enum: [waiting, called, checked_in, testing, completed, retest, skipped, paused, cancelled] }, expectedVersion: { type: integer, minimum: 0 }, reason: { type: string, maxLength: 500 } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '401': { $ref: '#/components/responses/AuthError' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/field/sessions:
+    post:
+      operationId: postFieldSession
+      summary: 在正式开测门禁通过后创建或幂等返回场地会话
+      tags: [Field]
+      security: [{ fieldDeviceId: [], fieldDeviceTimestamp: [], fieldDeviceNonce: [], fieldDeviceBodyHash: [], fieldDeviceSignature: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [clientSessionId, taskId, studentId], properties: { clientSessionId: { type: string, maxLength: 120, description: 设备端稳定生成的会话键；可带业务前缀，不强制 UUID 格式 }, taskId: { type: string }, studentId: { type: string }, startedAt: { type: string, format: date-time }, algorithmVersion: { type: string, maxLength: 120 }, summary: { type: object, additionalProperties: true } } } } } }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' }, '401': { $ref: '#/components/responses/AuthError' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/field/sessions/{sessionId}/events:
+    post:
+      operationId: postFieldSessionEvents
+      summary: 追加可重放的场地动作事件，客户端事件 ID 和序号不可被不同内容复用
+      tags: [Field]
+      security: [{ fieldDeviceId: [], fieldDeviceTimestamp: [], fieldDeviceNonce: [], fieldDeviceBodyHash: [], fieldDeviceSignature: [] }]
+      parameters: [{ in: path, name: sessionId, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [events], properties: { events: { type: array, minItems: 1, maxItems: 200, items: { type: object, required: [clientEventId, sequenceNo, eventType], properties: { clientEventId: { type: string, format: uuid }, sequenceNo: { type: integer, minimum: 0 }, eventType: { type: string, maxLength: 64 }, happenedAt: { type: string, format: date-time }, payload: { type: object, additionalProperties: true } } } } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '401': { $ref: '#/components/responses/AuthError' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/field/sessions/{sessionId}/complete:
+    post:
+      operationId: postFieldSessionComplete
+      summary: 提交场地最终成绩、证据关联和自动复核状态
+      tags: [Field]
+      security: [{ fieldDeviceId: [], fieldDeviceTimestamp: [], fieldDeviceNonce: [], fieldDeviceBodyHash: [], fieldDeviceSignature: [] }]
+      parameters: [{ in: path, name: sessionId, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [scores], properties: { algorithmVersion: { type: string, maxLength: 120 }, endedAt: { type: string, format: date-time }, outcome: { type: string, enum: [completed, retest] }, scores: { type: array, minItems: 1, maxItems: 7, items: { type: object, required: [item, score, confidence], properties: { item: { type: string }, score: { type: number, minimum: 0, maximum: 5 }, confidence: { type: number, minimum: 0, maximum: 1 }, reviewStatus: { type: string, enum: [passed, pendingReview], description: 缺失或非 passed 时服务端将保守地进入待复核 }, note: { type: string, maxLength: 1000 }, evidence: { type: object, additionalProperties: true } } } }, evidence: { type: array, maxItems: 30, items: { type: object, required: [fileId, evidenceType], properties: { fileId: { type: string }, evidenceType: { type: string, enum: [video, image, skeleton, timeline, calibration, log, other] }, checksumSha256: { type: string, pattern: '^[A-Fa-f0-9]{64}$' }, metadata: { type: object, additionalProperties: true } } } }, summary: { type: object, additionalProperties: true } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '401': { $ref: '#/components/responses/AuthError' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/field/sync/batches:
+    post:
+      operationId: postFieldSyncBatches
+      summary: 幂等补传场地端队列、会话、动作和完成事件
+      tags: [Field]
+      security: [{ fieldDeviceId: [], fieldDeviceTimestamp: [], fieldDeviceNonce: [], fieldDeviceBodyHash: [], fieldDeviceSignature: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [clientBatchId, events]
+              properties:
+                clientBatchId: { type: string, format: uuid }
+                events:
+                  type: array
+                  maxItems: 200
+                  items:
+                    type: object
+                    required: [clientEventId, eventType, payload]
+                    properties:
+                      clientEventId: { type: string, format: uuid }
+                      eventType: { type: string }
+                      happenedAt: { type: string, format: date-time }
+                      payload: { type: object }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/mobile/events:
+    post:
+      operationId: postMobileProductEvents
+      summary: 提交用户主动开启的隐私最小化产品事件
+      description: 仅接受固定事件、粗粒度周期、平台、版本和单次启动随机会话；不接受用户、儿童、学校、设备或健康数据。
+      tags: [Product]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductEventBatchRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/Conflict' }
+        '401': { $ref: '#/components/responses/AuthError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+    fieldDeviceId:
+      type: apiKey
+      in: header
+      name: X-Device-Id
+    fieldDeviceTimestamp:
+      type: apiKey
+      in: header
+      name: X-Device-Timestamp
+    fieldDeviceNonce:
+      type: apiKey
+      in: header
+      name: X-Device-Nonce
+    fieldDeviceBodyHash:
+      type: apiKey
+      in: header
+      name: X-Device-Body-Hash
+    fieldDeviceSignature:
+      type: apiKey
+      in: header
+      name: X-Device-Signature
+  parameters:
+    SchoolId:
+      in: path
+      name: schoolId
+      required: true
+      schema: { type: string }
+    IdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      required: false
+      schema: { type: string, maxLength: 128 }
+  schemas:
+    ContentReleaseItem:
+      type: object
+      required: [contentType, contentId]
+      properties:
+        contentType: { type: string, enum: [course, activity, expert, notification_template, scoring_rule] }
+        contentId: { type: string }
+        contentVersion: { type: integer, minimum: 1, default: 1 }
+        sortOrder: { type: integer, default: 0 }
+        metadata: { type: object, additionalProperties: true }
+    ProductEventBatchRequest:
+      type: object
+      additionalProperties: false
+      required: [events]
+      properties:
+        events:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: { $ref: '#/components/schemas/ProductEventInput' }
+    ProductEventInput:
+      type: object
+      additionalProperties: false
+      required: [eventId, eventName, platform, appVersion, clientSessionId, occurredAt]
+      properties:
+        eventId: { type: string, format: uuid }
+        eventName: { type: string, enum: [growth_report_opened, growth_report_period_changed, adaptive_plan_opened_courses] }
+        coarseValue: { type: [string, 'null'], enum: [本周, 本月, null] }
+        platform: { type: string, enum: [ios, android] }
+        appVersion: { type: string, minLength: 1, maxLength: 40, pattern: '^[A-Za-z0-9][A-Za-z0-9._+-]{0,39}$' }
+        clientSessionId: { type: string, format: uuid, description: 每次 App 启动随机生成；服务端仅保存其 SHA-256 摘要 }
+        occurredAt: { type: string, format: date-time }
+    LoginRequest:
+      type: object
+      required: [account]
+      properties:
+        account: { type: string }
+        password: { type: string, format: password }
+        verificationCode: { type: string, pattern: '^\\d{6}$', description: 使用短信登录时提供；与 password 二选一 }
+    VerificationCodeRequest:
+      type: object
+      required: [account, purpose]
+      properties:
+        account: { type: string, pattern: '^1\\d{10}$' }
+        purpose: { type: string, enum: [login, register, reset-password] }
+    ParentRegistrationRequest:
+      type: object
+      required: [name, phone, verificationCode, password]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        phone: { type: string, pattern: '^1\\d{10}$' }
+        verificationCode: { type: string, pattern: '^\\d{6}$' }
+        password: { type: string, format: password, minLength: 8 }
+        roleCode: { type: string, enum: [parent], default: parent }
+    MobileAuthRole:
+      type: object
+      required: [roleCode, campusIds, authorizedGradeIds, authorizedClassIds, capabilities, mobileEntryAllowed]
+      properties:
+        roleCode: { type: string, enum: [parent, teacher, principal, admin] }
+        name: { type: string }
+        schoolId: { type: [string, 'null'] }
+        campusIds: { type: array, items: { type: string } }
+        authorizedGradeIds: { type: array, items: { type: string } }
+        authorizedClassIds: { type: array, items: { type: string } }
+        capabilities: { type: array, items: { type: string } }
+        mobileEntryAllowed: { type: boolean }
+    MobileAuthClaims:
+      type: object
+      required: [claimsVersion, activeRole, accountRoles, user]
+      properties:
+        claimsVersion: { type: integer, minimum: 1 }
+        activeRole: { type: string, enum: [parent, teacher, principal, admin] }
+        accountRoles: { type: array, items: { $ref: '#/components/schemas/MobileAuthRole' } }
+        user:
+          type: object
+          required: [id, name, phone, roleCode, schoolName, authorizedClassIds, capabilities, mobileEntryAllowed]
+          properties:
+            id: { type: string }
+            name: { type: string }
+            phone: { type: string }
+            role: { type: string }
+            roleCode: { type: string }
+            schoolId: { type: [string, 'null'] }
+            schoolName: { type: string }
+            avatarInitials: { type: string }
+            authorizedGradeIds: { type: array, items: { type: string } }
+            authorizedClassIds: { type: array, items: { type: string } }
+            capabilities: { type: array, items: { type: string } }
+            mobileEntryAllowed: { type: boolean }
+    AssessmentStandardCreateRequest:
+      type: object
+      required: [standardVersion, effectiveDate]
+      properties:
+        schoolId: { type: [string, 'null'], description: 仅平台管理员可省略，表示中央继承标准 }
+        gradeId: { type: [string, 'null'] }
+        region: { type: string, maxLength: 80 }
+        povertyArea: { type: [boolean, 'null'] }
+        standardVersion: { type: string, maxLength: 120 }
+        effectiveDate: { type: string, format: date }
+        status: { type: string, enum: [draft, active], default: draft }
+        ruleConfig: { type: object, additionalProperties: true }
+        reportConfig: { type: object, additionalProperties: true }
+        courseConfig: { type: object, additionalProperties: true }
+    AccountCreateRequest:
+      type: object
+      required: [name, phone, password, role]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        phone: { type: string, pattern: '^1\\d{10}$' }
+        password: { type: string, minLength: 8 }
+        role: { type: string, enum: [admin, principal, teacher, parent] }
+        schoolId: { type: string }
+        classId: { type: string }
+    Envelope:
+      type: object
+      required: [code, message, data]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        data: {}
+    CourseSuggestion:
+      type: object
+      required: [id, courseId, lessonId, title, duration, focus, isPublicBenefit]
+      properties:
+        id: { type: string }
+        courseId: { type: string }
+        lessonId: { type: string }
+        title: { type: string }
+        duration: { type: string }
+        focus: { type: string }
+        isPublicBenefit: { type: boolean }
+    DiagnosisReportPayload:
+      type: object
+      required: [id, student, assessmentDate, scores, totalScore, ruleVersion, courseSuggestions]
+      properties:
+        id: { type: string }
+        student: { type: object, additionalProperties: true }
+        assessmentDate: { type: string, format: date }
+        scores: { type: array, items: { type: object, additionalProperties: true } }
+        totalScore: { type: number }
+        riskLevel: { type: string }
+        ruleVersion: { type: string }
+        courseSuggestions:
+          type: array
+          items: { $ref: '#/components/schemas/CourseSuggestion' }
+    DiagnosisReportEnvelope:
+      type: object
+      required: [code, message, data]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        data: { $ref: '#/components/schemas/DiagnosisReportPayload' }
+  responses:
+    Success:
+      description: Successful response
+      content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } }
+    ReportSuccess:
+      description: Published or freshly regenerated school assessment report
+      content: { application/json: { schema: { $ref: '#/components/schemas/DiagnosisReportEnvelope' } } }
+    Created:
+      description: Created response
+      content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } }
+    Accepted:
+      description: Accepted for asynchronous processing
+      content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } }
+    Forbidden:
+      description: Permission denied
+      content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } }
+    AuthError:
+      description: Authentication failure
+      content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } }
+    RateLimited:
+      description: Too many requests
+      headers:
+        Retry-After: { schema: { type: integer } }
+    Conflict:
+      description: Conflict or idempotency collision
+      content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } }
+    NotFound:
+      description: Resource not found
+      content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } }
+    ServerError:
+      description: Server error

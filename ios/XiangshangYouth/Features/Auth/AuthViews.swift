@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 struct SplashView: View {
     @EnvironmentObject private var state: AppState
@@ -27,11 +26,6 @@ struct SplashView: View {
         // This hides the transient Home indicator while the native poster is
         // visible; the login/dashboard screens restore the system overlay.
         .persistentSystemOverlays(.hidden)
-        .onAppear {
-            // The storyboard owns the first frame, while SwiftUI owns the
-            // timed poster. Keep both frames free of time/signal overlays.
-            UIApplication.shared.setStatusBarHidden(true, with: .none)
-        }
         .task {
             do {
                 try await Task.sleep(for: displayDuration)
@@ -47,7 +41,6 @@ struct SplashView: View {
             withAnimation(.easeOut(duration: 0.28)) {
                 state.dismissSplash()
             }
-            UIApplication.shared.setStatusBarHidden(false, with: .fade)
         }
     }
 }
@@ -93,7 +86,7 @@ struct LoginView: View {
                             Text("身心健康智慧平台")
                                 .font(.system(size: 25, weight: .heavy))
                             Text("学校体测 · 家庭健康记录 · 成长训练")
-                                .font(.system(size: 11, weight: .bold))
+                                .font(.system(size: 12, weight: .bold))
                                 .foregroundStyle(ReferenceColor.yellow)
                                 .padding(.horizontal, 12).padding(.vertical, 4)
                                 .background(.white.opacity(0.18), in: Capsule())
@@ -176,7 +169,7 @@ struct LoginView: View {
                             }
                         }
                     }
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(ReferenceColor.blue)
                     .disabled(codeCountdown > 0 || codeSending)
                 }
@@ -211,7 +204,7 @@ struct LoginView: View {
                 Spacer()
                 Button { resetPasswordPresented = true } label: { Text("忘记密码？").foregroundStyle(.secondary) }
             }
-            .font(.system(size: 11, weight: .semibold))
+            .font(.system(size: 12, weight: .semibold))
             VStack(alignment: .leading, spacing: 9) {
                 if dynamicTypeSize.isAccessibilitySize {
                     Text("登录后可查看孩子的测评、健康记录和训练建议。")
@@ -239,7 +232,7 @@ struct LoginView: View {
                     Button("儿童隐私政策") { legalDocument = .childPrivacy }
                 } label: {
                     Text("查看协议")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(ReferenceColor.blue)
                 }
                 .accessibilityLabel("查看用户协议、隐私政策和儿童隐私政策")
@@ -321,10 +314,10 @@ struct LoginView: View {
 
     private func check(_ title: String, _ subtitle: String) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundStyle(.white)
+            Image(systemName: "checkmark").font(.system(size: 12, weight: .bold)).foregroundStyle(.white)
                 .frame(width: 18, height: 18).background(ReferenceColor.green, in: Circle())
             VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(.system(size: 10, weight: .bold))
+                Text(title).font(.system(size: 12, weight: .bold))
                 Text(subtitle).font(.system(size: 12)).foregroundStyle(.secondary)
             }
         }
@@ -708,14 +701,14 @@ struct RoleSelectView: View {
                     .offset(y: visible ? 0 : 12).opacity(visible ? 1 : 0)
                 }
                 Text("学校管理数据看板由后台系统提供")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
                     .padding(.top, 1)
                 Button {
                     state.switchAccount()
                     router.reset()
                 } label: {
-                    Text("退出当前账号").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
+                    Text("退出当前账号").font(.system(size: 12, weight: .medium)).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Image("CampusFooter")

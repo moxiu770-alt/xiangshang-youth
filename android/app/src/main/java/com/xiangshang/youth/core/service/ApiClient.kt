@@ -20,6 +20,15 @@ import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 
 data class ApiEnvelope<T>(val code: String, val message: String, val data: T?)
+
+/**
+ * A successful HTTP response is not enough to make a repository result usable.
+ * Remote APIs must explicitly provide their `data` payload.  Treating a missing
+ * payload as an empty list hides contract regressions as a harmless empty state,
+ * which is particularly dangerous for children, tasks and permissions.
+ */
+fun <T> ApiEnvelope<T>.requireData(): T = data ?: throw ApiError.InvalidResponse
+
 data class WriteAck(val id: String? = null, val postId: String? = null, val status: String? = null, val version: Int? = null)
 
 /** Shared network boundary. Presentation code only talks to repositories. */

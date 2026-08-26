@@ -221,7 +221,18 @@ class LocalFeatureStore(context: Context) {
             reduceMotion = prefs.getBoolean("reduce_motion", false),
             voiceGuidanceEnabled = prefs.getBoolean("voice_guidance_enabled", true)
         )
+    ).migrateTaskScopedState()
+
+    /** Pre-composite-key records have no task ID. Remove them instead of
+     * inventing an unscoped task that could leak into another assessment. */
+    private fun LocalFeatureState.migrateTaskScopedState(): LocalFeatureState = copy(
+        studentTaskStatuses = emptyMap(), taskStatusVersions = emptyMap(), taskStatusSyncStates = emptyMap(), reviewNotes = emptyMap(),
+        taskScopedStatuses = taskScopedStatuses.filterKeys { !it.startsWith("unscoped|") && !it.startsWith("missing-task|") },
+        taskScopedStatusVersions = taskScopedStatusVersions.filterKeys { !it.startsWith("unscoped|") && !it.startsWith("missing-task|") },
+        taskScopedSyncStates = taskScopedSyncStates.filterKeys { !it.startsWith("unscoped|") && !it.startsWith("missing-task|") },
+        taskScopedReviewNotes = taskScopedReviewNotes.filterKeys { !it.startsWith("unscoped|") && !it.startsWith("missing-task|") }
     )
+
     fun save(value: LocalFeatureState) {
         val normalizedCheckInDate = if (value.checkedInToday) value.checkedInDate ?: today() else value.checkedInDate
         val normalizedCheckInDates = value.checkedInDates + listOfNotNull(normalizedCheckInDate)
@@ -252,14 +263,14 @@ class LocalFeatureStore(context: Context) {
         .putString("drafts", JSONObject(value.drafts).toString())
         .putString("expert_appointments", JSONArray().apply { value.expertAppointments.forEach { put(JSONObject().put("id", it.id).put("expertName", it.expertName).put("preferredDate", it.preferredDate).put("note", it.note).put("status", it.status.name).put("expertId", it.expertId).put("appointmentId", it.appointmentId).put("serviceId", it.serviceId).put("slotId", it.slotId).put("childId", it.childId).put("appointmentStatus", it.appointmentStatus).put("expectedVersion", it.expectedVersion).put("scheduledStartAt", it.scheduledStartAt).put("scheduledEndAt", it.scheduledEndAt)) } }.toString())
         .putString("course_uploads", JSONArray().apply { value.courseUploads.forEach { put(JSONObject().put("id", it.id).put("taskId", it.taskId).put("attendanceCount", it.attendanceCount).put("notes", it.notes).put("attachmentName", it.attachmentName).put("attachmentReference", it.attachmentReference).put("status", it.status.name)) } }.toString())
-        .putString("student_task_statuses", JSONObject(value.studentTaskStatuses.mapValues { it.value.name }).toString())
+        .remove("student_task_statuses")
         .putString("task_scoped_statuses", JSONObject(value.taskScopedStatuses.mapValues { it.value.name }).toString())
         .putString("task_scoped_status_versions", JSONObject(value.taskScopedStatusVersions).toString())
         .putString("task_scoped_sync_states", JSONObject(value.taskScopedSyncStates.mapValues { it.value.name }).toString())
         .putString("task_scoped_review_notes", JSONObject(value.taskScopedReviewNotes).toString())
-        .putString("task_status_versions", JSONObject(value.taskStatusVersions).toString())
-        .putString("task_status_sync_states", JSONObject(value.taskStatusSyncStates.mapValues { it.value.name }).toString())
-        .putString("review_notes", JSONObject(value.reviewNotes).toString())
+        .remove("task_status_versions")
+        .remove("task_status_sync_states")
+        .remove("review_notes")
         .putBoolean("session_active", value.sessionActive)
         .putString("session_phone", value.sessionPhone)
         .putString("session_role_name", value.sessionRoleName)

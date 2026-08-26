@@ -178,11 +178,6 @@ struct WorkflowApi {
         try await client.send(path: "v1/courses/uploads", body: CourseUploadRequest(taskID: value.taskID, attendanceCount: value.attendanceCount, notes: value.notes, attachmentName: value.attachmentName, attachmentFileID: fileID))
     }
 
-    func updateTaskStatus(studentID: String, status: TaskStatus, note: String?, expectedVersion: Int?) async throws -> Int? {
-        let ack: WorkflowWriteAck = try await client.request(path: "v1/students/\(studentID)/task-status", method: "PATCH", body: WorkflowTaskStatusRequest(status: status, note: note, expectedVersion: expectedVersion), type: WorkflowWriteAck.self)
-        return ack.version
-    }
-
     func publishClassPost(author: String, content: String, schoolID: String?, classID: String?, attachments: [ClassPostAttachment] = []) async throws -> String? {
         let uploadedAttachments = try await attachments.asyncMap { attachment -> ClassPostAttachmentRequest in
             if let objectID = attachment.objectID, !objectID.isEmpty {
@@ -549,8 +544,6 @@ private struct HealthObservationRequest: Encodable {
     let expectedVersion: Int?
 }
 private struct CourseUploadRequest: Encodable { let taskID: String; let attendanceCount: Int; let notes: String; let attachmentName: String; let attachmentFileID: String }
-private struct WorkflowTaskStatusRequest: Encodable { let status: TaskStatus; let note: String?; let expectedVersion: Int? }
-private struct WorkflowWriteAck: Decodable { let version: Int? }
 private struct ClassPostRequest: Encodable {
     let author: String; let content: String; let schoolID: String?; let classID: String?; let attachments: [ClassPostAttachmentRequest]
     enum CodingKeys: String, CodingKey { case author, content, schoolID = "schoolId", classID = "classId", attachments }

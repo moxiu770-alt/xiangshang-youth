@@ -37,6 +37,7 @@
 		485E1CB03020A9AC00AA1653 /* XiangshangYouth.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = XiangshangYouth.xcodeproj; sourceTree = "<group>"; };
 		48923D603036C53C005EC78E /* XiangshangYouth.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = XiangshangYouth.xcodeproj; sourceTree = "<group>"; };
 		48DDA3E6303B035800CE2867 /* XiangshangYouth.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = XiangshangYouth.xcodeproj; sourceTree = "<group>"; };
+		48F0CFCC303D49CE0028C0C8 /* XiangshangYouth.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = XiangshangYouth.xcodeproj; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000000000003 /* XiangshangYouth.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = XiangshangYouth.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B2C3D4E5F600000000000001 /* XiangshangYouthTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = XiangshangYouthTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B2C3D4E5F600000000000002 /* ../XiangshangYouthTests/LocalFeatureStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../XiangshangYouthTests/LocalFeatureStateTests.swift; sourceTree = SOURCE_ROOT; };
@@ -117,6 +118,11 @@
 			sourceTree = "<group>";
 		};
 		48DDA3E8303B035800CE2867 /* Products */ = {
+			isa = PBXGroup;
+			name = Products;
+			sourceTree = "<group>";
+		};
+		48F0CFCE303D49CE0028C0C8 /* Products */ = {
 			isa = PBXGroup;
 			name = Products;
 			sourceTree = "<group>";
@@ -275,6 +281,10 @@
 				{
 					ProductGroup = 48DDA3E8303B035800CE2867 /* Products */;
 					ProjectRef = 48DDA3E6303B035800CE2867 /* XiangshangYouth.xcodeproj */;
+				},
+				{
+					ProductGroup = 48F0CFCE303D49CE0028C0C8 /* Products */;
+					ProjectRef = 48F0CFCC303D49CE0028C0C8 /* XiangshangYouth.xcodeproj */;
 				},
 			);
 			projectRoot = "";

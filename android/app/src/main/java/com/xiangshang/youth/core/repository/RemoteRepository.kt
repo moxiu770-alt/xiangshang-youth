@@ -3,6 +3,7 @@ import com.xiangshang.youth.core.model.*
 import com.xiangshang.youth.BuildConfig
 import com.xiangshang.youth.core.service.ApiClient
 import com.xiangshang.youth.core.service.ApiError
+import com.xiangshang.youth.core.service.requireData
 import com.xiangshang.youth.core.service.ReportApi
 import com.xiangshang.youth.core.service.StatsApi
 import com.xiangshang.youth.core.service.WorkflowApi
@@ -14,7 +15,6 @@ import com.xiangshang.youth.core.service.ExpertRescheduleRequest
 import com.xiangshang.youth.core.service.CourseUploadRequest
 import com.xiangshang.youth.core.service.FileApi
 import com.xiangshang.youth.core.service.FilePresignRequest
-import com.xiangshang.youth.core.service.WorkflowTaskStatusRequest
 import com.xiangshang.youth.core.service.ClassPostRequest
 import com.xiangshang.youth.core.service.ClassPostAttachmentRequest
 import com.xiangshang.youth.core.service.SupportMessageRequest
@@ -97,7 +97,7 @@ class RemoteRepository(
         ), "consent-${consent.consentId}".sha256())
     }
     override suspend fun loadHealthObservations(studentId: String): List<com.xiangshang.youth.core.service.FamilyHealthRecord> =
-        healthObservationApi.list(studentId).data.orEmpty().map(::toLocalHealthRecord)
+        healthObservationApi.list(studentId).requireData().map(::toLocalHealthRecord)
 
     override suspend fun submitHealthObservation(studentId: String, category: String, record: com.xiangshang.youth.core.service.FamilyHealthRecord): com.xiangshang.youth.core.service.FamilyHealthRecord {
         val answers = record.structuredAnswers.map { answer ->
@@ -206,7 +206,7 @@ class RemoteRepository(
     override suspend fun cancelActivityRegistration(value: com.xiangshang.youth.core.service.ActivityRegistration): com.xiangshang.youth.core.service.ActivityRegistrationAck =
         workflowApi.cancelActivityRegistration(value.activityId, value.registrationId ?: throw ApiError.Client("缺少报名记录编号，请刷新后重试"), com.xiangshang.youth.core.service.CancellationRequest(value.version), "activity-cancel-${("${value.registrationId}:${value.version ?: 0}").sha256()}").data ?: throw ApiError.InvalidResponse
     override suspend fun activityRegistrationHistory(): List<com.xiangshang.youth.core.service.ActivityRegistrationAck> =
-        workflowApi.activityRegistrationHistory().data ?: emptyList()
+        workflowApi.activityRegistrationHistory().requireData()
     override suspend fun bookExpert(value: com.xiangshang.youth.core.service.ExpertAppointment): com.xiangshang.youth.core.service.ExpertAppointmentAck =
         workflowApi.bookExpert(ExpertAppointmentRequest(value.expertName, value.preferredDate, value.note, value.expertId, value.serviceId, value.slotId, value.childId), "expert-book-${value.id.sha256()}").data ?: throw ApiError.InvalidResponse
     override suspend fun rescheduleExpert(value: com.xiangshang.youth.core.service.ExpertAppointment, slotId: String): com.xiangshang.youth.core.service.ExpertAppointmentAck =
@@ -214,13 +214,13 @@ class RemoteRepository(
     override suspend fun cancelExpert(value: com.xiangshang.youth.core.service.ExpertAppointment): com.xiangshang.youth.core.service.ExpertAppointmentAck =
         workflowApi.cancelExpert(value.appointmentId ?: throw ApiError.Client("缺少预约记录编号，请刷新后重试"), com.xiangshang.youth.core.service.CancellationRequest(value.expectedVersion), "expert-cancel-${("${value.appointmentId}:${value.expectedVersion ?: 0}").sha256()}").data ?: throw ApiError.InvalidResponse
     override suspend fun expertAppointmentHistory(): List<com.xiangshang.youth.core.service.ExpertAppointmentAck> =
-        workflowApi.expertAppointmentHistory().data ?: emptyList()
+        workflowApi.expertAppointmentHistory().requireData()
     override suspend fun activities(childId: String?): List<com.xiangshang.youth.core.service.RemoteActivity> =
-        workflowApi.activities(childId).data ?: emptyList()
+        workflowApi.activities(childId).requireData()
     override suspend fun experts(): List<com.xiangshang.youth.core.service.RemoteExpert> =
-        workflowApi.experts().data ?: emptyList()
+        workflowApi.experts().requireData()
     override suspend fun expertSlots(expertId: String): List<com.xiangshang.youth.core.service.ExpertAvailableSlot> =
-        workflowApi.availableSlots(expertId).data ?: emptyList()
+        workflowApi.availableSlots(expertId).requireData()
     override suspend fun uploadCourse(value: com.xiangshang.youth.core.service.CourseUploadRecord) {
         val attachment = withContext(Dispatchers.IO) { CourseAttachmentStore.read(value.attachmentReference) }
         val ticket = fileApi.presign(FilePresignRequest(attachment.file.name, attachment.mimeType, attachment.file.length(), "course_upload_attachment")).data
@@ -230,39 +230,37 @@ class RemoteRepository(
         workflowApi.uploadCourse(CourseUploadRequest(value.taskId, value.attendanceCount, value.notes, value.attachmentName, receipt.id))
     }
     override suspend fun courses(childId: String): List<RemoteLesson> =
-        courseApi.courses(childId).data ?: emptyList()
+        courseApi.courses(childId).requireData()
     override suspend fun lessonPlayback(lessonId: String): PlaybackSource =
         courseApi.playback(lessonId).data ?: throw ApiError.InvalidResponse
     override suspend fun saveLessonProgress(childId: String, lessonId: String, lastPositionMs: Int, completed: Boolean, expectedVersion: Int?): LessonProgressAck =
         courseApi.saveProgress(childId, lessonId, LessonProgressWrite(lastPositionMs, completed, expectedVersion)).data
             ?: throw ApiError.InvalidResponse
     override suspend fun loadFollowAlongSessions(childId: String, from: String?, to: String?): List<TrainingSessionRecord> =
-        workflowApi.trainingSessions(childId, from, to).data ?: emptyList()
+        workflowApi.trainingSessions(childId, from, to).requireData()
     override suspend fun submitFollowAlongSession(record: FollowAlongSessionRecord): TrainingSessionRecord =
         workflowApi.submitTrainingSession(record.childId, TrainingSessionRequest(record.id, record.dayId, record.completedAt, record.durationSeconds, record.completionRatio, record.qualityScore, record.cameraVerified, record.visualUnits, record.manualUnits, record.modelVersion, record.mode)).data
             ?: throw ApiError.InvalidResponse
     override suspend fun loadHealthCheckins(studentId: String, from: String?, to: String?): List<com.xiangshang.youth.core.service.HealthCheckInRecord> =
-        workflowApi.healthCheckins(studentId, from, to).data ?: emptyList()
+        workflowApi.healthCheckins(studentId, from, to).requireData()
     override suspend fun submitHealthCheckin(record: com.xiangshang.youth.core.service.HealthCheckInRecord, expectedVersion: Int?): com.xiangshang.youth.core.service.HealthCheckInRecord =
         workflowApi.submitHealthCheckin(record.childId, com.xiangshang.youth.core.service.HealthCheckInRequest(record.checkInDate, record.activityType, record.durationMinutes, record.intensity, record.feeling, record.completedRecommended, record.parentNote, expectedVersion)).data
             ?: throw ApiError.InvalidResponse
-    override suspend fun updateTaskStatus(studentId: String, status: TaskStatus, note: String?, expectedVersion: Int?): Int? {
-        return workflowApi.updateTaskStatus(studentId, WorkflowTaskStatusRequest(status, note, expectedVersion)).data?.version
-    }
     override suspend fun updateTaskStatus(taskId: String, studentId: String, status: TaskStatus, note: String?, expectedVersion: Int?): Int? {
+        require(taskId.isNotBlank() && taskId != "unscoped") { "任务编号缺失，无法更新学生测评状态" }
         val operationId = java.util.UUID.randomUUID().toString()
         return taskApi.updateStatus(taskId, studentId, com.xiangshang.youth.core.service.TaskStatusRequest(status, note, expectedVersion, operationId), "task-status-${operationId.sha256()}").data?.version
     }
     override suspend fun batchUpdateTaskStatus(taskId: String, updates: List<com.xiangshang.youth.core.service.TaskStatusBatchItem>): com.xiangshang.youth.core.service.TaskBatchStatusAck {
         val operationKey = updates.map { it.clientOperationId }.sorted().joinToString(",")
-        return taskApi.batchUpdateStatus(taskId, com.xiangshang.youth.core.service.TaskBatchStatusRequest(updates), "task-batch-status-${operationKey.sha256()}").data ?: com.xiangshang.youth.core.service.TaskBatchStatusAck()
+        return taskApi.batchUpdateStatus(taskId, com.xiangshang.youth.core.service.TaskBatchStatusRequest(updates), "task-batch-status-${operationKey.sha256()}").requireData()
     }
-    override suspend fun taskStatusHistory(taskId: String, studentId: String): List<com.xiangshang.youth.core.service.TaskStatusEvent> = taskApi.statusHistory(taskId, studentId).data ?: emptyList()
+    override suspend fun taskStatusHistory(taskId: String, studentId: String): List<com.xiangshang.youth.core.service.TaskStatusEvent> = taskApi.statusHistory(taskId, studentId).requireData()
     override suspend fun taskStudentStatuses(taskId: String): List<com.xiangshang.youth.core.service.TaskStudentStatusRecord> {
-        return taskApi.taskStudents(taskId).data ?: emptyList()
+        return taskApi.taskStudents(taskId).requireData()
     }
     override suspend fun taskStudentRoster(taskId: String, page: Int, pageSize: Int, status: TaskStatus?, keyword: String?): List<com.xiangshang.youth.core.service.TaskStudentStatusRecord> {
-        return taskApi.taskStudents(taskId, page, pageSize.coerceIn(1, 200), status?.label, keyword).data ?: emptyList()
+        return taskApi.taskStudents(taskId, page, pageSize.coerceIn(1, 200), status?.label, keyword).requireData()
     }
     override suspend fun teacherOverview(schoolId: String, classId: String, taskId: String, standardVersion: String): com.xiangshang.youth.core.service.TeacherAnalyticsOverview? =
         statsApi.teacherOverview(schoolId, classId, taskId, standardVersion).data
@@ -281,7 +279,7 @@ class RemoteRepository(
         return workflowApi.publishClassPost(ClassPostRequest(author, content, schoolId, classId, uploaded)).data?.postId
     }
     override suspend fun listNotificationDrafts(schoolId: String): List<com.xiangshang.youth.core.service.NotificationCampaign> {
-        return notificationApi.drafts(schoolId).data ?: emptyList()
+        return notificationApi.drafts(schoolId).requireData()
     }
     override suspend fun loadClassNotice(notificationId: String): com.xiangshang.youth.core.service.NotificationCampaignDetail {
         return notificationApi.detail(notificationId).data ?: throw ApiError.InvalidResponse

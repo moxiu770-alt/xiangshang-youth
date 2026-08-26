@@ -1221,7 +1221,7 @@ struct FollowAlongTrainingView: View {
                 }
                 if poseFeedback.visible {
                     Label(poseFeedback.active ? "动作已开始" : "画面已就绪，等待动作幅度", systemImage: poseFeedback.active ? "viewfinder.circle.fill" : "viewfinder")
-                        .font(.caption2).foregroundStyle(poseFeedback.active ? ReferenceColor.green : .secondary)
+                        .font(.caption).foregroundStyle(poseFeedback.active ? ReferenceColor.green : .secondary)
                 }
                 ProgressView(value: min(Double(progress) / Double(max(exercise.target, 1)), 1)).tint(ReferenceColor.green)
                 HStack(spacing: 9) {
@@ -1241,7 +1241,7 @@ struct FollowAlongTrainingView: View {
                     .buttonStyle(.bordered).tint(ReferenceColor.green)
                 }
                 Text("手动记录仅用于补录，不计入视觉准确率。打开摄像头后会单独显示视觉确认数据。")
-                    .font(.caption2).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.secondary)
             }
             .padding(13)
             .background(ReferenceColor.green.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
@@ -1272,13 +1272,13 @@ struct FollowAlongTrainingView: View {
             phaseStrip
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text("动作范围").font(.caption2.weight(.semibold)).foregroundStyle(ReferenceColor.navy)
+                    Text("动作范围").font(.caption.weight(.semibold)).foregroundStyle(ReferenceColor.navy)
                     Spacer()
-                    Text("\(poseFeedback.rangePercent)% · \(poseFeedback.side.rawValue)").font(.caption2.weight(.bold)).foregroundStyle(ReferenceColor.blue)
+                    Text("\(poseFeedback.rangePercent)% · \(poseFeedback.side.rawValue)").font(.caption.weight(.bold)).foregroundStyle(ReferenceColor.blue)
                 }
                 ProgressView(value: Double(poseFeedback.rangePercent), total: 100).tint(poseFeedback.rangePercent >= 70 ? ReferenceColor.green : ReferenceColor.blue)
                 Text(poseFeedback.tempoScore > 0 ? "节奏匹配 \(poseFeedback.tempoScore)% · 跟随示范停顿后再回位" : "先跟随示范完成一整次，系统会校准你的节奏")
-                    .font(.caption2).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.secondary)
             }
             if let exercise {
                 TimelineView(.periodic(from: .now, by: 0.25)) { _ in
@@ -1286,7 +1286,7 @@ struct FollowAlongTrainingView: View {
                     let cadence = max(exercise.cadenceSeconds, 0.4)
                     let beat = Int(position / cadence).quotientAndRemainder(dividingBy: 4).remainder + 1
                     Label("模板第 \(beat) 拍 · \(String(format: "%.1f", cadence)) 秒/拍 · 实时节拍同步", systemImage: "metronome")
-                        .font(.caption2.weight(.semibold)).foregroundStyle(ReferenceColor.blue)
+                        .font(.caption.weight(.semibold)).foregroundStyle(ReferenceColor.blue)
                 }
             }
             HStack(spacing: 6) {
@@ -1296,7 +1296,7 @@ struct FollowAlongTrainingView: View {
             }
             if let exercise {
                 Label("当前动作：\(exercise.title) · \(exercise.cue)", systemImage: "figure.run")
-                    .font(.caption2).foregroundStyle(ReferenceColor.navy)
+                    .font(.caption).foregroundStyle(ReferenceColor.navy)
                     .lineLimit(2)
             }
         }
@@ -1310,7 +1310,7 @@ struct FollowAlongTrainingView: View {
         HStack(spacing: 6) {
             ForEach([FollowAlongStage.setup, .exertion, .returnPhase], id: \.self) { stage in
                 Text(stage.rawValue)
-                    .font(.caption2.weight(.bold))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(poseFeedback.stage == stage ? .white : ReferenceColor.navy)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 6)
@@ -1322,10 +1322,10 @@ struct FollowAlongTrainingView: View {
 
     private func guideStep(number: String, title: String, detail: String) -> some View {
         HStack(spacing: 5) {
-            Text(number).font(.caption2.bold()).foregroundStyle(.white)
+            Text(number).font(.caption.bold()).foregroundStyle(.white)
                 .frame(width: 18, height: 18).background(ReferenceColor.blue, in: Circle())
             VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(.caption2.bold()).foregroundStyle(ReferenceColor.navy)
+                Text(title).font(.caption.bold()).foregroundStyle(ReferenceColor.navy)
                 Text(detail).font(.system(size: 12)).foregroundStyle(.secondary)
             }
         }

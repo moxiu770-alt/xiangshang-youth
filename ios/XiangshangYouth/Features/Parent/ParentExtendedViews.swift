@@ -655,7 +655,7 @@ private struct ClassPostCard: View {
                     } else {
                         VStack(spacing: 4) {
                             Image(systemName: attachment.type == "video" ? "video.fill" : "photo").font(.system(size: 18, weight: .semibold))
-                            Text(state.classPostAttachmentErrors[attachment.objectID ?? ""] == nil ? "查看附件" : "加载失败，重试").font(.system(size: 9, weight: .semibold))
+                            Text(state.classPostAttachmentErrors[attachment.objectID ?? ""] == nil ? "查看附件" : "加载失败，重试").font(.system(size: 12, weight: .semibold))
                         }
                         .frame(maxWidth: .infinity, minHeight: 76)
                         .foregroundStyle(state.classPostAttachmentErrors[attachment.objectID ?? ""] == nil ? ReferenceColor.blue : Color.red)

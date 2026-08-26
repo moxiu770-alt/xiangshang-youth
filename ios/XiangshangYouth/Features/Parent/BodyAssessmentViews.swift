@@ -261,7 +261,7 @@ struct BodyAssessmentView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) { Text("当前 BMI").font(.caption).foregroundStyle(.secondary); Text(height > 0 && weight > 0 ? String(format: "%.1f", provisionalRecord.bmi) : "待填写").font(.system(size: 32, weight: .bold)).foregroundStyle(bodyCoral) }
                         Spacer()
-                        VStack(alignment: .trailing, spacing: 5) { attentionBadge(provisionalBMILevel, label: provisionalRecord.bmiScreeningLabel(ageMonths: student.bodyAssessmentAgeMonths, gender: student.gender)); Text("儿童年龄别 BMI 标准").font(.caption2).foregroundStyle(.secondary).multilineTextAlignment(.trailing) }
+                        VStack(alignment: .trailing, spacing: 5) { attentionBadge(provisionalBMILevel, label: provisionalRecord.bmiScreeningLabel(ageMonths: student.bodyAssessmentAgeMonths, gender: student.gender)); Text("儿童年龄别 BMI 标准").font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.trailing) }
                     }
                     if let geneticHeight = provisionalRecord.geneticHeightReference(gender: student.gender) {
                         Divider()
@@ -292,7 +292,7 @@ struct BodyAssessmentView: View {
                 Button { activeCameraTask = task } label: {
                     HStack(spacing: 13) {
                         Image(systemName: task == .gaitVideo ? "video.fill" : "viewfinder").font(.title3).foregroundStyle(completedCaptures.contains(task) ? ReferenceColor.green : bodyCoral).frame(width: 42, height: 42).background((completedCaptures.contains(task) ? ReferenceColor.green : bodyCoral).opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
-                        VStack(alignment: .leading, spacing: 4) { Text(task.title).font(.headline).foregroundStyle(ReferenceColor.navy); Text(task.instruction).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.leading); if let feedback = captureFeedback[task] { Text(feedback).font(.caption2).foregroundStyle(completedCaptures.contains(task) ? ReferenceColor.green : .orange) } }
+                        VStack(alignment: .leading, spacing: 4) { Text(task.title).font(.headline).foregroundStyle(ReferenceColor.navy); Text(task.instruction).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.leading); if let feedback = captureFeedback[task] { Text(feedback).font(.caption).foregroundStyle(completedCaptures.contains(task) ? ReferenceColor.green : .orange) } }
                         Spacer()
                         Image(systemName: completedCaptures.contains(task) ? "checkmark.seal.fill" : "camera.fill").foregroundStyle(completedCaptures.contains(task) ? ReferenceColor.green : ReferenceColor.blue)
                     }
@@ -300,7 +300,7 @@ struct BodyAssessmentView: View {
                 }.buttonStyle(.plain).accessibilityLabel("\(task.title)，\(completedCaptures.contains(task) ? "已完成" : "打开相机")")
             }
             Text("App 会实时校验画面清晰度与身体入镜完整性；如有提示不通过，请按语音提示调整距离、光线和站位后重试。")
-                .font(.caption2).foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(.secondary)
             primaryButton(completedCaptures.count == BodyAssessmentRecord.CaptureTask.allCases.count ? "继续补充安全信息" : "请完成全部拍摄", icon: "arrow.right") { move(to: .confirm) }
                 .opacity(completedCaptures.count == BodyAssessmentRecord.CaptureTask.allCases.count ? 1 : 0.55)
                 .disabled(completedCaptures.count != BodyAssessmentRecord.CaptureTask.allCases.count)
@@ -382,7 +382,7 @@ struct BodyAssessmentView: View {
                 attentionBadge(report.overallLevel)
             }
             Text("本次观察 · \(report.snapshots.values.map(\.sampleCount).reduce(0, +)) 条记录")
-                .font(.caption2).foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(.secondary)
             ForEach(BodyAssessmentRecord.CaptureTask.allCases) { task in
                 if let snapshot = report.snapshots[task] {
                     VStack(alignment: .leading, spacing: 4) {
@@ -390,10 +390,10 @@ struct BodyAssessmentView: View {
                             Text(task.title).font(.subheadline.bold()).foregroundStyle(ReferenceColor.navy)
                             Spacer()
                             Text(String(format: "记录稳定度 %.0f%% · %d 条", snapshot.confidence * 100, snapshot.sampleCount))
-                                .font(.caption2).foregroundStyle(snapshot.confidence >= PostureScreeningRules.minimumConfidence && snapshot.sampleCount >= PostureScreeningRules.minimumSamples ? ReferenceColor.green : bodyCoral)
+                                .font(.caption).foregroundStyle(snapshot.confidence >= PostureScreeningRules.minimumConfidence && snapshot.sampleCount >= PostureScreeningRules.minimumSamples ? ReferenceColor.green : bodyCoral)
                         }
                         Text(postureMetricSummary(snapshot))
-                            .font(.caption2).foregroundStyle(.secondary)
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                     .padding(9)
                     .background(ReferenceColor.canvas, in: RoundedRectangle(cornerRadius: 10))
@@ -406,7 +406,7 @@ struct BodyAssessmentView: View {
                 }
             }
             Text(report.disclaimer)
-                .font(.caption2).foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(.secondary)
                 .padding(10).background(ReferenceColor.blue.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
             if report.overallLevel == .pending {
                 Button {
@@ -605,7 +605,7 @@ struct BodyAssessmentView: View {
         }
         .padding(14).background(.white, in: RoundedRectangle(cornerRadius: 16))
     }
-    private func overviewPill(_ title: String, _ icon: String) -> some View { Label(title, systemImage: icon).font(.caption2.weight(.medium)).foregroundStyle(ReferenceColor.navy).padding(.horizontal, 8).padding(.vertical, 6).background(.white.opacity(0.72), in: Capsule()) }
+    private func overviewPill(_ title: String, _ icon: String) -> some View { Label(title, systemImage: icon).font(.caption.weight(.medium)).foregroundStyle(ReferenceColor.navy).padding(.horizontal, 8).padding(.vertical, 6).background(.white.opacity(0.72), in: Capsule()) }
     private func checklist(_ text: String) -> some View { Label(text, systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(.secondary).labelStyle(.titleAndIcon) }
     private func readinessToggle(_ text: String, isOn: Binding<Bool>) -> some View { Toggle(isOn: isOn) { Text(text).font(.caption).foregroundStyle(ReferenceColor.navy) }.tint(ReferenceColor.green) }
     private func confirmationToggle(title: String, detail: String, value: Binding<Bool>) -> some View { Toggle(isOn: value) { VStack(alignment: .leading, spacing: 4) { Text(title).font(.subheadline.bold()).foregroundStyle(ReferenceColor.navy); Text(detail).font(.caption).foregroundStyle(.secondary) } }.tint(bodyCoral).padding(14).background(.white, in: RoundedRectangle(cornerRadius: 16)) }
@@ -613,8 +613,8 @@ struct BodyAssessmentView: View {
     private func color(for level: BodyAssessmentRecord.AttentionLevel) -> Color { switch level { case .pending: ReferenceColor.blue; case .green: ReferenceColor.green; case .yellow: .orange; case .red: .red; case .unavailable: .secondary } }
     private func icon(for level: BodyAssessmentRecord.AttentionLevel) -> String { switch level { case .pending: "camera.viewfinder"; case .green: "checkmark.shield.fill"; case .yellow: "exclamationmark.triangle.fill"; case .red: "exclamationmark.shield.fill"; case .unavailable: "calendar.badge.exclamationmark" } }
     private func primaryButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View { Button(action: action) { Label(title, systemImage: icon).font(.headline).frame(maxWidth: .infinity).padding(.vertical, 14).background(bodyCoral, in: Capsule()).foregroundStyle(.white) }.buttonStyle(.plain) }
-    private func bmiTrend(history: [BodyAssessmentRecord], fallback: BodyAssessmentRecord) -> some View { VStack(alignment: .leading, spacing: 7) { Text("BMI 趋势").font(.caption.weight(.semibold)).foregroundStyle(.secondary); if history.count < 2 { Text("完成下一次实测后，将显示真实趋势；不会虚构历史或目标数据。") .font(.caption2).foregroundStyle(.secondary) } else { let values = Array(history.suffix(3)); HStack(alignment: .bottom, spacing: 10) { ForEach(Array(values.enumerated()), id: \.offset) { index, item in trendBar(index == values.count - 1 ? "本次" : dateText(item.measuredAt), item.bmi, values.map(\.bmi).max() ?? fallback.bmi) } } } } }
-    private func trendBar(_ label: String, _ value: Double, _ maxValue: Double) -> some View { VStack(spacing: 4) { Text(String(format: "%.1f", value)).font(.caption2.bold()).foregroundStyle(ReferenceColor.navy); Capsule().fill(bodyCoral.opacity(0.18)).frame(width: 48, height: 44).overlay(alignment: .bottom) { Capsule().fill(label == "本次" ? bodyCoral : ReferenceColor.blue).frame(width: 48, height: max(10, 44 * value / max(maxValue, 1))) }; Text(label).font(.caption2).foregroundStyle(.secondary) } }
+    private func bmiTrend(history: [BodyAssessmentRecord], fallback: BodyAssessmentRecord) -> some View { VStack(alignment: .leading, spacing: 7) { Text("BMI 趋势").font(.caption.weight(.semibold)).foregroundStyle(.secondary); if history.count < 2 { Text("完成下一次实测后，将显示真实趋势；不会虚构历史或目标数据。") .font(.caption).foregroundStyle(.secondary) } else { let values = Array(history.suffix(3)); HStack(alignment: .bottom, spacing: 10) { ForEach(Array(values.enumerated()), id: \.offset) { index, item in trendBar(index == values.count - 1 ? "本次" : dateText(item.measuredAt), item.bmi, values.map(\.bmi).max() ?? fallback.bmi) } } } } }
+    private func trendBar(_ label: String, _ value: Double, _ maxValue: Double) -> some View { VStack(spacing: 4) { Text(String(format: "%.1f", value)).font(.caption.bold()).foregroundStyle(ReferenceColor.navy); Capsule().fill(bodyCoral.opacity(0.18)).frame(width: 48, height: 44).overlay(alignment: .bottom) { Capsule().fill(label == "本次" ? bodyCoral : ReferenceColor.blue).frame(width: 48, height: max(10, 44 * value / max(maxValue, 1))) }; Text(label).font(.caption).foregroundStyle(.secondary) } }
     private func dateText(_ date: Date) -> String { Self.dateFormatter.string(from: date) }
     private func dayKey(_ date: Date) -> String { Self.dayFormatter.string(from: date) }
     private func weekday(_ date: Date) -> String { Self.weekdayFormatter.string(from: date) }

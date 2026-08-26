@@ -210,6 +210,13 @@ private fun NavHostController.replaceRoot(destination: String) {
         }
         handledDeepLink = value
     }
+    // The instrumentation fixture enters through the same role root as a
+    // signed-in school account. It does not add a public login shortcut.
+    LaunchedEffect(state.uiTestSchoolProvisionedTeacher, state.role, state.data) {
+        if (state.uiTestSchoolProvisionedTeacher && state.role == UserRole.Teacher && state.data != null && currentEntry?.destination?.route != Destinations.Teacher) {
+            nav.replaceRoot(Destinations.Teacher)
+        }
+    }
     CompositionLocalProvider(
         LocalReduceMotion provides (state.local.settings.reduceMotion || !systemAnimationsEnabled),
         LocalDashboardRetry provides { viewModel.refreshDashboard() },

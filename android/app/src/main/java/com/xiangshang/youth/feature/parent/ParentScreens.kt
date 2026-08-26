@@ -180,7 +180,7 @@ fun ParentHomeScreen(state: AppUiState, nav: NavHostController, saveDraft: (Stri
                         LinearProgressIndicator({ (registered.toFloat() / capacity.toFloat()).coerceIn(0f, 1f) }, Modifier.width(145.dp).height(5.dp).clip(CircleShape), color = Green, trackColor = Sky)
                         Text("已报名 $registered/$capacity", color = Color.Gray, fontSize = 12.sp)
                     } else if (!state.repositoryAcknowledged) {
-                        LinearProgressIndicator({ .75f }, Modifier.width(145.dp).height(5.dp).clip(CircleShape), color = Green, trackColor = Sky)
+                        Text("报名进度以活动详情为准", color = Color.Gray, fontSize = 12.sp)
                     }
                     Text(firstActivity.registrationEndAt?.take(10)?.let { "报名截止 · $it" } ?: if (state.repositoryAcknowledged) "活动时间以学校通知为准" else "2026 秋季测评 · 以学校通知为准", color = Color.Gray, fontSize = 12.sp)
                 }
@@ -815,7 +815,9 @@ private fun CourseCatalogDialog(paid: Boolean, onOpenCourse: (String) -> Unit, d
                 }
         }
         posts.forEach { post ->
-            val canDelete = post.ownedByCurrentUser || post.postId == null || post.status != LocalSubmissionStatus.Submitted
+            // A remote moderation status is not proof of ownership. Only a
+            // confirmed owner or a purely local draft may expose delete.
+            val canDelete = post.ownedByCurrentUser || post.postId == null
             Surface(Modifier.padding(vertical = 4.dp).fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(10.dp), shadowElevation = 1.dp) { Column(Modifier.padding(11.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.AccountCircle, null, tint = Sky, modifier = Modifier.size(28.dp)); Spacer(Modifier.width(8.dp)); Column { Text(post.author, color = Blue, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text("刚刚发布 · ${postSyncLabel(post.status)}", color = if (post.status == LocalSubmissionStatus.Failed) Color.Red else Color.Gray, fontSize = 12.sp) }; Spacer(Modifier.weight(1f)); TextButton(onClick = { if (canDelete) deletePost(post) else reportPost(post) }, contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp), modifier = Modifier.semantics { contentDescription = if (canDelete) "删除本人班级动态" else "举报这条班级动态" }) { Text(if (canDelete) "删除" else "举报", fontSize = 12.sp, color = if (canDelete) Color.Red else Color.Gray) } }
                 Text(post.content, color = Navy, fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp))
@@ -940,7 +942,7 @@ private fun ClassPostAttachments(state: AppUiState, attachments: List<ClassPostA
                     if (bitmap != null) Image(bitmap.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                     else Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                         Icon(if (attachment.type == "video") Icons.Filled.Videocam else Icons.Filled.Photo, null, tint = if (attachment.objectId?.let { state.classPostAttachmentErrors[it] } == null) Blue else Color.Red)
-                        Text(if (attachment.objectId?.let { state.classPostAttachmentErrors[it] } == null) "查看附件" else "重试", color = if (attachment.objectId?.let { state.classPostAttachmentErrors[it] } == null) Blue else Color.Red, fontSize = 9.sp)
+                        Text(if (attachment.objectId?.let { state.classPostAttachmentErrors[it] } == null) "查看附件" else "重试", color = if (attachment.objectId?.let { state.classPostAttachmentErrors[it] } == null) Blue else Color.Red, fontSize = 12.sp)
                     }
                 }
             }

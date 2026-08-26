@@ -8,10 +8,15 @@ const activityRoutes = await fs.readFile(new URL('../src/routes/activities.js', 
 const expertAppointmentRoutes = await fs.readFile(new URL('../src/routes/expertAppointments.js', import.meta.url), 'utf8');
 const classPostRoutes = await fs.readFile(new URL('../src/routes/classPosts.js', import.meta.url), 'utf8');
 const familyHealthRoutes = await fs.readFile(new URL('../src/routes/familyHealth.js', import.meta.url), 'utf8');
+const courseRoutes = await fs.readFile(new URL('../src/routes/courses.js', import.meta.url), 'utf8');
+const notificationRoutes = await fs.readFile(new URL('../src/routes/notifications.js', import.meta.url), 'utf8');
+const privacyRoutes = await fs.readFile(new URL('../src/routes/privacy.js', import.meta.url), 'utf8');
+const messageRoutes = await fs.readFile(new URL('../src/routes/messages.js', import.meta.url), 'utf8');
+const supportRoutes = await fs.readFile(new URL('../src/routes/support.js', import.meta.url), 'utf8');
 // Workflow assertions intentionally inspect the composed HTTP surface. Route
 // modules may move independently of the entrypoint, but their validation and
 // authorization rules must remain part of the same shipped service.
-const routeHandlers = `${server}\n${activityRoutes}\n${expertAppointmentRoutes}\n${classPostRoutes}\n${familyHealthRoutes}`;
+const routeHandlers = `${server}\n${activityRoutes}\n${expertAppointmentRoutes}\n${classPostRoutes}\n${familyHealthRoutes}\n${courseRoutes}\n${notificationRoutes}\n${privacyRoutes}\n${messageRoutes}\n${supportRoutes}`;
 const jobs = await fs.readFile(new URL('../src/jobs.js', import.meta.url), 'utf8');
 const schema = await fs.readFile(new URL('../db/schema.sql', import.meta.url), 'utf8');
 
@@ -24,7 +29,6 @@ test('workflow APIs document bounded request contracts', () => {
     ['/v1/activities/{activityId}/registrations', 'required: [contactName, phone]', 'pattern: \'^1\\\\d{10}$\''],
     ['/v1/expert-appointments', 'expertId', 'slotId', 'maxLength: 1000'],
     ['/v1/courses/uploads', 'required: [attachmentName, attendanceCount]', 'maximum: 10000'],
-    ['/v1/students/{studentId}/task-status', 'required: [status]', 'expectedVersion'],
     ['/v1/class-posts', 'required: [content]', 'maxLength: 2000'],
     ['/v1/support/messages', 'required: [content]', 'maxLength: 2000']
   ];
@@ -52,8 +56,16 @@ test('consent endpoint exposes an auditable withdrawal path', () => {
   const body = section('/v1/students/{studentId}/consent');
   assert.notEqual(body, '', 'consent endpoint must be documented');
   assert.match(body, /granted: \{ type: boolean \}/);
-  assert.match(server, /const granted = input\.granted !== false/);
-  assert.match(server, /data_consent\.revoke/);
+  assert.match(routeHandlers, /const granted = input\.granted !== false/);
+  assert.match(routeHandlers, /data_consent\.revoke/);
+});
+
+test('message inbox keeps receiver scope and explicit read receipts', () => {
+  assert.match(messageRoutes, /receiver_user_id=\$1/);
+  assert.match(messageRoutes, /parts\[2\] !== user\.id/);
+  assert.match(messageRoutes, /MESSAGE_NOT_FOUND/);
+  assert.match(messageRoutes, /business_route AS "businessRoute"/);
+  assert.match(messageRoutes, /read_at=COALESCE\(read_at,now\(\)\)/);
 });
 
 test('mobile session claims are documented and server-owned', () => {
@@ -108,13 +120,13 @@ test('class notification drafts expose remote lifecycle and scoped delivery', ()
   assert.match(updateDraft, /draftVersion/);
   assert.match(updateDraft, /delete:/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS notification_receipts/);
-  assert.match(server, /notification\.receipt\.acknowledge/);
-  assert.match(server, /parent_receipt_enabled/);
+  assert.match(routeHandlers, /notification\.receipt\.acknowledge/);
+  assert.match(routeHandlers, /parent_receipt_enabled/);
   assert.match(server, /function noticeClassIds|const noticeClassIds/);
-  assert.match(server, /VERSION_CONFLICT/);
-  assert.match(server, /notification\.draft\.discard/);
-  assert.match(server, /ur\.class_id=ANY\(\$2\)/);
-  assert.match(server, /teacherClassIds\(user, schoolId\)\.includes\(classId\)/);
+  assert.match(routeHandlers, /VERSION_CONFLICT/);
+  assert.match(routeHandlers, /notification\.draft\.discard/);
+  assert.match(routeHandlers, /ur\.class_id=ANY\(\$2\)/);
+  assert.match(routeHandlers, /teacherClassIds\(user, schoolId\)\.includes\(classId\)/);
 });
 
 test('class circle exposes paged comments with ownership and attachment moderation hooks', () => {

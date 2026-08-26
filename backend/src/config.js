@@ -1,4 +1,8 @@
 const isProduction = process.env.NODE_ENV === 'production';
+// The release-preflight command must be able to report every missing setting
+// in one run. Runtime processes remain fail-closed and still reject a missing
+// database URL before opening a listener.
+const preflightDiagnostics = process.env.PREFLIGHT_DIAGNOSTICS === 'true';
 const fieldLivenessMinimumSeconds = isProduction ? 30 : 1;
 const fieldLivenessReconcileMinimumSeconds = isProduction ? 10 : 1;
 
@@ -62,23 +66,31 @@ export const poolOptions = {
   statement_timeout: Number(process.env.DB_STATEMENT_TIMEOUT_MS || 15_000)
 };
 
-if (!poolOptions.connectionString) throw new Error('DATABASE_URL is required');
+if (!poolOptions.connectionString && !preflightDiagnostics) throw new Error('DATABASE_URL is required');
 
 // API-only requirements intentionally live behind an explicit assertion. Workers
 // and the backup executor import the common timing/database configuration but
 // must not be given browser-facing or device-signing secrets unnecessarily.
-export const assertServerRuntimeConfig = () => {
-  if (!isProduction) return;
-  if (!config.corsOrigin || config.corsOrigin === '*') throw new Error('生产环境必须配置明确的 CORS_ORIGIN');
-  if (config.metricsToken.length < 24) throw new Error('生产环境必须配置至少 24 位 METRICS_TOKEN');
-  if (!config.trustProxy) throw new Error('生产环境必须经受信任的反向代理访问，并设置 TRUST_PROXY=true');
-  if (config.mfaEncryptionKey.length < 32) throw new Error('生产环境必须配置至少 32 位 MFA_ENCRYPTION_KEY');
-  if (config.verificationCodePepper.length < 32) throw new Error('生产环境必须配置至少 32 位 VERIFICATION_CODE_PEPPER');
-  if (config.auditLogSigningKey.length < 32) throw new Error('生产环境必须配置至少 32 位 AUDIT_LOG_SIGNING_KEY');
-  if (!config.fieldDeviceSignedRequestsRequired) throw new Error('生产环境必须启用 FIELD_DEVICE_SIGNED_REQUESTS_REQUIRED=true');
-  if (config.fieldDeviceSigningEncryptionKey.length < 32) throw new Error('生产环境必须配置至少 32 位 FIELD_DEVICE_SIGNING_ENCRYPTION_KEY');
+export const serverRuntimeConfigErrors = () => {
+  if (!isProduction) return [];
+  const errors = [];
+  if (!poolOptions.connectionString) errors.push('DATABASE_URL');
+  if (!config.corsOrigin || config.corsOrigin === '*') errors.push('明确的 CORS_ORIGIN');
+  if (config.metricsToken.length < 24) errors.push('至少 24 位 METRICS_TOKEN');
+  if (!config.trustProxy) errors.push('TRUST_PROXY=true');
+  if (config.mfaEncryptionKey.length < 32) errors.push('至少 32 位 MFA_ENCRYPTION_KEY');
+  if (config.verificationCodePepper.length < 32) errors.push('至少 32 位 VERIFICATION_CODE_PEPPER');
+  if (config.auditLogSigningKey.length < 32) errors.push('至少 32 位 AUDIT_LOG_SIGNING_KEY');
+  if (!config.fieldDeviceSignedRequestsRequired) errors.push('FIELD_DEVICE_SIGNED_REQUESTS_REQUIRED=true');
+  if (config.fieldDeviceSigningEncryptionKey.length < 32) errors.push('至少 32 位 FIELD_DEVICE_SIGNING_ENCRYPTION_KEY');
   const wechatConfig = [config.wechatAppId, config.wechatAppSecret, config.wechatRedirectUri];
   if (wechatConfig.some(Boolean) && (!config.wechatAppId || !config.wechatAppSecret || !config.wechatRedirectUri || !/^https:\/\//.test(config.wechatRedirectUri))) {
-    throw new Error('微信授权必须同时配置 HTTPS WECHAT_APP_ID、WECHAT_APP_SECRET、WECHAT_REDIRECT_URI');
+    errors.push('完整的 HTTPS 微信授权配置（WECHAT_APP_ID、WECHAT_APP_SECRET、WECHAT_REDIRECT_URI）');
   }
+  return errors;
+};
+
+export const assertServerRuntimeConfig = () => {
+  const errors = serverRuntimeConfigErrors();
+  if (errors.length > 0) throw new Error(`生产环境缺少或无效配置：${errors.join('；')}`);
 };

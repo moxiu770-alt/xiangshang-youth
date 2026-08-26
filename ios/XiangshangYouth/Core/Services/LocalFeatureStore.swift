@@ -303,21 +303,20 @@ final class LocalFeatureStore: ObservableObject {
     private static func decodePersistedState(_ data: Data) -> LocalFeatureState? {
         let decoder = JSONDecoder()
         if var current = try? decoder.decode(LocalFeatureState.self, from: data) {
-            // Migrate the pre-task-scoped projection once. New writes always use
-            // taskID|studentID; the unscoped key keeps an older offline edit
-            // retryable instead of silently dropping it after an app update.
-            if current.taskScopedStatuses.isEmpty {
-                current.taskScopedStatuses = current.studentTaskStatuses.reduce(into: [:]) { $0["unscoped|\($1.key)"] = $1.value }
-            }
-            if current.taskScopedSyncStates.isEmpty {
-                current.taskScopedSyncStates = current.taskStatusSyncStates.reduce(into: [:]) { $0["unscoped|\($1.key)"] = $1.value }
-            }
-            if current.taskScopedStatusVersions.isEmpty {
-                current.taskScopedStatusVersions = current.taskStatusVersions.reduce(into: [:]) { $0["unscoped|\($1.key)"] = $1.value }
-            }
-        if current.taskScopedReviewNotes.isEmpty {
-                current.taskScopedReviewNotes = current.reviewNotes.reduce(into: [:]) { $0["unscoped|\($1.key)"] = $1.value }
-            }
+            // A pre-v2 record has only a student ID, so it cannot safely be
+            // attributed to a task. Drop that unsafe projection rather than
+            // inventing an "unscoped" task and leaking it into another task.
+            current.studentTaskStatuses = [:]
+            current.taskStatusVersions = [:]
+            current.taskStatusSyncStates = [:]
+            current.reviewNotes = [:]
+            // A short-lived earlier migration used `unscoped|studentId` as a
+            // placeholder. It is not a valid composite identity and must not
+            // survive into the retry queue.
+            current.taskScopedStatuses = current.taskScopedStatuses.filter { !$0.key.hasPrefix("unscoped|") && !$0.key.hasPrefix("missing-task|") }
+            current.taskScopedStatusVersions = current.taskScopedStatusVersions.filter { !$0.key.hasPrefix("unscoped|") && !$0.key.hasPrefix("missing-task|") }
+            current.taskScopedSyncStates = current.taskScopedSyncStates.filter { !$0.key.hasPrefix("unscoped|") && !$0.key.hasPrefix("missing-task|") }
+            current.taskScopedReviewNotes = current.taskScopedReviewNotes.filter { !$0.key.hasPrefix("unscoped|") && !$0.key.hasPrefix("missing-task|") }
             if current.followAlongSyncStates.isEmpty && !current.followAlongSessions.isEmpty {
                 current.followAlongSyncStates = Dictionary(uniqueKeysWithValues: current.followAlongSessions.map { ($0.id.uuidString, .submitted) })
             }
@@ -393,7 +392,12 @@ final class LocalFeatureStore: ObservableObject {
             }
         }
         guard let migrated = try? JSONSerialization.data(withJSONObject: legacy) else { return nil }
-        return try? decoder.decode(LocalFeatureState.self, from: migrated)
+        guard var current = try? decoder.decode(LocalFeatureState.self, from: migrated) else { return nil }
+        current.studentTaskStatuses = [:]
+        current.taskStatusVersions = [:]
+        current.taskStatusSyncStates = [:]
+        current.reviewNotes = [:]
+        return current
     }
 }
 

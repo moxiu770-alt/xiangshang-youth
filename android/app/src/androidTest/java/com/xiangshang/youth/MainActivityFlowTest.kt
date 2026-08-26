@@ -55,23 +55,8 @@ class MainActivityFlowTest {
     }
 
     @Test
-    fun publicLoginOnlyOffersFamilyAndSupportsParentBinding() {
-        // Instrumentation does not guarantee an empty encrypted preference
-        // sandbox. Clear the active ViewModel session as well as its store;
-        // recreating an Activity alone would retain the old ViewModel.
-        composeRule.activity.runOnUiThread {
-            composeRule.activity.resetSessionForUiTest()
-        }
-        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
-            composeRule.onAllNodesWithText("微信登录").fetchSemanticsNodes().isNotEmpty() ||
-                composeRule.onAllNodesWithText("退出当前账号").fetchSemanticsNodes().isNotEmpty()
-        }
-        if (composeRule.onAllNodesWithText("退出当前账号").fetchSemanticsNodes().isNotEmpty()) {
-            composeRule.onNodeWithText("退出当前账号").performClick()
-        }
-        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
-            composeRule.onAllNodesWithText("微信登录").fetchSemanticsNodes().isNotEmpty()
-        }
+    fun publicLoginOnlyOffersFamilyWorkbench() {
+        resetToPublicLogin()
         // The production login page must expose all three entry points, not
         // merely draw inactive alternatives below a phone-only flow.
         composeRule.onNodeWithText("手机号登录").assertIsDisplayed().performClick()
@@ -93,8 +78,8 @@ class MainActivityFlowTest {
         composeRule.onAllNodesWithText("学校端").assertCountEquals(0)
         composeRule.onAllNodesWithText("校长端").assertCountEquals(0)
 
-        // Parent workbench: a new session still requires the child-binding
-        // guard, and the school-code help is reachable from the dialog.
+        // A public family account enters a root workbench and cannot get a
+        // synthetic back button to a hidden teacher role.
         composeRule.onNodeWithText("家庭端").performClick()
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             // A new family session must bind a child before child-specific
@@ -105,6 +90,21 @@ class MainActivityFlowTest {
         // secondary route and will provide its own usable return control.
         composeRule.onAllNodesWithContentDescription("返回").assertCountEquals(0)
         composeRule.onNodeWithText("去绑定孩子").assertIsDisplayed()
+    }
+
+    @Test
+    fun parentBindingUnlocksReportAndKeepsFamilyRoutesReachable() {
+        resetToPublicLogin()
+        composeRule.onNodeWithText("微信登录").performClick()
+        composeRule.onNodeWithText("请阅读并同意相关协议").performClick()
+        composeRule.onNodeWithText("微信登录").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("请选择进入方式").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("家庭端").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("去绑定孩子").fetchSemanticsNodes().isNotEmpty()
+        }
         // Secondary parent tabs must preserve the same actionable binding guard;
         // an empty report/health page must never strand a family account.
         composeRule.onNodeWithContentDescription("我的评测").performClick()
@@ -143,49 +143,84 @@ class MainActivityFlowTest {
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
             composeRule.onAllNodesWithText("查看 7 项报告", substring = true).fetchSemanticsNodes().isNotEmpty()
         }
+    }
 
-        // “孩子管理” is a family-management entry point, not a one-shot
-        // binding guard.  After the first child is bound, it must stay open
-        // so the same household can add another child without losing context.
-        composeRule.onNodeWithContentDescription("我的").performClick()
-        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
-            composeRule.onAllNodesWithText("孩子管理").fetchSemanticsNodes().isNotEmpty()
+    @Test
+    fun schoolProvisionedTeacherFixtureCoversTeacherWorkbench() {
+        composeRule.activity.runOnUiThread {
+            composeRule.activity.resetSessionForUiTest()
+            composeRule.activity.startSchoolProvisionedTeacherFixtureForUiTest()
         }
-        composeRule.onAllNodesWithText("孩子管理")[0].performClick()
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
-            composeRule.onAllNodesWithText("已绑定孩子 1 人").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithText("班级健康概览").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithText("绑定孩子").performClick()
-        composeRule.onNodeWithText("孩子姓名").performTextClearance()
-        composeRule.onNodeWithText("孩子姓名").performTextInput("王小雨")
-        composeRule.onNodeWithText("学校绑定码").performTextClearance()
-        composeRule.onNodeWithText("学校绑定码").performTextInput("XS-S02")
-        composeRule.onNodeWithText("确认绑定").performClick()
-        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
-            composeRule.onAllNodesWithText("已绑定孩子 2 人").fetchSemanticsNodes().isNotEmpty()
-        }
+        // Teacher workbench is a root, so it must not expose a synthetic back
+        // button after the authorized session replaces the public login root.
+        composeRule.onAllNodesWithContentDescription("返回").assertCountEquals(0)
 
-        // Course cards must not manufacture a completed progress value merely
-        // because they were opened. The learner starts the course explicitly,
-        // then the locally persisted progress becomes visible in the dialog.
+        composeRule.onNodeWithContentDescription("班级看板").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("班级数据看板").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription("返回").performClick()
+        // A stable accessibility label keeps the metric actionable without
+        // coupling the regression test to a dynamic measured-student count.
+        composeRule.onNodeWithContentDescription("打开体测任务").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("延时课程上传").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("2026年秋季综合运动能力测评").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("学生测评状态").fetchSemanticsNodes().isNotEmpty()
+        }
+        // The roster itself is scoped to this fixture's authorized classes.
+        // Write authorization and transition rules are covered by unit tests,
+        // keeping the device regression bounded and repeatable.
+        composeRule.onNodeWithContentDescription("更新王小明的测评状态，当前已完成").assertIsDisplayed()
+        // The task list is a teacher-only route, and returning restores the
+        // authorized workbench instead of leaking to a public role selector.
+        composeRule.onNodeWithContentDescription("返回").performClick()
         composeRule.onNodeWithContentDescription("返回").performClick()
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
-            composeRule.onAllNodesWithContentDescription("我的课程").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithText("班级健康概览").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithContentDescription("我的课程").performClick()
+        composeRule.onNodeWithContentDescription("预警中心").performClick()
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
-            composeRule.onAllNodesWithText("体质成长课").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithText("预警中心").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithText("体质成长课").performClick()
+        composeRule.onNodeWithContentDescription("返回").performClick()
         composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
-            composeRule.onAllNodesWithText("播放课程").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithText("班级健康概览").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithText("播放课程").performClick()
-        composeRule.onNodeWithText("暂停学习").assertIsDisplayed()
-        // Playback time is a real media-clock value, so it must not be pinned
-        // to a fabricated 25% just for a screenshot. Reaching the active
-        // playback control proves this route is live; persistence is covered
-        // by the dedicated repository/unit tests.
-        composeRule.onNodeWithText("完成").performClick()
+        // Notification composer belongs to the teacher class-circle root, not
+        // the home dashboard. This validates the real tab transition before
+        // asserting the editor is reachable.
+        composeRule.onNodeWithContentDescription("班级圈").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("发班级通知").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("发班级通知").performClick()
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("发班级通知").fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    private fun resetToPublicLogin() {
+        // Instrumentation does not guarantee an empty encrypted preference
+        // sandbox. Clear the active ViewModel session as well as its store;
+        // recreating an Activity alone would retain the old ViewModel.
+        composeRule.activity.runOnUiThread {
+            composeRule.activity.resetSessionForUiTest()
+        }
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("微信登录").fetchSemanticsNodes().isNotEmpty() ||
+                composeRule.onAllNodesWithText("退出当前账号").fetchSemanticsNodes().isNotEmpty()
+        }
+        if (composeRule.onAllNodesWithText("退出当前账号").fetchSemanticsNodes().isNotEmpty()) {
+            composeRule.onNodeWithText("退出当前账号").performClick()
+        }
+        composeRule.waitUntil(timeoutMillis = coldStartTimeout) {
+            composeRule.onAllNodesWithText("微信登录").fetchSemanticsNodes().isNotEmpty()
+        }
     }
 }

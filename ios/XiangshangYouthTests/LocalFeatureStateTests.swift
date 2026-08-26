@@ -1,8 +1,57 @@
 import XCTest
 @testable import XiangshangYouth
 
+private final class IncompleteRemoteRepository: YouthRepository {
+    let supportsRemoteAcknowledgement = true
+    func loadDashboard() async throws -> DashboardData { try await MockRepository.shared.loadDashboard() }
+    func report(for student: Student) -> DiagnosisReport { MockRepository.shared.report(for: student) }
+}
+
 @MainActor
 final class LocalFeatureStateTests: XCTestCase {
+    func testMissingRemoteEnvelopePayloadIsNotRenderedAsEmptyContent() throws {
+        let missing = #"{"code":"OK","message":"ok"}"#.data(using: .utf8)!
+        XCTAssertThrowsError(try ApiClient.decodePayload(missing, type: [String].self)) { error in
+            guard case ApiError.invalidResponse = error else {
+                return XCTFail("Expected invalid response, got \(error)")
+            }
+        }
+        let empty = #"{"code":"OK","message":"ok","data":[]}"#.data(using: .utf8)!
+        XCTAssertEqual(try ApiClient.decodePayload(empty, type: [String].self), [])
+    }
+
+    func testIncompleteRemoteRepositoryCannotUseMockOnlyDefaults() async {
+        do {
+            _ = try await IncompleteRemoteRepository().loadActivities()
+            XCTFail("Remote defaults must not return bundled activities")
+        } catch let error as ApiError {
+            guard case .notConfigured = error else {
+                return XCTFail("Expected notConfigured, got \(error)")
+            }
+        } catch {
+            XCTFail("Expected notConfigured, got \(error)")
+        }
+    }
+
+    func testTeacherOverviewContextRejectsAStaleClassOrTaskResponse() {
+        let current = TeacherOverviewContext(schoolID: "school-a", classID: "class-a", taskID: "task-a", standardVersion: "standard-v1")
+        XCTAssertNotEqual(current, TeacherOverviewContext(schoolID: "school-b", classID: "class-a", taskID: "task-a", standardVersion: "standard-v1"))
+        XCTAssertNotEqual(current, TeacherOverviewContext(schoolID: "school-a", classID: "class-b", taskID: "task-a", standardVersion: "standard-v1"))
+        XCTAssertNotEqual(current, TeacherOverviewContext(schoolID: "school-a", classID: "class-a", taskID: "task-b", standardVersion: "standard-v1"))
+        XCTAssertNotEqual(current, TeacherOverviewContext(schoolID: "school-a", classID: "class-a", taskID: "task-a", standardVersion: "standard-v2"))
+    }
+
+    func testRemoteTaskStatusRequiresCompositeTaskIdentity() async {
+        do {
+            _ = try await RemoteRepository().updateTaskStatus(taskID: "", studentID: "student-1", status: .checkedIn, note: nil, expectedVersion: 1)
+            XCTFail("A remote task status write must require a task ID")
+        } catch let ApiError.message(message) {
+            XCTAssertTrue(message.contains("任务编号"))
+        } catch {
+            XCTFail("Expected missing-task error, got \(error)")
+        }
+    }
+
     func testReportCourseSuggestionDecodesStableCourseAndLessonIDs() throws {
         let payload = #"{"id":"suggestion-1","courseId":"course-1","lessonId":"lesson-1","title":"协调训练","duration":"12分钟","focus":"平衡","isPublicBenefit":true}"#.data(using: .utf8)!
         let suggestion = try JSONDecoder().decode(CourseSuggestion.self, from: payload)
@@ -20,13 +69,26 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(Student.self, from: payload).classID, "c31")
     }
 
+    func testTeacherTaskScopeRejectsStudentsOutsideAuthorizedClassIDs() async throws {
+        let base = MockRepository.shared
+        let defaults = UserDefaults(suiteName: "xiangshang.teacher-task-scope-test")!
+        defaults.removePersistentDomain(forName: "xiangshang.teacher-task-scope-test")
+        let state = AppState(repository: base, featureStore: LocalFeatureStore(defaults: defaults))
+        state.data = try await base.loadDashboard()
+        state.profile = UserProfile(id: "teacher-scope", name: "同名教师", phone: "13800138000", role: .teacher, schoolName: base.school.name, avatarInitials: "教", authorizedClassIDs: ["c31"])
+        state.selectedRole = .teacher
+
+        XCTAssertTrue(state.canManageTaskStudent(try XCTUnwrap(state.data?.students.first(where: { $0.classID == "c31" }))))
+        XCTAssertFalse(state.canManageTaskStudent(try XCTUnwrap(state.data?.students.first(where: { $0.classID == "c32" }))))
+    }
+
     func testStudentAndLocalStateCarryServerTaskVersionForConflictSafeEdits() {
         let student = Student(id: "s-version", name: "测试学生", gender: "男", grade: "三年级", className: "三年级1班", region: "南湖区", isPovertyArea: false, taskStatus: .checkedIn, totalScore: nil, birthDate: "2017-01-01", taskVersion: 7)
         var local = LocalFeatureState()
-        local.taskStatusVersions[student.id] = student.taskVersion
+        local.taskScopedStatusVersions["t1|\(student.id)"] = student.taskVersion
 
         XCTAssertEqual(student.taskVersion, 7)
-        XCTAssertEqual(local.taskStatusVersions[student.id], 7)
+        XCTAssertEqual(local.taskScopedStatusVersions["t1|\(student.id)"], 7)
     }
 
     func testMobileRolePickerOnlyExposesParentAndTeacherWorkbenches() {
@@ -842,10 +904,10 @@ final class LocalFeatureStateTests: XCTestCase {
             value.drafts["assessment-s01-fitness-0"] = "身高132cm，体重30kg"
             value.expertAppointments.append(ExpertAppointment(id: UUID(), expertName: "张教授", preferredDate: "周五上午", note: "运动发展咨询", status: .pendingSync, createdAt: .now))
             value.courseUploads.append(CourseUploadRecord(id: UUID(), taskID: "after-class-upload", attendanceCount: 26, notes: "已完成课程", attachmentName: "课堂.jpg", status: .pendingSync, createdAt: .now))
-            value.studentTaskStatuses["s01"] = .review
-            value.taskStatusVersions["s01"] = 7
-            value.taskStatusSyncStates["s01"] = .pendingSync
-            value.reviewNotes["s01"] = "核验视频后建议周五补测。"
+            value.taskScopedStatuses["t1|s01"] = .review
+            value.taskScopedStatusVersions["t1|s01"] = 7
+            value.taskScopedSyncStates["t1|s01"] = .pendingSync
+            value.taskScopedReviewNotes["t1|s01"] = "核验视频后建议周五补测。"
             value.settings.reduceMotion = true
             let postID = UUID()
             value.likedClassPostIDs.insert(postID)
@@ -859,10 +921,10 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertEqual(restored.drafts["assessment-s01-fitness-0"], "身高132cm，体重30kg")
         XCTAssertEqual(restored.expertAppointments.first?.status, .pendingSync)
         XCTAssertEqual(restored.courseUploads.first?.attachmentName, "课堂.jpg")
-        XCTAssertEqual(restored.studentTaskStatuses["s01"], .review)
-        XCTAssertEqual(restored.taskStatusVersions["s01"], 7)
-        XCTAssertEqual(restored.taskStatusSyncStates["s01"], .pendingSync)
-        XCTAssertEqual(restored.reviewNotes["s01"], "核验视频后建议周五补测。")
+        XCTAssertEqual(restored.taskScopedStatuses["t1|s01"], .review)
+        XCTAssertEqual(restored.taskScopedStatusVersions["t1|s01"], 7)
+        XCTAssertEqual(restored.taskScopedSyncStates["t1|s01"], .pendingSync)
+        XCTAssertEqual(restored.taskScopedReviewNotes["t1|s01"], "核验视频后建议周五补测。")
         XCTAssertTrue(restored.settings.reduceMotion)
         XCTAssertTrue(restored.settings.voiceGuidanceEnabled)
         XCTAssertEqual(restored.classPostComments.first?.text, "继续加油")
@@ -949,7 +1011,7 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertEqual(router.path.count, 1, "An unbound report link should route to child binding instead of a report.")
     }
 
-    func testRiskDeepLinkKeepsSchoolDashboardAuthorityExplicit() async {
+    func testRiskDeepLinkCannotGrantRemovedPrincipalMobileWorkbench() async {
         let suite = "xiangshang.youth.risk-link-tests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defaults.removePersistentDomain(forName: suite)
@@ -960,9 +1022,11 @@ final class LocalFeatureStateTests: XCTestCase {
         router.receiveDeepLink(URL(string: "xiangshang-youth://open?target=risk")!)
         router.activatePendingDeepLink(using: state)
 
-        XCTAssertEqual(state.selectedRole, .principal)
-        XCTAssertEqual(router.path.count, 0, "学校管理看板是角色根页，风险通知不能制造一个带返回键的二级页")
-        XCTAssertNotEqual(state.selectedRole, .teacher, "Risk links must not silently convert the account into a teacher workbench.")
+        // 校长工作台已经迁至学校数据管理后台。风险通知不能通过深链
+        // 将公开家庭账号提升为校长，也不能制造带返回按钮的伪工作台。
+        XCTAssertNil(state.selectedRole)
+        XCTAssertEqual(router.path.count, 0)
+        XCTAssertNotEqual(state.selectedRole, .teacher, "Risk links must not silently convert a family account into a teacher workbench.")
     }
 
     func testRouterDeduplicatesRepeatedDestinationAndKeepsBackStackRecoverable() {
@@ -1019,7 +1083,8 @@ final class LocalFeatureStateTests: XCTestCase {
 
         let restored = LocalFeatureStore(defaults: defaults).state
         XCTAssertEqual(restored.drafts["publish"], "已保存的班级动态")
-        XCTAssertEqual(restored.studentTaskStatuses["s01"], .review)
+        XCTAssertTrue(restored.taskScopedStatuses.isEmpty)
+        XCTAssertTrue(restored.studentTaskStatuses.isEmpty)
         XCTAssertTrue(restored.reviewNotes.isEmpty)
         XCTAssertTrue(restored.taskStatusSyncStates.isEmpty)
     }
@@ -1179,11 +1244,11 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertFalse(invalidActivityResult)
         if case .failed = state.workflowState(for: "activity:health-growth-season-2026") {} else { XCTFail("Invalid activity command should expose failure") }
 
-        let statusResult = await state.submitTaskStatusCommand(studentID: "s01", status: .review, note: "请核验动作视频")
+        let statusResult = await state.submitTaskStatusCommand(taskID: "task-demo", studentID: "s01", status: .review, note: "请核验动作视频")
         XCTAssertTrue(statusResult)
-        if case .succeeded = state.workflowState(for: "task-status:unscoped|s01") {} else { XCTFail("Mock task status command should reach succeeded") }
-        XCTAssertEqual(state.taskStatus(for: state.data!.students[0]), .review)
-        XCTAssertEqual(state.localFeatures.taskStatusSyncStates["s01"], .pendingSync)
+        if case .succeeded = state.workflowState(for: "task-status:task-demo|s01") {} else { XCTFail("Mock task status command should reach succeeded") }
+        XCTAssertEqual(state.taskStatus(for: state.data!.students[0], taskID: "task-demo"), .review)
+        XCTAssertEqual(state.localFeatures.taskScopedSyncStates["task-demo|s01"], .pendingSync)
     }
 
     func testFailedTeacherStatusUpdateRemainsPersistedForRetry() async throws {
@@ -1194,13 +1259,13 @@ final class LocalFeatureStateTests: XCTestCase {
         await state.login(phone: "13800138000")
         let student = try XCTUnwrap(state.data?.students.first(where: { $0.id == "s06" }))
 
-        let succeeded = await state.submitTaskStatusCommand(studentID: student.id, status: .checkedIn, note: "已到场")
+        let succeeded = await state.submitTaskStatusCommand(taskID: "task-retry", studentID: student.id, status: .checkedIn, note: "已到场")
 
         XCTAssertFalse(succeeded)
-        XCTAssertEqual(state.taskStatus(for: student), .checkedIn)
-        XCTAssertEqual(state.localFeatures.taskStatusSyncStates[student.id], .failed)
+        XCTAssertEqual(state.taskStatus(for: student, taskID: "task-retry"), .checkedIn)
+        XCTAssertEqual(state.localFeatures.taskScopedSyncStates["task-retry|\(student.id)"], .failed)
         XCTAssertEqual(state.pendingSyncCount, 1)
-        if case .failed = state.workflowState(for: "task-status:unscoped|\(student.id)") {} else { XCTFail("Failed task updates must expose a retryable command state") }
+        if case .failed = state.workflowState(for: "task-status:task-retry|\(student.id)") {} else { XCTFail("Failed task updates must expose a retryable command state") }
     }
 
     func testTaskStatusConflictClearsStaleOptimisticProjection() async throws {
@@ -1211,13 +1276,13 @@ final class LocalFeatureStateTests: XCTestCase {
         await state.login(phone: "13800138000")
         let student = try XCTUnwrap(state.data?.students.first(where: { $0.id == "s06" }))
 
-        let succeeded = await state.submitTaskStatusCommand(studentID: student.id, status: .checkedIn, note: "已到场")
+        let succeeded = await state.submitTaskStatusCommand(taskID: "task-conflict", studentID: student.id, status: .checkedIn, note: "已到场")
 
         XCTAssertFalse(succeeded)
-        XCTAssertNil(state.localFeatures.studentTaskStatuses[student.id], "冲突后不得继续展示本地乐观状态")
-        XCTAssertNil(state.localFeatures.taskStatusVersions[student.id], "冲突后不得复用过期版本号")
-        XCTAssertEqual(state.localFeatures.taskStatusSyncStates[student.id], .failed)
-        if case .failed = state.workflowState(for: "task-status:unscoped|\(student.id)") {} else { XCTFail("版本冲突必须进入可刷新/重试状态") }
+        XCTAssertNil(state.localFeatures.taskScopedStatuses["task-conflict|\(student.id)"], "冲突后不得继续展示本地乐观状态")
+        XCTAssertNil(state.localFeatures.taskScopedStatusVersions["task-conflict|\(student.id)"], "冲突后不得复用过期版本号")
+        XCTAssertEqual(state.localFeatures.taskScopedSyncStates["task-conflict|\(student.id)"], .failed)
+        if case .failed = state.workflowState(for: "task-status:task-conflict|\(student.id)") {} else { XCTFail("版本冲突必须进入可刷新/重试状态") }
     }
 
     func testPendingSyncCountExposesUnacknowledgedLocalWrites() {
@@ -1231,7 +1296,7 @@ final class LocalFeatureStateTests: XCTestCase {
         state.bookExpert(name: "张教授", preferredDate: "周五上午", note: "运动发展咨询", expertID: "expert-zhang-child-sports")
         state.saveCourseUpload(taskID: "after-class-upload", attendanceCount: 20, notes: "课堂记录", attachmentName: "课堂.jpg", attachmentReference: "local://course/1", submit: true)
         store.update { value in
-            value.taskScopedSyncStates["unscoped|s01"] = .pendingSync
+            value.taskScopedSyncStates["task-pending|s01"] = .pendingSync
             value.bodyAssessmentSyncStates["s01"] = .pendingSync
         }
         let reloaded = AppState(featureStore: store)
@@ -1342,13 +1407,13 @@ private struct UnauthorizedRepository: YouthRepository {
 private struct TaskStatusFailingRepository: YouthRepository {
     func loadDashboard() async throws -> DashboardData { try await MockRepository.shared.loadDashboard() }
     func report(for student: Student) -> DiagnosisReport { MockRepository.shared.report(for: student) }
-    func updateTaskStatus(studentID: String, status: TaskStatus, note: String?) async throws { throw ApiError.network }
+    func updateTaskStatus(taskID: String, studentID: String, status: TaskStatus, note: String?, expectedVersion: Int?) async throws -> Int? { throw ApiError.network }
 }
 
 private struct TaskStatusConflictRepository: YouthRepository {
     func loadDashboard() async throws -> DashboardData { try await MockRepository.shared.loadDashboard() }
     func report(for student: Student) -> DiagnosisReport { MockRepository.shared.report(for: student) }
-    func updateTaskStatus(studentID: String, status: TaskStatus, note: String?, expectedVersion: Int?) async throws -> Int? {
+    func updateTaskStatus(taskID: String, studentID: String, status: TaskStatus, note: String?, expectedVersion: Int?) async throws -> Int? {
         throw ApiError.conflict("记录已被其他人更新，请刷新后重试")
     }
 }

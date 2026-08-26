@@ -81,7 +81,7 @@ struct LiveVisionCaptureSheet: View {
                     VStack(spacing: 5) {
                         ProgressView(value: captureProgress).tint(.yellow)
                         Text(!cameraReady ? "正在连接所选摄像头…" : captureArmed ? (captureProgress == 0 ? "正在确认取景与全身入镜" : "记录稳定度 \(Int(captureProgress * 100))%") : "请先完成取景，再开始记录")
-                            .font(.caption2).foregroundStyle(.white.opacity(0.76))
+                            .font(.caption).foregroundStyle(.white.opacity(0.76))
                     }
                     if captureArmed {
                         Label("正在记录，请保持当前姿势", systemImage: "waveform.path.ecg")
@@ -177,7 +177,7 @@ private struct LiveBodyGuideOverlay: View {
                         Image(systemName: task == .gaitVideo ? "arrow.left.and.right" : task == .forwardBend ? "figure.flexibility" : "figure.stand")
                             .font(.system(size: 46, weight: .light))
                         Text(frameInstruction)
-                            .font(.caption2.weight(.medium))
+                            .font(.caption.weight(.medium))
                     }
                     .foregroundStyle(.white.opacity(0.82))
                 }

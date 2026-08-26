@@ -1583,27 +1583,6 @@ paths:
                 attendanceCount: { type: integer, minimum: 0, maximum: 10000 }
                 notes: { type: string, maxLength: 2000 }
       responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { $ref: '#/components/responses/Conflict' } }
-  /v1/students/{studentId}/task-status:
-    patch:
-      summary: "PATCH /v1/students/{studentId}/task-status"
-      operationId: patchV1StudentsStudentIdTaskStatus
-      tags: [School]
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - { in: path, name: studentId, required: true, schema: { type: string } }
-        - { $ref: '#/components/parameters/IdempotencyKey' }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [status]
-              properties:
-                status: { type: string, enum: [未签到, 已签到, 候测, 测试中, 已完成, 待复核, 待补测, 缺席] }
-                note: { type: string, maxLength: 500 }
-                expectedVersion: { type: integer, minimum: 1 }
-      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
   /v1/class-posts:
     get:
       summary: "GET /v1/class-posts"

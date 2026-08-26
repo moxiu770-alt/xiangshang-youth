@@ -187,7 +187,7 @@ private fun ClassTeacherPanel(state: AppUiState, nav: NavHostController, reportF
             SectionHeader("班级健康概览", "查看班级看板") { nav.navigateSingleTop(Destinations.TeacherBoard) }
             Row(Modifier.fillMaxWidth().padding(top = 9.dp)) {
                 TeacherMetric("班级人数", "${classStudents.size}", Icons.Filled.Groups, Blue) { primaryClassId?.let { nav.navigateSingleTop("${Destinations.Students}?classId=$it") } }
-                TeacherMetric("已测评", "$measured", Icons.Filled.Visibility, Green) { nav.navigateSingleTop(Destinations.Tasks) }
+                TeacherMetric("已测评", "$measured", Icons.Filled.Visibility, Green, actionDescription = "打开体测任务") { nav.navigateSingleTop(Destinations.Tasks) }
                 TeacherMetric("测评率", "${if (classStudents.isEmpty()) 0 else measured * 100 / classStudents.size}%", Icons.Filled.Refresh, Green) { nav.navigateSingleTop(Destinations.TeacherBoard) }
                 TeacherMetric("待处理预警", "$risk", Icons.Filled.WarningAmber, Color(0xFFFF4242)) { nav.navigateSingleTop(Destinations.Review) }
             }
@@ -214,7 +214,7 @@ private fun ClassTeacherPanel(state: AppUiState, nav: NavHostController, reportF
 }
 
 @Composable
-private fun RowScope.TeacherMetric(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, onClick: () -> Unit) = Surface(onClick = onClick, modifier = Modifier.weight(1f).semantics { role = Role.Button; contentDescription = "$label：$value，查看详情" }, color = Color.Transparent, shape = RoundedCornerShape(8.dp)) {
+private fun RowScope.TeacherMetric(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, actionDescription: String? = null, onClick: () -> Unit) = Surface(onClick = onClick, modifier = Modifier.weight(1f).semantics { role = Role.Button; contentDescription = actionDescription ?: "$label：$value，查看详情" }, color = Color.Transparent, shape = RoundedCornerShape(8.dp)) {
     Column(Modifier.fillMaxWidth().padding(vertical = 3.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(label, color = Color(0xFF798699), fontSize = 12.sp)
         Row(verticalAlignment = Alignment.CenterVertically) { Text(value, color = color, fontWeight = FontWeight.Bold, fontSize = 19.sp); Spacer(Modifier.width(3.dp)); Icon(icon, null, tint = color, modifier = Modifier.size(15.dp)) }
@@ -368,6 +368,7 @@ fun TeacherClassCircleScreen(
             else -> {
                 state.local.classPosts.forEach { post ->
                     var menuExpanded by remember(post.id) { mutableStateOf(false) }
+                    val canEditOrDelete = post.ownedByCurrentUser || post.postId == null
                     Surface(Modifier.padding(horizontal = 12.dp, vertical = 4.dp).fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(12.dp)) {
                         Column(Modifier.padding(14.dp)) {
                             Row(verticalAlignment = Alignment.Top) {
@@ -378,10 +379,10 @@ fun TeacherClassCircleScreen(
                                 Box {
                                     IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(40.dp)) { Icon(Icons.Filled.MoreVert, contentDescription = "管理班级动态", tint = Blue) }
                                     DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                                        if (post.status != LocalSubmissionStatus.Submitted) DropdownMenuItem(text = { Text("编辑") }, onClick = { menuExpanded = false; editingPost = post }, leadingIcon = { Icon(Icons.Filled.Edit, null) })
+                                        if (canEditOrDelete) DropdownMenuItem(text = { Text("编辑") }, onClick = { menuExpanded = false; editingPost = post }, leadingIcon = { Icon(Icons.Filled.Edit, null) })
                                         if (state.teacherHasCapability("PUBLISH_CLASS_NOTICE") && post.postId != null) DropdownMenuItem(text = { Text(if (post.pinned) "取消置顶" else "置顶") }, onClick = { menuExpanded = false; setClassPostPinned(post, !post.pinned) }, leadingIcon = { Icon(Icons.Filled.PushPin, null) })
                                         DropdownMenuItem(text = { Text("举报") }, onClick = { menuExpanded = false; reportClassPost(post) }, leadingIcon = { Icon(Icons.Filled.Report, null) })
-                                        DropdownMenuItem(text = { Text("删除") }, onClick = { menuExpanded = false; deleteClassPost(post) }, leadingIcon = { Icon(Icons.Filled.Delete, null) })
+                                        if (canEditOrDelete) DropdownMenuItem(text = { Text("删除") }, onClick = { menuExpanded = false; deleteClassPost(post) }, leadingIcon = { Icon(Icons.Filled.Delete, null) })
                                     }
                                 }
                             }
@@ -578,12 +579,20 @@ fun TeacherClassBoardScreen(state: AppUiState, nav: NavHostController, onOpenRep
     var selectedPeriod by rememberSaveable { mutableStateOf("本轮综合测评") }
     var historicalDetailShown by rememberSaveable { mutableStateOf(false) }
     val isHistorical = selectedPeriod == "2026春季"
-    val totalStudents = if (isHistorical) 0 else classStudents.size
-    val completed = if (isHistorical) 0 else state.teacherOverview?.completedCount ?: classStudents.count { state.taskStatus(it, currentTask?.id).name == "Completed" }
-    val completionRate = if (totalStudents == 0) 0 else state.teacherOverview?.let { it.completedCount * 100 / it.totalCount.coerceAtLeast(1) } ?: completed * 100 / totalStudents
+    // The remote dashboard directory is bounded and may not contain every
+    // student in the selected class. Only the server overview is allowed to
+    // represent official completion/risk metrics in a remote session.
+    // `dataAvailable=false` represents an unavailable aggregate, not a
+    // completed task with zero students or zero risks.
+    val overviewContext = com.xiangshang.youth.app.TeacherOverviewContext(state.profile?.schoolId.orEmpty(), primaryClass?.id.orEmpty(), currentTask?.id.orEmpty(), currentTask?.ruleVersion.orEmpty())
+    val remoteOverview = state.teacherOverview?.takeIf { state.teacherOverviewContext == overviewContext && it.dataAvailable }
+    val useRemoteOverview = state.repositoryAcknowledged
+    val totalStudents = if (isHistorical) 0 else remoteOverview?.totalCount ?: if (useRemoteOverview) 0 else classStudents.size
+    val completed = if (isHistorical) 0 else remoteOverview?.completedCount ?: if (useRemoteOverview) 0 else classStudents.count { state.taskStatus(it, currentTask?.id).name == "Completed" }
+    val completionRate = if (totalStudents == 0) 0 else completed * 100 / totalStudents
     val officialReports = classStudents.filter(state::hasPublishedSchoolReport).mapNotNull(reportForStudent)
     val lowScoreStudentIds = officialReports.filter { it.requiresFollowUp }.map { it.student.id }.toSet()
-    val risk = if (isHistorical) 0 else state.teacherOverview?.riskCount ?: classStudents.count { val status = state.taskStatus(it, currentTask?.id); it.id in lowScoreStudentIds || status.name == "Review" || status.name == "Retest" }
+    val risk = if (isHistorical) 0 else remoteOverview?.riskCount ?: if (useRemoteOverview) 0 else classStudents.count { val status = state.taskStatus(it, currentTask?.id); it.id in lowScoreStudentIds || status.name == "Review" || status.name == "Retest" }
     fun drillDown(action: () -> Unit) { if (isHistorical) historicalDetailShown = true else action() }
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(vertical = 4.dp)) {
         state.managedTeacherClasses.forEach { item ->
@@ -598,6 +607,10 @@ fun TeacherClassBoardScreen(state: AppUiState, nav: NavHostController, onOpenRep
     }
     Spacer(Modifier.height(7.dp))
     if (isHistorical) Surface(Modifier.fillMaxWidth().padding(bottom = 7.dp).semantics { role = Role.Button; contentDescription = "查看2026春季归档说明" }.clickable { historicalDetailShown = true }, color = Color(0xFFF3EEFF), shape = RoundedCornerShape(9.dp)) { Row(Modifier.padding(9.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.Archive, null, tint = Color(0xFF8A5AF5), modifier = Modifier.size(17.dp)); Spacer(Modifier.width(6.dp)); Text("2026春季为已归档汇总；学生明细请切换回本轮查看", color = Color(0xFF6F4DAD), fontSize = 12.sp, modifier = Modifier.weight(1f)); Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray, modifier = Modifier.size(14.dp)) } }
+    if (!isHistorical && useRemoteOverview && remoteOverview == null) {
+        EmptyState("当前班级统计正在同步。服务端返回本任务统计后，将显示完成率、风险分布和单项成绩。")
+        return@AppScaffold
+    }
     BoardCard("${primaryClassName}健康概览", if (isHistorical) "归档说明" else "查看明细", onClick = { drillDown { primaryClass?.id?.let { nav.navigateSingleTop("${Destinations.Students}?classId=$it") } } }) { Row { TeacherMetric("班级人数", "$totalStudents", Icons.Filled.Groups, Blue) { drillDown { primaryClass?.id?.let { nav.navigateSingleTop("${Destinations.Students}?classId=$it") } } }; TeacherMetric("已测评", "$completed", Icons.Filled.Visibility, Green) { drillDown { nav.navigateSingleTop(Destinations.Tasks) } }; TeacherMetric("测评率", "$completionRate%", Icons.Filled.Refresh, Green) { drillDown { nav.navigateSingleTop(Destinations.Tasks) } }; TeacherMetric("待处理预警", "$risk", Icons.Filled.WarningAmber, Color.Red) { drillDown { nav.navigateSingleTop(Destinations.Review) } } } }
     Spacer(Modifier.height(7.dp)); BoardCard("7 项运动项目进度", if (isHistorical) "归档说明" else "查看任务", onClick = { drillDown { nav.navigateSingleTop(Destinations.Tasks) } }) {
         Text("仅统计学校场地端的综合运动能力测评任务。", color = Color.Gray, fontSize = 12.sp)
@@ -611,7 +624,7 @@ fun TeacherClassBoardScreen(state: AppUiState, nav: NavHostController, onOpenRep
                             Spacer(Modifier.width(8.dp))
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                 Text(item.label, color = Navy, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, maxLines = 2)
-                                val metric = state.teacherOverview?.itemStats?.firstOrNull { it.itemCode == item.label }
+                                val metric = remoteOverview?.itemStats?.firstOrNull { it.itemCode == item.label }
                                 Text(metric?.let { "${it.measuredCount}/${it.totalCount}人 · ${"%.1f".format(it.averageScore)}分" } ?: if (state.repositoryAcknowledged) "暂无该项目数据" else "单项数据待同步", color = Color.Gray, fontSize = 12.sp)
                             }
                         }
@@ -622,8 +635,8 @@ fun TeacherClassBoardScreen(state: AppUiState, nav: NavHostController, onOpenRep
             Spacer(Modifier.height(8.dp))
         }
     }
-    Spacer(Modifier.height(8.dp)); BoardCard("测评平均完成趋势", if (isHistorical) "归档说明" else "查看详情", onClick = { drillDown { nav.navigateSingleTop(Destinations.Tasks) } }) { LinearProgressIndicator(progress = { completionRate / 100f }, modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape), color = Green, trackColor = Sky); Text("${if (isHistorical) "历史归档" else "当前班级"}完成率 $completionRate%", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.fillMaxWidth().padding(top = 6.dp), textAlign = TextAlign.Center) }
-    Spacer(Modifier.height(8.dp)); BoardCard("重点关注学生", if (isHistorical) "归档说明" else "查看全部", onClick = { drillDown { nav.navigateSingleTop(Destinations.Review) } }) { if (isHistorical) Text("历史周期数据尚未同步，不展示演示统计或学生明细。", color = Color.Gray, fontSize = 12.sp) else { classStudents.filter { student -> val status = state.taskStatus(student, state.data.tasks.firstOrNull()?.id); student.id in lowScoreStudentIds || status.name == "Review" || status.name == "Retest" }.take(3).forEach { student -> val status = state.taskStatus(student, state.data.tasks.firstOrNull()?.id); Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics { role = Role.Button; contentDescription = "查看${student.name}报告，状态${status.label}" }.clickable { onOpenReport(student) }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) { Text("${student.name}   ${student.className}   ${status.label}", color = Navy, fontSize = 12.sp, modifier = Modifier.weight(1f)); Icon(Icons.Filled.ChevronRight, contentDescription = "查看${student.name}报告", tint = Color.Gray, modifier = Modifier.size(16.dp)) } }; if (risk == 0) Text("当前班级暂无重点风险学生", color = Color.Gray, fontSize = 12.sp) } }
+    Spacer(Modifier.height(8.dp)); BoardCard("测评平均完成趋势", if (isHistorical) "归档说明" else "查看详情", onClick = { drillDown { nav.navigateSingleTop(Destinations.Tasks) } }) { EmptyState(if (isHistorical) "暂无历史趋势数据" else "暂无趋势数据。完成多个测评周期后显示真实趋势。") }
+    Spacer(Modifier.height(8.dp)); BoardCard("重点关注学生", if (isHistorical) "归档说明" else "查看全部", onClick = { drillDown { nav.navigateSingleTop(Destinations.Review) } }) { if (isHistorical) Text("历史周期数据尚未同步，不展示演示统计或学生明细。", color = Color.Gray, fontSize = 12.sp) else if (useRemoteOverview && remoteOverview == null) Text("风险学生名单正在同步。", color = Color.Gray, fontSize = 12.sp) else { classStudents.filter { student -> val status = state.taskStatus(student, currentTask?.id); student.id in lowScoreStudentIds || status.name == "Review" || status.name == "Retest" }.take(3).forEach { student -> val status = state.taskStatus(student, currentTask?.id); Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics { role = Role.Button; contentDescription = "查看${student.name}报告，状态${status.label}" }.clickable { onOpenReport(student) }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) { Text("${student.name}   ${student.className}   ${status.label}", color = Navy, fontSize = 12.sp, modifier = Modifier.weight(1f)); Icon(Icons.Filled.ChevronRight, contentDescription = "查看${student.name}报告", tint = Color.Gray, modifier = Modifier.size(16.dp)) } }; if (risk == 0) Text("当前班级暂无重点风险学生", color = Color.Gray, fontSize = 12.sp) } }
     Spacer(Modifier.height(9.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedButton(onClick = {
             val report = "向上少年 · ${primaryClassName}${selectedPeriod}数据报告\\n测评完成率：$completionRate%\\n已完成：$completed / $totalStudents 人\\n待处理预警：$risk 人\\n评测标准：小学综合运动能力标准 v1.0"
@@ -645,7 +658,9 @@ fun TeacherClassBoardScreen(state: AppUiState, nav: NavHostController, onOpenRep
         data.classes.isEmpty() -> EmptyState("暂无管理班级，学校完成分班后这里会显示。")
         else -> state.managedTeacherClasses.forEach { item ->
             val classStudents = data.students.filter { it.classId == item.id }
-            val completionRate = if (classStudents.isEmpty()) item.completionRate else classStudents.count { state.taskStatus(it, data.tasks.firstOrNull()?.id) == com.xiangshang.youth.core.model.TaskStatus.Completed } * 100 / classStudents.size
+            // Student rows can be a paged directory. The class aggregate is
+            // the only authoritative completion rate in a remote session.
+            val completionRate = if (state.repositoryAcknowledged || classStudents.isEmpty()) item.completionRate else classStudents.count { state.taskStatus(it, data.tasks.firstOrNull()?.id) == com.xiangshang.youth.core.model.TaskStatus.Completed } * 100 / classStudents.size
             Surface(Modifier.fillMaxWidth().padding(vertical = 5.dp).semantics { role = Role.Button; contentDescription = "查看${item.name}学生列表，完成率${completionRate}%" }.clickable { nav.navigate("${Destinations.Students}?classId=${item.id}") }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(13.dp), verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(item.name, color = Navy, fontWeight = FontWeight.Bold); Text(item.studentCount.toString() + "人 · " + item.teacherName, fontSize = 12.sp, color = Color.Gray) }; Text(completionRate.toString() + "%", color = Green, fontWeight = FontWeight.Bold, fontSize = 18.sp) } }
         }
     }
@@ -859,14 +874,19 @@ fun TeacherTaskDetailScreen(state: AppUiState, nav: NavHostController, taskId: S
     Text("学生测评状态", color = Navy, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
     Text("点击学生按现场队列更新签到、候测、测试、复核或补测状态；不支持跨步骤直接完成。", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(vertical = 5.dp))
     when {
-        state.taskRosterRecords[task.id] == null -> LoadingState()
-        else -> state.taskRosterStudents(task.id, task).filter { student ->
-            val query = rosterSearch.trim()
-            (query.isEmpty() || student.name.contains(query, ignoreCase = true) || student.className.contains(query, ignoreCase = true)) && (rosterStatus == null || state.taskStatus(student, task.id) == rosterStatus)
-        }.forEach { student ->
-            val taskStatus = state.taskStatus(student, task.id)
-            TeacherStudentStatusRow(student, taskStatus, state.taskSyncStatus(student, task.id)) { selectedStudent = student }
-            Spacer(Modifier.height(5.dp))
+        state.repositoryAcknowledged && state.taskRosterRecords[task.id] == null -> LoadingState()
+        else -> {
+            val managedClassIds = state.managedTeacherClasses.map { it.id }.toSet()
+            state.taskRosterStudents(task.id, task).filter { student ->
+                val query = rosterSearch.trim()
+                student.classId in managedClassIds &&
+                    (query.isEmpty() || student.name.contains(query, ignoreCase = true) || student.className.contains(query, ignoreCase = true)) &&
+                    (rosterStatus == null || state.taskStatus(student, task.id) == rosterStatus)
+            }.forEach { student ->
+                val taskStatus = state.taskStatus(student, task.id)
+                TeacherStudentStatusRow(student, taskStatus, state.taskSyncStatus(student, task.id)) { selectedStudent = student }
+                Spacer(Modifier.height(5.dp))
+            }
         }
     }
     selectedStudent?.let { student ->
@@ -911,7 +931,7 @@ fun ReviewListScreen(state: AppUiState, nav: NavHostController, submitDecision: 
             student.name,
             current,
             state.local.drafts[draftKey] ?: state.taskReviewNote(student, reviewTaskId).orEmpty(),
-            state.workflowStates["task-status:${reviewTaskId ?: "unscoped"}|${student.id}"] ?: WorkflowCommandState(),
+            state.workflowStates["task-status:${reviewTaskId ?: "missing-task"}|${student.id}"] ?: WorkflowCommandState(),
             onDraftChanged = { saveDraft(draftKey, it) },
             onSubmit = { status, note -> submitStatus(student.id, status, note, reviewTaskId) },
             onSuccess = { clearDraft(draftKey); selectedStudent = null },

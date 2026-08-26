@@ -62,7 +62,7 @@ struct ReportDetailView: View {
                                 Task { await state.refreshReport(for: currentStudent) }
                             } label: {
                                 Label(state.reportLoading ? "同步中" : "同步报告", systemImage: "arrow.clockwise")
-                                    .font(.caption2.weight(.semibold))
+                                    .font(.caption.weight(.semibold))
                             }
                             .buttonStyle(.bordered)
                             .tint(.white)
@@ -70,7 +70,7 @@ struct ReportDetailView: View {
                             .accessibilityLabel(state.reportLoading ? "正在同步报告" : "同步最新体测报告")
                         }
                     }
-                    Divider().overlay(.white.opacity(0.25)); Label(report.student.region, systemImage: "mappin.and.ellipse").font(.caption).foregroundStyle(.white.opacity(0.9)); Text("测评日期：\(report.assessmentDate) · 评测标准已应用").font(.caption2).foregroundStyle(.white.opacity(0.8))
+                    Divider().overlay(.white.opacity(0.25)); Label(report.student.region, systemImage: "mappin.and.ellipse").font(.caption).foregroundStyle(.white.opacity(0.9)); Text("测评日期：\(report.assessmentDate) · 评测标准已应用").font(.caption).foregroundStyle(.white.opacity(0.8))
                 }.padding(18).background(LinearGradient(colors: [AppTheme.primary, AppTheme.teal], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 20))
                 if let reportError = state.reportError {
                     ErrorStateView(message: reportError, retry: { Task { await state.refreshReport(for: currentStudent) } }, dismiss: state.clearReportError)
@@ -100,7 +100,7 @@ struct ReportDetailView: View {
                     } else {
                         selectedDetail = "课程建议\n\(course.title)\n\(course.focus) · \(course.duration)\n\(course.isPublicBenefit ? "公益课程" : "推荐课程")"
                     }
-                } label: { HStack { Image(systemName: "play.circle.fill").font(.title2).foregroundStyle(AppTheme.teal); VStack(alignment: .leading) { Text(course.title).font(.subheadline.weight(.semibold)); Text("\(course.focus) · \(course.duration)").font(.caption).foregroundStyle(AppTheme.muted) }; Spacer(); Text(course.isPublicBenefit ? "公益" : "推荐").font(.caption2.weight(.semibold)).foregroundStyle(AppTheme.primary) }.padding(10).background(AppTheme.surface, in: RoundedRectangle(cornerRadius: 10)).accessibilityElement(children: .combine).accessibilityLabel("课程建议：\(course.title)，\(course.focus)，\(course.duration)") }.buttonStyle(.plain) } } }
+                } label: { HStack { Image(systemName: "play.circle.fill").font(.title2).foregroundStyle(AppTheme.teal); VStack(alignment: .leading) { Text(course.title).font(.subheadline.weight(.semibold)); Text("\(course.focus) · \(course.duration)").font(.caption).foregroundStyle(AppTheme.muted) }; Spacer(); Text(course.isPublicBenefit ? "公益" : "推荐").font(.caption.weight(.semibold)).foregroundStyle(AppTheme.primary) }.padding(10).background(AppTheme.surface, in: RoundedRectangle(cornerRadius: 10)).accessibilityElement(children: .combine).accessibilityLabel("课程建议：\(course.title)，\(course.focus)，\(course.duration)") }.buttonStyle(.plain) } } }
                 if let bodyRecord {
                     section("家庭身体观察（家长记录）", icon: "figure.stand") {
                         VStack(alignment: .leading, spacing: 7) {
@@ -114,17 +114,17 @@ struct ReportDetailView: View {
                                 .font(.caption).foregroundStyle(AppTheme.muted)
                             if let geneticHeight = bodyRecord.geneticHeightReference(gender: currentStudent.gender) {
                                 Text("遗传靶身高参考：\(String(format: "%.1f", geneticHeight)) cm（\(bodyRecord.geneticHeightFormula(gender: currentStudent.gender))，仅供健康管理参考）")
-                                    .font(.caption2).foregroundStyle(AppTheme.muted)
+                                    .font(.caption).foregroundStyle(AppTheme.muted)
                             }
                             if let heightAssessment = bodyRecord.heightDevelopmentAssessment(ageMonths: currentStudent.bodyAssessmentAgeMonths, gender: currentStudent.gender) {
                                 Text("当前身高发育：\(heightAssessment.level.label) · \(heightAssessment.ageYears)岁参考中位 \(String(format: "%.1f", heightAssessment.median)) cm")
-                                    .font(.caption2).foregroundStyle(AppTheme.muted)
+                                    .font(.caption).foregroundStyle(AppTheme.muted)
                             }
                             if let hint = bodyRecord.visualObservationSummary {
                                 Label(hint, systemImage: "viewfinder.circle.fill").font(.caption).foregroundStyle(.orange)
                             }
                             Text("该记录为家长居家观察与年龄别 BMI 筛查，不属于学校体测的 7 项能力得分，也不构成医学诊断。")
-                                .font(.caption2).foregroundStyle(AppTheme.muted)
+                                .font(.caption).foregroundStyle(AppTheme.muted)
                         }
                     }
                 }

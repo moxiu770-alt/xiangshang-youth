@@ -527,7 +527,7 @@ struct HealthDashboard: View {
                         ForEach(archivedCategories, id: \.self) { category in
                             let savedAt = state.familyHealthRecord(for: child, category: category).map { Self.familyRecordDateFormatter.string(from: $0.completedAt) } ?? "历史记录"
                             Button { router.push(.assessment(category)) } label: {
-                                HStack { Image(systemName: category.icon).foregroundStyle(category.color); VStack(alignment: .leading, spacing: 2) { Text("\(category.rawValue)家庭记录已保存").font(.subheadline.weight(.semibold)).foregroundStyle(ReferenceColor.navy); Text("家长填写 · \(savedAt)").font(.caption2).foregroundStyle(.secondary) }; Spacer(); Text("查看").font(.caption.weight(.semibold)).foregroundStyle(ReferenceColor.blue); Image(systemName: "chevron.right").font(.caption).foregroundStyle(ReferenceColor.blue) }
+                                HStack { Image(systemName: category.icon).foregroundStyle(category.color); VStack(alignment: .leading, spacing: 2) { Text("\(category.rawValue)家庭记录已保存").font(.subheadline.weight(.semibold)).foregroundStyle(ReferenceColor.navy); Text("家长填写 · \(savedAt)").font(.caption).foregroundStyle(.secondary) }; Spacer(); Text("查看").font(.caption.weight(.semibold)).foregroundStyle(ReferenceColor.blue); Image(systemName: "chevron.right").font(.caption).foregroundStyle(ReferenceColor.blue) }
                             }.buttonStyle(.plain)
                         }
                     }.padding(12)

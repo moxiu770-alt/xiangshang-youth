@@ -16,7 +16,6 @@ import com.xiangshang.youth.core.util.AuthIdentity
 import com.xiangshang.youth.core.service.ClassPost
 import com.xiangshang.youth.core.service.LocalFeatureState
 import com.xiangshang.youth.core.service.LocalFeatureStore
-import com.xiangshang.youth.core.service.SupportMessage
 import com.xiangshang.youth.core.service.ExpertAppointment
 import com.xiangshang.youth.core.service.ActivityRegistrationAck
 import com.xiangshang.youth.core.service.ExpertAppointmentAck
@@ -34,6 +33,7 @@ import com.xiangshang.youth.core.service.VerificationCodeRequest
 import com.xiangshang.youth.core.service.WechatExchangeRequest
 import com.xiangshang.youth.core.util.ChildBindingValidator
 import com.xiangshang.youth.core.util.BusinessClock
+import com.xiangshang.youth.BuildConfig
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,13 +42,19 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
+    /** Stable key functions live in their domain files; this companion keeps
+     * source compatibility for UI callers while the state holder stays lean. */
+    companion object {
+        fun courseProgressKey(childId: String, courseId: String, moduleId: String = "default", lessonId: String): String =
+            "course|$childId|$courseId|$moduleId|$lessonId"
+    }
     private val connectivityManager = application.getSystemService(ConnectivityManager::class.java)
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) { setOffline(false) }
         override fun onLost(network: Network) { setOffline(!hasValidatedNetwork()) }
         override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) { setOffline(!capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) }
     }
-    private val repository: YouthRepository = RepositoryProvider.create()
+    internal val repository: YouthRepository = RepositoryProvider.create()
     private val featureStore = LocalFeatureStore(application)
     private val initialLocal = featureStore.load()
     /** A logout may happen while a cold-start restore is awaiting the
@@ -56,7 +62,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
      * old account can never repopulate state after the user chose to exit. */
     private var sessionRestoreJob: Job? = null
     private var sessionGeneration = 0L
-    private val _state = MutableStateFlow(AppUiState(local = initialLocal, restoringSession = initialLocal.sessionActive, repositoryAcknowledged = repository.supportsRemoteAcknowledgement))
+    internal val _state = MutableStateFlow(AppUiState(local = initialLocal, restoringSession = initialLocal.sessionActive, repositoryAcknowledged = repository.supportsRemoteAcknowledgement))
     val state: StateFlow<AppUiState> = _state.asStateFlow()
     init {
         setOffline(!hasValidatedNetwork())
@@ -240,7 +246,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun taskRosterStudents(taskId: String, fallbackTask: TestTask? = null): List<Student> {
         val current = _state.value
-        return current.taskRosterRecords[taskId].orEmpty().map { row ->
+        val rows = current.taskRosterRecords[taskId].orEmpty()
+        if (rows.isEmpty() && !repository.supportsRemoteAcknowledgement) {
+            return fallbackTask?.scopedStudents(current.data?.students.orEmpty()).orEmpty()
+        }
+        return rows.map { row ->
             current.data?.students?.firstOrNull { it.id == row.studentId } ?: Student(
                 id = row.studentId,
                 name = row.studentName,
@@ -256,10 +266,25 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
     }
+    /**
+     * A task can span an entire school, while a teacher claim normally covers
+     * only a subset of its classes.  Keep this check close to every local
+     * mutation as well as in the screen filter: hiding a row is not enough if
+     * a stale deep link or a crafted UI event can still invoke the command.
+     */
+    private fun canManageTaskStudent(student: Student): Boolean {
+        return _state.value.isTeacherAuthorizedFor(student)
+    }
     fun submitTaskStatusBatch(taskId: String, studentIds: List<String>, status: TaskStatus, note: String? = null) = viewModelScope.launch {
         val ids = studentIds.distinct().filter { it.isNotBlank() }
         val commandKey = "task-batch:$taskId"
         if (taskId.isBlank() || ids.isEmpty() || _state.value.workflowStates[commandKey]?.isSubmitting == true) return@launch
+        val roster = taskRosterStudents(taskId, _state.value.data?.tasks?.firstOrNull { it.id == taskId })
+        val studentsById = (_state.value.data?.students.orEmpty() + roster).associateBy { it.id }
+        if (ids.any { studentId -> studentsById[studentId]?.let { canManageTaskStudent(it) } != true }) {
+            setWorkflow(commandKey, WorkflowCommandState(WorkflowCommandStatus.Failed, "只能更新已授权班级内的学生。"))
+            return@launch
+        }
         setWorkflow(commandKey, WorkflowCommandState(WorkflowCommandStatus.Submitting))
         val updates = ids.map { studentId ->
             com.xiangshang.youth.core.service.TaskStatusBatchItem(studentId, status, note, expectedVersion = _state.value.local.taskScopedStatusVersions["$taskId|$studentId"])
@@ -283,9 +308,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun loadTeacherOverview(classId: String, task: TestTask) = viewModelScope.launch {
         val profile = _state.value.profile ?: return@launch
         if (!repository.supportsRemoteAcknowledgement || profile.schoolId.isNullOrBlank()) return@launch
+        val context = TeacherOverviewContext(profile.schoolId, classId, task.id, task.ruleVersion)
+        _state.value = _state.value.copy(teacherOverview = null, teacherOverviewContext = context)
         runCatching { repository.teacherOverview(profile.schoolId, classId, task.id, task.ruleVersion) }
-            .onSuccess { overview -> _state.value = _state.value.copy(teacherOverview = overview) }
-            .onFailure { _state.value = _state.value.copy(teacherOverview = null, error = it.localizedMessage ?: "班级统计加载失败，请重试") }
+            .onSuccess { overview ->
+                if (_state.value.teacherOverviewContext == context) {
+                    _state.value = _state.value.copy(teacherOverview = overview)
+                }
+            }
+            .onFailure {
+                if (_state.value.teacherOverviewContext == context) {
+                    _state.value = _state.value.copy(teacherOverview = null, error = it.localizedMessage ?: "班级统计加载失败，请重试")
+                }
+            }
     }
     /** A mobile role is usable only when it is present in the signed-in
      * account claims. `UserRole.mobileRoles` is a product capability list,
@@ -399,6 +434,51 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         featureStore.clear()
         _state.value = AppUiState()
     }
+
+    /**
+     * Instrumentation-only identity fixture.  Public registration deliberately
+     * never creates a teacher account; UI tests that cover the teacher
+     * workbench must therefore use an explicit school-provisioned identity
+     * with the same scoped claims a server session would provide.
+     */
+    fun startSchoolProvisionedTeacherFixtureForUiTest() {
+        if (!BuildConfig.DEBUG) return
+        viewModelScope.launch {
+            val data = repository.dashboard()
+            val profile = UserProfile(
+                id = "teacher_ui_fixture",
+                name = "学校授权教师",
+                phone = "13800000001",
+                role = UserRole.Teacher,
+                schoolName = data.school.name,
+                roleCode = "teacher",
+                schoolId = data.school.id,
+                availableRoles = listOf(UserRole.Teacher),
+                authorizedClassIds = listOf("c31", "c32"),
+                capabilities = setOf(
+                    "VIEW_CLASS_DASHBOARD", "MANAGE_CLASS_STUDENTS", "VIEW_TEST_TASKS",
+                    "UPDATE_TEST_STATUS", "REVIEW_RESULT", "REQUEST_RETEST",
+                    "UPLOAD_AFTER_SCHOOL_COURSE", "PUBLISH_CLASS_NOTICE"
+                )
+            )
+            repository.configureSession(profile)
+            val local = _state.value.local.copy(
+                sessionActive = true,
+                sessionPhone = profile.phone,
+                sessionRoleName = UserRole.Teacher.name,
+                accountBucketName = UserRole.Teacher.name
+            )
+            featureStore.save(local)
+            _state.value = AppUiState(
+                profile = profile,
+                role = UserRole.Teacher,
+                data = data,
+                local = local,
+                repositoryAcknowledged = false,
+                uiTestSchoolProvisionedTeacher = true
+            )
+        }
+    }
     fun report(student: Student): DiagnosisReport = _state.value.reportOverrides[student.id] ?: repository.report(student)
     /** In remote mode, only render a report that came from ReportApi. */
     fun visibleReport(student: Student): DiagnosisReport? =
@@ -426,12 +506,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun clearReportError() { _state.value = _state.value.copy(reportError = null) }
     fun workflowState(key: String): WorkflowCommandState = _state.value.workflowStates[key] ?: WorkflowCommandState()
-    private fun setWorkflow(key: String, value: WorkflowCommandState) { _state.value = _state.value.copy(workflowStates = _state.value.workflowStates + (key to value)) }
-    private fun childWorkflowKey(prefix: String, childId: String? = _state.value.selectedChild?.id): String =
+    /** Shared by the separated notification/workflow domain files. */
+    internal fun setWorkflow(key: String, value: WorkflowCommandState) { _state.value = _state.value.copy(workflowStates = _state.value.workflowStates + (key to value)) }
+    internal fun childWorkflowKey(prefix: String, childId: String? = _state.value.selectedChild?.id): String =
         childId?.takeIf { it.isNotBlank() }?.let { "$prefix:$it" } ?: prefix
     fun clearWorkflowState(key: String) { _state.value = _state.value.copy(workflowStates = _state.value.workflowStates + (key to WorkflowCommandState())) }
 
-    private fun executeWorkflow(key: String, operation: suspend () -> Unit, onSuccess: (() -> Unit)? = null, onFailure: (() -> Unit)? = null, successMessage: (() -> String)? = null, onError: ((Throwable) -> Unit)? = null) = viewModelScope.launch {
+    internal fun executeWorkflow(key: String, operation: suspend () -> Unit, onSuccess: (() -> Unit)? = null, onFailure: (() -> Unit)? = null, successMessage: (() -> String)? = null, onError: ((Throwable) -> Unit)? = null) = viewModelScope.launch {
         val current = workflowState(key)
         if (current.isSubmitting) return@launch
         _state.value = _state.value.copy(workflowStates = _state.value.workflowStates + (key to WorkflowCommandState(WorkflowCommandStatus.Submitting)))
@@ -454,105 +535,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun submitActivityCommand(contactName: String, phone: String, activityId: String = "health-growth-season-2026") = executeWorkflow(childWorkflowKey("activity:$activityId"), {
-        if (contactName.isBlank() || phone.filter(Char::isDigit).length != 11) throw IllegalArgumentException("请填写有效的联系人和手机号。")
-        registerActivity(contactName.trim(), phone.trim(), activityId)
-        val childId = _state.value.selectedChild?.id
-        val record = _state.value.local.activityRegistrations.firstOrNull { it.activityId == activityId && (it.childId == childId || it.childId == null) } ?: throw IllegalArgumentException("报名信息不完整。")
-        val ack = if (record.registrationId == null) repository.submitActivity(record) else repository.updateActivityRegistration(record)
-        applyActivityAck(activityId, ack, if (repository.supportsRemoteAcknowledgement) LocalSubmissionStatus.Submitted else LocalSubmissionStatus.PendingSync)
-    }, onSuccess = { if (repository.supportsRemoteAcknowledgement) loadActivities() }, onFailure = { markActivitySyncFailed(activityId) })
-
-    fun submitExpertCommand(name: String, date: String, note: String, expertId: String? = null, serviceId: String? = null, slotId: String? = null, scheduledStartAt: String? = null, scheduledEndAt: String? = null) = executeWorkflow(childWorkflowKey("expert:${expertId?.takeIf { it.isNotBlank() } ?: "unresolved"}"), {
-        val stableId = expertId?.takeIf { it.isNotBlank() } ?: throw IllegalArgumentException("专家信息缺少编号，请刷新专家列表后重试。")
-        if (date.isBlank() || note.trim().isBlank()) throw IllegalArgumentException("请填写咨询时间和说明。")
-        bookExpert(name, date.trim(), note.trim(), stableId, serviceId, slotId, scheduledStartAt, scheduledEndAt)
-        val childId = _state.value.selectedChild?.id
-        val record = _state.value.local.expertAppointments.firstOrNull { it.expertId == stableId && (it.childId == childId || it.childId == null) } ?: throw IllegalArgumentException("预约信息不完整。")
-        val ack = repository.bookExpert(record)
-        applyExpertAck(stableId, ack, if (repository.supportsRemoteAcknowledgement) LocalSubmissionStatus.Submitted else LocalSubmissionStatus.PendingSync)
-    }, onSuccess = { if (repository.supportsRemoteAcknowledgement) loadExperts() }, onFailure = {
-        expertId?.takeIf { it.isNotBlank() }?.let { stableId ->
-            _state.value.local.expertAppointments.firstOrNull { it.expertId == stableId }?.let(::markExpertSyncFailed)
-        }
-    })
-
-    fun submitCourseUploadCommand(taskId: String, attendance: Int, notes: String, attachment: String, attachmentReference: String?) = executeWorkflow("course:$taskId", {
-        if (attendance <= 0 || notes.trim().isBlank() || attachment.trim().isBlank() || attachmentReference.isNullOrBlank()) throw IllegalArgumentException("提交前请补齐出勤人数、课堂记录和可上传的照片附件。")
-        saveCourseUpload(taskId, attendance, notes, attachment, attachmentReference, true)
-        val record = _state.value.local.courseUploads.firstOrNull { it.taskId == taskId } ?: throw IllegalArgumentException("课程记录不完整。")
-        repository.uploadCourse(record)
-    }, onSuccess = { updateCourseSyncStatus(taskId, if (repository.supportsRemoteAcknowledgement) LocalSubmissionStatus.Submitted else LocalSubmissionStatus.PendingSync) }, onFailure = { markCourseSyncFailed(taskId) })
-
-    fun submitPrivacyRequest(studentId: String, requestType: String) {
-        val key = "privacy:$studentId:$requestType"
-        if (_state.value.data?.students?.none { it.id == studentId } != false) {
-            _state.value = _state.value.copy(workflowStates = _state.value.workflowStates + (key to WorkflowCommandState(WorkflowCommandStatus.Failed, "未找到孩子信息，请重新选择后再试。")))
-            return
-        }
-        executeWorkflow(key, { repository.submitPrivacyRequest(studentId, requestType) }, successMessage = {
-            if (repository.supportsRemoteAcknowledgement) {
-                if (requestType == "export") "导出申请已提交，文件生成后会在消息中心通知。" else "删除申请已提交，需经学校/平台审核；审核前不会删除任何记录。"
-            } else "申请已保存到本机记录。接入学校服务后可提交审核。"
-        })
-    }
-
-    fun revokeHealthConsent(studentId: String, version: String = "v1") {
-        val key = "privacy:$studentId:consent-revoke"
-        if (_state.value.data?.students?.none { it.id == studentId } != false) {
-            _state.value = _state.value.copy(workflowStates = _state.value.workflowStates + (key to WorkflowCommandState(WorkflowCommandStatus.Failed, "未找到孩子信息，请重新选择后再试。")))
-            return
-        }
-        executeWorkflow(key, { repository.revokeHealthConsent(studentId, version) }, onSuccess = {
-            val existing = _state.value.local.healthConsents[studentId] ?: return@executeWorkflow
-            mutate { it.copy(healthConsents = it.healthConsents + (studentId to existing.copy(revokedAt = BusinessClock.format("yyyy-MM-dd'T'HH:mm:ssXXX")))) }
-        }, successMessage = {
-            if (repository.supportsRemoteAcknowledgement) "已撤回身体测评数据使用同意；新的身体测评需重新授权。" else "撤回记录已保存在本机，接入学校服务后提交。"
-        })
-    }
-
-    fun submitAccountDeletionRequest() {
-        executeWorkflow("privacy:account-deletion", { repository.submitAccountDeletionRequest() }, successMessage = {
-            if (repository.supportsRemoteAcknowledgement) "注销申请已提交，平台审核通过后会撤销会话并匿名化账户。" else "注销申请已保存到本机记录，接入学校服务后提交审核。"
-        })
-    }
-
     fun syncPendingRecords() = executeWorkflow("sync-pending", {
         if (_state.value.profile == null) throw IllegalStateException("请登录后再同步本机记录。")
         if (_state.value.isOffline) throw IllegalStateException("当前网络不可用，记录会继续保存在本机。")
         if (!repository.supportsRemoteAcknowledgement) return@executeWorkflow
-        var failed = 0
-        _state.value.local.activityRegistrations.filter { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed }.forEach { record ->
-            markActivitySyncSubmitting(record.activityId)
-            try {
-                val ack = if (record.registrationId == null) repository.submitActivity(record) else repository.updateActivityRegistration(record)
-                applyActivityAck(record.activityId, ack, LocalSubmissionStatus.Submitted)
-            } catch (error: Throwable) {
-                if (error is ApiError.Unauthorized) throw error
-                markActivitySyncFailed(record.activityId); failed += 1
-            }
-        }
-        _state.value.local.expertAppointments.filter { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed }.forEach { record ->
-            markExpertSyncSubmitting(record)
-            try {
-                val ack = repository.bookExpert(record)
-                val expertId = record.expertId ?: throw IllegalStateException("本地预约缺少专家编号，请刷新专家列表后重新预约。")
-                applyExpertAck(expertId, ack, LocalSubmissionStatus.Submitted)
-            } catch (error: Throwable) {
-                if (error is ApiError.Unauthorized) throw error
-                markExpertSyncFailed(record); failed += 1
-            }
-        }
-        _state.value.local.courseUploads.filter { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed }.forEach { record ->
-            markCourseSyncSubmitting(record.taskId)
-            try {
-                repository.uploadCourse(record)
-                markCourseSynced(record.taskId)
-            } catch (error: Throwable) {
-                if (error is ApiError.Unauthorized) throw error
-                markCourseSyncFailed(record.taskId); failed += 1
-            }
-        }
+        var failed = syncPendingSchedulingRecords() + syncPendingCourseUploads()
         _state.value.local.classPosts.filter { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed }.forEach { post ->
             updatePostSyncStatus(post.id, LocalSubmissionStatus.Submitting)
             try {
@@ -655,16 +642,22 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             val taskId = parts.firstOrNull().orEmpty()
             val studentId = parts.getOrNull(1).orEmpty()
             val status = _state.value.local.taskScopedStatuses[key]
-            if (status == null) {
+            if (taskId.isBlank() || taskId == "missing-task") {
+                // A pre-migration student-only record has no safe remote target.
+                // Leave a visible failed item for the user instead of guessing a
+                // task and contaminating another assessment's state.
+                markTaskStatusSyncFailed(studentId, taskId)
+                failed += 1
+            } else if (status == null) {
                 markTaskStatusSyncFailed(studentId, taskId)
                 failed += 1
             } else {
                 markTaskStatusSyncSubmitting(studentId, taskId)
                 val expectedVersion = _state.value.local.taskScopedStatusVersions[key]
                     ?: if (_state.value.repositoryAcknowledged) _state.value.data?.students?.firstOrNull { it.id == studentId }?.taskVersion
-                    else _state.value.local.taskStatusVersions[studentId] ?: _state.value.data?.students?.firstOrNull { it.id == studentId }?.taskVersion
+                    else _state.value.data?.students?.firstOrNull { it.id == studentId }?.taskVersion
                 try {
-                    val acknowledgedVersion = repository.updateTaskStatus(taskId, studentId, status, _state.value.local.taskScopedReviewNotes[key] ?: _state.value.local.reviewNotes[studentId], expectedVersion)
+                    val acknowledgedVersion = repository.updateTaskStatus(taskId, studentId, status, _state.value.local.taskScopedReviewNotes[key], expectedVersion)
                     acknowledgeTaskStatusVersion(studentId, taskId, acknowledgedVersion)
                     markTaskStatusSynced(studentId, taskId)
                 } catch (error: Throwable) {
@@ -677,225 +670,30 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     })
 
     fun submitTaskStatusCommand(studentId: String, status: TaskStatus, note: String?, taskId: String? = null) : Unit {
+        if (taskId.isNullOrBlank()) {
+            setWorkflow("task-status:$studentId", WorkflowCommandState(WorkflowCommandStatus.Failed, "任务信息缺失，请返回任务列表后重试。"))
+            return
+        }
         var acknowledgedVersion: Int? = null
         val key = _state.value.taskKey(taskId, studentId)
         executeWorkflow("task-status:$key", operation = {
         if (studentId.isBlank()) throw IllegalArgumentException("学生信息缺失。")
         val student = _state.value.data?.students?.firstOrNull { it.id == studentId }
             ?: throw IllegalArgumentException("未找到学生档案，请刷新名单后重试。")
+        if (!canManageTaskStudent(student)) throw ApiError.Forbidden
         val current = _state.value.taskStatus(student, taskId)
         if (!current.allowsTransitionTo(status)) throw IllegalArgumentException("当前为${current.label}，不能直接变更为${status.label}。请按现场队列流程操作。")
         val expectedVersion = _state.value.local.taskScopedStatusVersions[key]
-            ?: if (_state.value.repositoryAcknowledged) student.taskVersion else _state.value.local.taskStatusVersions[studentId] ?: student.taskVersion
+            ?: student.taskVersion
         submitReviewDecision(studentId, status, note.orEmpty().ifBlank { "已完成状态处理" }, taskId)
         markTaskStatusSyncPending(studentId, taskId)
-        acknowledgedVersion = repository.updateTaskStatus(taskId ?: "unscoped", studentId, status, note, expectedVersion)
+        acknowledgedVersion = repository.updateTaskStatus(requireNotNull(taskId), studentId, status, note, expectedVersion)
         }, onSuccess = {
             acknowledgeTaskStatusVersion(studentId, taskId, acknowledgedVersion)
             updateTaskStatusSyncStatus(studentId, taskId, if (repository.supportsRemoteAcknowledgement) LocalSubmissionStatus.Submitted else LocalSubmissionStatus.PendingSync)
         }, onFailure = { markTaskStatusSyncFailed(studentId, taskId) }, onError = { error -> if (error is ApiError.Conflict) resetTaskStatusProjectionAfterConflict(studentId, taskId) })
     }
 
-    fun submitClassPostCommand(author: String, content: String, attachments: List<com.xiangshang.youth.core.service.ClassPostAttachment> = emptyList()): Job {
-        var postIdForCommand: String? = null
-        var serverPostId: String? = null
-        val workflowKey = "post:${_state.value.profile?.id ?: "session"}"
-        return executeWorkflow(workflowKey, operation = {
-        if (content.trim().isBlank()) throw IllegalArgumentException("动态内容不能为空。")
-        postIdForCommand = publishPost(author, content.trim(), attachments)
-        val post = postIdForCommand?.let { id -> _state.value.local.classPosts.firstOrNull { it.id == id } }
-            ?: throw IllegalStateException("动态草稿保存失败，请重试。")
-        serverPostId = repository.publishClassPost(author, content.trim(), _state.value.profile?.schoolId, post.classId, attachments)
-        }, onSuccess = { postIdForCommand?.let { updatePostSyncStatus(it, if (repository.supportsRemoteAcknowledgement) LocalSubmissionStatus.Submitted else LocalSubmissionStatus.PendingSync, serverPostId) } }, onFailure = { postIdForCommand?.let { updatePostSyncStatus(it, LocalSubmissionStatus.Failed) } })
-    }
-
-    fun deleteClassPostCommand(post: ClassPost) {
-        val serverPostId = post.postId
-        if (serverPostId.isNullOrBlank()) {
-            mutate { local -> local.copy(classPosts = local.classPosts.filterNot { it.id == post.id }) }
-            return
-        }
-        executeWorkflow("class-post:delete:$serverPostId", operation = {
-            repository.deleteClassPost(serverPostId)
-        }, onSuccess = {
-            mutate { local -> local.copy(classPosts = local.classPosts.filterNot { it.id == post.id || it.postId == serverPostId }) }
-        })
-    }
-
-    fun reportClassPostCommand(post: ClassPost, reason: String = "不适合班级圈展示") {
-        val serverPostId = post.postId ?: return
-        val cleanReason = reason.trim()
-        if (cleanReason.isBlank()) return
-        executeWorkflow("class-post:report:$serverPostId", operation = {
-            repository.reportClassPost(serverPostId, cleanReason)
-        }, onSuccess = {
-            mutate { local -> local.copy(classPosts = local.classPosts.map { if (it.id == post.id || it.postId == serverPostId) it.copy(reportStatus = "reported") else it }) }
-        })
-    }
-
-    fun setClassPostPinnedCommand(post: ClassPost, pinned: Boolean) {
-        val serverPostId = post.postId ?: return
-        executeWorkflow("class-post:pin:$serverPostId", operation = {
-            repository.setClassPostPinned(serverPostId, pinned)
-        }, onSuccess = {
-            mutate { local -> local.copy(classPosts = local.classPosts.map { if (it.id == post.id || it.postId == serverPostId) it.copy(pinned = pinned) else it }) }
-        })
-    }
-
-    /** Sends a school notification through the dedicated notification contract.
-     * It deliberately does not reuse the class-circle post workflow: a notice
-     * has a target class, an auditable sender and a delivery acknowledgement. */
-    fun submitClassNoticeCommand(classId: String, title: String, content: String) = executeWorkflow("notice:$classId", operation = {
-        val profile = _state.value.profile ?: throw ApiError.Unauthorized
-        if (_state.value.role != UserRole.Teacher || !_state.value.teacherHasCapability("PUBLISH_CLASS_NOTICE")) {
-            throw ApiError.Forbidden
-        }
-        if (classId.isBlank() || classId !in _state.value.managedTeacherClasses.map { it.id }) {
-            throw ApiError.Forbidden
-        }
-        val cleanTitle = title.trim()
-        val cleanContent = content.trim()
-        if (cleanTitle.length < 2) throw IllegalArgumentException("请填写通知标题。")
-        if (cleanContent.length < 4) throw IllegalArgumentException("请填写通知内容。")
-        repository.sendClassNotice(profile.schoolId.orEmpty(), classId, cleanTitle, cleanContent)
-    })
-
-    fun loadNotificationDrafts() = viewModelScope.launch {
-        val schoolId = _state.value.profile?.schoolId.orEmpty()
-        if (schoolId.isBlank()) return@launch
-        _state.value = _state.value.copy(notificationDraftsLoading = true, notificationDraftsError = null)
-        runCatching { repository.listNotificationDrafts(schoolId) }
-            .onSuccess { drafts -> _state.value = _state.value.copy(notificationDrafts = drafts, notificationDraftsLoading = false, notificationDraftsError = null) }
-            .onFailure { error -> _state.value = _state.value.copy(notificationDraftsLoading = false, notificationDraftsError = error.localizedMessage ?: "通知草稿加载失败") }
-    }
-
-    fun saveNotificationDraft(notificationId: String?, classIds: List<String>, title: String, content: String, draftVersion: Int?, parentReceiptEnabled: Boolean, scheduledAt: String? = null, onSaved: (com.xiangshang.youth.core.service.NotificationCampaign?) -> Unit = {}) = viewModelScope.launch {
-        val profile = _state.value.profile ?: run { onSaved(null); return@launch }
-        val targets = classIds.distinct().filter { it.isNotBlank() }
-        val cleanTitle = title.trim()
-        val cleanContent = content.trim()
-        val key = "notice:draft"
-        if (targets.isEmpty() || cleanTitle.length < 2 || cleanContent.length < 4) {
-            setWorkflow(key, WorkflowCommandState(WorkflowCommandStatus.Failed, "请填写标题、正文并选择授权班级。"))
-            onSaved(null)
-            return@launch
-        }
-        setWorkflow(key, WorkflowCommandState(WorkflowCommandStatus.Submitting))
-        runCatching {
-            if (notificationId != null && draftVersion != null) repository.updateNotificationDraft(notificationId, profile.schoolId.orEmpty(), targets, cleanTitle, cleanContent, draftVersion, parentReceiptEnabled = parentReceiptEnabled, scheduledAt = scheduledAt)
-            else repository.createNotificationDraft(profile.schoolId.orEmpty(), targets, cleanTitle, cleanContent, parentReceiptEnabled = parentReceiptEnabled, scheduledAt = scheduledAt)
-        }.onSuccess { draft ->
-            _state.value = _state.value.copy(
-                notificationDrafts = listOf(draft) + _state.value.notificationDrafts.filterNot { it.notificationId == draft.notificationId },
-                workflowStates = _state.value.workflowStates + (key to WorkflowCommandState(WorkflowCommandStatus.Succeeded, "通知草稿已保存。"))
-            )
-            onSaved(draft)
-        }.onFailure { error ->
-            setWorkflow(key, WorkflowCommandState(WorkflowCommandStatus.Failed, error.localizedMessage ?: "通知草稿保存失败"))
-            onSaved(null)
-        }
-    }
-
-    fun sendNotificationDraft(notificationId: String) = executeWorkflow("notice:send:$notificationId", operation = {
-        repository.sendNotification(notificationId)
-    }, onSuccess = {
-        _state.value = _state.value.copy(notificationDrafts = _state.value.notificationDrafts.filterNot { it.notificationId == notificationId })
-    })
-
-    fun discardNotificationDraft(notificationId: String) = executeWorkflow("notice:discard:$notificationId", operation = {
-        repository.discardNotificationDraft(notificationId)
-    }, onSuccess = {
-        _state.value = _state.value.copy(notificationDrafts = _state.value.notificationDrafts.filterNot { it.notificationId == notificationId })
-    })
-
-    fun loadClassNoticeDetail(notificationId: String, onLoaded: (com.xiangshang.youth.core.service.NotificationCampaignDetail?) -> Unit = {}) = viewModelScope.launch {
-        val key = "notice:detail:$notificationId"
-        setWorkflow(key, WorkflowCommandState(WorkflowCommandStatus.Submitting))
-        runCatching { repository.loadClassNotice(notificationId) }
-            .onSuccess { detail ->
-                setWorkflow(key, WorkflowCommandState(WorkflowCommandStatus.Succeeded, "通知详情已加载。"))
-                onLoaded(detail)
-            }
-            .onFailure { error ->
-                setWorkflow(key, WorkflowCommandState(WorkflowCommandStatus.Failed, error.localizedMessage ?: "通知详情加载失败"))
-                onLoaded(null)
-            }
-    }
-
-    fun acknowledgeClassNotice(notificationId: String, onDone: (Boolean) -> Unit = {}) = executeWorkflow("notice:receipt:$notificationId", operation = {
-        repository.acknowledgeClassNotice(notificationId)
-    }, onSuccess = { onDone(true) }, onFailure = { onDone(false) }, successMessage = { "已确认收到，学校会看到回执。" })
-
-    fun submitSupportCommand(content: String) {
-        val normalized = content.trim()
-        val key = "support"
-        if (normalized.isBlank()) {
-            _state.value = _state.value.copy(workflowStates = _state.value.workflowStates + (key to WorkflowCommandState(WorkflowCommandStatus.Failed, "请输入咨询内容。")))
-            return
-        }
-        val message = createSupportMessage(normalized)
-        executeWorkflow(key, operation = { repository.sendSupportMessage(normalized) }, onSuccess = {
-            updateSupportSyncStatus(message.id, if (repository.supportsRemoteAcknowledgement) LocalSubmissionStatus.Submitted else LocalSubmissionStatus.PendingSync)
-        }, onFailure = { updateSupportSyncStatus(message.id, LocalSubmissionStatus.Failed) })
-    }
-    fun registerActivity(contactName: String, phone: String, activityId: String = "health-growth-season-2026") {
-        if (contactName.isBlank() || phone.filter(Char::isDigit).length != 11) return
-        val childId = _state.value.selectedChild?.id
-        mutate { local ->
-            val previous = local.activityRegistrations.firstOrNull { it.activityId == activityId && it.childId == childId }
-            val record = com.xiangshang.youth.core.service.ActivityRegistration(
-                id = previous?.id ?: java.util.UUID.randomUUID().toString(),
-                activityId = activityId,
-                contactName = contactName.trim(),
-                phone = phone,
-                status = LocalSubmissionStatus.PendingSync,
-                registrationId = previous?.registrationId,
-                childId = childId,
-                contactUserId = previous?.contactUserId,
-                capacity = previous?.capacity,
-                remainingCapacity = previous?.remainingCapacity,
-                registrationStartAt = previous?.registrationStartAt,
-                registrationEndAt = previous?.registrationEndAt,
-                registrationStatus = previous?.registrationStatus ?: "pending",
-                version = previous?.version
-            )
-            local.copy(activityRegistered = true, activityRegistrations = listOf(record) + local.activityRegistrations.filterNot { it.activityId == record.activityId && it.childId == childId })
-        }
-    }
-    fun cancelActivityRegistration(activityId: String = "health-growth-season-2026") {
-        val childId = _state.value.selectedChild?.id
-        mutate { local ->
-            val remaining = local.activityRegistrations.filterNot { it.activityId == activityId && (it.childId == childId || it.childId == null) }
-            local.copy(
-                activityRegistered = remaining.any { it.registrationStatus != "cancelled" },
-                activityRegistrations = remaining
-            )
-        }
-        clearDraft("activity-registration-$activityId")
-        clearWorkflowState("activity:$activityId")
-    }
-
-    /**
-     * [registrationKey] is the server registration id in remote mode, or the
-     * locally generated draft id while offline. Activity id remains only a
-     * legacy Mock fallback and is never sent to the cancel endpoint as a
-     * registration identifier.
-     */
-    fun cancelActivityRegistrationCommand(registrationKey: String) = executeWorkflow(childWorkflowKey("activity-cancel:$registrationKey"), {
-        val childId = _state.value.selectedChild?.id
-        val record = _state.value.local.activityRegistrations.firstOrNull {
-            (it.registrationId == registrationKey || it.id == registrationKey ||
-                (!repository.supportsRemoteAcknowledgement && it.activityId == registrationKey)) &&
-                (it.childId == childId || it.childId == null)
-        }
-            ?: return@executeWorkflow
-        if (repository.supportsRemoteAcknowledgement && record.registrationId != null) {
-            val ack = repository.cancelActivityRegistration(record)
-            applyActivityAck(record.activityId, ack, LocalSubmissionStatus.Submitted)
-        } else {
-            cancelActivityRegistration(record.activityId)
-        }
-    }, onSuccess = { if (repository.supportsRemoteAcknowledgement) loadActivities() })
     fun completeAssessment(category: String, entries: Map<String, String> = emptyMap(), structuredAnswers: List<com.xiangshang.youth.core.service.HealthObservationAnswer>? = null) = mutate { local ->
         val childId = _state.value.selectedChild?.id ?: "anonymous"
         val completed = local.completedAssessments + "$childId-$category"
@@ -989,211 +787,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
             .onFailure { error -> if (error is ApiError.Unauthorized) handleDashboardFailure(error) }
     }
-    fun saveBodyAssessment(student: Student, record: BodyAssessmentRecord) = mutate { local ->
-        val history = (local.bodyAssessmentHistory[student.id].orEmpty() + record).takeLast(24)
-        local.copy(bodyAssessments = local.bodyAssessments + (student.id to record), bodyAssessmentHistory = local.bodyAssessmentHistory + (student.id to history), bodyAssessmentDrafts = local.bodyAssessmentDrafts - student.id, completedAssessments = local.completedAssessments + "${student.id}-身体测评", bodyAssessmentSyncStates = local.bodyAssessmentSyncStates + (student.id to if (repository.supportsRemoteAcknowledgement) LocalSubmissionStatus.PendingSync else LocalSubmissionStatus.Submitted))
-    }.also {
-        if (repository.supportsRemoteAcknowledgement) {
-            _state.value = _state.value.copy(workflowStates = _state.value.workflowStates + ("body-assessment-${student.id}" to WorkflowCommandState(WorkflowCommandStatus.Submitting)))
-            viewModelScope.launch {
-                runCatching {
-                    val consent = _state.value.local.healthConsents[student.id]
-                        ?: throw ApiError.Client("请先完成监护人授权后再同步身体测评")
-                    if (consent.revokedAt != null) throw ApiError.Client("监护人授权已撤回，请重新确认后再同步身体测评")
-                    repository.grantHealthConsent(consent)
-                    val canonicalReport = repository.submitBodyAssessment(student.id, record, "v1")
-                    if (canonicalReport != null) {
-                        val current = _state.value.local.bodyAssessments[student.id]
-                        if (current != null) {
-                            val canonical = current.copy(postureReport = canonicalReport)
-                            val history = _state.value.local.bodyAssessmentHistory[student.id].orEmpty().toMutableList()
-                            if (history.isNotEmpty()) history[history.lastIndex] = canonical
-                            mutate { local -> local.copy(bodyAssessments = local.bodyAssessments + (student.id to canonical), bodyAssessmentHistory = local.bodyAssessmentHistory + (student.id to history)) }
-                        }
-                    }
-                }.onSuccess { updateBodyAssessmentSyncStatus(student.id, LocalSubmissionStatus.Submitted); _state.value = _state.value.copy(workflowStates = _state.value.workflowStates + ("body-assessment-${student.id}" to WorkflowCommandState(WorkflowCommandStatus.Succeeded, "测评已同步学校后台"))) }
-                    .onFailure { error ->
-                        updateBodyAssessmentSyncStatus(student.id, LocalSubmissionStatus.Failed)
-                        _state.value = _state.value.copy(workflowStates = _state.value.workflowStates + ("body-assessment-${student.id}" to WorkflowCommandState(WorkflowCommandStatus.Failed, error.localizedMessage ?: "同步失败")))
-                        if (error is ApiError.Unauthorized) handleDashboardFailure(error)
-                    }
-            }
-        }
-    }
-    fun saveBodyAssessmentDraft(student: Student, draft: BodyAssessmentDraft) = mutate { local ->
-        local.copy(bodyAssessmentDrafts = local.bodyAssessmentDrafts + (student.id to draft))
-    }
-    fun toggleBodyPlanDay(student: Student, key: String) = mutate { local -> val record = local.bodyAssessments[student.id] ?: return@mutate local; local.copy(bodyAssessments = local.bodyAssessments + (student.id to record.copy(planDays = if (key in record.planDays) record.planDays - key else record.planDays + key))) }
-    /** Progress can originate from a resumed player or a local draft; keep the
-     * persisted value valid even if a caller supplies an out-of-range value. */
-    companion object {
-        fun courseProgressKey(childId: String, courseId: String, moduleId: String = "default", lessonId: String): String = "course|$childId|$courseId|$moduleId|$lessonId"
-    }
-    fun courseProgress(childId: String, courseId: String, moduleId: String = "default", lessonId: String, legacyTitle: String? = null): Float {
-        val key = courseProgressKey(childId, courseId, moduleId, lessonId)
-        return _state.value.local.courseProgress[key] ?: legacyTitle?.let { _state.value.local.courseProgress[it] } ?: 0f
-    }
-    fun updateCourseProgress(title: String, progress: Float) = mutate {
-        it.copy(courseProgress = it.courseProgress + (title to progress.coerceIn(0f, 1f)))
-    }
-    fun updateCourseProgress(childId: String, courseId: String, moduleId: String = "default", lessonId: String, progress: Float) = mutate {
-        it.copy(courseProgress = it.courseProgress + (courseProgressKey(childId, courseId, moduleId, lessonId) to progress.coerceIn(0f, 1f)))
-    }
-    /** Remote course lists never fall back to bundled cards: an empty result is
-     * a truthful school-side assignment state. */
-    fun loadActivities() {
-        _state.value = _state.value.copy(activitiesLoading = true, activitiesError = null)
-        viewModelScope.launch {
-            runCatching { repository.activities(_state.value.selectedChild?.id) to repository.activityRegistrationHistory() }
-                .onSuccess { (activities, history) -> _state.value = _state.value.copy(activitiesLoading = false, remoteActivities = activities, activityRegistrationHistory = history) }
-                .onFailure { error ->
-                    if (error is ApiError.Unauthorized) handleDashboardFailure(error)
-                    else _state.value = _state.value.copy(activitiesLoading = false, activitiesError = error.message ?: "活动加载失败")
-                }
-        }
-    }
 
-    fun loadExperts() {
-        _state.value = _state.value.copy(expertsLoading = true, expertsError = null)
-        viewModelScope.launch {
-            runCatching { repository.experts() to repository.expertAppointmentHistory() }
-                .onSuccess { (experts, history) -> _state.value = _state.value.copy(expertsLoading = false, remoteExperts = experts, expertAppointmentHistory = history) }
-                .onFailure { error ->
-                    if (error is ApiError.Unauthorized) handleDashboardFailure(error)
-                    else _state.value = _state.value.copy(expertsLoading = false, expertsError = error.message ?: "专家加载失败")
-                }
-        }
-    }
-
-    fun loadClassPosts(cursor: String? = null) {
-        if (!repository.supportsRemoteAcknowledgement) return
-        _state.value = _state.value.copy(classPostsLoading = true, classPostsError = null)
-        viewModelScope.launch {
-            val teacherMode = _state.value.role == UserRole.Teacher
-            val selectedChildId = if (teacherMode) null else _state.value.selectedChild?.id
-            val selectedClassId = if (teacherMode) _state.value.managedTeacherClasses.firstOrNull()?.id else _state.value.selectedChild?.classId
-            runCatching { repository.loadClassPosts(_state.value.profile?.schoolId, selectedClassId, cursor) }
-                .onSuccess { page ->
-                    if (teacherMode) {
-                        if (selectedClassId != null && _state.value.managedTeacherClasses.none { it.id == selectedClassId }) return@onSuccess
-                    } else if (_state.value.selectedChild?.id != selectedChildId || _state.value.selectedChild?.classId != selectedClassId) return@onSuccess
-                    mutate { local -> local.copy(classPosts = if (cursor == null) page.posts else local.classPosts + page.posts) }
-                    _state.value = _state.value.copy(classPostsLoading = false, classPostsNextCursor = page.nextCursor)
-                }
-                .onFailure { error ->
-                    if (error is ApiError.Unauthorized) handleDashboardFailure(error)
-                    else _state.value = _state.value.copy(classPostsLoading = false, classPostsError = error.message ?: "班级圈加载失败")
-                }
-        }
-    }
-
-    fun loadClassPostAttachment(fileId: String) {
-        if (!repository.supportsRemoteAcknowledgement || fileId.isBlank() || _state.value.classPostAttachmentBytes.containsKey(fileId)) return
-        _state.value = _state.value.copy(classPostAttachmentErrors = _state.value.classPostAttachmentErrors - fileId)
-        viewModelScope.launch {
-            runCatching { repository.loadClassPostAttachment(fileId) }
-                .onSuccess { bytes -> _state.value = _state.value.copy(classPostAttachmentBytes = _state.value.classPostAttachmentBytes + (fileId to bytes)) }
-                .onFailure { error -> _state.value = _state.value.copy(classPostAttachmentErrors = _state.value.classPostAttachmentErrors + (fileId to (error.message ?: "附件暂时无法打开"))) }
-        }
-    }
-
-    fun loadExpertSlots(expertId: String) {
-        if (expertId.isBlank()) return
-        _state.value = _state.value.copy(expertSlotErrors = _state.value.expertSlotErrors - expertId)
-        viewModelScope.launch {
-            runCatching { repository.expertSlots(expertId) }
-                .onSuccess { slots -> _state.value = _state.value.copy(expertSlots = _state.value.expertSlots + (expertId to slots)) }
-                .onFailure { error ->
-                    if (error is ApiError.Unauthorized) handleDashboardFailure(error)
-                    else _state.value = _state.value.copy(expertSlotErrors = _state.value.expertSlotErrors + (expertId to (error.message ?: "时段加载失败")))
-                }
-        }
-    }
-
-    fun loadCourses(childId: String) {
-        if (!repository.supportsRemoteAcknowledgement) return
-        // Reset synchronously before dispatching I/O.  This prevents a course
-        // recommendation for a newly selected child from resolving against a
-        // previous child's catalogue during a fast child switch.
-        _state.value = _state.value.copy(coursesLoading = true, coursesError = null, remoteCourses = emptyList(), coursesChildId = childId)
-        viewModelScope.launch {
-            runCatching { repository.courses(childId) }
-            .onSuccess { courses ->
-                if (_state.value.coursesChildId == childId) _state.value = _state.value.copy(coursesLoading = false, remoteCourses = courses)
-            }
-            .onFailure { error ->
-                if (error is ApiError.Unauthorized) handleDashboardFailure(error)
-                else if (_state.value.coursesChildId == childId) _state.value = _state.value.copy(coursesLoading = false, coursesError = error.message ?: "课程加载失败")
-            }
-        }
-    }
-    fun saveRemoteLessonProgress(childId: String, lesson: com.xiangshang.youth.core.service.RemoteLesson, lastPositionMs: Int, completed: Boolean) = viewModelScope.launch {
-        if (!repository.supportsRemoteAcknowledgement) return@launch
-        runCatching { repository.saveLessonProgress(childId, lesson.lessonId, lastPositionMs, completed, lesson.version) }
-            .onSuccess { ack ->
-                val key = courseProgressKey(childId, lesson.courseId, lesson.moduleId ?: "default", lesson.lessonId)
-                mutate { it.copy(courseProgress = it.courseProgress + (key to if (ack.completed) 1f else (ack.lastPositionMs.toFloat() / lesson.durationMs.coerceAtLeast(1)).coerceIn(0f, 1f))) }
-                _state.value = _state.value.copy(remoteCourses = _state.value.remoteCourses.map { current ->
-                    if (current.lessonId == ack.lessonId) current.copy(lastPositionMs = ack.lastPositionMs, completed = ack.completed, version = ack.version) else current
-                })
-            }
-            .onFailure { if (it is ApiError.Unauthorized) handleDashboardFailure(it) }
-    }
-
-    fun openRecommendedCourse(childId: String, courseId: String?, lessonId: String?, title: String) {
-        _state.value = _state.value.copy(
-            courseRecommendationTarget = CourseRecommendationTarget(childId, courseId, lessonId, title)
-        )
-    }
-    fun openActivityTarget(activityId: String) { _state.value = _state.value.copy(pendingActivityId = activityId) }
-    fun clearActivityTarget() { _state.value = _state.value.copy(pendingActivityId = null) }
-    fun openExpertAppointmentTarget(appointmentId: String) { _state.value = _state.value.copy(pendingExpertAppointmentId = appointmentId) }
-    fun clearExpertAppointmentTarget() { _state.value = _state.value.copy(pendingExpertAppointmentId = null) }
-
-    fun clearRecommendedCourseTarget() {
-        _state.value = _state.value.copy(courseRecommendationTarget = null)
-    }
-
-    fun saveFollowAlongSession(record: FollowAlongSessionRecord) {
-        mutate { local ->
-        val history = (local.followAlongSessions + record).takeLast(90)
-        val key = "follow-along-${record.childId}"
-        val previous = local.courseProgress[key] ?: 0f
-        val dayKey = record.completedAt.take(10)
-        val updatedBody = if (record.cameraVerified) local.bodyAssessments[record.childId]?.let { it.copy(planDays = it.planDays + dayKey) } else null
-        local.copy(
-            followAlongSessions = history,
-            followAlongSyncStates = local.followAlongSyncStates + (record.id to if (repository.supportsRemoteAcknowledgement) LocalSubmissionStatus.PendingSync else LocalSubmissionStatus.Submitted),
-            courseProgress = if (record.cameraVerified) local.courseProgress + (key to maxOf(previous, record.completionRatio).coerceIn(0f, 1f)) else local.courseProgress,
-            checkedInDates = if (record.cameraVerified) local.checkedInDates + dayKey else local.checkedInDates,
-            bodyAssessments = if (updatedBody != null) local.bodyAssessments + (record.childId to updatedBody) else local.bodyAssessments
-        )
-        }
-        if (repository.supportsRemoteAcknowledgement && !_state.value.isOffline) syncFollowAlongSession(record)
-    }
-    private fun updateFollowAlongSyncStatus(sessionId: String, status: LocalSubmissionStatus) = mutate { local ->
-        local.copy(followAlongSyncStates = local.followAlongSyncStates + (sessionId to status))
-    }
-    private fun syncFollowAlongSession(record: FollowAlongSessionRecord) = viewModelScope.launch {
-        updateFollowAlongSyncStatus(record.id, LocalSubmissionStatus.Submitting)
-        try {
-            repository.submitFollowAlongSession(record)
-            updateFollowAlongSyncStatus(record.id, LocalSubmissionStatus.Submitted)
-        } catch (error: Throwable) {
-            if (error is ApiError.Unauthorized) handleDashboardFailure(error)
-            else updateFollowAlongSyncStatus(record.id, LocalSubmissionStatus.Failed)
-        }
-    }
-    /** Legacy local composer hook. New submit flows use the tracked command above. */
-    fun sendSupport(text: String) { createSupportMessage(text) }
-    private fun createSupportMessage(text: String): SupportMessage {
-        val message = SupportMessage(text = text, mine = true, status = LocalSubmissionStatus.PendingSync)
-        mutate { it.copy(supportMessages = it.supportMessages + message) }
-        return message
-    }
-    private fun updateSupportSyncStatus(id: String, status: LocalSubmissionStatus) = mutate { local ->
-        local.copy(supportMessages = local.supportMessages.map { if (it.id == id) it.copy(status = status) else it })
-    }
     fun publishPost(author: String, content: String, attachments: List<com.xiangshang.youth.core.service.ClassPostAttachment> = emptyList()): String? {
         if (content.isBlank()) return null
         val id = java.util.UUID.randomUUID().toString()
@@ -1202,7 +796,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         return id
     }
     fun updatePost(id: String, content: String) { if (content.isBlank()) return; mutate { local -> local.copy(classPosts = local.classPosts.map { if (it.id == id) it.copy(content = content, status = LocalSubmissionStatus.PendingSync) else it }) } }
-    private fun updatePostSyncStatus(id: String, status: LocalSubmissionStatus, serverPostId: String? = null) = mutate { local ->
+    internal fun updatePostSyncStatus(id: String, status: LocalSubmissionStatus, serverPostId: String? = null) = mutate { local ->
         local.copy(classPosts = local.classPosts.map { post ->
             if (post.id == id) post.copy(status = status, postId = serverPostId ?: post.postId, ownedByCurrentUser = post.ownedByCurrentUser || !serverPostId.isNullOrBlank()) else post
         })
@@ -1226,145 +820,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun saveDraft(key: String, content: String) = mutate { it.copy(drafts = it.drafts + (key to content)) }
     fun clearDraft(key: String) = mutate { it.copy(drafts = it.drafts - key) }
-    fun bookExpert(name: String, date: String, note: String, expertIdOverride: String? = null, serviceId: String? = null, slotId: String? = null, scheduledStartAt: String? = null, scheduledEndAt: String? = null) {
-        if (date.isBlank() || note.isBlank()) return
-        val expertId = expertIdOverride?.takeIf { it.isNotBlank() } ?: return
-        val childId = _state.value.selectedChild?.id
-        // An update replaces the existing local projection. This preserves
-        // idempotency without preventing a family from correcting a booking.
-        mutate { local ->
-            local.copy(expertAppointments = listOf(ExpertAppointment(expertName = name, preferredDate = date, note = note, status = LocalSubmissionStatus.PendingSync, expertId = expertId, serviceId = serviceId?.takeIf { it.isNotBlank() }, slotId = slotId?.takeIf { it.isNotBlank() }, childId = childId, appointmentStatus = "pending", scheduledStartAt = scheduledStartAt, scheduledEndAt = scheduledEndAt)) + local.expertAppointments.filterNot { it.expertId == expertId && (it.childId == childId || it.childId == null) })
-        }
-    }
-    /** Uses a server appointment id when available; expert id is data scope,
-     * not the identity of a booking. */
-    fun cancelExpertCommand(appointmentKey: String) = executeWorkflow(childWorkflowKey("expert-cancel:$appointmentKey"), {
-        val childId = _state.value.selectedChild?.id
-        val record = _state.value.local.expertAppointments.firstOrNull {
-            (it.appointmentId == appointmentKey || it.id == appointmentKey ||
-                (!repository.supportsRemoteAcknowledgement && it.expertId == appointmentKey)) &&
-                (it.childId == childId || it.childId == null)
-        } ?: return@executeWorkflow
-        if (repository.supportsRemoteAcknowledgement && record.appointmentId != null) {
-            val ack = repository.cancelExpert(record)
-            applyExpertAck(record.expertId ?: throw IllegalArgumentException("预约记录缺少专家编号，请刷新后重试。"), ack, LocalSubmissionStatus.Submitted)
-        } else {
-            mutate { local -> local.copy(expertAppointments = local.expertAppointments.filterNot { it.id == record.id }) }
-        }
-    }, onSuccess = { if (repository.supportsRemoteAcknowledgement) loadExperts() })
-
-    fun rescheduleExpertCommand(name: String, date: String, note: String, expertId: String, serviceId: String?, slotId: String?, scheduledStartAt: String?, scheduledEndAt: String?) : Unit {
-        val childId = _state.value.selectedChild?.id
-        executeWorkflow(childWorkflowKey("expert:$expertId", childId), {
-        if (slotId.isNullOrBlank()) throw IllegalArgumentException("请选择可预约时段。")
-        val existing = _state.value.local.expertAppointments.firstOrNull { it.expertId == expertId && (it.childId == childId || it.childId == null) }
-        if (existing?.appointmentId == null || !repository.supportsRemoteAcknowledgement) {
-            bookExpert(name, date, note, expertId, serviceId, slotId, scheduledStartAt, scheduledEndAt)
-            val record = _state.value.local.expertAppointments.firstOrNull { it.expertId == expertId && (it.childId == childId || it.childId == null) } ?: throw IllegalArgumentException("预约信息不完整。")
-            applyExpertAck(expertId, repository.bookExpert(record), if (repository.supportsRemoteAcknowledgement) LocalSubmissionStatus.Submitted else LocalSubmissionStatus.PendingSync)
-        } else {
-            val transport = existing.copy(expertName = name, preferredDate = date, note = note, expertId = expertId, serviceId = serviceId, slotId = slotId, scheduledStartAt = scheduledStartAt, scheduledEndAt = scheduledEndAt)
-            applyExpertAck(expertId, repository.rescheduleExpert(transport, slotId), LocalSubmissionStatus.Submitted)
-        }
-    }, onSuccess = { if (repository.supportsRemoteAcknowledgement) loadExperts() }, onFailure = {
-        _state.value.local.expertAppointments.firstOrNull { it.expertId == expertId && (it.childId == childId || it.childId == null) }?.let(::markExpertSyncFailed)
-        })
-    }
-
     private fun privacyDisplayName(value: String): String {
         val first = value.trim().firstOrNull() ?: return "本班家长"
         return "${first}同学家长"
     }
-    fun saveCourseUpload(taskId: String, attendance: Int, notes: String, attachment: String, attachmentReference: String? = null, submit: Boolean) {
-        val trimmedNotes = notes.trim()
-        val trimmedAttachment = attachment.trim()
-        if (attendance < 0 || (submit && !CourseUploadValidator.isValidForSubmission(attendance, trimmedNotes, trimmedAttachment, attachmentReference))) return
-        mutate { local ->
-            val record = CourseUploadRecord(taskId=taskId, attendanceCount=attendance, notes=trimmedNotes, attachmentName=trimmedAttachment, attachmentReference=attachmentReference, status=if (submit) LocalSubmissionStatus.PendingSync else LocalSubmissionStatus.Draft)
-            local.copy(courseUploads=listOf(record)+local.courseUploads.filterNot { it.taskId==taskId }, uploadedTaskIds=if (submit) local.uploadedTaskIds+taskId else local.uploadedTaskIds)
-        }
-    }
-    private fun applyActivityAck(activityId: String, ack: ActivityRegistrationAck, status: LocalSubmissionStatus) {
-        mutate { local ->
-            val selectedChildId = ack.childId ?: _state.value.selectedChild?.id
-            val exactRegistrationIndex = local.activityRegistrations.indexOfFirst {
-                it.activityId == activityId && it.registrationId == ack.registrationId
-            }
-            val targetIndex = if (exactRegistrationIndex >= 0) exactRegistrationIndex else {
-                local.activityRegistrations.indexOfFirst {
-                    it.activityId == activityId && (it.childId == selectedChildId || it.childId == null)
-                }
-            }
-            val projected = local.activityRegistrations.mapIndexed { index, value ->
-                if (index == targetIndex) value.copy(
-                        status = status,
-                        registrationId = ack.registrationId,
-                        childId = ack.childId ?: value.childId,
-                        contactName = ack.contactName ?: value.contactName,
-                        phone = ack.phone ?: value.phone,
-                        registrationStatus = ack.status,
-                        version = ack.version
-                    ) else value
-                }
-            local.copy(
-                activityRegistered = projected.any { it.registrationStatus != "cancelled" },
-                activityRegistrations = projected
-            )
-        }
-        _state.value = _state.value.copy(activityRegistrationHistory = listOf(ack) + _state.value.activityRegistrationHistory.filterNot { it.registrationId == ack.registrationId })
-    }
-    private fun applyExpertAck(expertId: String, ack: ExpertAppointmentAck, status: LocalSubmissionStatus) {
-        mutate { local ->
-            val targetChildId = ack.childId ?: _state.value.selectedChild?.id
-            val targetIndex = local.expertAppointments.indexOfFirst {
-                it.expertId == expertId && (it.childId == targetChildId || it.childId == null)
-            }
-            local.copy(expertAppointments = local.expertAppointments.mapIndexed { index, value ->
-                if (index == targetIndex) value.copy(
-                    status = status,
-                    appointmentId = ack.appointmentId,
-                    expertId = ack.expertId ?: value.expertId,
-                    serviceId = ack.serviceId ?: value.serviceId,
-                    slotId = ack.slotId ?: value.slotId,
-                    childId = ack.childId ?: value.childId,
-                    expertName = ack.expertName ?: value.expertName,
-                    preferredDate = ack.preferredDate ?: value.preferredDate,
-                    note = ack.note ?: value.note,
-                    appointmentStatus = ack.status,
-                    expectedVersion = ack.version,
-                    scheduledStartAt = ack.scheduledStartAt ?: value.scheduledStartAt,
-                    scheduledEndAt = ack.scheduledEndAt ?: value.scheduledEndAt
-                ) else value
-            })
-        }
-        _state.value = _state.value.copy(expertAppointmentHistory = listOf(ack) + _state.value.expertAppointmentHistory.filterNot { it.appointmentId == ack.appointmentId })
-    }
-    private fun markActivitySynced(activityId: String) = updateActivitySyncStatus(activityId, LocalSubmissionStatus.Submitted)
-    private fun markActivitySyncSubmitting(activityId: String) = updateActivitySyncStatus(activityId, LocalSubmissionStatus.Submitting)
-    private fun markActivitySyncFailed(activityId: String) = updateActivitySyncStatus(activityId, LocalSubmissionStatus.Failed)
-    private fun updateActivitySyncStatus(activityId: String, status: LocalSubmissionStatus) = mutate { local -> local.copy(activityRegistrations = local.activityRegistrations.map { if (it.activityId == activityId) it.copy(status = status) else it }) }
-    private fun markExpertSynced(record: ExpertAppointment) = updateExpertSyncStatus(record, LocalSubmissionStatus.Submitted)
-    private fun markExpertSyncSubmitting(record: ExpertAppointment) = updateExpertSyncStatus(record, LocalSubmissionStatus.Submitting)
-    private fun markExpertSyncFailed(record: ExpertAppointment) = updateExpertSyncStatus(record, LocalSubmissionStatus.Failed)
-    private fun updateExpertSyncStatus(record: ExpertAppointment, status: LocalSubmissionStatus) = mutate { local ->
-        local.copy(expertAppointments = local.expertAppointments.map { value ->
-            if (value.id == record.id) value.copy(status = status) else value
-        })
-    }
-    private fun markCourseSynced(taskId: String) = updateCourseSyncStatus(taskId, LocalSubmissionStatus.Submitted)
-    private fun markCourseSyncSubmitting(taskId: String) = updateCourseSyncStatus(taskId, LocalSubmissionStatus.Submitting)
-    private fun markCourseSyncFailed(taskId: String) = updateCourseSyncStatus(taskId, LocalSubmissionStatus.Failed)
-    private fun updateCourseSyncStatus(taskId: String, status: LocalSubmissionStatus) = mutate { local -> local.copy(courseUploads = local.courseUploads.map { if (it.taskId == taskId) it.copy(status = status) else it }) }
     private fun markTaskStatusSynced(studentId: String, taskId: String? = null) = updateTaskStatusSyncStatus(studentId, taskId, LocalSubmissionStatus.Submitted)
     private fun markTaskStatusSyncPending(studentId: String, taskId: String? = null) = updateTaskStatusSyncStatus(studentId, taskId, LocalSubmissionStatus.PendingSync)
     private fun markTaskStatusSyncSubmitting(studentId: String, taskId: String? = null) = updateTaskStatusSyncStatus(studentId, taskId, LocalSubmissionStatus.Submitting)
     private fun markTaskStatusSyncFailed(studentId: String, taskId: String? = null) = updateTaskStatusSyncStatus(studentId, taskId, LocalSubmissionStatus.Failed)
     private fun updateTaskStatusSyncStatus(studentId: String, taskId: String? = null, status: LocalSubmissionStatus) = mutate { local ->
         val key = _state.value.taskKey(taskId, studentId)
-        local.copy(
-            taskScopedSyncStates = local.taskScopedSyncStates + (key to status),
-            taskStatusSyncStates = if (_state.value.repositoryAcknowledged) local.taskStatusSyncStates else local.taskStatusSyncStates + (studentId to status)
-        )
+        local.copy(taskScopedSyncStates = local.taskScopedSyncStates + (key to status))
     }
     /** Stores the acknowledged task-row version used by the next teacher edit. */
     private fun acknowledgeTaskStatusVersion(studentId: String, taskId: String?, serverVersion: Int?) {
@@ -1377,21 +843,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         mutate { local ->
             val key = _state.value.taskKey(taskId, studentId)
             local.copy(
-                studentTaskStatuses = if (_state.value.repositoryAcknowledged) local.studentTaskStatuses else local.studentTaskStatuses - studentId,
                 taskScopedStatuses = local.taskScopedStatuses - key,
                 taskScopedStatusVersions = local.taskScopedStatusVersions - key,
-                taskScopedSyncStates = local.taskScopedSyncStates + (key to LocalSubmissionStatus.Failed),
-                taskStatusVersions = if (_state.value.repositoryAcknowledged) local.taskStatusVersions else local.taskStatusVersions - studentId,
-                taskStatusSyncStates = if (_state.value.repositoryAcknowledged) local.taskStatusSyncStates else local.taskStatusSyncStates + (studentId to LocalSubmissionStatus.Failed)
+                taskScopedSyncStates = local.taskScopedSyncStates + (key to LocalSubmissionStatus.Failed)
             )
         }
     }
-    private fun updateBodyAssessmentSyncStatus(studentId: String, status: LocalSubmissionStatus) = mutate { local -> local.copy(bodyAssessmentSyncStates = local.bodyAssessmentSyncStates + (studentId to status)) }
+    internal fun updateBodyAssessmentSyncStatus(studentId: String, status: LocalSubmissionStatus) = mutate { local -> local.copy(bodyAssessmentSyncStates = local.bodyAssessmentSyncStates + (studentId to status)) }
     fun updateStudentTaskStatus(studentId: String, status: TaskStatus, taskId: String? = null) {
         val student = _state.value.data?.students?.firstOrNull { it.id == studentId } ?: return
         val current = _state.value.taskStatus(student, taskId)
         if (!current.allowsTransitionTo(status)) return
-        mutate { local -> local.copy(taskScopedStatuses = local.taskScopedStatuses + (_state.value.taskKey(taskId, studentId) to status), studentTaskStatuses = if (_state.value.repositoryAcknowledged) local.studentTaskStatuses else local.studentTaskStatuses + (studentId to status)) }
+        mutate { local -> local.copy(taskScopedStatuses = local.taskScopedStatuses + (_state.value.taskKey(taskId, studentId) to status)) }
     }
     fun submitReviewDecision(studentId: String, status: TaskStatus, note: String, taskId: String? = null) {
         val trimmed = note.trim()
@@ -1399,7 +862,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val student = _state.value.data?.students?.firstOrNull { it.id == studentId } ?: return
         val current = _state.value.taskStatus(student, taskId)
         if (!current.allowsTransitionTo(status)) return
-        mutate { local -> local.copy(taskScopedStatuses = local.taskScopedStatuses + (_state.value.taskKey(taskId, studentId) to status), taskScopedReviewNotes = local.taskScopedReviewNotes + (_state.value.taskKey(taskId, studentId) to trimmed), studentTaskStatuses = if (_state.value.repositoryAcknowledged) local.studentTaskStatuses else local.studentTaskStatuses + (studentId to status), reviewNotes = if (_state.value.repositoryAcknowledged) local.reviewNotes else local.reviewNotes + (studentId to trimmed)) }
+        mutate { local -> local.copy(taskScopedStatuses = local.taskScopedStatuses + (_state.value.taskKey(taskId, studentId) to status), taskScopedReviewNotes = local.taskScopedReviewNotes + (_state.value.taskKey(taskId, studentId) to trimmed)) }
     }
     fun updateSettings(notificationsEnabled: Boolean? = null, reduceMotion: Boolean? = null, voiceGuidanceEnabled: Boolean? = null) = mutate { local -> local.copy(settings = local.settings.copy(notificationsEnabled = notificationsEnabled ?: local.settings.notificationsEnabled, reduceMotion = reduceMotion ?: local.settings.reduceMotion, voiceGuidanceEnabled = voiceGuidanceEnabled ?: local.settings.voiceGuidanceEnabled)) }
     /** Submission data must come from the validated upload form. */
@@ -1514,11 +977,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
-    private fun handleDashboardFailure(error: Throwable) {
+    internal fun handleDashboardFailure(error: Throwable) {
         if (error is ApiError.Unauthorized) {
             featureStore.clear()
             _state.value = AppUiState(error = error.message)
         } else _state.value = _state.value.copy(loading = false, error = error.message)
     }
-    private fun mutate(transform: (LocalFeatureState) -> LocalFeatureState) { val local = transform(_state.value.local); featureStore.save(local); _state.value = _state.value.copy(local = local) }
+    internal fun mutate(transform: (LocalFeatureState) -> LocalFeatureState) { val local = transform(_state.value.local); featureStore.save(local); _state.value = _state.value.copy(local = local) }
+    /** Narrow state seam for the remote-content domain extensions. */
+    internal fun updateRemoteTargetState(transform: (AppUiState) -> AppUiState) {
+        _state.value = transform(_state.value)
+    }
 }

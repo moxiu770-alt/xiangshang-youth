@@ -38,6 +38,14 @@ data class CourseRecommendationTarget(
     val title: String
 )
 
+/** Binds an analytics response to the selected class/task scope. */
+data class TeacherOverviewContext(
+    val schoolId: String,
+    val classId: String,
+    val taskId: String,
+    val standardVersion: String
+)
+
 /** Immutable UI snapshot kept separate from [AppViewModel]'s orchestration.
  * This gives feature-level tests a stable state contract without coupling them
  * to Android services, storage or navigation. */
@@ -59,6 +67,7 @@ data class AppUiState(
     val studentsLoadingMore: Boolean = false,
     val studentsLoadError: String? = null,
     val teacherOverview: TeacherAnalyticsOverview? = null,
+    val teacherOverviewContext: TeacherOverviewContext? = null,
     val remoteActivities: List<RemoteActivity> = emptyList(),
     val activitiesLoading: Boolean = false,
     val activitiesError: String? = null,
@@ -84,6 +93,8 @@ data class AppUiState(
     val courseRecommendationTarget: CourseRecommendationTarget? = null,
     val pendingActivityId: String? = null,
     val pendingExpertAppointmentId: String? = null,
+    /** Debug-only routing signal used by the school-provisioned UI fixture. */
+    val uiTestSchoolProvisionedTeacher: Boolean = false,
     /** Authoritative task roster rows, independent from the paged dashboard directory. */
     val taskRosterRecords: Map<String, List<TaskStudentStatusRecord>> = emptyMap()
 ) {
@@ -111,27 +122,34 @@ data class AppUiState(
             return data?.classes.orEmpty().filter { it.id in ids || (it.teacherId != null && it.teacherId == teacherId) }
         }
 
+    /** Stable teacher scope check shared by screens and write commands. */
+    fun isTeacherAuthorizedFor(student: Student): Boolean {
+        if (role != UserRole.Teacher && profile?.role != UserRole.Teacher) return false
+        val classId = student.classId ?: return false
+        return managedTeacherClasses.any { it.id == classId }
+    }
+
     fun teacherHasCapability(capability: String): Boolean {
         if (role != UserRole.Teacher && profile?.role != UserRole.Teacher) return false
         val claims = profile?.capabilities.orEmpty()
         return (claims.isEmpty() && !repositoryAcknowledged && capability == "VIEW_CLASS_DASHBOARD") || capability in claims
     }
 
-    fun taskKey(taskId: String?, studentId: String): String = "${taskId ?: "unscoped"}|$studentId"
+    fun taskKey(taskId: String?, studentId: String): String = "${taskId?.takeIf { it.isNotBlank() } ?: "missing-task"}|$studentId"
 
     fun taskStatus(student: Student, taskId: String? = null): TaskStatus {
         val key = taskKey(taskId, student.id)
-        return if (taskId != null) local.taskScopedStatuses[key] ?: student.taskStatus else local.taskScopedStatuses[key] ?: if (repositoryAcknowledged) student.taskStatus else local.studentTaskStatuses[student.id] ?: student.taskStatus
+        return local.taskScopedStatuses[key] ?: student.taskStatus
     }
 
     fun taskSyncStatus(student: Student, taskId: String? = null): LocalSubmissionStatus? {
         val key = taskKey(taskId, student.id)
-        return if (taskId != null) local.taskScopedSyncStates[key] else local.taskScopedSyncStates[key] ?: local.taskStatusSyncStates[student.id]
+        return local.taskScopedSyncStates[key]
     }
 
     fun taskReviewNote(student: Student, taskId: String? = null): String? {
         val key = taskKey(taskId, student.id)
-        return if (taskId != null) local.taskScopedReviewNotes[key] else local.taskScopedReviewNotes[key] ?: local.reviewNotes[student.id]
+        return local.taskScopedReviewNotes[key]
     }
 
     val unreadMessageCount: Int get() = if (!local.settings.notificationsEnabled) 0 else data?.messages?.count { !it.isRead && it.id !in local.readMessageIds } ?: 0
@@ -146,7 +164,7 @@ data class AppUiState(
         }
     }
 
-    val pendingSyncCount: Int get() = local.activityRegistrations.count { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed } + local.expertAppointments.count { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed } + local.courseUploads.count { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed } + local.classPosts.count { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed } + local.supportMessages.count { it.mine && (it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed) } + local.taskStatusSyncStates.values.count { it == LocalSubmissionStatus.PendingSync || it == LocalSubmissionStatus.Failed } + local.bodyAssessmentSyncStates.values.count { it == LocalSubmissionStatus.PendingSync || it == LocalSubmissionStatus.Failed } + local.followAlongSyncStates.values.count { it == LocalSubmissionStatus.PendingSync || it == LocalSubmissionStatus.Failed } + local.healthObservationSyncStates.values.count { it == LocalSubmissionStatus.PendingSync || it == LocalSubmissionStatus.Failed } + local.healthCheckinSyncStates.values.count { it == LocalSubmissionStatus.PendingSync || it == LocalSubmissionStatus.Failed }
+    val pendingSyncCount: Int get() = local.activityRegistrations.count { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed } + local.expertAppointments.count { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed } + local.courseUploads.count { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed } + local.classPosts.count { it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed } + local.supportMessages.count { it.mine && (it.status == LocalSubmissionStatus.PendingSync || it.status == LocalSubmissionStatus.Failed) } + local.taskScopedSyncStates.values.count { it == LocalSubmissionStatus.PendingSync || it == LocalSubmissionStatus.Failed } + local.bodyAssessmentSyncStates.values.count { it == LocalSubmissionStatus.PendingSync || it == LocalSubmissionStatus.Failed } + local.followAlongSyncStates.values.count { it == LocalSubmissionStatus.PendingSync || it == LocalSubmissionStatus.Failed } + local.healthObservationSyncStates.values.count { it == LocalSubmissionStatus.PendingSync || it == LocalSubmissionStatus.Failed } + local.healthCheckinSyncStates.values.count { it == LocalSubmissionStatus.PendingSync || it == LocalSubmissionStatus.Failed }
 
     fun hasPublishedSchoolReport(student: Student): Boolean {
         val status = data?.tasks?.firstOrNull()?.let { taskStatus(student, it.id) } ?: taskStatus(student)

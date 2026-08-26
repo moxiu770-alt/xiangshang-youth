@@ -90,6 +90,12 @@ class MainActivity : ComponentActivity() {
         if (::appViewModel.isInitialized) appViewModel.logout()
     }
 
+    /** Explicit teacher fixture for instrumentation. It is never exposed by
+     * public registration or production navigation. */
+    fun startSchoolProvisionedTeacherFixtureForUiTest() {
+        if (::appViewModel.isInitialized) appViewModel.startSchoolProvisionedTeacherFixtureForUiTest()
+    }
+
     private fun preloadPostureCaptureProfiles() {
         runCatching {
             assets.open("body_pose_capture_profiles.json").bufferedReader().use { reader ->

@@ -95,12 +95,12 @@ struct RootView: View {
                     Image(systemName: "internaldrive.trianglebadge.exclamationmark")
                         .foregroundStyle(.red)
                     Text(persistenceError)
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(ReferenceColor.navy)
                         .lineLimit(2)
                     Button { state.clearLocalPersistenceError() } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.system(size: 12, weight: .bold))
                             .frame(width: 28, height: 28)
                     }
                     .accessibilityLabel("关闭本机保存受限提示")
@@ -126,7 +126,7 @@ struct RootView: View {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small).tint(ReferenceColor.blue)
                     Text("正在刷新数据")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(ReferenceColor.navy)
                 }
                 .padding(.horizontal, 14)
@@ -173,7 +173,7 @@ struct RootView: View {
                         state.error = nil
                     } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(.secondary)
                             .frame(width: 24, height: 24)
                     }

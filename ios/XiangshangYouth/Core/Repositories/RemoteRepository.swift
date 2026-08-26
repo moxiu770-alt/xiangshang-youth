@@ -153,10 +153,8 @@ final class RemoteRepository: YouthRepository {
     func retryNotification(notificationID: String) async throws -> NotificationCampaignReceipt { try await notificationCampaignApi.retry(notificationID: notificationID) }
     func discardNotificationDraft(notificationID: String) async throws { try await notificationCampaignApi.discard(notificationID: notificationID) }
     func sendClassNotice(schoolID: String, classID: String, title: String, content: String) async throws -> NotificationCampaignReceipt { try await notificationCampaignApi.send(schoolID: schoolID, classID: classID, title: title, content: content) }
-    func updateTaskStatus(studentID: String, status: TaskStatus, note: String?, expectedVersion: Int?) async throws -> Int? {
-        try await workflowApi.updateTaskStatus(studentID: studentID, status: status, note: note, expectedVersion: expectedVersion)
-    }
     func updateTaskStatus(taskID: String, studentID: String, status: TaskStatus, note: String?, expectedVersion: Int?) async throws -> Int? {
+        guard !taskID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, taskID != "unscoped" else { throw ApiError.message("任务编号缺失，无法更新学生测评状态") }
         let operationID = UUID().uuidString
         return try await taskApi.updateStatus(taskID: taskID, studentID: studentID, status: status, note: note, expectedVersion: expectedVersion, clientOperationID: operationID)
     }

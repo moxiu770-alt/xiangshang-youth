@@ -100,9 +100,6 @@ interface WorkflowApi {
     @POST("v1/courses/uploads")
     suspend fun uploadCourse(@Body body: CourseUploadRequest): ApiEnvelope<WriteAck>
 
-    @PATCH("v1/students/{studentId}/task-status")
-    suspend fun updateTaskStatus(@Path("studentId") studentId: String, @Body body: WorkflowTaskStatusRequest): ApiEnvelope<WriteAck>
-
     @POST("v1/class-posts")
     suspend fun publishClassPost(@Body body: ClassPostRequest): ApiEnvelope<WriteAck>
 
@@ -337,7 +334,6 @@ data class RemoteHealthObservationAnswer(
     val note: String? = null,
     val required: Boolean = true
 )
-data class WorkflowTaskStatusRequest(val status: TaskStatus, val note: String? = null, val expectedVersion: Int? = null)
 data class ClassPostRequest(
     val author: String,
     val content: String,

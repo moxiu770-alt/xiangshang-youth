@@ -28,6 +28,11 @@ import { handleActivityRoutes } from './routes/activities.js';
 import { handleExpertAppointmentRoutes } from './routes/expertAppointments.js';
 import { handleClassPostRoutes } from './routes/classPosts.js';
 import { handleFamilyHealthRoutes } from './routes/familyHealth.js';
+import { handleCourseRoutes } from './routes/courses.js';
+import { handleNotificationRoutes } from './routes/notifications.js';
+import { handlePrivacyRoutes } from './routes/privacy.js';
+import { handleMessageRoutes } from './routes/messages.js';
+import { handleSupportRoutes } from './routes/support.js';
 
 const { port, isProduction, accessTokenTtlMinutes, refreshTokenTtlDays, maxSessionsPerUser, mfaEncryptionKey, verificationCodePepper, requireMfaForPrivileged, auditLogSigningKey, requireHealthConsent, healthRetentionDays, allowPublicRegistration, smsWebhookUrl, smsWebhookAuthorization, wechatAppId, wechatAppSecret, wechatRedirectUri, oauthStateTtlSeconds, corsOrigin, trustProxy, metricsToken, jobWorkerEnabled, jobWorkerMode, jobWorkerIntervalMs, jobWorkerShutdownTimeoutMs, fieldDeviceKeyTtlDays, fieldDeviceSigningEncryptionKey, fieldDeviceSignedRequestsRequired, fieldDeviceSignatureMaxAgeSeconds, fieldEvidenceVideoRetentionDays, fieldEvidenceDerivedRetentionDays, workerHeartbeatMaxAgeSeconds, backupEnabled, backupIntervalSeconds, backupHeartbeatMaxAgeSeconds } = config;
 assertServerRuntimeConfig();
@@ -3601,243 +3606,15 @@ async function handle(req, res) {
       await audit(user, req, `operation.${type}.status`, type, id, row, { ...updated.rows[0], note: input.note || '' }, schoolId);
       return okIdempotently(res, user, idempotency, { ...updated.rows[0], ...(jobId ? { jobId } : {}) });
     }
-    if (req.method === 'GET' && url.pathname === '/v1/admin/notifications/campaigns') {
-      if (!hasRole(user, 'admin', 'principal')) return fail(res, 403, 'NO_PERMISSION', '无权查看通知批次');
-      const schoolId = queryValue(url, 'schoolId') || user.roles.find((role) => role.school_id)?.school_id;
-      if (!schoolId || !schoolAllowed(user, schoolId)) return fail(res, 403, 'NO_PERMISSION', '无权访问该学校');
-      const result = await query(`SELECT id,school_id AS "schoolId",title,content,audience_type AS "audienceType",audience_filter AS "audienceFilter",channel,status,sent_count AS "sentCount",failed_count AS "failedCount",created_at AS "createdAt",sent_at AS "sentAt" FROM notification_campaigns WHERE school_id=$1 ORDER BY created_at DESC LIMIT 100`, [schoolId]);
-      return ok(res, result.rows);
-    }
-    if (req.method === 'GET' && url.pathname === '/v1/classes/notifications/drafts') {
-      if (!hasRole(user, 'teacher')) return fail(res, 403, 'NO_PERMISSION', '只有教师可以查看班级通知草稿');
-      const schoolId = queryValue(url, 'schoolId') || user.roles.find((role) => role.school_id)?.school_id;
-      if (!schoolId || !schoolAllowed(user, schoolId) || !await userHasCapability(user, 'PUBLISH_CLASS_NOTICE', schoolId, null)) return fail(res, 403, 'CAPABILITY_DENIED', '当前账号无发布班级通知权限');
-      const result = await query(`SELECT id AS "notificationId",school_id AS "schoolId",created_by AS "senderTeacherId",title,content,
-        COALESCE(audience_filter->'targetClassIds', audience_filter->'classIds', CASE WHEN audience_filter ? 'classId' THEN jsonb_build_array(audience_filter->>'classId') ELSE '[]'::jsonb END) AS "targetClassIds",
-        COALESCE(audience_filter->>'recipientScope', audience_type) AS "recipientScope",
-        audience_filter AS "audienceFilter",scheduled_at AS "scheduledAt",status,draft_version AS "draftVersion",created_at AS "createdAt",sent_at AS "sentAt",failure_reason AS "failureReason",parent_receipt_enabled AS "parentReceiptEnabled"
-        FROM notification_campaigns WHERE school_id=$1 AND created_by=$2 AND status='draft' ORDER BY created_at DESC LIMIT 100`, [schoolId, user.id]);
-      return ok(res, result.rows);
-    }
-    if (req.method === 'GET' && /^\/v1\/classes\/notifications\/[^/]+$/.test(url.pathname)) {
-      const notificationId = url.pathname.split('/').pop();
-      const result = await query(`SELECT nc.id AS "notificationId",nc.school_id AS "schoolId",nc.created_by AS "senderTeacherId",nc.title,nc.content,
-          COALESCE(nc.audience_filter->'targetClassIds', nc.audience_filter->'classIds', CASE WHEN nc.audience_filter ? 'classId' THEN jsonb_build_array(nc.audience_filter->>'classId') ELSE '[]'::jsonb END) AS "targetClassIds",
-          COALESCE(nc.audience_filter->>'recipientScope', nc.audience_type) AS "recipientScope",
-          nc.status,nc.draft_version AS "draftVersion",nc.scheduled_at AS "scheduledAt",nc.sent_at AS "sentAt",nc.failure_reason AS "failureReason",nc.parent_receipt_enabled AS "parentReceiptEnabled",
-          nr.status AS "userReceiptStatus",nr.acknowledged_at AS "acknowledgedAt",
-          COALESCE((SELECT json_build_object(
-            'pending', COUNT(*) FILTER (WHERE status='pending')::int,
-            'acknowledged', COUNT(*) FILTER (WHERE status='acknowledged')::int,
-            'total', COUNT(*)::int
-          ) FROM notification_receipts WHERE campaign_id=nc.id),'{"pending":0,"acknowledged":0,"total":0}'::json) AS "receiptStats"
-        FROM notification_campaigns nc
-        LEFT JOIN notification_receipts nr ON nr.campaign_id=nc.id AND nr.receiver_user_id=$2
-        WHERE nc.id=$1`, [notificationId, user.id]);
-      const row = result.rows[0];
-      if (!row || !schoolAllowed(user, row.schoolId)) return fail(res, 404, 'NOTIFICATION_NOT_FOUND', '通知不存在或无权访问');
-      const classIds = Array.isArray(row.targetClassIds) ? row.targetClassIds.map(String) : [];
-      if (teacherOnly(user) && row.senderTeacherId !== user.id && !classIds.some((classId) => teacherClassIds(user, row.schoolId).includes(classId))) return fail(res, 404, 'NOTIFICATION_NOT_FOUND', '通知不存在或无权访问');
-      if (parentOnly(user)) {
-        const delivered = await query('SELECT 1 FROM messages WHERE receiver_user_id=$1 AND business_route=$2 AND business_id=$3 LIMIT 1', [user.id, 'classNotice', notificationId]);
-        if (!delivered.rowCount) return fail(res, 404, 'NOTIFICATION_NOT_FOUND', '通知不存在或无权访问');
-        delete row.receiptStats;
-      }
-      return ok(res, row);
-    }
-    if (req.method === 'POST' && /^\/v1\/classes\/notifications\/[^/]+\/receipt$/.test(url.pathname)) {
-      if (!hasRole(user, 'parent')) return fail(res, 403, 'NO_PERMISSION', '只有家长可以确认通知回执');
-      const notificationId = url.pathname.split('/').at(-2);
-      const campaign = await query('SELECT * FROM notification_campaigns WHERE id=$1', [notificationId]);
-      const row = campaign.rows[0];
-      if (!row || !schoolAllowed(user, row.school_id)) return fail(res, 404, 'NOTIFICATION_NOT_FOUND', '通知不存在或无权访问');
-      if (!row.parent_receipt_enabled) return fail(res, 409, 'RECEIPT_NOT_REQUIRED', '该通知不需要家长确认回执');
-      const delivered = await query('SELECT 1 FROM messages WHERE receiver_user_id=$1 AND business_route=$2 AND business_id=$3 LIMIT 1', [user.id, 'classNotice', notificationId]);
-      if (!delivered.rowCount) return fail(res, 404, 'NOTIFICATION_NOT_FOUND', '通知不存在或无权访问');
-      const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ notificationId, action: 'acknowledge' }));
-      if (idempotency === false) return;
-      const updated = await query(`INSERT INTO notification_receipts(campaign_id,receiver_user_id,status,acknowledged_at)
-        VALUES($1,$2,'acknowledged',now())
-        ON CONFLICT(campaign_id,receiver_user_id) DO UPDATE SET
-          status='acknowledged',
-          acknowledged_at=COALESCE(notification_receipts.acknowledged_at,now()),
-          version=notification_receipts.version + CASE WHEN notification_receipts.status='acknowledged' THEN 0 ELSE 1 END,
-          updated_at=now()
-        RETURNING id,campaign_id AS "notificationId",receiver_user_id AS "receiverUserId",status,acknowledged_at AS "acknowledgedAt",version`, [notificationId, user.id]);
-      await audit(user, req, 'notification.receipt.acknowledge', 'notification_receipt', updated.rows[0].id, null, updated.rows[0], row.school_id);
-      return okIdempotently(res, user, idempotency, updated.rows[0]);
-    }
-    if (req.method === 'PUT' && /^\/v1\/classes\/notifications\/[^/]+$/.test(url.pathname)) {
-      if (!hasRole(user, 'teacher')) return fail(res, 403, 'NO_PERMISSION', '只有教师可以编辑班级通知');
-      const notificationId = url.pathname.split('/').pop();
-      const input = await body(req);
-      const existing = await query('SELECT * FROM notification_campaigns WHERE id=$1', [notificationId]);
-      const row = existing.rows[0];
-      const classIds = noticeClassIds(input);
-      const fallbackClassIds = noticeClassIds(row?.audience_filter || {});
-      if (!row || row.created_by !== user.id || !schoolAllowed(user, row.school_id)) return fail(res, 404, 'NOTIFICATION_NOT_FOUND', '通知草稿不存在或无权编辑');
-      const capabilityClassIds = classIds.length ? classIds : fallbackClassIds;
-      for (const classId of capabilityClassIds) {
-        if (!await userHasCapability(user, 'PUBLISH_CLASS_NOTICE', row.school_id, classId)) return fail(res, 404, 'NOTIFICATION_NOT_FOUND', '通知草稿不存在或无权编辑');
-      }
-      if (row.status !== 'draft') return fail(res, 409, 'NOTIFICATION_NOT_EDITABLE', '已发送通知不能继续编辑');
-      if (Number.isInteger(input.draftVersion) && Number(row.draft_version) !== Number(input.draftVersion)) return fail(res, 409, 'VERSION_CONFLICT', '通知草稿已被更新，请刷新后继续编辑');
-      if (!input.title || !input.content || !classIds.length) return fail(res, 400, 'INVALID_ARGUMENT', '通知标题、正文和接收班级不能为空');
-      const allowedClassIds = teacherClassIds(user, row.school_id);
-      if (!classIds.every((classId) => allowedClassIds.includes(classId))) return fail(res, 403, 'TEACHER_CLASS_SCOPE_INVALID', '教师只能向本人管理的班级发送通知');
-      const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ notificationId, ...input }));
-      if (idempotency === false) return;
-      const audienceFilter = { ...input, classId: classIds[0], classIds, targetClassIds: classIds, recipientScope: input.recipientScope || 'class' };
-      const updated = await query(`UPDATE notification_campaigns SET title=$1,content=$2,audience_type='class',audience_filter=$3,scheduled_at=$4,draft_version=draft_version+1,parent_receipt_enabled=COALESCE($5,parent_receipt_enabled),updated_at=now() WHERE id=$6 RETURNING id AS "notificationId",school_id AS "schoolId",created_by AS "senderTeacherId",title,content,COALESCE(audience_filter->'targetClassIds', audience_filter->'classIds') AS "targetClassIds",COALESCE(audience_filter->>'recipientScope', audience_type) AS "recipientScope",status,draft_version AS "draftVersion",scheduled_at AS "scheduledAt",sent_at AS "sentAt",failure_reason AS "failureReason",parent_receipt_enabled AS "parentReceiptEnabled"`, [input.title, input.content, audienceFilter, input.scheduledAt || null, input.parentReceiptEnabled, notificationId]);
-      await audit(user, req, 'notification.draft.update', 'notification_campaign', notificationId, row, updated.rows[0], row.school_id);
-      return okIdempotently(res, user, idempotency, updated.rows[0]);
-    }
-    if (req.method === 'DELETE' && /^\/v1\/classes\/notifications\/[^/]+$/.test(url.pathname)) {
-      if (!hasRole(user, 'teacher')) return fail(res, 403, 'NO_PERMISSION', '只有教师可以删除班级通知草稿');
-      const notificationId = url.pathname.split('/').pop();
-      const existing = await query('SELECT * FROM notification_campaigns WHERE id=$1', [notificationId]);
-      const row = existing.rows[0];
-      if (!row || row.created_by !== user.id || row.status !== 'draft' || !schoolAllowed(user, row.school_id)) return fail(res, 404, 'NOTIFICATION_NOT_FOUND', '通知草稿不存在或无权删除');
-      const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ notificationId, action: 'discard' }));
-      if (idempotency === false) return;
-      await query('DELETE FROM notification_campaigns WHERE id=$1 AND status=$2', [notificationId, 'draft']);
-      await audit(user, req, 'notification.draft.discard', 'notification_campaign', notificationId, row, null, row.school_id);
-      return okIdempotently(res, user, idempotency, { notificationId, status: 'discarded' });
-    }
-    const draftAction = url.pathname.match(/^\/v1\/classes\/notifications\/([^/]+)\/(send|retry)$/);
-    if (req.method === 'POST' && draftAction) {
-      const draft = await query('SELECT * FROM notification_campaigns WHERE id=$1', [draftAction[1]]);
-      if (!draft.rowCount || !schoolAllowed(user, draft.rows[0].school_id) || draft.rows[0].created_by !== user.id) return fail(res, 404, 'NOTIFICATION_NOT_FOUND', '通知草稿不存在或无权发送');
-      const scopedClassIds = noticeClassIds(draft.rows[0].audience_filter);
-      if (!scopedClassIds.length) return fail(res, 400, 'INVALID_ARGUMENT', '通知草稿缺少接收班级');
-      if (teacherOnly(user)) {
-        const allowedClassIds = teacherClassIds(user, draft.rows[0].school_id);
-        if (!scopedClassIds.every((classId) => allowedClassIds.includes(classId))) return fail(res, 403, 'TEACHER_CLASS_SCOPE_INVALID', '教师只能向本人管理的班级发送通知');
-        for (const classId of scopedClassIds) {
-          if (!await userHasCapability(user, 'PUBLISH_CLASS_NOTICE', draft.rows[0].school_id, classId)) return fail(res, 403, 'CAPABILITY_DENIED', '当前账号无发布班级通知权限');
-        }
-      }
-      if (draftAction[2] === 'send' && draft.rows[0].status !== 'draft') return fail(res, 409, 'NOTIFICATION_ALREADY_SENT', '通知已经发送');
-      if (draftAction[2] === 'retry' && draft.rows[0].status !== 'failed') return fail(res, 409, 'NOTIFICATION_NOT_RETRYABLE', '当前通知不需要重试');
-    }
-    if (req.method === 'POST' && (url.pathname === '/v1/admin/notifications/campaigns' || url.pathname === '/v1/classes/notifications' || draftAction)) {
-      if (!hasRole(user, 'admin', 'principal', 'teacher')) return fail(res, 403, 'NO_PERMISSION', '无权发送学校通知');
-      const draft = draftAction ? (await query('SELECT * FROM notification_campaigns WHERE id=$1', [draftAction[1]])).rows[0] : null;
-      const input = draft ? { ...(draft.audience_filter || {}), schoolId: draft.school_id, title: draft.title, content: draft.content, audienceType: draft.audience_type, channel: draft.channel, parentReceiptEnabled: draft.parent_receipt_enabled } : await body(req);
-      if (!input.title || !input.content) return fail(res, 400, 'INVALID_ARGUMENT', '通知标题和内容不能为空');
-      const schoolId = input.schoolId || user.roles.find((role) => role.school_id)?.school_id;
-      if (!schoolId || !schoolAllowed(user, schoolId)) return fail(res, 403, 'NO_PERMISSION', '无权向该学校发送通知');
-      const classIds = noticeClassIds(input);
-      if (teacherOnly(user)) {
-        for (const classId of classIds) {
-          if (!await userHasCapability(user, 'PUBLISH_CLASS_NOTICE', schoolId, classId)) return fail(res, 403, 'CAPABILITY_DENIED', '当前账号无发布班级通知权限');
-        }
-      }
-      const audienceType = ['school', 'grade', 'class', 'users'].includes(input.audienceType) ? input.audienceType : 'school';
-      if (teacherOnly(user) && audienceType !== 'class') return fail(res, 403, 'TEACHER_AUDIENCE_SCOPE_INVALID', '教师通知仅允许发送给本人管理的班级');
-      if (audienceType === 'grade' && !input.gradeId) return fail(res, 400, 'INVALID_ARGUMENT', '指定年级发送通知时必须提供 gradeId');
-      if (audienceType === 'class' && !classIds.length) return fail(res, 400, 'INVALID_ARGUMENT', '指定班级发送通知时必须提供 classId');
-      if (audienceType === 'users' && (!Array.isArray(input.userIds) || !input.userIds.length)) return fail(res, 400, 'INVALID_ARGUMENT', '指定用户发送通知时必须提供 userIds');
-      if (audienceType === 'grade' && !(await query('SELECT 1 FROM grades WHERE id=$1 AND school_id=$2', [input.gradeId, schoolId])).rowCount) return fail(res, 400, 'GRADE_SCOPE_INVALID', '年级不属于该学校');
-      if (audienceType === 'class') {
-        const classScope = await query('SELECT id FROM classes WHERE school_id=$1 AND id=ANY($2)', [schoolId, classIds]);
-        if (classScope.rowCount !== classIds.length) return fail(res, 400, 'CLASS_SCOPE_INVALID', '班级不属于该学校');
-      }
-      if (teacherOnly(user) && !classIds.every((classId) => teacherClassIds(user, schoolId).includes(classId))) return fail(res, 403, 'TEACHER_CLASS_SCOPE_INVALID', '教师只能向本人管理的班级发送通知');
-      const channel = input.channel || 'in_app';
-      if (!['in_app', 'push', 'sms', 'wechat'].includes(channel)) return fail(res, 400, 'INVALID_ARGUMENT', '通知渠道不支持');
-      if (channel !== 'in_app') return fail(res, 503, 'DELIVERY_PROVIDER_NOT_CONFIGURED', '当前环境尚未配置短信、微信或推送服务商');
-      if (input.status === 'draft') {
-        const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ ...input, status: 'draft' }));
-        if (idempotency === false) return;
-        const audienceFilter = { ...input, classId: classIds[0], classIds, targetClassIds: classIds, recipientScope: input.recipientScope || audienceType };
-        const draft = await query(`INSERT INTO notification_campaigns(school_id,created_by,sender_teacher_id,title,content,audience_type,audience_filter,channel,status,draft_version,scheduled_at,parent_receipt_enabled,idempotency_key) VALUES($1,$2,$2,$3,$4,$5,$6,$7,'draft',1,$8,$9,$10) RETURNING id AS "notificationId",school_id AS "schoolId",created_by AS "senderTeacherId",title,content,COALESCE(audience_filter->'targetClassIds', audience_filter->'classIds') AS "targetClassIds",COALESCE(audience_filter->>'recipientScope', audience_type) AS "recipientScope",status,draft_version AS "draftVersion",scheduled_at AS "scheduledAt",sent_at AS "sentAt",failure_reason AS "failureReason",parent_receipt_enabled AS "parentReceiptEnabled"`, [schoolId, user.id, input.title, input.content, audienceType, audienceFilter, channel, input.scheduledAt || null, input.parentReceiptEnabled === true, req.headers['idempotency-key'] || null]);
-        await audit(user, req, 'notification.draft.create', 'notification_campaign', draft.rows[0].notificationId, null, draft.rows[0], schoolId);
-        return createdIdempotently(res, user, idempotency, draft.rows[0]);
-      }
-      let audience;
-      if (audienceType === 'users') {
-        const ids = Array.isArray(input.userIds) ? input.userIds : [];
-        audience = await query(`SELECT DISTINCT u.id FROM users u JOIN user_roles ur ON ur.user_id=u.id WHERE ur.school_id=$1 AND u.id=ANY($2)`, [schoolId, ids]);
-      } else if (audienceType === 'grade') {
-        audience = await query(`SELECT DISTINCT u.id FROM users u JOIN user_roles ur ON ur.user_id=u.id WHERE ur.school_id=$1 UNION SELECT DISTINCT pb.parent_user_id FROM parent_student_bindings pb JOIN students st ON st.id=pb.student_id WHERE st.school_id=$1 AND st.grade_id=$2`, [schoolId, input.gradeId]);
-      } else if (audienceType === 'class') {
-        audience = await query(`SELECT DISTINCT u.id FROM users u JOIN user_roles ur ON ur.user_id=u.id WHERE ur.school_id=$1 AND ur.class_id=ANY($2)
-          UNION SELECT DISTINCT pb.parent_user_id FROM parent_student_bindings pb JOIN students st ON st.id=pb.student_id WHERE st.school_id=$1 AND st.class_id=ANY($2)`, [schoolId, classIds]);
-      } else {
-        audience = await query(`SELECT DISTINCT u.id FROM users u JOIN user_roles ur ON ur.user_id=u.id WHERE ur.school_id=$1 UNION SELECT DISTINCT pb.parent_user_id FROM parent_student_bindings pb JOIN students st ON st.id=pb.student_id WHERE st.school_id=$1`, [schoolId]);
-      }
-      const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash(input));
-      if (idempotency === false) return;
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
-        const audienceFilter = { ...input, classId: classIds[0], classIds, targetClassIds: classIds, recipientScope: input.recipientScope || audienceType };
-        const campaign = draft
-          ? await client.query(`UPDATE notification_campaigns SET status='sent',failure_reason=NULL,sent_at=now(),updated_at=now() WHERE id=$1 RETURNING id,title,status`, [draft.id])
-          : await client.query(`INSERT INTO notification_campaigns(school_id,created_by,title,content,audience_type,audience_filter,channel,status,sender_teacher_id,parent_receipt_enabled,idempotency_key) VALUES($1,$2,$3,$4,$5,$6,$7,'sent',$2,$8,$9) RETURNING id,title,status`, [schoolId, user.id, input.title, input.content, audienceType, audienceFilter, channel, input.parentReceiptEnabled === true, req.headers['idempotency-key'] || null]);
-        for (const receiver of audience.rows) {
-          await client.query(`INSERT INTO notification_deliveries(campaign_id,receiver_user_id,channel,status,delivered_at) VALUES($1,$2,$3,'sent',now()) ON CONFLICT DO NOTHING`, [campaign.rows[0].id, receiver.id, channel]);
-          await client.query(`INSERT INTO messages(receiver_user_id,title,content,category,message_type,business_id,business_route,action_label,expires_at) VALUES($1,$2,$3,'campaign','classNotice',$4,'classNotice','查看通知',NULL)`, [receiver.id, input.title, input.content, campaign.rows[0].id]);
-          if (input.parentReceiptEnabled === true) {
-            await client.query(`INSERT INTO notification_receipts(campaign_id,receiver_user_id,status)
-              SELECT $1,$2,'pending'
-              WHERE EXISTS (
-                SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.role_id
-                WHERE ur.user_id=$2 AND r.code='parent'
-              )
-              ON CONFLICT(campaign_id,receiver_user_id) DO NOTHING`, [campaign.rows[0].id, receiver.id]);
-          }
-        }
-        await client.query(`UPDATE notification_campaigns SET sent_count=$1,sent_at=now() WHERE id=$2`, [audience.rowCount, campaign.rows[0].id]);
-        await client.query('COMMIT');
-        await audit(user, req, 'notification.campaign.send', 'notification_campaign', campaign.rows[0].id, null, { audienceType, sentCount: audience.rowCount }, schoolId);
-        return createdIdempotently(res, user, idempotency, { ...campaign.rows[0], sentCount: audience.rowCount, channel });
-      } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
-    }
-    if (req.method === 'GET' && parts[0] === 'v1' && parts[1] === 'students' && parts[3] === 'courses') {
-      const student = await guardianStudentForUser(user, parts[2]);
-      if (!student) return fail(res, 404, 'STUDENT_NOT_FOUND', '学生不存在或无权访问');
-      const result = await query(`SELECT c.id AS "courseId",c.title,c.cover,l.module_id AS "moduleId",l.id AS "lessonId",l.title AS "lessonTitle",l.duration_ms AS "durationMs",l.video_source AS "videoSource",l.captions,
-        COALESCE(p.last_position_ms,0)::int AS "lastPositionMs",COALESCE(p.completed,false) AS completed,COALESCE(p.version,0)::int AS version
-        FROM courses c JOIN course_lessons l ON l.course_id=c.id AND l.status='active'
-        LEFT JOIN lesson_progress p ON p.lesson_id=l.id AND p.student_id=$2
-        WHERE c.status='active' AND (c.school_id IS NULL OR c.school_id=$1) ORDER BY c.created_at DESC,l.sort_order`, [student.school_id, parts[2]]);
-      return ok(res, result.rows);
-    }
-    if (req.method === 'GET' && parts[0] === 'v1' && parts[1] === 'courses' && parts.length === 3) {
-      const course = await query(`SELECT c.id AS "courseId",c.school_id AS "schoolId",c.title,c.cover,c.status,COALESCE(json_agg(json_build_object('lessonId',l.id,'moduleId',l.module_id,'title',l.title,'durationMs',l.duration_ms,'locked',l.status<>'active') ORDER BY l.sort_order) FILTER(WHERE l.id IS NOT NULL),'[]') AS lessons FROM courses c LEFT JOIN course_lessons l ON l.course_id=c.id WHERE c.id=$1 GROUP BY c.id`, [parts[2]]);
-      if (!course.rowCount || course.rows[0].status !== 'active') return fail(res, 404, 'COURSE_NOT_FOUND', '课程不存在或已下架');
-      if (course.rows[0].schoolId && !schoolAllowed(user, course.rows[0].schoolId)) return fail(res, 404, 'COURSE_NOT_FOUND', '课程不存在或无权访问');
-      return ok(res, course.rows[0]);
-    }
-    if (req.method === 'GET' && parts[0] === 'v1' && parts[1] === 'lessons' && parts[3] === 'playback') {
-      const lesson = await query(`SELECT l.id AS "lessonId",l.course_id AS "courseId",c.school_id AS "schoolId",l.video_source AS "videoSource",l.captions,l.duration_ms AS "durationMs" FROM course_lessons l JOIN courses c ON c.id=l.course_id WHERE l.id=$1 AND l.status='active' AND c.status='active'`, [parts[2]]);
-      if (!lesson.rowCount) return fail(res, 404, 'LESSON_NOT_FOUND', '课节不存在或已下架');
-      if (lesson.rows[0].schoolId && !schoolAllowed(user, lesson.rows[0].schoolId)) return fail(res, 404, 'LESSON_NOT_FOUND', '课节不存在或无权访问');
-      if (!lesson.rows[0].videoSource) return fail(res, 404, 'VIDEO_NOT_AVAILABLE', '课程视频暂不可用');
-      return ok(res, lesson.rows[0]);
-    }
-    if (req.method === 'PUT' && parts[0] === 'v1' && parts[1] === 'students' && parts[3] === 'lessons' && parts[5] === 'progress') {
-      const student = await guardianStudentForUser(user, parts[2]);
-      if (!student) return fail(res, 404, 'STUDENT_NOT_FOUND', '学生不存在或无权访问');
-      const input = await body(req);
-      const position = Number(input.lastPositionMs);
-      if (!Number.isInteger(position) || position < 0) return fail(res, 400, 'PROGRESS_INVALID', '播放位置不合法');
-      const expectedVersion = input.expectedVersion == null ? null : Number(input.expectedVersion);
-      const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ studentId: parts[2], lessonId: parts[4], ...input }));
-      if (idempotency === false) return;
-      const lesson = await query(`SELECT l.id,l.duration_ms AS "durationMs",c.school_id AS "schoolId" FROM course_lessons l JOIN courses c ON c.id=l.course_id WHERE l.id=$1 AND l.status='active' AND c.status='active'`, [parts[4]]);
-      if (!lesson.rowCount) return failIdempotently(req, res, 404, 'LESSON_NOT_FOUND', '课节不存在或已下架');
-      if (lesson.rows[0].schoolId && lesson.rows[0].schoolId !== student.school_id) return failIdempotently(req, res, 404, 'LESSON_NOT_FOUND', '课节不存在或无权访问');
-      if (position > Number(lesson.rows[0].durationMs || 0)) return failIdempotently(req, res, 400, 'PROGRESS_INVALID', '播放位置不能超过课时长度');
-      const existing = await query('SELECT version FROM lesson_progress WHERE student_id=$1 AND lesson_id=$2', [parts[2], parts[4]]);
-      if (expectedVersion != null && existing.rowCount && existing.rows[0].version !== expectedVersion) return failIdempotently(req, res, 409, 'VERSION_CONFLICT', '学习进度已在其他设备更新，请刷新后重试');
-      const saved = await query(`INSERT INTO lesson_progress(student_id,lesson_id,last_position_ms,completed,version) VALUES($1,$2,$3,$4,1)
-        ON CONFLICT(student_id,lesson_id) DO UPDATE SET last_position_ms=EXCLUDED.last_position_ms,completed=lesson_progress.completed OR EXCLUDED.completed,version=lesson_progress.version+1,updated_at=now()
-        RETURNING student_id AS "studentId",lesson_id AS "lessonId",last_position_ms AS "lastPositionMs",completed,version,updated_at AS "updatedAt"`, [parts[2], parts[4], position, input.completed === true]);
-      return okIdempotently(res, user, idempotency, saved.rows[0]);
-    }
+    await handleNotificationRoutes({
+      req, res, user, url, query, pool, hasRole, parentOnly, teacherOnly,
+      teacherClassIds, schoolAllowed, userHasCapability, queryValue,
+      noticeClassIds, body, fail, beginIdempotentRequest, requestBodyHash,
+      audit, createdIdempotently, okIdempotently, ok
+    });
+    if (res.writableEnded) return;
+    await handleCourseRoutes({ req, res, user, parts, query, hasRole, schoolAllowed, guardianStudentForUser, body, fail, requiredString, beginIdempotentRequest, requestBodyHash, failIdempotently, createdIdempotently, okIdempotently, ok });
+    if (res.writableEnded) return;
     await handleActivityRoutes({
       req, res, user, url, parts,
       query, pool, hasRole, queryValue, studentForUser, fail,
@@ -3853,43 +3630,11 @@ async function handle(req, res) {
       failIdempotently, audit, okIdempotently, createdIdempotently, ok
     });
     if (res.writableEnded) return;
-    if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'courses' && parts[2] === 'uploads') {
-      if (!hasRole(user, 'teacher', 'principal', 'admin')) return fail(res, 403, 'NO_PERMISSION', '只有学校工作人员可以上传课程');
-      const input = await body(req);
-      if (input.attachmentFileId) {
-        const file = await query(`SELECT id,status,owner_id FROM files WHERE id=$1`, [input.attachmentFileId]);
-        if (!file.rows[0] || file.rows[0].status !== 'uploaded' || (file.rows[0].owner_id !== user.id && !hasRole(user, 'admin'))) return fail(res, 400, 'FILE_NOT_READY', '附件尚未上传完成');
-      }
-      const attendanceCount = Number(input.attendanceCount);
-      if (!Number.isInteger(attendanceCount) || attendanceCount < 0 || attendanceCount > 10000) return fail(res, 400, 'INVALID_ARGUMENT', '出勤人数必须是0到10000之间的整数');
-      const notes = String(input.notes || '').trim();
-      const attachmentName = requiredString(input.attachmentName, '附件名称', { max: 180 });
-      if (notes.length > 2000) return fail(res, 400, 'INVALID_ARGUMENT', '课堂记录长度不能超过2000个字符');
-      const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash(input));
-      if (idempotency === false) return;
-      const taskSchool = input.taskId ? await query('SELECT school_id FROM assessment_tasks WHERE id=$1', [input.taskId]) : { rows: [] };
-      const schoolId = input.schoolId || taskSchool.rows[0]?.school_id || user.roles.find((role) => role.school_id)?.school_id || null;
-      if (schoolId && !schoolAllowed(user, schoolId)) return fail(res, 403, 'NO_PERMISSION', '无权向该学校上传课程');
-      const result = await query(`INSERT INTO course_uploads(user_id,school_id,task_id,attachment_file_id,attendance_count,notes,attachment_name) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id,status`, [user.id, schoolId, input.taskId || null, input.attachmentFileId || null, attendanceCount, notes, attachmentName]);
-      return createdIdempotently(res, user, idempotency, result.rows[0]);
-    }
     if (req.method === 'PATCH' && parts[0] === 'v1' && parts[1] === 'students' && parts[3] === 'task-status') {
-      if (!hasRole(user, 'teacher', 'principal', 'admin')) return fail(res, 403, 'NO_PERMISSION', '无权修改学生状态');
-      const input = await body(req);
-      const latest = await query(`SELECT task_id FROM task_students WHERE student_id=$1 ORDER BY created_at DESC LIMIT 1`, [parts[2]]);
-      if (!latest.rows[0]) return fail(res, 404, 'TASK_STUDENT_NOT_FOUND', '学生暂无测评任务');
-      const taskStudent = await taskStudentForUser(user, latest.rows[0].task_id, parts[2]);
-      if (!taskStudent) return fail(res, 404, 'TASK_STUDENT_NOT_FOUND', '任务学生不存在或无权访问');
-      const expectedVersion = input.expectedVersion == null ? null : Number(input.expectedVersion);
-      if (expectedVersion != null && (!Number.isInteger(expectedVersion) || expectedVersion < 1)) return fail(res, 400, 'VERSION_INVALID', '版本号不合法');
-      if (!taskStatusAllowed(taskStudent.status, input.status)) return fail(res, 409, 'TASK_STATUS_INVALID', `不能从${taskStudent.status}变更为${input.status}`);
-      const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ studentId: parts[2], ...input }));
-      if (idempotency === false) return;
-      const updated = await query(`UPDATE task_students SET status=$1,note=$2,check_in_at=CASE WHEN $1='已签到' THEN COALESCE(check_in_at,now()) ELSE check_in_at END,
-        completed_at=CASE WHEN $1='已完成' THEN COALESCE(completed_at,now()) ELSE completed_at END,version=version+1 WHERE task_id=$3 AND student_id=$4 AND ($5::int IS NULL OR version=$5) RETURNING *`, [input.status, input.note || null, latest.rows[0].task_id, parts[2], expectedVersion]);
-      if (!updated.rowCount) return failIdempotently(req, res, 409, 'VERSION_CONFLICT', '记录已被其他人更新，请刷新后重试');
-      await audit(user, req, 'task.status.update', 'task_student', taskStudent.id, taskStudent, updated.rows[0], taskStudent.school_id);
-      return okIdempotently(res, user, idempotency, updated.rows[0]);
+      // Kept as a deliberate migration error rather than inferring a student's
+      // "latest" task.  A student may be in several tasks concurrently; only
+      // /v1/tasks/{taskId}/students/{studentId}/status is safe to mutate.
+      return fail(res, 410, 'TASK_ID_REQUIRED', '请使用包含任务编号的测评状态接口');
     }
     await handleClassPostRoutes({
       req, res, user, url, parts,
@@ -3906,16 +3651,8 @@ async function handle(req, res) {
       failIdempotently, audit, createdIdempotently, okIdempotently, ok
     });
     if (res.writableEnded) return;
-    if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'support' && parts[2] === 'messages') {
-      const input = await body(req);
-      const content = requiredString(input.content, '咨询内容', { max: 2000 });
-      const schoolId = input.schoolId || user.roles.find((role) => role.school_id)?.school_id || null;
-      if (schoolId && !schoolAllowed(user, schoolId)) return fail(res, 403, 'NO_PERMISSION', '无权向该学校提交咨询');
-      const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ ...input, content }));
-      if (idempotency === false) return;
-      const result = await query(`INSERT INTO support_messages(user_id,school_id,content) VALUES($1,$2,$3) RETURNING id,status,created_at`, [user.id, schoolId, content]);
-      return createdIdempotently(res, user, idempotency, result.rows[0]);
-    }
+    await handleSupportRoutes({ req, res, user, parts, query, body, requiredString, schoolAllowed, fail, beginIdempotentRequest, requestBodyHash, createdIdempotently, audit });
+    if (res.writableEnded) return;
     if (req.method === 'GET' && url.pathname === '/v1/reports') {
       const schoolId = queryValue(url, 'schoolId');
       if (!schoolId || !schoolAllowed(user, schoolId)) return fail(res, 403, 'NO_PERMISSION', '无权访问报告列表');
@@ -3995,105 +3732,21 @@ async function handle(req, res) {
         ...bodyReport
       });
     }
-    if (req.method === 'GET' && parts[0] === 'v1' && parts[1] === 'students' && parts[3] === 'consent') {
-      const student = await guardianStudentForUser(user, parts[2]);
-      if (!student) return fail(res, 404, 'STUDENT_NOT_FOUND', '学生不存在或无权访问');
-      const result = await query(`SELECT id,consent_id AS "consentId",student_id AS "studentId",parent_user_id AS "parentUserId",consent_version AS "consentVersion",purpose,
-          privacy_policy_version AS "privacyPolicyVersion",camera_consent_version AS "cameraConsentVersion",algorithm_notice_version AS "algorithmNoticeVersion",
-          device_info_hash AS "deviceInfoHash",app_version AS "appVersion",data_retention_notice_accepted AS "dataRetentionNoticeAccepted",
-          granted_at AS "grantedAt",revoked_at AS "revokedAt",expires_at AS "expiresAt",created_at AS "createdAt"
-        FROM data_consents WHERE student_id=$1 AND ($2::text IS NULL OR parent_user_id=$2) ORDER BY created_at DESC`, [parts[2], hasRole(user, 'parent') ? user.id : null]);
-      return ok(res, result.rows);
-    }
-    if (req.method === 'GET' && parts[0] === 'v1' && parts[1] === 'students' && parts[3] === 'privacy-requests') {
-      if (!hasRole(user, 'parent')) return fail(res, 403, 'NO_PERMISSION', '只有家长可以查看孩子的数据申请');
-      const student = await guardianStudentForUser(user, parts[2]);
-      if (!student) return fail(res, 404, 'STUDENT_NOT_FOUND', '学生不存在或未绑定');
-      const result = await query(`SELECT id,request_type AS "requestType",status,created_at AS "createdAt",completed_at AS "completedAt",
-        CASE WHEN status='completed' AND request_type='export' THEN result_json ELSE NULL END AS "result"
-        FROM privacy_requests WHERE student_id=$1 AND requested_by=$2 ORDER BY created_at DESC LIMIT 20`, [parts[2], user.id]);
-      return ok(res, result.rows);
-    }
-    if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'students' && parts[3] === 'privacy-requests') {
-      if (!hasRole(user, 'parent')) return fail(res, 403, 'NO_PERMISSION', '只有家长可以提交孩子的数据申请');
-      const student = await guardianStudentForUser(user, parts[2]);
-      if (!student) return fail(res, 404, 'STUDENT_NOT_FOUND', '学生不存在或未绑定');
-      const input = await body(req);
-      const requestType = String(input.requestType || '');
-      if (!['export', 'delete'].includes(requestType)) return fail(res, 400, 'PRIVACY_REQUEST_TYPE_INVALID', '仅支持数据导出或删除申请');
-      const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ studentId: parts[2], requestType }));
-      if (idempotency === false) return;
-      const active = await query(`SELECT id,status,created_at AS "createdAt" FROM privacy_requests
-        WHERE student_id=$1 AND requested_by=$2 AND request_type=$3 AND status IN ('pending','approved','processing')
-        ORDER BY created_at DESC LIMIT 1`, [parts[2], user.id, requestType]);
-      if (active.rows[0]) return acceptedIdempotently(res, user, idempotency, { ...active.rows[0], requestType, reused: true });
-      const request = await query(`INSERT INTO privacy_requests(student_id,requested_by,request_type,status)
-        VALUES($1,$2,$3,'pending') RETURNING id,request_type AS "requestType",status,created_at AS "createdAt"`, [parts[2], user.id, requestType]);
-      let jobId = null;
-      if (requestType === 'export') {
-        const job = await enqueueJob('privacy.export', { requestId: request.rows[0].id, studentId: parts[2], requestedBy: user.id });
-        jobId = job.id;
-      }
-      await audit(user, req, `privacy.${requestType}.request`, 'student', parts[2], null, { requestId: request.rows[0].id, requestType, jobId }, student.school_id);
-      return acceptedIdempotently(res, user, idempotency, { ...request.rows[0], jobId });
-    }
-    if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'students' && parts[3] === 'consent') {
-      if (!hasRole(user, 'parent')) return fail(res, 403, 'NO_PERMISSION', '只有家长可以提交家庭数据使用同意');
-      const student = await guardianStudentForUser(user, parts[2]);
-      if (!student) return fail(res, 404, 'STUDENT_NOT_FOUND', '学生不存在或未绑定');
-      const input = await body(req);
-      const consentVersion = String(input.consentVersion || 'v1');
-      const purpose = String(input.purpose || 'body_assessment');
-      const granted = input.granted !== false;
-      const expiresAt = input.expiresAt || null;
-      const consentId = String(input.consentId || '').trim() || crypto.randomUUID();
-      const privacyPolicyVersion = String(input.privacyPolicyVersion || consentVersion).slice(0, 80);
-      const cameraConsentVersion = String(input.cameraConsentVersion || consentVersion).slice(0, 80);
-      const algorithmNoticeVersion = String(input.algorithmNoticeVersion || '').slice(0, 120) || null;
-      const deviceInfoHash = String(input.deviceInfoHash || '').slice(0, 128) || null;
-      const appVersion = String(input.appVersion || '').slice(0, 80) || null;
-      const retentionAccepted = input.dataRetentionNoticeAccepted === true;
-      if (granted && purpose === 'body_assessment' && !retentionAccepted) return fail(res, 400, 'CONSENT_RETENTION_NOTICE_REQUIRED', '请确认数据保留说明后再继续');
-      const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ studentId: parts[2], ...input }));
-      if (idempotency === false) return;
-      const result = await query(`INSERT INTO data_consents(student_id,parent_user_id,consent_version,purpose,granted_at,revoked_at,expires_at,consent_id,privacy_policy_version,camera_consent_version,algorithm_notice_version,device_info_hash,app_version,data_retention_notice_accepted)
-        VALUES($1,$2,$3,$4,CASE WHEN $5 THEN now() ELSE NULL END,CASE WHEN $5 THEN NULL ELSE now() END,$6,$7,$8,$9,$10,$11,$12,$13)
-        ON CONFLICT(student_id,parent_user_id,consent_version,purpose) DO UPDATE SET granted_at=CASE WHEN $5 THEN now() ELSE data_consents.granted_at END,
-          revoked_at=CASE WHEN $5 THEN NULL ELSE now() END,expires_at=EXCLUDED.expires_at,consent_id=EXCLUDED.consent_id,privacy_policy_version=EXCLUDED.privacy_policy_version,camera_consent_version=EXCLUDED.camera_consent_version,algorithm_notice_version=EXCLUDED.algorithm_notice_version,device_info_hash=EXCLUDED.device_info_hash,app_version=EXCLUDED.app_version,data_retention_notice_accepted=EXCLUDED.data_retention_notice_accepted
-        RETURNING id,consent_id AS "consentId",student_id AS "studentId",parent_user_id AS "parentUserId",consent_version AS "consentVersion",purpose,privacy_policy_version AS "privacyPolicyVersion",camera_consent_version AS "cameraConsentVersion",algorithm_notice_version AS "algorithmNoticeVersion",device_info_hash AS "deviceInfoHash",app_version AS "appVersion",data_retention_notice_accepted AS "dataRetentionNoticeAccepted",granted_at AS "grantedAt",revoked_at AS "revokedAt",expires_at AS "expiresAt"`, [parts[2], user.id, consentVersion, purpose, granted, expiresAt, consentId, privacyPolicyVersion, cameraConsentVersion, algorithmNoticeVersion, deviceInfoHash, appVersion, retentionAccepted]);
-      await audit(user, req, granted ? 'data_consent.grant' : 'data_consent.revoke', 'data_consent', result.rows[0].id, null, result.rows[0], student.school_id);
-      return okIdempotently(res, user, idempotency, result.rows[0]);
-    }
-    if (req.method === 'DELETE' && parts[0] === 'v1' && parts[1] === 'students' && parts[3] === 'consent') {
-      if (!hasRole(user, 'parent')) return fail(res, 403, 'NO_PERMISSION', '只有已绑定监护人可以撤销家庭数据使用同意');
-      const student = await guardianStudentForUser(user, parts[2]);
-      if (!student) return fail(res, 404, 'STUDENT_NOT_FOUND', '学生不存在或无权访问');
-      const consentVersion = queryValue(url, 'consentVersion') || 'v1';
-      const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ studentId: parts[2], consentVersion, action: 'revoke' }));
-      if (idempotency === false) return;
-      const result = await query(`UPDATE data_consents SET revoked_at=now() WHERE student_id=$1 AND consent_version=$2 AND ($3::text IS NULL OR parent_user_id=$3) AND revoked_at IS NULL RETURNING id,student_id AS "studentId",consent_version AS "consentVersion",revoked_at AS "revokedAt"`, [parts[2], consentVersion, hasRole(user, 'parent') ? user.id : null]);
-      if (!result.rowCount) return failIdempotently(req, res, 404, 'CONSENT_NOT_FOUND', '有效同意记录不存在');
-      await audit(user, req, 'data_consent.revoke', 'data_consent', result.rows[0].id, null, result.rows[0], student.school_id);
-      return okIdempotently(res, user, idempotency, result.rows[0]);
-    }
+    await handlePrivacyRoutes({
+      req, res, user, url, parts, query, hasRole, guardianStudentForUser,
+      queryValue, body, fail, beginIdempotentRequest, requestBodyHash,
+      failIdempotently, acceptedIdempotently, okIdempotently, ok, audit,
+      enqueueJob
+    });
+    if (res.writableEnded) return;
     if (req.method === 'GET' && parts[0] === 'v1' && parts[1] === 'students' && parts[3] === 'report') return ok(res, await reportFor(user, parts[2]));
     if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'students' && parts[3] === 'report' && parts[4] === 'refresh') {
       const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ studentId: parts[2], action: 'report.refresh' }));
       if (idempotency === false) return;
       return okIdempotently(res, user, idempotency, await refreshReport(user, req, parts[2]));
     }
-    if (req.method === 'GET' && parts[0] === 'v1' && parts[1] === 'users' && parts[3] === 'messages') {
-      if (parts[2] !== user.id && !hasRole(user, 'admin')) return fail(res, 403, 'NO_PERMISSION', '无权查看该用户消息');
-      const result = await query(`SELECT id,title,content,to_char(created_at,'YYYY-MM-DD HH24:MI') AS time,is_read AS "isRead",category,
-        message_type AS "messageType",business_id AS "businessId",business_route AS "businessRoute",child_id AS "childId",task_id AS "taskId",course_id AS "courseId",lesson_id AS "lessonId",action_label AS "actionLabel",read_at AS "readAt",expires_at AS "expiresAt"
-        FROM messages WHERE receiver_user_id=$1 ORDER BY created_at DESC LIMIT 100`, [parts[2]]);
-      return ok(res, result.rows);
-    }
-    if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'messages' && parts[3] === 'read') {
-      const result = await query('UPDATE messages SET is_read=true,read_at=COALESCE(read_at,now()) WHERE id=$1 AND receiver_user_id=$2 RETURNING id,read_at AS "readAt"', [parts[2], user.id]);
-      if (!result.rowCount) return fail(res, 404, 'MESSAGE_NOT_FOUND', '消息不存在');
-      return ok(res, null);
-    }
+    await handleMessageRoutes({ req, res, user, parts, hasRole, query, fail, ok });
+    if (res.writableEnded) return;
     return fail(res, 404, 'NOT_FOUND', '接口不存在');
   } catch (error) {
     logger.error('http.request_failed', { requestId: requestId(req), method: req.method, path: req.url?.split('?')[0], error: error.message, code: error.code });

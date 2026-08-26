@@ -19,12 +19,18 @@ import com.xiangshang.youth.core.model.Student
 import com.xiangshang.youth.core.model.UserProfile
 import com.xiangshang.youth.core.model.UserRole
 import com.xiangshang.youth.core.service.MeResponse
+import com.xiangshang.youth.core.service.ApiEnvelope
+import com.xiangshang.youth.core.service.ApiError
+import com.xiangshang.youth.core.service.requireData
 import com.xiangshang.youth.core.mock.MockRepository
 import com.xiangshang.youth.core.repository.RemoteRepository
 import com.xiangshang.youth.core.repository.RepositoryProvider
+import com.xiangshang.youth.core.repository.YouthRepository
+import com.xiangshang.youth.core.repository.DashboardData
 import com.xiangshang.youth.app.AppUiState
 import com.xiangshang.youth.app.AppViewModel
 import com.xiangshang.youth.app.CourseRecommendationTarget
+import com.xiangshang.youth.app.TeacherOverviewContext
 import com.xiangshang.youth.core.util.ChildBindingValidator
 import com.xiangshang.youth.core.util.AuthIdentity
 import com.xiangshang.youth.core.util.BusinessClock
@@ -37,6 +43,57 @@ import org.junit.Test
 import java.util.Date
 
 class LocalFeatureStateTest {
+    @Test fun missingRemoteEnvelopePayloadIsNotRenderedAsAnEmptyState() {
+        val failure = runCatching { ApiEnvelope<List<String>>("OK", "ok", null).requireData() }.exceptionOrNull()
+        assertTrue(failure is ApiError.InvalidResponse)
+        assertEquals(emptyList<String>(), ApiEnvelope("OK", "ok", emptyList<String>()).requireData())
+    }
+
+    @Test fun missingRemoteBatchTaskReceiptIsNotFabricatedAsSuccess() {
+        val failure = runCatching {
+            ApiEnvelope<com.xiangshang.youth.core.service.TaskBatchStatusAck>("OK", "ok", null).requireData()
+        }.exceptionOrNull()
+        assertTrue(failure is ApiError.InvalidResponse)
+    }
+
+    /** A Remote implementation that misses an endpoint must fail loudly.
+     * Returning a local activity, a pending-sync receipt, or an empty result
+     * here would make production screens appear to have completed an action. */
+    private class IncompleteRemoteRepository : YouthRepository {
+        override val supportsRemoteAcknowledgement = true
+        override suspend fun dashboard(studentPage: Int?, studentPageSize: Int?): DashboardData = MockRepository().dashboard(studentPage, studentPageSize)
+        override fun report(student: Student) = MockRepository().report(student)
+    }
+
+    @Test fun incompleteRemoteRepositoryCannotUseMockOnlyDefaults() = runBlocking {
+        val repository = IncompleteRemoteRepository()
+        val failure = runCatching { repository.activities() }.exceptionOrNull()
+        assertTrue(failure is ApiError.NotConfigured)
+    }
+
+    @Test fun incompleteRemoteRepositoryUsesTypedFailureForAllDirectDefaults() = runBlocking {
+        val repository = IncompleteRemoteRepository()
+        assertTrue(runCatching { repository.bindChild("王小明", "XS-S01") }.exceptionOrNull() is ApiError.NotConfigured)
+        assertTrue(runCatching { repository.lessonPlayback("lesson-1") }.exceptionOrNull() is ApiError.NotConfigured)
+        assertTrue(runCatching { repository.loadClassPostAttachment("file-1") }.exceptionOrNull() is ApiError.NotConfigured)
+    }
+
+    @Test fun teacherOverviewContextRejectsAStaleClassOrTaskResponse() {
+        val current = TeacherOverviewContext("school-a", "class-a", "task-a", "standard-v1")
+        assertNotEquals(current, TeacherOverviewContext("school-b", "class-a", "task-a", "standard-v1"))
+        assertNotEquals(current, TeacherOverviewContext("school-a", "class-b", "task-a", "standard-v1"))
+        assertNotEquals(current, TeacherOverviewContext("school-a", "class-a", "task-b", "standard-v1"))
+        assertNotEquals(current, TeacherOverviewContext("school-a", "class-a", "task-a", "standard-v2"))
+    }
+
+    @Test fun remoteTaskStatusRequiresCompositeTaskIdentity() = runBlocking {
+        val failure = runCatching {
+            RemoteRepository().updateTaskStatus("", "student-1", TaskStatus.CheckedIn, null, 1)
+        }.exceptionOrNull()
+        assertTrue(failure is IllegalArgumentException)
+        assertTrue(failure?.message?.contains("任务编号") == true)
+    }
+
     @Test
     fun healthCheckinsUseChildAndBusinessDateAsTheVisibleScope() {
         val first = HealthCheckInRecord("checkin-a", "child-a", "2026-08-24", "跟练", 20, "moderate")
@@ -58,6 +115,17 @@ class LocalFeatureStateTest {
         val data = MockRepository().dashboard()
         assertTrue(data.students.all { it.classId != null })
         assertEquals("c31", data.students.first { it.className == "三年级1班" }.classId)
+    }
+
+    @Test fun teacherTaskScopeRejectsStudentsOutsideAuthorizedClassIds() = runBlocking {
+        val data = MockRepository().dashboard()
+        val teacher = AppUiState(
+            profile = UserProfile("teacher-scope", "同名教师", "13800138000", UserRole.Teacher, data.school.name, authorizedClassIds = listOf("c31")),
+            role = UserRole.Teacher,
+            data = data
+        )
+        assertTrue(teacher.isTeacherAuthorizedFor(data.students.first { it.classId == "c31" }))
+        assertFalse(teacher.isTeacherAuthorizedFor(data.students.first { it.classId == "c32" }))
     }
 
     @Test fun courseProgressKeyIsolatedByChildAndLesson() {
@@ -98,10 +166,10 @@ class LocalFeatureStateTest {
             birthDate = "2017-01-01",
             taskVersion = 7
         )
-        val local = LocalFeatureState(taskStatusVersions = mapOf(student.id to student.taskVersion!!))
+        val local = LocalFeatureState(taskScopedStatusVersions = mapOf("t1|${student.id}" to student.taskVersion!!))
 
         assertEquals(7, student.taskVersion)
-        assertEquals(7, local.taskStatusVersions[student.id])
+        assertEquals(7, local.taskScopedStatusVersions["t1|${student.id}"])
     }
 
     @Test
@@ -246,9 +314,9 @@ class LocalFeatureStateTest {
             courseUploads = listOf(CourseUploadRecord(taskId = "after-class-upload", attendanceCount = 26, notes = "已完成课程", attachmentName = "课堂.jpg", status = LocalSubmissionStatus.PendingSync)),
             uploadedTaskIds = setOf("after-class-upload"),
             checkedInToday = true,
-            studentTaskStatuses = mapOf("s01" to TaskStatus.Review),
-            taskStatusSyncStates = mapOf("s01" to LocalSubmissionStatus.PendingSync),
-            reviewNotes = mapOf("s01" to "核验视频后建议周五补测。"),
+            taskScopedStatuses = mapOf("t1|s01" to TaskStatus.Review),
+            taskScopedSyncStates = mapOf("t1|s01" to LocalSubmissionStatus.PendingSync),
+            taskScopedReviewNotes = mapOf("t1|s01" to "核验视频后建议周五补测。"),
             sessionActive = true,
             sessionPhone = "13800138000",
             sessionRoleName = "Teacher",
@@ -274,9 +342,9 @@ class LocalFeatureStateTest {
         assertEquals("张教授", state.expertAppointments.single().expertName)
         assertEquals(LocalSubmissionStatus.PendingSync, state.courseUploads.single().status)
         assertTrue("after-class-upload" in state.uploadedTaskIds)
-        assertEquals(TaskStatus.Review, state.studentTaskStatuses["s01"])
-        assertEquals(LocalSubmissionStatus.PendingSync, state.taskStatusSyncStates["s01"])
-        assertEquals("核验视频后建议周五补测。", state.reviewNotes["s01"])
+        assertEquals(TaskStatus.Review, state.taskScopedStatuses["t1|s01"])
+        assertEquals(LocalSubmissionStatus.PendingSync, state.taskScopedSyncStates["t1|s01"])
+        assertEquals("核验视频后建议周五补测。", state.taskScopedReviewNotes["t1|s01"])
         assertTrue(state.sessionActive)
         assertEquals("Teacher", state.sessionRoleName)
         assertEquals("王女士", state.parentAccountName)
@@ -408,7 +476,7 @@ class LocalFeatureStateTest {
             activityRegistrations = listOf(ActivityRegistration(activityId = "health-growth-season-2026", contactName = "王女士", phone = "13800138000")),
             expertAppointments = listOf(ExpertAppointment(expertName = "张教授", preferredDate = "周五上午", note = "运动发展咨询")),
             courseUploads = listOf(CourseUploadRecord(taskId = "after-class-upload", attendanceCount = 20, notes = "课堂记录", attachmentName = "课堂.jpg", status = LocalSubmissionStatus.PendingSync)),
-            taskStatusSyncStates = mapOf("s01" to LocalSubmissionStatus.PendingSync),
+            taskScopedSyncStates = mapOf("t1|s01" to LocalSubmissionStatus.PendingSync),
             bodyAssessmentSyncStates = mapOf("s01" to LocalSubmissionStatus.PendingSync)
         )
 

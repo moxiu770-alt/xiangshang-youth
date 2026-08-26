@@ -27,13 +27,13 @@ struct NotificationsView: View {
                         Spacer()
                         if state.unreadMessageCount > 0 {
                             Button("全部已读") { state.markAllMessagesRead() }
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(ReferenceColor.blue)
                                 .buttonStyle(.plain)
                                 .accessibilityLabel("将全部通知标记为已读")
                         }
                         Text("未读 \(state.unreadMessageCount)")
-                            .font(.system(size: 10, weight: .semibold)).foregroundStyle(ReferenceColor.blue)
+                            .font(.system(size: 12, weight: .semibold)).foregroundStyle(ReferenceColor.blue)
                     }
                     .padding(.horizontal, 12)
 
@@ -59,7 +59,7 @@ struct NotificationsView: View {
                                     Text("\(message.category) · \(message.time)").font(.system(size: 12)).foregroundStyle(.secondary)
                                 }
                                 Spacer()
-                                Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+                                Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
                             }
                             .padding(11)
                             .background(.white, in: RoundedRectangle(cornerRadius: 11))

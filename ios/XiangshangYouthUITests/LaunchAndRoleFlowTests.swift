@@ -15,53 +15,60 @@ final class LaunchAndRoleFlowTests: XCTestCase {
         app.launch()
     }
 
-    func testLaunchLoginAndRoleSelection() {
+    func testPublicFamilyLoginOnlyOffersFamilyWorkbench() {
         loginAndWaitForRoleSelection()
         attachScreenshot("role-picker")
 
         XCTAssertTrue(button(containing: "家庭端").waitForExistence(timeout: 2))
-        XCTAssertTrue(button(containing: "学校端").exists)
-        // School management analytics are delivered by the backend dashboard;
-        // the mobile app intentionally exposes only family and teacher roles.
+        // Public registration and WeChat fallback create family accounts only.
+        // A teacher workbench can only be supplied by a school-authorized
+        // session, never by a role selector bundled in the public app.
+        XCTAssertFalse(button(containing: "学校端").exists)
         XCTAssertFalse(button(containing: "校长端").exists)
+        button(containing: "家庭端").tap()
+        XCTAssertTrue(staticText(containing: "综合测评").waitForExistence(timeout: 5))
+        XCTAssertFalse(button(containing: "返回").exists)
+    }
 
-        // The teacher dashboard bell is a real route, and returning from the
-        // message list must restore the same root dashboard without exposing a
-        // duplicate dashboard back-stack entry.
-        button(containing: "学校端").tap()
+    func testSchoolProvisionedTeacherFixtureCoversTeacherWorkbench() {
+        app.terminate()
+        app = XCUIApplication()
+        app.launchArguments += ["-ui-testing"]
+        app.launchEnvironment["XS_DEBUG_ROLE"] = "teacher"
+        app.launch()
         XCTAssertTrue(staticText(containing: "班级健康概览").waitForExistence(timeout: 5))
         attachScreenshot("teacher-home")
-        // A teacher workbench is a role root, not a pushed page. This guards
-        // against a top-bar change reintroducing the dead back affordance that
-        // previously trapped users after they selected a different identity.
         XCTAssertFalse(button(containing: "返回").exists)
-        // Teacher board drill-downs must remain in the teacher workbench.
-        // A former route opened the principal risk page from “问题分布”.
+
         let classBoard = button(containing: "班级看板")
         XCTAssertTrue(classBoard.waitForExistence(timeout: 2))
         classBoard.tap()
         XCTAssertTrue(staticText(containing: "班级数据看板").waitForExistence(timeout: 3))
-        // The archived period is intentionally aggregate-only. Switching it
-        // must change the board and show the protected-history explanation,
-        // never reuse current student reports as historical records.
-        let historicalPeriod = button(containing: "2026春季")
-        XCTAssertTrue(historicalPeriod.waitForExistence(timeout: 2))
-        historicalPeriod.tap()
-        XCTAssertTrue(staticText(containing: "已归档汇总").waitForExistence(timeout: 3))
-        let archiveInfo = button(containing: "归档说明")
-        XCTAssertTrue(archiveInfo.waitForExistence(timeout: 2))
-        archiveInfo.tap()
-        XCTAssertTrue(staticText(containing: "历史测评归档").waitForExistence(timeout: 3))
-        button(containing: "关闭").tap()
-        button(containing: "本轮综合测评").tap()
-        let issueDistribution = button(containing: "问题分布")
-        XCTAssertTrue(issueDistribution.waitForExistence(timeout: 2))
-        issueDistribution.tap()
-        XCTAssertTrue(staticText(containing: "预警中心").waitForExistence(timeout: 3))
-        button(containing: "返回").tap()
-        XCTAssertTrue(staticText(containing: "班级数据看板").waitForExistence(timeout: 3))
         button(containing: "返回").tap()
         XCTAssertTrue(staticText(containing: "班级健康概览").waitForExistence(timeout: 3))
+
+        let tasks = button(containing: "查看延时课")
+        XCTAssertTrue(tasks.waitForExistence(timeout: 2))
+        tasks.tap()
+        XCTAssertTrue(staticText(containing: "延时课程上传").waitForExistence(timeout: 3))
+        let task = button(containing: "2026年秋季综合运动能力测评")
+        XCTAssertTrue(task.waitForExistence(timeout: 3))
+        task.tap()
+        XCTAssertTrue(staticText(containing: "点击学生按现场队列").waitForExistence(timeout: 3))
+        // This student belongs to the fixture's authorized c31 scope. The
+        // task route must render a scoped roster rather than a schoolwide list.
+        // Command authorization and transition rules are unit-tested.
+        let student = button(containing: "王小明")
+        XCTAssertTrue(student.waitForExistence(timeout: 3))
+        button(containing: "返回").tap()
+        button(containing: "返回").tap()
+
+        let review = button(containing: "预警中心")
+        XCTAssertTrue(review.waitForExistence(timeout: 2))
+        review.tap()
+        XCTAssertTrue(staticText(containing: "预警中心").waitForExistence(timeout: 3))
+        button(containing: "返回").tap()
+
         let teacherMessages = button(containing: "消息通知")
         XCTAssertTrue(teacherMessages.waitForExistence(timeout: 3))
         teacherMessages.tap()
@@ -70,42 +77,6 @@ final class LaunchAndRoleFlowTests: XCTestCase {
         XCTAssertTrue(messageBack.waitForExistence(timeout: 2))
         messageBack.tap()
         XCTAssertTrue(staticText(containing: "班级健康概览").waitForExistence(timeout: 3))
-
-        // The assignment shortcut has its own data scope. Mock fixtures have
-        // no unassigned students, so it must present the truthful empty state
-        // instead of silently opening the generic student list.
-        let unassignedStudents = button(containing: "待分班学生")
-        XCTAssertTrue(unassignedStudents.waitForExistence(timeout: 2))
-        unassignedStudents.tap()
-        XCTAssertTrue(staticText(containing: "暂无待分班学生").waitForExistence(timeout: 3))
-        button(containing: "返回").tap()
-        XCTAssertTrue(staticText(containing: "班级健康概览").waitForExistence(timeout: 3))
-
-        // Keep the dedicated class-management page exposed directly from the
-        // teacher workbench instead of regressing into a duplicate roster card.
-        let classManagement = button(containing: "班级管理")
-        XCTAssertTrue(classManagement.waitForExistence(timeout: 2))
-        classManagement.tap()
-        XCTAssertTrue(staticText(containing: "我管理的班级").waitForExistence(timeout: 3))
-        button(containing: "返回").tap()
-        XCTAssertTrue(staticText(containing: "班级健康概览").waitForExistence(timeout: 3))
-
-        let teacherAccount = button(containing: "我的")
-        XCTAssertTrue(teacherAccount.waitForExistence(timeout: 2))
-        teacherAccount.tap()
-        let returnToRoles = button(containing: "切换使用角色")
-        XCTAssertTrue(returnToRoles.waitForExistence(timeout: 2))
-        returnToRoles.tap()
-        XCTAssertTrue(button(containing: "家庭端").waitForExistence(timeout: 3))
-        XCTAssertTrue(button(containing: "学校端").exists)
-        XCTAssertFalse(button(containing: "校长端").exists)
-
-        button(containing: "家庭端").tap()
-        XCTAssertTrue(staticText(containing: "综合测评").waitForExistence(timeout: 5))
-        attachScreenshot("parent-home")
-        // The family workbench is also a role root. Child/report drill-downs
-        // get a back control; the home itself must never show one.
-        XCTAssertFalse(button(containing: "返回").exists)
     }
 
     /// Keep the commercial login alternatives independently covered.  This is

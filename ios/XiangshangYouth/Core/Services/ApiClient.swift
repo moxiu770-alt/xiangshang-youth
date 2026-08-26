@@ -124,12 +124,26 @@ final class ApiClient {
 
     func request<T: Decodable>(_ request: URLRequest, type: T.Type) async throws -> T {
         let data = try await perform(request)
+        return try Self.decodePayload(data, type: type)
+    }
+
+    /// Typed endpoints use the API envelope. A 2xx response with a missing
+    /// `data` field is a contract failure, not an empty business result.
+    /// Keep the direct-decoding fallback only for explicitly non-enveloped
+    /// endpoints such as third-party playback manifests.
+    static func decodePayload<T: Decodable>(_ data: Data, type: T.Type) throws -> T {
         let decoder = JSONDecoder()
+        let isEnvelope = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])?["code"] != nil
         do {
-            if let envelope = try? decoder.decode(ApiEnvelope<T>.self, from: data), let value = envelope.data {
+            if isEnvelope {
+                guard let envelope = try? decoder.decode(ApiEnvelope<T>.self, from: data), let value = envelope.data else {
+                    throw ApiError.invalidResponse
+                }
                 return value
             }
             return try decoder.decode(T.self, from: data)
+        } catch let error as ApiError {
+            throw error
         } catch is DecodingError {
             throw ApiError.invalidResponse
         }

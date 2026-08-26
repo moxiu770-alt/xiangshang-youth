@@ -47,7 +47,7 @@ struct GrowthInsightView: View {
                                     .rotationEffect(.degrees(-90))
                                 VStack(spacing: 1) {
                                     Text("\(insight.consistencyPercent)%").font(.title2.bold()).foregroundStyle(ReferenceColor.navy)
-                                    Text("完成率").font(.caption2).foregroundStyle(.secondary)
+                                    Text("完成率").font(.caption).foregroundStyle(.secondary)
                                 }
                             }.frame(width: 104, height: 104)
                             VStack(alignment: .leading, spacing: 6) {
@@ -79,7 +79,7 @@ struct GrowthInsightView: View {
                             Divider()
                             ForEach(Array(insight.actions.enumerated()), id: \.offset) { index, action in
                                 HStack(alignment: .top, spacing: 9) {
-                                    Text("\(index + 1)").font(.caption2.bold()).foregroundStyle(.white).frame(width: 20, height: 20).background(ReferenceColor.blue, in: Circle())
+                                    Text("\(index + 1)").font(.caption.bold()).foregroundStyle(.white).frame(width: 20, height: 20).background(ReferenceColor.blue, in: Circle())
                                     Text(action).font(.subheadline).foregroundStyle(ReferenceColor.navy)
                                 }
                             }
@@ -95,7 +95,7 @@ struct GrowthInsightView: View {
                     }.buttonStyle(.borderedProminent)
 
                     Text("计划调整属于健康管理建议，不替代医疗诊断；出现疼痛、麻木、无力或持续异常时请停止训练并咨询专业人员。")
-                        .font(.caption2).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(.secondary)
                 }.padding(16).frame(maxWidth: 720)
             }
             .background(ReferenceColor.canvas)

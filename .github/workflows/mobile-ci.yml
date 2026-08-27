@@ -155,7 +155,19 @@ jobs:
       - name: Run Android unit tests
         id: android-unit-tests
         continue-on-error: true
-        run: ./gradlew :app:testDebugUnitTest --no-daemon --max-workers=1 --console=plain
+        run: |
+          set -o pipefail
+          gradle_log="$RUNNER_TEMP/android-gradle-unit.log"
+          for attempt in 1 2 3; do
+            echo "Android JVM test attempt $attempt"
+            if ./gradlew :app:testDebugUnitTest --no-daemon --max-workers=1 --console=plain 2>&1 | tee -a "$gradle_log"; then
+              exit 0
+            fi
+            if ! grep -q 'Received status code 429' "$gradle_log" || [ "$attempt" -eq 3 ]; then
+              exit 1
+            fi
+            sleep $((attempt * 15))
+          done
       - name: Upload Android unit-test reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -164,6 +176,7 @@ jobs:
           path: |
             android/app/build/test-results/testDebugUnitTest
             android/app/build/reports/tests/testDebugUnitTest
+            ${{ runner.temp }}/android-gradle-unit.log
           if-no-files-found: warn
       - name: Report Android unit-test failures
         if: steps.android-unit-tests.outcome == 'failure'

@@ -42,16 +42,17 @@ jobs:
         run: npm ci
       - name: Migrate and seed test database
         env:
-          DATABASE_URL: postgres://xiangshang:ci_password@127.0.0.1:5432/xiangshang_youth
-          TEST_DATABASE_URL: postgres://xiangshang:ci_password@127.0.0.1:5432/xiangshang_youth
-          PGOPTIONS: -c search_path=xiangshang_integration,public
+          DATABASE_URL: postgres://xiangshang:ci_password@127.0.0.1:5432/xiangshang_youth?options=-csearch_path%3Dxiangshang_integration%2Cpublic
+          TEST_DATABASE_URL: postgres://xiangshang:ci_password@127.0.0.1:5432/xiangshang_youth?options=-csearch_path%3Dxiangshang_integration%2Cpublic
           SEED_PASSWORD: TestPass123!
-        run: npm run migrate && npm run seed
+        run: |
+          psql postgres://xiangshang:ci_password@127.0.0.1:5432/xiangshang_youth -v ON_ERROR_STOP=1 -c 'CREATE SCHEMA IF NOT EXISTS xiangshang_integration AUTHORIZATION xiangshang'
+          npm run migrate
+          npm run seed
       - name: Run backend integration tests
         env:
-          DATABASE_URL: postgres://xiangshang:ci_password@127.0.0.1:5432/xiangshang_youth
-          TEST_DATABASE_URL: postgres://xiangshang:ci_password@127.0.0.1:5432/xiangshang_youth
-          PGOPTIONS: -c search_path=xiangshang_integration,public
+          DATABASE_URL: postgres://xiangshang:ci_password@127.0.0.1:5432/xiangshang_youth?options=-csearch_path%3Dxiangshang_integration%2Cpublic
+          TEST_DATABASE_URL: postgres://xiangshang:ci_password@127.0.0.1:5432/xiangshang_youth?options=-csearch_path%3Dxiangshang_integration%2Cpublic
           SEED_PASSWORD: TestPass123!
         run: npm run check && npm test && npm run test:integration && npm audit --omit=dev --audit-level=high
       - name: Validate OpenAPI contract

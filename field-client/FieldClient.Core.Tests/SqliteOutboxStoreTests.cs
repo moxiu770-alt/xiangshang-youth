@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using System.Text.Json;
 using Xunit;
 
@@ -14,13 +15,21 @@ public sealed class SqliteOutboxStoreTests : IAsyncLifetime
         await _store.InitializeAsync(CancellationToken.None);
     }
 
-    public Task DisposeAsync()
+    public async Task DisposeAsync()
     {
+        // Microsoft.Data.Sqlite keeps disposed connections in a process pool.
+        // Windows correctly refuses to unlink the WAL database while that
+        // pooled handle is still open, so release idle handles before removing
+        // the per-test fixture. This does not affect live connections.
+        SqliteConnection.ClearAllPools();
         foreach (var path in new[] { _databasePath, $"{_databasePath}-shm", $"{_databasePath}-wal" })
         {
-            if (File.Exists(path)) File.Delete(path);
+            for (var attempt = 0; attempt < 3 && File.Exists(path); attempt++)
+            {
+                try { File.Delete(path); }
+                catch (IOException) when (attempt < 2) { await Task.Delay(50); }
+            }
         }
-        return Task.CompletedTask;
     }
 
     [Fact]

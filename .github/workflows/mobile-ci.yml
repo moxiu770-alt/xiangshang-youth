@@ -140,10 +140,6 @@ jobs:
   android:
     name: Android unit test and build
     runs-on: ubuntu-latest
-    env:
-      # Newer command-line tools and the emulator can otherwise resolve
-      # different per-user AVD locations across workflow steps.
-      ANDROID_AVD_HOME: ${{ runner.temp }}/android-avd
     defaults:
       run:
         working-directory: android
@@ -203,6 +199,10 @@ jobs:
           path: android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
           if-no-files-found: error
       - name: Prepare hosted Android emulator
+        env:
+          # Newer command-line tools and the emulator can otherwise resolve
+          # different per-user AVD locations across workflow steps.
+          ANDROID_AVD_HOME: ${{ runner.temp }}/android-avd
         run: |
           android_sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:?Android SDK is not configured}}"
           mkdir -p "$ANDROID_AVD_HOME"
@@ -216,6 +216,8 @@ jobs:
       - name: Run Compose instrumentation flow on a clean emulator
         id: android-instrumentation
         continue-on-error: true
+        env:
+          ANDROID_AVD_HOME: ${{ runner.temp }}/android-avd
         run: |
           set -euo pipefail
           android_sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:?Android SDK is not configured}}"

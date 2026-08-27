@@ -50,7 +50,7 @@ import com.xiangshang.youth.core.util.DeepLinkResolver
 import com.xiangshang.youth.core.util.DeepLinkTarget
 import com.xiangshang.youth.shared.component.*
 
-object Destinations { const val Splash="splash"; const val Login="login"; const val Register="register"; const val PasswordReset="passwordReset"; const val Role="role"; const val Parent="parent"; const val Children="children"; const val ChildrenBinding="childrenBinding"; const val ParentEvaluations="parentEvaluations"; const val BodyAssessment="bodyAssessment"; const val Assessment="assessment"; const val Activities="activities"; const val Experts="experts"; const val Courses="courses"; const val CoursesRoute="courses?openSupport={openSupport}"; const val Circle="circle"; const val Account="account"; const val Messages="messages"; const val Notifications="notifications"; const val Health="health"; const val Report="report"; const val ReportRoute="report/{studentId}"; const val Teacher="teacher"; const val TeacherMessages="teacherMessages"; const val Classes="classes"; const val TeacherCircle="teacherCircle"; const val TeacherBoard="teacherBoard"; const val Students="students"; const val StudentsRoute="students?classId={classId}"; const val OutstandingStudents="outstandingStudents"; const val UnassignedStudents="unassignedStudents"; const val Tasks="tasks"; const val SportsUpload="sportsUpload"; const val TaskDetail="taskDetail"; const val TaskDetailRoute="taskDetail/{taskId}"; const val Review="review"; const val BackendDashboard="backendDashboard" }
+object Destinations { const val Splash="splash"; const val Login="login"; const val Register="register"; const val PasswordReset="passwordReset"; const val Role="role"; const val Parent="parent"; const val Children="children"; const val ChildrenBinding="childrenBinding"; const val ParentEvaluations="parentEvaluations"; const val ParentEvaluationsRoute="parentEvaluations?taskId={taskId}"; const val BodyAssessment="bodyAssessment"; const val Assessment="assessment"; const val Activities="activities"; const val Experts="experts"; const val Courses="courses"; const val CoursesRoute="courses?openSupport={openSupport}"; const val Circle="circle"; const val Account="account"; const val Messages="messages"; const val Notifications="notifications"; const val Health="health"; const val Report="report"; const val ReportRoute="report/{studentId}"; const val Teacher="teacher"; const val TeacherMessages="teacherMessages"; const val Classes="classes"; const val TeacherCircle="teacherCircle"; const val TeacherBoard="teacherBoard"; const val Students="students"; const val StudentsRoute="students?classId={classId}"; const val OutstandingStudents="outstandingStudents"; const val UnassignedStudents="unassignedStudents"; const val Tasks="tasks"; const val SportsUpload="sportsUpload"; const val TaskDetail="taskDetail"; const val TaskDetailRoute="taskDetail/{taskId}"; const val Review="review"; const val BackendDashboard="backendDashboard" }
 
 /** Shared retry actions keep page-level failures actionable without threading
  * the same callbacks through every feature screen. */
@@ -294,7 +294,14 @@ private fun NavHostController.replaceRoot(destination: String) {
         composable(Destinations.ChildrenBinding) { ChildrenScreen(state, nav, viewModel::bindChild, choose = { viewModel.chooseChild(it); nav.popBackStack() }, saveDraft = viewModel::saveDraft, clearDraft = viewModel::clearDraft, clearWorkflow = viewModel::clearWorkflowState, onBound = { nav.popBackStack() }) }
         // `visibleReport` deliberately stays empty in remote mode until ReportApi
         // returns.  Do not use the synchronous Mock-shaped fallback here.
-        composable(Destinations.ParentEvaluations) { ParentEvaluationsScreen(state, nav, state.selectedChild?.takeIf(state::hasPublishedSchoolReport)?.let(viewModel::visibleReport)) }
+        composable(Destinations.ParentEvaluationsRoute) { entry ->
+            ParentEvaluationsScreen(
+                state,
+                nav,
+                state.selectedChild?.takeIf(state::hasPublishedSchoolReport)?.let(viewModel::visibleReport),
+                focusedTaskId = entry.arguments?.getString("taskId")
+            )
+        }
         composable(Destinations.BodyAssessment) { BodyAssessmentScreen(state, nav, viewModel::saveBodyAssessment, viewModel::saveBodyAssessmentDraft, viewModel::toggleBodyPlanDay, viewModel::saveFollowAlongSession, updateVoiceGuidance = { viewModel.updateSettings(voiceGuidanceEnabled = it) }, recordHealthConsent = viewModel::recordHealthConsent) }
         composable("${Destinations.Assessment}/{category}") { entry ->
             // Legacy local routes may still contain /assessment/fitness. The

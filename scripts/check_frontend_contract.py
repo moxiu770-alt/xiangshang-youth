@@ -71,10 +71,16 @@ def main() -> int:
         "ios/XiangshangYouth/Features/Parent/BodyAssessmentViews.swift",
         "ios/XiangshangYouth/Features/Parent/BodyAssessmentResultsView.swift",
     )
-    ios_parent_screen = read("ios/XiangshangYouth/Features/Parent/ParentViews.swift")
+    ios_parent_screen = read_all(
+        "ios/XiangshangYouth/Features/Parent/ParentViews.swift",
+        "ios/XiangshangYouth/Features/Parent/ParentMessageViews.swift",
+    )
     ios_auth = read("ios/XiangshangYouth/Features/Auth/AuthViews.swift")
     ios_auth_api = read("ios/XiangshangYouth/Core/Services/AuthApi.swift")
-    ios_parent_forms = read("ios/XiangshangYouth/Features/Parent/ParentExtendedViews.swift")
+    ios_parent_forms = read_all(
+        "ios/XiangshangYouth/Features/Parent/ParentExtendedViews.swift",
+        "ios/XiangshangYouth/Features/Parent/ParentAccountViews.swift",
+    )
     ios_local_store = read("ios/XiangshangYouth/Core/Services/LocalFeatureStore.swift")
     ios_teacher_forms = read_all(
         "ios/XiangshangYouth/Features/Teacher/TeacherViews.swift",
@@ -108,7 +114,10 @@ def main() -> int:
         "android/app/src/main/java/com/xiangshang/youth/app/AppStateSupport.kt",
     )
     android_upload_validator = read("android/app/src/main/java/com/xiangshang/youth/core/service/CourseUploadValidator.kt")
-    android_body = read("android/app/src/main/java/com/xiangshang/youth/feature/parent/LivePostureCapture.kt")
+    android_body = read_all(
+        "android/app/src/main/java/com/xiangshang/youth/feature/parent/LivePostureCapture.kt",
+        "android/app/src/main/java/com/xiangshang/youth/feature/parent/LivePostureAnalyzer.kt",
+    )
     android_body_screen = read("android/app/src/main/java/com/xiangshang/youth/feature/parent/BodyAssessmentScreen.kt")
     android_follow_along = read("android/app/src/main/java/com/xiangshang/youth/feature/parent/FollowAlongTraining.kt")
     android_auth = read("android/app/src/main/java/com/xiangshang/youth/feature/auth/AuthScreens.kt")
@@ -118,6 +127,7 @@ def main() -> int:
         "android/app/src/main/java/com/xiangshang/youth/feature/parent/ParentCommunityAccountScreens.kt",
         "android/app/src/main/java/com/xiangshang/youth/feature/parent/ParentEngagementScreens.kt",
     )
+    android_parent_notifications = read("android/app/src/main/java/com/xiangshang/youth/feature/parent/ParentNotifications.kt")
     android_local_store = read("android/app/src/main/java/com/xiangshang/youth/core/service/LocalFeatureStore.kt")
     android_teacher_forms = read_all(
         "android/app/src/main/java/com/xiangshang/youth/feature/teacher/TeacherScreens.kt",
@@ -229,6 +239,10 @@ def main() -> int:
     require(android_youth_repo, "throw ApiError.NotConfigured", "Android typed Remote default guard")
     if 'error("服务尚未配置")' in android_youth_repo:
         raise AssertionError("Android Repository: generic unconfigured defaults bypass typed error handling")
+    if "supportsRemoteAcknowledgement: Bool { false }" in ios_youth_repo:
+        raise AssertionError("iOS Repository: acknowledgement mode must be explicit on every implementation")
+    if "supportsRemoteAcknowledgement: Boolean get() = false" in android_youth_repo:
+        raise AssertionError("Android Repository: acknowledgement mode must be explicit on every implementation")
     for legacy in (".data ?: emptyList()", ".data.orEmpty()", ".data ?: com.xiangshang.youth.core.service.TaskBatchStatusAck()"):
         if legacy in android_remote_repo:
             raise AssertionError(f"Android RemoteRepository must not hide missing envelope payload: {legacy}")
@@ -380,6 +394,15 @@ def main() -> int:
     require(mobile_ci, "device_matrix_preflight.py", "CI device matrix evidence")
     require(read("scripts/visual_regression.py"), "maxChangedPixelRatio", "visual regression script")
     require(read("qa/visual-baseline/README.md"), "不能把当前构建截图复制成 baseline", "visual baseline policy")
+
+    # Task/retest inbox routes are role-scoped. A family message must never
+    # expose the teacher status editor merely because both workflows share a
+    # taskId. Preserve the exact task target on the family report stack.
+    require(android_parent_notifications, 'role == UserRole.Teacher', "Android role-scoped task message")
+    require(android_parent_notifications, '?taskId=${Uri.encode(task.id)}', "Android exact family task target")
+    require(android_nav, 'ParentEvaluationsRoute', "Android family task route")
+    require(ios_router, 'case parentTask(TestTask)', "iOS exact family task route")
+    require(ios_parent_screen, 'router.push(.parentTask(task))', "iOS role-scoped family message")
 
     print("frontend contract OK (launch, role routing, camera, privacy, data seam, pagination, release guards, UI flows)")
     return 0

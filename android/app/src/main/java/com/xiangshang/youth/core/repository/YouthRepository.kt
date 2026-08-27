@@ -33,7 +33,7 @@ data class DashboardData(
 
 interface YouthRepository {
     /** Mock writes are local-only and cannot count as a school-side acknowledgement. */
-    val supportsRemoteAcknowledgement: Boolean get() = false
+    val supportsRemoteAcknowledgement: Boolean
     /**
      * Interface defaults exist solely for the bundled MockRepository.  A
      * RemoteRepository that forgets an endpoint must fail loudly instead of

@@ -1,5 +1,6 @@
 package com.xiangshang.youth.feature.parent
 
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -30,6 +31,7 @@ import com.xiangshang.youth.core.model.UserRole
 import com.xiangshang.youth.core.model.BodyAttentionLevel
 import com.xiangshang.youth.core.model.bodyAssessmentAgeMonths
 import com.xiangshang.youth.core.util.MessageBusinessRoutePolicy
+import com.xiangshang.youth.core.util.MessageTaskScope
 import com.xiangshang.youth.shared.component.*
 import java.time.Instant
 
@@ -62,7 +64,17 @@ fun openMessageBusinessRoute(
                 UserRole.Parent -> item.childId == state.selectedChild?.id || item.childId in state.local.boundChildIds
                 else -> false
             }
-            if (!allowed) false else { nav.navigate(Destinations.TaskDetailRoute.replace("{taskId}", task.id)); true }
+            val target = MessageBusinessRoutePolicy.taskTarget(item, role, taskExists = true, roleAuthorized = allowed) ?: return false
+            when (target.scope) {
+                MessageTaskScope.Teacher -> {
+                    nav.navigate(Destinations.TaskDetailRoute.replace("{taskId}", Uri.encode(task.id)))
+                }
+                MessageTaskScope.Parent -> {
+                    // Family accounts must never enter the teacher status editor.
+                    nav.navigate("${Destinations.ParentEvaluations}?taskId=${Uri.encode(task.id)}")
+                }
+            }
+            true
         }
         "course", "lesson" -> {
             val target = MessageBusinessRoutePolicy.courseTarget(item) ?: return false

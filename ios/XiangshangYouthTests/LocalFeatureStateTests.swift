@@ -1473,11 +1473,13 @@ final class LocalFeatureStateTests: XCTestCase {
 }
 
 private struct FailingRepository: YouthRepository {
+    let supportsRemoteAcknowledgement = false
     func loadDashboard() async throws -> DashboardData { throw ApiError.network }
     func report(for student: Student) -> DiagnosisReport { MockRepository.shared.report(for: student) }
 }
 
 private struct UnauthorizedRepository: YouthRepository {
+    let supportsRemoteAcknowledgement = false
     func loadDashboard() async throws -> DashboardData { try await MockRepository.shared.loadDashboard() }
     func report(for student: Student) -> DiagnosisReport { MockRepository.shared.report(for: student) }
     func loadReport(for student: Student) async throws -> DiagnosisReport { throw ApiError.unauthorized }
@@ -1485,12 +1487,14 @@ private struct UnauthorizedRepository: YouthRepository {
 }
 
 private struct TaskStatusFailingRepository: YouthRepository {
+    let supportsRemoteAcknowledgement = false
     func loadDashboard() async throws -> DashboardData { try await MockRepository.shared.loadDashboard() }
     func report(for student: Student) -> DiagnosisReport { MockRepository.shared.report(for: student) }
     func updateTaskStatus(taskID: String, studentID: String, status: TaskStatus, note: String?, expectedVersion: Int?) async throws -> Int? { throw ApiError.network }
 }
 
 private struct TaskStatusConflictRepository: YouthRepository {
+    let supportsRemoteAcknowledgement = false
     func loadDashboard() async throws -> DashboardData { try await MockRepository.shared.loadDashboard() }
     func report(for student: Student) -> DiagnosisReport { MockRepository.shared.report(for: student) }
     func updateTaskStatus(taskID: String, studentID: String, status: TaskStatus, note: String?, expectedVersion: Int?) async throws -> Int? {

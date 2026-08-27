@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const openapi = await fs.readFile(new URL('../openapi.yaml', import.meta.url), 'utf8');
 const server = await fs.readFile(new URL('../src/server.js', import.meta.url), 'utf8');
+const authClaims = await fs.readFile(new URL('../src/authClaims.js', import.meta.url), 'utf8');
 const activityRoutes = await fs.readFile(new URL('../src/routes/activities.js', import.meta.url), 'utf8');
 const expertAppointmentRoutes = await fs.readFile(new URL('../src/routes/expertAppointments.js', import.meta.url), 'utf8');
 const classPostRoutes = await fs.readFile(new URL('../src/routes/classPosts.js', import.meta.url), 'utf8');
@@ -17,11 +18,13 @@ const supportRoutes = await fs.readFile(new URL('../src/routes/support.js', impo
 const productEventRoutes = await fs.readFile(new URL('../src/routes/productEvents.js', import.meta.url), 'utf8');
 const contentOperationRoutes = await fs.readFile(new URL('../src/routes/contentOperations.js', import.meta.url), 'utf8');
 const teacherTaskRoutes = await fs.readFile(new URL('../src/routes/teacherTasks.js', import.meta.url), 'utf8');
+const fileRoutes = await fs.readFile(new URL('../src/routes/files.js', import.meta.url), 'utf8');
+const remoteWorkflowSmoke = await fs.readFile(new URL('../scripts/remote-workflow-smoke.js', import.meta.url), 'utf8');
 const { validateProductEventBatch } = await import('../src/routes/productEvents.js');
 // Workflow assertions intentionally inspect the composed HTTP surface. Route
 // modules may move independently of the entrypoint, but their validation and
 // authorization rules must remain part of the same shipped service.
-const routeHandlers = `${server}\n${activityRoutes}\n${expertAppointmentRoutes}\n${classPostRoutes}\n${familyHealthRoutes}\n${courseRoutes}\n${notificationRoutes}\n${privacyRoutes}\n${messageRoutes}\n${supportRoutes}\n${productEventRoutes}\n${contentOperationRoutes}\n${teacherTaskRoutes}`;
+const routeHandlers = `${server}\n${activityRoutes}\n${expertAppointmentRoutes}\n${classPostRoutes}\n${familyHealthRoutes}\n${courseRoutes}\n${notificationRoutes}\n${privacyRoutes}\n${messageRoutes}\n${supportRoutes}\n${productEventRoutes}\n${contentOperationRoutes}\n${teacherTaskRoutes}\n${fileRoutes}`;
 const jobs = await fs.readFile(new URL('../src/jobs.js', import.meta.url), 'utf8');
 const schema = await fs.readFile(new URL('../db/schema.sql', import.meta.url), 'utf8');
 
@@ -105,8 +108,9 @@ test('mobile session claims are documented and server-owned', () => {
   assert.match(session, /MobileAuthClaims/);
   assert.match(openapi, /authorizedClassIds/);
   assert.match(openapi, /mobileEntryAllowed/);
-  assert.match(server, /async function authClaimsForUser/);
-  assert.match(server, /user_capability_overrides/);
+  assert.match(authClaims, /async function authClaimsForUser/);
+  assert.match(authClaims, /user_capability_overrides/);
+  assert.match(server, /createAuthClaimsService/);
   assert.match(server, /url\.pathname === '\/v1\/auth\/session'/);
 });
 
@@ -180,6 +184,16 @@ test('class circle exposes paged comments with ownership and attachment moderati
   assert.match(server, /hasRole, parentOnly, teacherOnly/);
   assert.match(openapi, /ownedByCurrentUser/);
   assert.match(schema, /idx_class_post_comments_post_created/);
+});
+
+test('file routes keep owner scope, content validation, and idempotent upload metadata', () => {
+  assert.match(server, /handleFileRoutes/);
+  assert.match(fileRoutes, /beginIdempotentRequest/);
+  assert.match(fileRoutes, /FILE_TYPE_NOT_ALLOWED/);
+  assert.match(fileRoutes, /FILE_SIGNATURE_INVALID/);
+  assert.match(fileRoutes, /file\.owner_id !== user\.id/);
+  assert.match(fileRoutes, /classPostFileVisibleToUser/);
+  assert.match(fileRoutes, /Cache-Control': 'private, no-store'/);
 });
 
 test('activity lifecycle exposes list detail edit cancel history and capacity guard', () => {
@@ -313,4 +327,18 @@ test('family exercise check-ins are date-scoped, versioned, and child-authorized
   assert.match(routeHandlers, /打卡已在其他设备更新/);
   assert.match(routeHandlers, /health_checkin\.upsert/);
   assert.match(schema, /UNIQUE\(user_id, child_id, check_in_date\)/);
+});
+
+test('remote workflow acceptance follows the real session schema and exercises isolated lifecycles', () => {
+  assert.match(remoteWorkflowSmoke, /ready\.data\?\.migration\?\.healthy/);
+  assert.doesNotMatch(remoteWorkflowSmoke, /ready\.data\?\.migrations/);
+  assert.match(remoteWorkflowSmoke, /session\.data\?\.user\?\.id/);
+  assert.doesNotMatch(remoteWorkflowSmoke, /session\.data\?\.userId/);
+  assert.doesNotMatch(remoteWorkflowSmoke, /parent\.session\.userId/);
+  assert.match(remoteWorkflowSmoke, /REMOTE_E2E_ALLOW_LIFECYCLE_WRITES/);
+  assert.match(remoteWorkflowSmoke, /parent\.activity\.lifecycle/);
+  assert.match(remoteWorkflowSmoke, /parent\.appointment\.lifecycle/);
+  assert.match(remoteWorkflowSmoke, /parent\.activity\.optimistic-conflict/);
+  assert.match(remoteWorkflowSmoke, /parent\.appointment\.optimistic-conflict/);
+  assert.match(remoteWorkflowSmoke, /expected: \[409\]/);
 });

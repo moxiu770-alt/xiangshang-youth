@@ -5,6 +5,7 @@ import com.xiangshang.youth.core.repository.DashboardData
 import com.xiangshang.youth.core.repository.YouthRepository
 
 class MockRepository : YouthRepository {
+    override val supportsRemoteAcknowledgement: Boolean = false
     private val school = School("school-1", "向上实验小学", "南湖校区", "广东省韶关市乳源瑶族自治县", true)
     private val grades = listOf(Grade("g3", "三年级", "小学三年级运动能力标准 v1.0"), Grade("g4", "四年级", "小学四年级运动能力标准 v1.0"), Grade("g5", "五年级", "小学五年级运动能力标准 v1.0"))
     private val classes = listOf(

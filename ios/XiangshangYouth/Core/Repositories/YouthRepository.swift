@@ -103,8 +103,6 @@ extension YouthRepository {
     func submitHealthCheckin(_ record: HealthCheckInRecord, expectedVersion: Int? = nil) async throws -> HealthCheckInRecord { try requireMockDefault(); return record }
     func loadClassPosts(schoolID: String?, classID: String?, cursor: String?) async throws -> ClassPostPage { try requireMockDefault(); return ClassPostPage(posts: [], nextCursor: nil) }
     func loadClassPostAttachment(fileID: String) async throws -> Data { throw ApiError.notConfigured }
-    var supportsRemoteAcknowledgement: Bool { false }
-
     func loadReport(for student: Student) async throws -> DiagnosisReport { try requireMockDefault(); return report(for: student) }
 
     func submitActivity(_ value: ActivityRegistration) async throws -> ActivityRegistrationAck {

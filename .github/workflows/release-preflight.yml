@@ -9,6 +9,12 @@ on:
         default: pilot
         type: choice
         options: [pilot, production]
+      remote_workflow_mode:
+        description: "真实后端业务验收（专用 fixture）"
+        required: true
+        default: none
+        type: choice
+        options: [none, read-only, task-write, lifecycle-write]
 
 permissions:
   contents: read
@@ -40,9 +46,37 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run strict release preflight
         run: python3 scripts/release_preflight.py --target "${{ inputs.target }}" --allow-missing-devices --json "$RUNNER_TEMP/youth-release-preflight.json"
+      - name: Run remote workflow acceptance
+        if: ${{ always() && inputs.remote_workflow_mode != 'none' }}
+        working-directory: backend
+        env:
+          REMOTE_E2E_BASE_URL: ${{ secrets.API_BASE_URL }}
+          REMOTE_E2E_SCHOOL_ID: ${{ secrets.REMOTE_E2E_SCHOOL_ID }}
+          REMOTE_E2E_PARENT_ACCOUNT: ${{ secrets.REMOTE_E2E_PARENT_ACCOUNT }}
+          REMOTE_E2E_PARENT_PASSWORD: ${{ secrets.REMOTE_E2E_PARENT_PASSWORD }}
+          REMOTE_E2E_TEACHER_ACCOUNT: ${{ secrets.REMOTE_E2E_TEACHER_ACCOUNT }}
+          REMOTE_E2E_TEACHER_PASSWORD: ${{ secrets.REMOTE_E2E_TEACHER_PASSWORD }}
+          REMOTE_E2E_ALLOW_WRITES: ${{ inputs.remote_workflow_mode == 'task-write' && '1' || '0' }}
+          REMOTE_E2E_TASK_ID: ${{ secrets.REMOTE_E2E_TASK_ID }}
+          REMOTE_E2E_STUDENT_ID: ${{ secrets.REMOTE_E2E_STUDENT_ID }}
+          REMOTE_E2E_ALLOW_LIFECYCLE_WRITES: ${{ inputs.remote_workflow_mode == 'lifecycle-write' && '1' || '0' }}
+          REMOTE_E2E_CHILD_ID: ${{ secrets.REMOTE_E2E_CHILD_ID }}
+          REMOTE_E2E_ACTIVITY_ID: ${{ secrets.REMOTE_E2E_ACTIVITY_ID }}
+          REMOTE_E2E_EXPERT_ID: ${{ secrets.REMOTE_E2E_EXPERT_ID }}
+          REMOTE_E2E_SLOT_ID: ${{ secrets.REMOTE_E2E_SLOT_ID }}
+          REMOTE_E2E_RESCHEDULE_SLOT_ID: ${{ secrets.REMOTE_E2E_RESCHEDULE_SLOT_ID }}
+        run: node scripts/remote-workflow-smoke.js > "$RUNNER_TEMP/youth-remote-workflows.json"
       - name: Upload release evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: xiangshang-youth-${{ inputs.target }}-preflight
           path: ${{ runner.temp }}/youth-release-preflight.json
+          if-no-files-found: error
+      - name: Upload remote workflow evidence
+        if: ${{ always() && inputs.remote_workflow_mode != 'none' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: xiangshang-youth-${{ inputs.target }}-remote-workflows
+          path: ${{ runner.temp }}/youth-remote-workflows.json
           if-no-files-found: error

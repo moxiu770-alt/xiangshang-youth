@@ -2,6 +2,8 @@ package com.xiangshang.youth
 
 import com.xiangshang.youth.core.model.MessageItem
 import com.xiangshang.youth.core.util.MessageBusinessRoutePolicy
+import com.xiangshang.youth.core.util.MessageTaskScope
+import com.xiangshang.youth.core.model.UserRole
 import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -70,5 +72,16 @@ class MessageBusinessRoutePolicyTest {
             )
         )
         assertNull(target)
+    }
+
+    @Test fun familyTaskMessagesCanNeverResolveToTheTeacherEditor() {
+        val item = MessageItem("m-task", "补测提醒", "", "刚刚", "任务", false, businessRoute = "retest", businessId = "task-1", childId = "s01")
+        val parentTarget = MessageBusinessRoutePolicy.taskTarget(item, UserRole.Parent, taskExists = true, roleAuthorized = true)
+        val teacherTarget = MessageBusinessRoutePolicy.taskTarget(item, UserRole.Teacher, taskExists = true, roleAuthorized = true)
+        assertEquals(MessageTaskScope.Parent, parentTarget?.scope)
+        assertEquals(MessageTaskScope.Teacher, teacherTarget?.scope)
+        assertEquals("task-1", parentTarget?.taskId)
+        assertNull(MessageBusinessRoutePolicy.taskTarget(item, UserRole.Parent, taskExists = true, roleAuthorized = false))
+        assertNull(MessageBusinessRoutePolicy.taskTarget(item, UserRole.Principal, taskExists = true, roleAuthorized = true))
     }
 }

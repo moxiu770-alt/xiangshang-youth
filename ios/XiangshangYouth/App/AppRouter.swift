@@ -6,7 +6,7 @@ enum AssessmentCategory: String, Hashable, CaseIterable { case fitness = "体质
 }
 
 enum AppRoute: Hashable {
-    case roleSelect; case backendDashboard; case parentHome; case parentCourses; case children(returnAfterBinding: Bool); case parentEvaluations; case parentMessages; case notifications; case healthProfile; case bodyAssessment; case assessment(AssessmentCategory); case activityList; case expertList; case teacherHome; case teacherMessages; case teacherNoticeComposer; case teacherClasses; case teacherClassBoard; case studentList(ClassInfo?); case outstandingStudents; case unassignedStudents; case teacherTasks; case teacherTaskDetail(TestTask); case reviewList; case report(Student)
+    case roleSelect; case backendDashboard; case parentHome; case parentCourses; case children(returnAfterBinding: Bool); case parentEvaluations; case parentTask(TestTask); case parentMessages; case notifications; case healthProfile; case bodyAssessment; case assessment(AssessmentCategory); case activityList; case expertList; case teacherHome; case teacherMessages; case teacherNoticeComposer; case teacherClasses; case teacherClassBoard; case studentList(ClassInfo?); case outstandingStudents; case unassignedStudents; case teacherTasks; case teacherTaskDetail(TestTask); case reviewList; case report(Student)
 
     /// A bell must never route a family into the teacher inbox. Keep this
     /// mapping next to the route declarations so every header uses the same

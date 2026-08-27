@@ -38,6 +38,8 @@ import { handleContentOperationRoutes } from './routes/contentOperations.js';
 import { handleTeacherTaskRoutes } from './routes/teacherTasks.js';
 import { handleFieldDeviceRoutes } from './routes/fieldDevice.js';
 import { handleFieldAdminRoutes } from './routes/fieldAdmin.js';
+import { createAuthClaimsService } from './authClaims.js';
+import { handleFileRoutes } from './routes/files.js';
 
 const { port, isProduction, accessTokenTtlMinutes, refreshTokenTtlDays, maxSessionsPerUser, mfaEncryptionKey, verificationCodePepper, requireMfaForPrivileged, auditLogSigningKey, requireHealthConsent, healthRetentionDays, allowPublicRegistration, smsWebhookUrl, smsWebhookAuthorization, wechatAppId, wechatAppSecret, wechatRedirectUri, oauthStateTtlSeconds, corsOrigin, trustProxy, metricsToken, jobWorkerEnabled, jobWorkerMode, jobWorkerIntervalMs, jobWorkerShutdownTimeoutMs, fieldDeviceKeyTtlDays, fieldDeviceSigningEncryptionKey, fieldDeviceSignedRequestsRequired, fieldDeviceSignatureMaxAgeSeconds, fieldEvidenceVideoRetentionDays, fieldEvidenceDerivedRetentionDays, workerHeartbeatMaxAgeSeconds, backupEnabled, backupIntervalSeconds, backupHeartbeatMaxAgeSeconds } = config;
 assertServerRuntimeConfig();
@@ -541,118 +543,7 @@ const startFieldRealtime = async () => {
   } catch (error) { logger.warn('field.realtime_listener_start_failed', { error: error.message }); }
 };
 
-const mobileEntryAllowedForRole = (roleCode) => ['parent', 'teacher'].includes(roleCode);
-
-/**
- * Builds the sole authorization contract consumed by native clients.  It is
- * deliberately independent from display names: a teacher may share a name
- * with another teacher without sharing a class or an operational capability.
- */
-async function authClaimsForUser(user) {
-  const scopedRoles = await query(`SELECT ur.id AS "userRoleId", ur.role_id AS "roleId", r.code, r.name,
-      ur.school_id AS "schoolId", ur.class_id AS "classId"
-    FROM user_roles ur JOIN roles r ON r.id=ur.role_id
-    LEFT JOIN schools scoped_school ON scoped_school.id=ur.school_id
-    WHERE ur.user_id=$1 AND (ur.school_id IS NULL OR scoped_school.status='active')
-    ORDER BY CASE r.code WHEN 'parent' THEN 1 WHEN 'teacher' THEN 2 WHEN 'principal' THEN 3 ELSE 4 END, ur.created_at, ur.id`, [user.id]);
-  const roleRows = scopedRoles.rows;
-  const roleIds = [...new Set(roleRows.map((row) => row.roleId))];
-  const roleCapabilities = roleIds.length
-    ? await query(`SELECT role_id AS "roleId", capability_code AS "capabilityCode" FROM role_capabilities WHERE role_id = ANY($1::text[])`, [roleIds])
-    : { rows: [] };
-  const overrides = await query(`SELECT capability_code AS "capabilityCode",allowed,
-      school_id AS "schoolId",class_id AS "classId"
-    FROM user_capability_overrides
-    WHERE user_id=$1 AND (expires_at IS NULL OR expires_at>now())`, [user.id]);
-  const capsByRole = new Map();
-  for (const row of roleCapabilities.rows) {
-    const current = capsByRole.get(row.roleId) || new Set();
-    current.add(row.capabilityCode);
-    capsByRole.set(row.roleId, current);
-  }
-  const groups = new Map();
-  for (const row of roleRows) {
-    const key = `${row.code}|${row.schoolId || ''}`;
-    const current = groups.get(key) || {
-      roleCode: row.code,
-      name: row.name,
-      schoolId: row.schoolId || null,
-      campusIds: [],
-      authorizedGradeIds: [],
-      authorizedClassIds: [],
-      capabilities: new Set()
-    };
-    if (row.classId && !current.authorizedClassIds.includes(row.classId)) current.authorizedClassIds.push(row.classId);
-    for (const capability of capsByRole.get(row.roleId) || []) current.capabilities.add(capability);
-    groups.set(key, current);
-  }
-  // Resolve user-specific grants/denials after role grants.  A class-specific
-  // override applies only to its class claim; global/school overrides apply to
-  // the whole role+school group.
-  for (const group of groups.values()) {
-    for (const override of overrides.rows) {
-      if (override.schoolId && override.schoolId !== group.schoolId) continue;
-      if (override.classId && !group.authorizedClassIds.includes(override.classId)) continue;
-      if (override.allowed) group.capabilities.add(override.capabilityCode);
-      else group.capabilities.delete(override.capabilityCode);
-    }
-  }
-  const classIds = [...new Set([...groups.values()].flatMap((group) => group.authorizedClassIds))];
-  const gradeRows = classIds.length
-    ? await query('SELECT DISTINCT grade_id AS "gradeId" FROM classes WHERE id = ANY($1::text[])', [classIds])
-    : { rows: [] };
-  const gradeIds = gradeRows.rows.map((row) => row.gradeId);
-  const accountRoles = [...groups.values()].map((group) => ({
-    roleCode: group.roleCode,
-    name: group.name,
-    schoolId: group.schoolId,
-    campusIds: group.campusIds,
-    authorizedGradeIds: group.authorizedClassIds.length ? gradeIds : [],
-    authorizedClassIds: group.authorizedClassIds,
-    capabilities: [...group.capabilities].sort(),
-    mobileEntryAllowed: mobileEntryAllowedForRole(group.roleCode)
-  }));
-  const primary = accountRoles[0] || { roleCode: 'parent', schoolId: null, capabilities: [], authorizedClassIds: [] };
-  const schoolName = primary.schoolId ? (await query('SELECT name FROM schools WHERE id=$1', [primary.schoolId])).rows[0]?.name || '' : '';
-  const roleLabels = { parent: '家长', teacher: '教师', principal: '校长', admin: '管理员' };
-  return {
-    claimsVersion: 1,
-    activeRole: primary.roleCode,
-    accountRoles,
-    user: {
-      id: user.id,
-      name: user.name,
-      phone: user.phone || '未绑定手机号',
-      role: roleLabels[primary.roleCode] || primary.roleCode,
-      roleCode: primary.roleCode,
-      schoolId: primary.schoolId,
-      schoolName,
-      avatarInitials: String(user.name).slice(0, 1),
-      authorizedGradeIds: primary.authorizedGradeIds || gradeIds,
-      authorizedClassIds: primary.authorizedClassIds || [],
-      capabilities: primary.capabilities || [],
-      mobileEntryAllowed: mobileEntryAllowedForRole(primary.roleCode)
-    },
-    // Retained during mobile rollout so older clients can decode the response.
-    roles: accountRoles.map((role) => ({ code: role.roleCode, name: role.name, schoolId: role.schoolId, classIds: role.authorizedClassIds, capabilities: role.capabilities }))
-  };
-}
-
-/**
- * Server-side authorization guard.  UI visibility is advisory only: every
- * teacher action must also match the capability and the scoped school/class
- * carried by the authoritative role claim.
- */
-async function userHasCapability(user, capability, schoolId = null, classId = null) {
-  if (hasRole(user, 'admin', 'principal')) return true;
-  const claims = await authClaimsForUser(user);
-  return claims.accountRoles.some((role) => {
-    if (role.roleCode !== 'teacher' || !role.capabilities.includes(capability)) return false;
-    if (schoolId && role.schoolId && role.schoolId !== schoolId) return false;
-    if (classId && !role.authorizedClassIds.includes(classId)) return false;
-    return true;
-  });
-}
+const { authClaimsForUser, userHasCapability } = createAuthClaimsService({ query, hasRole });
 
 async function authPayload(user, accessToken, refreshToken, accessExpiresAt, refreshExpiresAt) {
   return {
@@ -2678,50 +2569,13 @@ async function handle(req, res) {
         WHERE c.school_id=$1 AND ($2::text IS NULL OR c.grade_id=$2) AND ($3::text[] IS NULL OR c.id=ANY($3)) GROUP BY c.id,u.name ORDER BY c.name`, [schoolId, gradeId, scopedClasses]);
       return ok(res, result.rows);
     }
-    if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'files' && parts[2] === 'presign') {
-      const input = await body(req);
-      const name = safeFileName(input.fileName || input.name || 'upload.bin');
-      const contentType = String(input.contentType || 'application/octet-stream');
-      const fileSize = Number(input.fileSize || 0);
-      if (!allowedContentTypes.has(contentType)) return fail(res, 400, 'FILE_TYPE_NOT_ALLOWED', '文件类型不受支持');
-      if (!Number.isInteger(fileSize) || fileSize < 0 || fileSize > maxUploadBytes) return fail(res, 400, 'FILE_SIZE_INVALID', '文件大小不合法或超过 20MB');
-      const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash(input));
-      if (idempotency === false) return;
-      const fileId = crypto.randomUUID();
-      const objectKey = `${user.id}/${fileId}-${name}`;
-      const expiresAt = new Date(Date.now() + 30 * 60_000);
-      const result = await query(`INSERT INTO files(id,owner_id,object_key,file_type,purpose,content_type,file_size,expires_at)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id,object_key AS "objectKey",content_type AS "contentType",status,expires_at AS "expiresAt"`, [fileId, user.id, objectKey, path.extname(name).slice(1) || 'bin', input.purpose || 'general', contentType, fileSize, expiresAt]);
-      return createdIdempotently(res, user, idempotency, { ...result.rows[0], uploadUrl: `/v1/files/${fileId}/content` });
-    }
-    if (req.method === 'PUT' && parts[0] === 'v1' && parts[1] === 'files' && parts[3] === 'content') {
-      const fileResult = await query('SELECT * FROM files WHERE id=$1', [parts[2]]);
-      const file = fileResult.rows[0];
-      if (!file || (file.owner_id !== user.id && !hasRole(user, 'admin'))) return fail(res, 404, 'FILE_NOT_FOUND', '文件不存在');
-      if (file.expires_at && new Date(file.expires_at) < new Date()) return fail(res, 410, 'FILE_UPLOAD_EXPIRED', '上传凭证已过期');
-      const bytes = await rawBody(req);
-      if (bytes.length > maxUploadBytes || (Number(file.file_size) > 0 && bytes.length > Number(file.file_size))) return fail(res, 413, 'FILE_SIZE_INVALID', '实际文件大小超过限制');
-      if (!fileSignatureMatches(bytes, file.content_type)) return fail(res, 400, 'FILE_SIGNATURE_INVALID', '文件内容与声明类型不匹配');
-      await storage.put(file.object_key, bytes, file.content_type);
-      const result = await query(`UPDATE files SET file_size=$1,checksum_sha256=$2,status='uploaded',uploaded_at=now() WHERE id=$3 RETURNING id,file_size AS "fileSize",checksum_sha256 AS "checksumSha256",status,uploaded_at AS "uploadedAt"`, [bytes.length, sha256(bytes), file.id]);
-      return ok(res, result.rows[0]);
-    }
-    if (req.method === 'GET' && parts[0] === 'v1' && parts[1] === 'files' && parts[3] === 'content') {
-      const fileResult = await query('SELECT * FROM files WHERE id=$1 AND status=\'uploaded\'', [parts[2]]);
-      const file = fileResult.rows[0];
-      if (!file || (file.owner_id !== user.id && !(await classPostFileVisibleToUser(user, parts[2])))) return fail(res, 404, 'FILE_NOT_FOUND', '文件不存在');
-      let bytes;
-      try { bytes = await storage.get(file.object_key); } catch { return fail(res, 404, 'FILE_NOT_FOUND', '文件内容不存在'); }
-      res.writeHead(200, { 'Content-Type': file.content_type, 'Content-Length': bytes.length, 'Content-Disposition': `inline; filename="${safeFileName(file.object_key.split('/').pop())}"`, 'Cache-Control': 'private, no-store', ...(corsOrigin ? { 'Access-Control-Allow-Origin': corsOrigin } : {}) });
-      return res.end(bytes);
-    }
-    if (req.method === 'GET' && parts[0] === 'v1' && parts[1] === 'files' && parts.length === 3) {
-      const result = await query('SELECT id,owner_id AS "ownerId",object_key AS "objectKey",file_type AS "fileType",purpose,content_type AS "contentType",file_size AS "fileSize",status,expires_at AS "expiresAt",uploaded_at AS "uploadedAt" FROM files WHERE id=$1', [parts[2]]);
-      const file = result.rows[0];
-      if (!file || (file.ownerId !== user.id && !(await classPostFileVisibleToUser(user, parts[2])))) return fail(res, 404, 'FILE_NOT_FOUND', '文件不存在');
-      return ok(res, file);
-    }
-
+    await handleFileRoutes({
+      req, res, user, parts, storage, query, body, rawBody, fail, ok,
+      beginIdempotentRequest, requestBodyHash, createdIdempotently,
+      classPostFileVisibleToUser, hasRole, corsOrigin, allowedContentTypes,
+      fileSignatureMatches, maxUploadBytes, safeFileName
+    });
+    if (res.writableEnded) return;
     if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'admin' && parts[2] === 'students' && parts.length === 3) {
       if (!hasRole(user, 'admin', 'principal')) return fail(res, 403, 'NO_PERMISSION', '只有管理员或校长可以创建学生');
       const input = await body(req);

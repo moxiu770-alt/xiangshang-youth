@@ -1,10 +1,20 @@
 {
-  "backend/src/server.js": 3100,
+  "backend/src/server.js": 2920,
+  "backend/src/authClaims.js": 140,
+  "backend/src/routes/files.js": 80,
   "ios/XiangshangYouth/App/AppState.swift": 700,
   "ios/XiangshangYouth/Features/Parent/BodyAssessmentViews.swift": 800,
+  "ios/XiangshangYouth/Features/Parent/ParentViews.swift": 800,
+  "ios/XiangshangYouth/Features/Parent/ParentMessageViews.swift": 260,
+  "ios/XiangshangYouth/Features/Parent/ParentExtendedViews.swift": 640,
+  "ios/XiangshangYouth/Features/Parent/ParentAccountViews.swift": 460,
+  "ios/XiangshangYouth/Features/Auth/AuthViews.swift": 700,
+  "ios/XiangshangYouth/Features/Auth/AuthRoleViews.swift": 140,
   "ios/XiangshangYouth/Core/Models/BodyAssessment.swift": 450,
   "ios/XiangshangYouth/Core/Models/BodyPostureAssessment.swift": 700,
   "android/app/src/main/java/com/xiangshang/youth/app/AppState.kt": 550,
   "android/app/src/main/java/com/xiangshang/youth/core/model/BodyAssessment.kt": 250,
-  "android/app/src/main/java/com/xiangshang/youth/core/model/BodyPostureAssessment.kt": 820
+  "android/app/src/main/java/com/xiangshang/youth/core/model/BodyPostureAssessment.kt": 820,
+  "android/app/src/main/java/com/xiangshang/youth/feature/parent/LivePostureCapture.kt": 470,
+  "android/app/src/main/java/com/xiangshang/youth/feature/parent/LivePostureAnalyzer.kt": 520
 }

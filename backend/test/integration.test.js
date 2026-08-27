@@ -433,6 +433,88 @@ test('auth, scope, idempotency and file guardrails', async () => {
   assert.equal(forbiddenDownload.response.status, 404);
 });
 
+test('activity and expert appointment lifecycles persist versions and reject stale writes', async () => {
+  const parent = await login('13800000002', 'ChangeMe123!');
+  const suffix = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+  const activityId = `integration-activity-${suffix}`;
+  const expertId = `integration-expert-${suffix}`;
+  const firstSlotId = `integration-slot-a-${suffix}`;
+  const secondSlotId = `integration-slot-b-${suffix}`;
+  const verificationPool = new Pool({ connectionString: databaseUrl });
+  try {
+    await verificationPool.query(`INSERT INTO activities(id,school_id,title,description,starts_at,ends_at,capacity,registration_start_at,registration_end_at,status,created_by)
+      VALUES($1,'school-1','集成验收活动','仅用于自动化验收',now()+interval '10 day',now()+interval '10 day 2 hour',2,now()-interval '1 day',now()+interval '5 day','published','user-admin')`, [activityId]);
+    await verificationPool.query(`INSERT INTO experts(id,school_id,name,title,bio,status) VALUES($1,'school-1','验收专家','自动化验收','仅用于独立测试库','active')`, [expertId]);
+    await verificationPool.query(`INSERT INTO expert_slots(id,expert_id,school_id,service_id,scheduled_start_at,scheduled_end_at,capacity,status)
+      VALUES($1,$3,'school-1','integration-service',now()+interval '11 day',now()+interval '11 day 1 hour',1,'available'),
+            ($2,$3,'school-1','integration-service',now()+interval '12 day',now()+interval '12 day 1 hour',1,'available')`, [firstSlotId, secondSlotId, expertId]);
+
+    const createRegistration = await request(`/v1/activities/${activityId}/registrations`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${parent.accessToken}`, 'content-type': 'application/json', 'Idempotency-Key': `activity-create-${suffix}` },
+      body: JSON.stringify({ childId: 'student-1', contactName: '验收联系人', phone: '13900000000' })
+    });
+    assert.equal(createRegistration.response.status, 201, JSON.stringify(createRegistration.body));
+    const registration = createRegistration.body.data;
+    const editRegistration = await request(`/v1/activities/${activityId}/registrations/${registration.registrationId}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${parent.accessToken}`, 'content-type': 'application/json', 'Idempotency-Key': `activity-edit-${suffix}` },
+      body: JSON.stringify({ childId: 'student-1', contactName: '验收联系人', phone: '13900000000', expectedVersion: registration.version })
+    });
+    assert.equal(editRegistration.response.status, 200, JSON.stringify(editRegistration.body));
+    assert.ok(editRegistration.body.data.version > registration.version);
+    const staleRegistration = await request(`/v1/activities/${activityId}/registrations/${registration.registrationId}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${parent.accessToken}`, 'content-type': 'application/json', 'Idempotency-Key': `activity-stale-${suffix}` },
+      body: JSON.stringify({ childId: 'student-1', contactName: '验收联系人', phone: '13900000000', expectedVersion: registration.version })
+    });
+    assert.equal(staleRegistration.response.status, 409, JSON.stringify(staleRegistration.body));
+    assert.equal(staleRegistration.body.code, 'VERSION_CONFLICT');
+    const cancelRegistration = await request(`/v1/activities/${activityId}/registrations/${registration.registrationId}/cancel`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${parent.accessToken}`, 'content-type': 'application/json', 'Idempotency-Key': `activity-cancel-${suffix}` },
+      body: JSON.stringify({ expectedVersion: editRegistration.body.data.version })
+    });
+    assert.equal(cancelRegistration.response.status, 200, JSON.stringify(cancelRegistration.body));
+    assert.equal(cancelRegistration.body.data.status, 'cancelled');
+
+    const createAppointment = await request('/v1/expert-appointments', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${parent.accessToken}`, 'content-type': 'application/json', 'Idempotency-Key': `appointment-create-${suffix}` },
+      body: JSON.stringify({ childId: 'student-1', expertId, slotId: firstSlotId, note: '自动化验收' })
+    });
+    assert.equal(createAppointment.response.status, 201, JSON.stringify(createAppointment.body));
+    const appointment = createAppointment.body.data;
+    const reschedule = await request(`/v1/expert-appointments/${appointment.appointmentId}/reschedule`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${parent.accessToken}`, 'content-type': 'application/json', 'Idempotency-Key': `appointment-reschedule-${suffix}` },
+      body: JSON.stringify({ slotId: secondSlotId, expectedVersion: appointment.version })
+    });
+    assert.equal(reschedule.response.status, 200, JSON.stringify(reschedule.body));
+    assert.ok(reschedule.body.data.version > appointment.version);
+    const staleAppointment = await request(`/v1/expert-appointments/${appointment.appointmentId}/reschedule`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${parent.accessToken}`, 'content-type': 'application/json', 'Idempotency-Key': `appointment-stale-${suffix}` },
+      body: JSON.stringify({ slotId: firstSlotId, expectedVersion: appointment.version })
+    });
+    assert.equal(staleAppointment.response.status, 409, JSON.stringify(staleAppointment.body));
+    assert.equal(staleAppointment.body.code, 'VERSION_CONFLICT');
+    const cancelAppointment = await request(`/v1/expert-appointments/${appointment.appointmentId}/cancel`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${parent.accessToken}`, 'content-type': 'application/json', 'Idempotency-Key': `appointment-cancel-${suffix}` },
+      body: JSON.stringify({ expectedVersion: reschedule.body.data.version })
+    });
+    assert.equal(cancelAppointment.response.status, 200, JSON.stringify(cancelAppointment.body));
+    assert.equal(cancelAppointment.body.data.status, 'cancelled');
+  } finally {
+    await verificationPool.query('DELETE FROM activity_registrations WHERE activity_id=$1', [activityId]).catch(() => {});
+    await verificationPool.query('DELETE FROM expert_appointments WHERE expert_id=$1 OR slot_id=ANY($2::text[])', [expertId, [firstSlotId, secondSlotId]]).catch(() => {});
+    await verificationPool.query('DELETE FROM activities WHERE id=$1', [activityId]).catch(() => {});
+    await verificationPool.query('DELETE FROM experts WHERE id=$1', [expertId]).catch(() => {});
+    await verificationPool.end();
+  }
+});
+
 test('field device syncs queue, session, evidence contract and commands idempotently', async () => {
   const admin = await login('13800000000', process.env.SEED_PASSWORD || 'ChangeMe123!');
   const authHeaders = { Authorization: `Bearer ${admin.accessToken}`, 'content-type': 'application/json' };

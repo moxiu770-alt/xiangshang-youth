@@ -33,4 +33,18 @@ npm run smoke:remote-workflows
 
 写入模式先使用服务端当前版本执行幂等更新，再使用旧版本验证 HTTP 409；不允许指向真实教学任务。
 
+活动和专家预约的创建、修改/改期、版本冲突与取消验收必须使用可清理的专用 fixture，并单独显式开启：
+
+```bash
+REMOTE_E2E_ALLOW_LIFECYCLE_WRITES=1 \
+REMOTE_E2E_CHILD_ID=<该验收账号已绑定的专用孩子ID> \
+REMOTE_E2E_ACTIVITY_ID=<可反复报名并取消的验收活动ID> \
+REMOTE_E2E_EXPERT_ID=<验收专家ID> \
+REMOTE_E2E_SLOT_ID=<验收时段ID> \
+REMOTE_E2E_RESCHEDULE_SLOT_ID=<另一个验收时段ID> \
+npm run smoke:remote-workflows
+```
+
+脚本会为专用孩子创建并取消报名、创建并取消预约，且用旧版本验证两条业务链路都返回 `VERSION_CONFLICT`。两个预约时段必须属于测试资源且保持可预约；不得使用真实家庭或真实服务时段。
+
 验收输出应作为 CI artifact 保存。缺少专用账号或 fixture 时必须记录为阻塞，不能用 Mock 结果替代。

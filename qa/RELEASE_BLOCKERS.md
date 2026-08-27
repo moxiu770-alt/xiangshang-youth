@@ -2,12 +2,12 @@
 
 ## 2026-08-27 候选基线复核
 
-- 大文件已按可独立评审的边界继续拆分：iOS `AppState` 为 679 行、身体基础模型为 411 行、姿态模型为 673 行、身体测评主视图为 763 行；Android `AppState` 为 505 行、身体基础模型为 211 行、姿态模型为 784 行；后端学生导入从 `server.js` 抽离，`server.js` 为 3053 行。新增行数预算门禁，后续不能重新合并或继续无界增长。
-- iOS 模拟器 Debug 构建通过，核心 XCTest 100/100 通过；Android Debug 单元测试 115/115 通过，`assembleDebug` 与 `lintDebug` 通过；后端 `npm run check`、OpenAPI lint 和 62/62 单元/契约测试通过；前端契约、225 项跨端模型不变量及本地发布预检通过。
-- RemoteRepository 的协议默认实现保持 Mock-only：远程实现漏接方法时明确抛出 `notConfigured`，不会返回空数组、随机 ID 或 `pending_sync` 冒充服务端成功。
-- 已增加专用远程业务验收脚本和清单。脚本默认只读，只有设置 `REMOTE_E2E_ALLOW_WRITES=1` 并提供专用任务/学生 fixture 时才验证写入、幂等与 409 版本冲突；不会输出令牌或账号密码。
+- 大文件已按可独立评审的边界继续拆分：后端权威账号范围抽到 `authClaims.js`、文件上传与访问路由抽到 `routes/files.js`，`server.js` 从 3053 行降到 2907 行；iOS 角色入口、家庭账户、班级圈/课程和家庭消息已拆为独立文件；Android 实时姿态 UI 与分析器已分离为 425/477 行。18 个重点文件都加入行数预算门禁，后续不能重新合并或无界增长。
+- iOS 模拟器 Debug 构建通过；Android Debug 单元测试、`assembleDebug` 与 `lintDebug` 通过；后端 `npm run check`、OpenAPI lint 和 63/63 单元/契约测试通过；前端契约、迁移序列、本地发布预检和大文件边界门禁通过。本轮最终 XCTest 数量以本次任务结尾的测试结果为准。
+- RemoteRepository 的 Mock-only 默认实现进一步收紧：所有 Repository 实现必须显式声明是否支持远程确认，漏掉模式声明将直接编译失败；远程实现漏接业务方法时继续明确抛出 `notConfigured`，不会返回空数组、随机 ID 或 `pending_sync` 冒充服务端成功。
+- 专用远程业务验收脚本已修正真实 `/auth/session` 和 `/readyz` 响应字段，并增加活动“报名→编辑→版本冲突→取消”、专家“预约→改期→版本冲突→取消”生命周期模式。手工发布 workflow 可按只读、任务写入或生命周期写入运行并保存 JSON 证据，所有写入都要求显式专用孩子和 fixture ID；不会输出令牌或账号密码。
 - 当前仍不能宣称“真实远程全闭环通过”：本机未配置专用家长/教师验收账号、写入 fixture 和独立 `TEST_DATABASE_URL`；当前网络对 `api.risingteen.com` 解析到保留测试地址 `198.18.0.177`，TLS 握手失败。集成测试、远程业务验收和真实推送因此保持阻塞，不以 Mock、本地构建或生产数据库替代。
-- 本轮没有执行 iOS UI Test、Android Compose instrumentation/真机测试；它们需在候选提交进入受保护 CI 后保存证据。当前通过结果只覆盖本地模拟器构建/XCTest、Android JVM 单测/Lint/APK 和后端无数据库测试。
+- 后端真实 PostgreSQL 集成套件已加入活动和专家生命周期用例，但本机仍缺少独立 `TEST_DATABASE_URL`，因此新增用例只完成语法检查并等待 CI 独立 schema 执行；不得把该状态描述为远程联调通过。Android 本机没有连接设备，Compose instrumentation 仍由候选提交的干净模拟器 CI 保存证据。
 
 本轮已完成的代码级门禁：
 

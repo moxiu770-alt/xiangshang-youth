@@ -314,18 +314,29 @@ fun ChildrenScreen(state: AppUiState, nav: NavHostController, bindChild: (String
     )
 }
 @Composable
-fun ParentEvaluationsScreen(state: AppUiState, nav: NavHostController, report: DiagnosisReport?) = ParentTabScaffold(nav, Destinations.ParentEvaluations) {
+fun ParentEvaluationsScreen(state: AppUiState, nav: NavHostController, report: DiagnosisReport?, focusedTaskId: String? = null) = ParentTabScaffold(nav, Destinations.ParentEvaluations) {
     val dashboardError = state.error
     if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current); return@ParentTabScaffold }
     if (state.loading || state.data == null) { LoadingState(); return@ParentTabScaffold }
     if (state.selectedChild == null) { EmptyState("暂无孩子档案，请先完成孩子绑定。"); Button(onClick = { nav.navigate(Destinations.ChildrenBinding) }, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("去绑定孩子") }; return@ParentTabScaffold }
     val selectedChild = state.selectedChild
+    val focusedTask = focusedTaskId?.let { id -> state.data.tasks.firstOrNull { it.id == id && (it.studentIds.isEmpty() || selectedChild.id in it.studentIds) } }
     val bodyHistory = state.local.bodyAssessmentHistory[selectedChild.id].orEmpty().takeLast(5)
     val measuredHeights = bodyHistory.map { it.heightCm }
     val latestHeight = measuredHeights.lastOrNull()
     val geneticReference = bodyHistory.lastOrNull()?.geneticHeightReference(selectedChild.gender)
     val heightDevelopment = bodyHistory.lastOrNull()?.heightDevelopmentAssessment(selectedChild.bodyAssessmentAgeMonths, selectedChild.gender)
     ParentHeader(selectedChild.name, "${selectedChild.grade} · ${selectedChild.className} · 成长小档案", onClick = { nav.navigate(Destinations.Children) })
+    if (focusedTaskId != null) {
+        Spacer(Modifier.height(8.dp))
+        Surface(Modifier.fillMaxWidth(), color = if (focusedTask == null) Color(0xFFFFF4E5) else Sky, shape = RoundedCornerShape(12.dp)) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(if (focusedTask == null) "通知关联任务暂不可用" else "通知关联测评", color = Navy, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text(focusedTask?.title ?: "任务可能已结束、被撤回，或不属于当前孩子。", color = Color.Gray, fontSize = 12.sp)
+                focusedTask?.let { Text("${it.date} · ${it.location} · ${it.status.label}", color = Blue, fontSize = 12.sp) }
+            }
+        }
+    }
     Spacer(Modifier.height(8.dp))
     val publishedReport = report?.takeIf { state.hasPublishedSchoolReport(selectedChild) }
     val reportAwaitingSync = state.hasPublishedSchoolReport(selectedChild) && publishedReport == null && state.repositoryAcknowledged

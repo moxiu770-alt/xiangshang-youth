@@ -3,6 +3,7 @@ import Foundation
 /// Default data source for phase one. Switch AppEnvironment.repository to RemoteRepository when backend is ready.
 final class MockRepository: YouthRepository {
     static let shared = MockRepository()
+    let supportsRemoteAcknowledgement = false
     let school = School(id: "school-1", name: "向上实验小学", campus: "南湖校区", region: "广东省韶关市乳源瑶族自治县", isPovertyArea: true)
     let grades = [Grade(id: "g3", name: "三年级", standardVersion: "小学三年级运动能力标准 v1.0"), Grade(id: "g4", name: "四年级", standardVersion: "小学四年级运动能力标准 v1.0"), Grade(id: "g5", name: "五年级", standardVersion: "小学五年级运动能力标准 v1.0")]
     let classes = [

@@ -73,6 +73,15 @@ def main() -> int:
     ios_project = (ROOT / "ios/XiangshangYouth/XiangshangYouth.xcodeproj/project.pbxproj").read_text(encoding="utf-8")
 
     add(checks, "frontend-contract-script", (ROOT / "scripts/check_frontend_contract.py").is_file(), "跨端契约脚本存在")
+    migration_sequence = subprocess.run(
+        [sys.executable, str(ROOT / "scripts/check_migration_sequence.py")],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    migration_detail = (migration_sequence.stdout.strip().splitlines()[-1] if migration_sequence.stdout.strip() else "迁移序列检查未运行")
+    add(checks, "migration-sequence", migration_sequence.returncode == 0, migration_detail)
     boundary_check = subprocess.run(
         [sys.executable, str(ROOT / "scripts/check_large_file_boundaries.py")],
         cwd=ROOT,
@@ -98,7 +107,9 @@ def main() -> int:
         add(checks, "crash-dsn", sentry.startswith("https://") and "@" in sentry, "发布构建必须注入崩溃监控 DSN")
         for key, minimum in REQUIRED_PRODUCTION_SECRETS.items():
             value = env(key)
-            add(checks, f"secret:{key}", len(value) >= minimum and not value.lower().startswith("replace_with"), f"{key} 已注入且长度满足要求")
+            ready = len(value) >= minimum and not value.lower().startswith("replace_with")
+            detail = f"{key} 已注入且长度满足要求" if ready else f"{key} 未注入、长度不足或仍为占位值"
+            add(checks, f"secret:{key}", ready, detail)
         add(checks, "storage-driver", env("FILE_STORAGE_DRIVER") == "s3" and bool(env("S3_BUCKET")), "正式环境使用对象存储并配置 bucket")
         add(checks, "backup", env("BACKUP_ENABLED").lower() == "true" and env("BACKUP_ARCHIVE_ENABLED").lower() == "true", "正式环境启用异地备份归档")
         add(checks, "cors", bool(env("CORS_ORIGIN")) and env("CORS_ORIGIN") != "*", "正式环境 CORS 不得为通配符")
@@ -116,6 +127,8 @@ def main() -> int:
     if strict:
         verification = subprocess.run([sys.executable, str(model_verifier)], cwd=ROOT, text=True, capture_output=True, check=False)
         detail = (verification.stdout.strip() or verification.stderr.strip() or "模型人工验证失败").replace("\n", " ")
+        if detail.startswith("[BLOCK] model-human-validation: "):
+            detail = detail.removeprefix("[BLOCK] model-human-validation: ")
         add(checks, "model-human-validation", verification.returncode == 0, detail, blocking=True)
     else:
         add(checks, "model-human-validation", True, "本地模式仅验证门禁脚本；模型保持 pending-human-validation", blocking=False)

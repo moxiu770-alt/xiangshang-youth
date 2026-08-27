@@ -67,7 +67,7 @@ jobs:
           test -n "$backup_file"
           BACKUP_FILE="$backup_file" npm run backup:verify
           psql --username=xiangshang --dbname=postgres://xiangshang:ci_password@127.0.0.1:5432/postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS xiangshang_restore_verify'
-          createdb --username=xiangshang --owner=xiangshang --dbname=postgres://xiangshang:ci_password@127.0.0.1:5432/postgres xiangshang_restore_verify
+          createdb --host=127.0.0.1 --port=5432 --username=xiangshang --owner=xiangshang --maintenance-db=postgres xiangshang_restore_verify
           BACKUP_FILE="$backup_file" RESTORE_DATABASE_URL=postgres://xiangshang:ci_password@127.0.0.1:5432/xiangshang_restore_verify RESTORE_SCHEMA=xiangshang_integration RESTORE_EXPECT_DATA=true npm run backup:restore-verify
           psql --username=xiangshang --dbname=postgres://xiangshang:ci_password@127.0.0.1:5432/postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS xiangshang_restore_verify'
 

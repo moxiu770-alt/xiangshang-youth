@@ -7,16 +7,12 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.test.captureToImage
-import androidx.compose.ui.graphics.asAndroidBitmap
+import android.os.ParcelFileDescriptor
 import androidx.test.platform.app.InstrumentationRegistry
-import java.io.File
-import java.io.FileOutputStream
 import org.junit.Rule
 import org.junit.Test
 
@@ -42,16 +38,22 @@ class MainActivityFlowTest {
     @Test
     fun launchScreenshotIsSavedForVisualEvidence() {
         composeRule.onNodeWithContentDescription("向上少年启动页").assertIsDisplayed()
-        val bitmap = composeRule.onRoot().captureToImage().asAndroidBitmap()
-        val output = File(
-            InstrumentationRegistry.getInstrumentation().targetContext.filesDir,
-            "visual-evidence/launch-poster.png"
-        )
-        output.parentFile?.mkdirs()
-        FileOutputStream(output).use { stream ->
-            check(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, stream))
+        // connectedAndroidTest may uninstall the target package as soon as the
+        // suite finishes, so a targetContext.filesDir artifact is not reliably
+        // available to a following CI step. Capture through the test's shell
+        // identity into this clean emulator's public Download directory.
+        shellOutput("mkdir -p /sdcard/Download")
+        shellOutput("rm -f /sdcard/Download/xiangshang-launch-poster.png")
+        val captureOutput = shellOutput("screencap -p /sdcard/Download/xiangshang-launch-poster.png")
+        val evidence = shellOutput("ls -l /sdcard/Download/xiangshang-launch-poster.png")
+        check(evidence.contains("xiangshang-launch-poster.png") && !evidence.contains("No such file")) {
+            "launch screenshot was not written: capture=$captureOutput evidence=$evidence"
         }
-        check(output.length() > 0) { "launch screenshot was not written" }
+    }
+
+    private fun shellOutput(command: String): String {
+        val descriptor = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)
+        return ParcelFileDescriptor.AutoCloseInputStream(descriptor).bufferedReader().use { it.readText() }
     }
 
     @Test

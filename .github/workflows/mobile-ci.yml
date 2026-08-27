@@ -247,7 +247,7 @@ jobs:
           "$adb_cmd" shell settings put global transition_animation_scale 0
           "$adb_cmd" shell settings put global animator_duration_scale 0
           ./gradlew :app:connectedDebugAndroidTest --no-daemon --max-workers=2 --console=plain
-          "$adb_cmd" shell run-as com.xiangshang.youth cat files/visual-evidence/launch-poster.png > "$RUNNER_TEMP/android-visual-evidence/launch-poster.png"
+          "$adb_cmd" pull /sdcard/Download/xiangshang-launch-poster.png "$RUNNER_TEMP/android-visual-evidence/launch-poster.png"
           test -s "$RUNNER_TEMP/android-visual-evidence/launch-poster.png"
       - name: Upload Android instrumentation reports
         if: always()

@@ -47,6 +47,7 @@ __pycache__/
 field-client/**/bin/
 field-client/**/obj/
 field-client/artifacts/
+field-client/*.zip
 backend/monitoring/metrics_token
 
 # Secrets / environment

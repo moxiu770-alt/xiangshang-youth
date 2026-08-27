@@ -140,6 +140,10 @@ jobs:
   android:
     name: Android unit test and build
     runs-on: ubuntu-latest
+    env:
+      # Newer command-line tools and the emulator can otherwise resolve
+      # different per-user AVD locations across workflow steps.
+      ANDROID_AVD_HOME: ${{ runner.temp }}/android-avd
     defaults:
       run:
         working-directory: android
@@ -159,11 +163,12 @@ jobs:
           set -o pipefail
           gradle_log="$RUNNER_TEMP/android-gradle-unit.log"
           for attempt in 1 2 3; do
+            attempt_log="$RUNNER_TEMP/android-gradle-unit-attempt-$attempt.log"
             echo "Android JVM test attempt $attempt"
-            if ./gradlew :app:testDebugUnitTest --no-daemon --max-workers=1 --console=plain 2>&1 | tee -a "$gradle_log"; then
+            if ./gradlew :app:testDebugUnitTest --no-daemon --max-workers=1 --console=plain 2>&1 | tee "$attempt_log" | tee -a "$gradle_log"; then
               exit 0
             fi
-            if ! grep -q 'Received status code 429' "$gradle_log" || [ "$attempt" -eq 3 ]; then
+            if ! grep -q 'Received status code 429' "$attempt_log" || [ "$attempt" -eq 3 ]; then
               exit 1
             fi
             sleep $((attempt * 15))
@@ -200,11 +205,14 @@ jobs:
       - name: Prepare hosted Android emulator
         run: |
           android_sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:?Android SDK is not configured}}"
+          mkdir -p "$ANDROID_AVD_HOME"
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
           yes | "$android_sdk/cmdline-tools/latest/bin/sdkmanager" "system-images;android-34;google_apis;x86_64" >/dev/null
           printf 'no\n' | "$android_sdk/cmdline-tools/latest/bin/avdmanager" create avd --force --name XiangshangYouth_CI_API34 --package "system-images;android-34;google_apis;x86_64" --device pixel_2
+          test -f "$ANDROID_AVD_HOME/XiangshangYouth_CI_API34.ini"
+          "$android_sdk/emulator/emulator" -list-avds | grep -Fx XiangshangYouth_CI_API34
       - name: Run Compose instrumentation flow on a clean emulator
         id: android-instrumentation
         continue-on-error: true

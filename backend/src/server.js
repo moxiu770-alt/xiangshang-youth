@@ -2628,7 +2628,7 @@ async function handle(req, res) {
       parentOnly, hasRole, listResult, studentRow, beginIdempotentRequest,
       requestBodyHash, randomToken, sha256, audit, createdIdempotently,
       failIdempotently, body, requiredString, isProduction,
-      taskStatusAllowed, okIdempotently, taskStudentForUser,
+      taskStatusAllowed, okIdempotently, taskStudentForUser, studentForUser,
       movementScoreRules: MOVEMENT_SCORE_RULES, normalizeScoreRows,
       normalizeScore, normalizeConfidence, normalizeReviewStatus
     });
@@ -2724,7 +2724,7 @@ async function handle(req, res) {
     await handleActivityRoutes({
       req, res, user, url, parts,
       query, pool, hasRole, queryValue, studentForUser, fail,
-      requiredString, schoolAllowed, assertPhone, beginIdempotentRequest,
+      body, requiredString, schoolAllowed, assertPhone, beginIdempotentRequest,
       requestBodyHash, failIdempotently, audit, createdIdempotently,
       okIdempotently, ok
     });

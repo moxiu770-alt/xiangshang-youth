@@ -102,6 +102,10 @@ before(async () => {
     env: { ...process.env, DATABASE_URL: databaseUrl, PORT: String(port), NODE_ENV: 'test', CORS_ORIGIN: `http://127.0.0.1:${port}`, ALLOW_PUBLIC_REGISTRATION: 'false', METRICS_TOKEN: '', MFA_ENCRYPTION_KEY: 'integration-mfa-key-that-is-longer-than-thirty-two-characters', AUDIT_LOG_SIGNING_KEY: 'integration-audit-key-that-is-longer-than-thirty-two-characters', FIELD_DEVICE_SIGNED_REQUESTS_REQUIRED: 'true', FIELD_DEVICE_OFFLINE_AFTER_SECONDS: '1', FIELD_LIVENESS_RECONCILE_INTERVAL_SECONDS: '1', JOB_WORKER_CONCURRENCY: '3' },
     stdio: ['ignore', 'pipe', 'pipe']
   });
+  if (process.env.TEST_VERBOSE_SERVER_LOGS === 'true') {
+    serverProcess.stdout.pipe(process.stdout);
+    serverProcess.stderr.pipe(process.stderr);
+  }
   const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) {
     try {

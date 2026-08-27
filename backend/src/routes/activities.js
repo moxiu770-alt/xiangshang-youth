@@ -9,7 +9,7 @@ export async function handleActivityRoutes(context) {
   const {
     req, res, user, url, parts,
     query, pool, hasRole, queryValue, studentForUser, fail,
-    requiredString, schoolAllowed, assertPhone, beginIdempotentRequest,
+    body, requiredString, schoolAllowed, assertPhone, beginIdempotentRequest,
     requestBodyHash, failIdempotently, audit, createdIdempotently,
     okIdempotently, ok
   } = context;
@@ -63,7 +63,7 @@ if (req.method === 'GET' && parts[0] === 'v1' && parts[1] === 'activities' && pa
   if (!row || (row.schoolId && !schoolAllowed(user, row.schoolId))) return fail(res, 404, 'ACTIVITY_NOT_FOUND', '活动不存在或无权访问');
   return ok(res, { ...row, remainingCapacity: row.capacity == null ? null : row.remainingCapacity });
 }
-if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'activities' && parts[3] === 'registrations') {
+if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'activities' && parts[3] === 'registrations' && !parts[4]) {
   if (!hasRole(user, 'parent')) return fail(res, 403, 'NO_PERMISSION', '只有家庭账号可以报名活动');
   const input = await body(req);
   const activityId = requiredString(parts[2], '活动', { max: 120 });

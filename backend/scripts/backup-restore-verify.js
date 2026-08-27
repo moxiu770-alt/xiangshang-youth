@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { Pool } from 'pg';
-import { postgresCliEnv } from '../src/postgresCli.js';
+import { postgresCliEnv, postgresDatabaseName } from '../src/postgresCli.js';
 
 const backupFile = process.env.BACKUP_FILE;
 const sourceDatabaseUrl = process.env.DATABASE_URL;
@@ -19,10 +19,11 @@ const target = new URL(restoreDatabaseUrl);
 if (source.hostname === target.hostname && source.port === target.port && source.pathname === target.pathname) {
   throw new Error('RESTORE_DATABASE_URL must point to a dedicated database, never the source database');
 }
+const targetDatabase = postgresDatabaseName(restoreDatabaseUrl);
 
 await new Promise((resolve, reject) => {
   const child = spawn(process.env.PG_RESTORE_BIN || 'pg_restore', [
-    '--no-password', '--clean', '--if-exists', '--no-owner', '--exit-on-error', backupFile
+    '--no-password', '--dbname', targetDatabase, '--clean', '--if-exists', '--no-owner', '--exit-on-error', backupFile
   ], { stdio: 'inherit', env: postgresCliEnv(restoreDatabaseUrl) });
   child.once('error', reject);
   child.once('exit', (code) => code === 0 ? resolve() : reject(new Error(`pg_restore exited with code ${code}`)));

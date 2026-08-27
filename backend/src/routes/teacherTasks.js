@@ -7,7 +7,7 @@ export async function handleTeacherTaskRoutes(context) {
     parentOnly, hasRole, listResult, studentRow, beginIdempotentRequest,
     requestBodyHash, randomToken, sha256, audit, createdIdempotently,
     failIdempotently, body, requiredString, isProduction,
-    taskStatusAllowed, okIdempotently, taskStudentForUser,
+    taskStatusAllowed, okIdempotently, taskStudentForUser, studentForUser,
     movementScoreRules: MOVEMENT_SCORE_RULES, normalizeScoreRows,
     normalizeScore, normalizeConfidence, normalizeReviewStatus
   } = context;

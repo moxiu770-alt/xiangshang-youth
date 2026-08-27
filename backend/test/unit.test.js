@@ -11,7 +11,7 @@ import { MODEL_CALIBRATION, MODEL_CALIBRATION_STATUS, MODEL_CALIBRATION_VERSION 
 import { MODEL_REGISTRY, MODEL_REGISTRY_VERSION, modelManifest } from '../src/modelRegistry.js';
 import { clientIp } from '../src/request.js';
 import { archiveBackup, backupArchivePrefix } from '../src/backupArchive.js';
-import { postgresCliEnv } from '../src/postgresCli.js';
+import { postgresCliEnv, postgresDatabaseName } from '../src/postgresCli.js';
 import { normalizePath } from '../src/observability.js';
 import { assessmentStandardSnapshot, resolveAssessmentStandard } from '../src/assessmentStandards.js';
 
@@ -46,6 +46,7 @@ test('PostgreSQL CLI receives connection parts without forwarding the database U
   assert.equal(environment.PGSSLMODE, 'verify-full');
   assert.equal(environment.PGAPPNAME, 'backup-drill');
   assert.equal(environment.DATABASE_URL, undefined);
+  assert.equal(postgresDatabaseName('postgresql://backup_user:p%40ssword@db.example.test:6432/restore%5Fverify'), 'restore_verify');
   assert.throws(() => postgresCliEnv('https://database.example.test/app'), /postgres/i);
 });
 

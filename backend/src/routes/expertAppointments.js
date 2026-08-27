@@ -98,7 +98,7 @@ if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'expert-appointme
   await audit(user, req, 'expert.appointment.cancel', 'expert_appointment', parts[2], row, updated.rows[0], row.school_id);
   return okIdempotently(res, user, idempotency, updated.rows[0]);
 }
-if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'expert-appointments') {
+if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'expert-appointments' && !parts[2]) {
   if (!hasRole(user, 'parent')) return fail(res, 403, 'NO_PERMISSION', '只有家庭账号可以预约专家');
   const input = await body(req);
   const note = String(input.note || '').trim();

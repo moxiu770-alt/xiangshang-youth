@@ -214,8 +214,10 @@ jobs:
         shell: pwsh
         run: |
           $result = dotnet list FieldClient.Windows/FieldClient.Windows.csproj package --vulnerable --include-transitive | Out-String
+          $exitCode = $LASTEXITCODE
           Write-Host $result
-          if ($result -match 'vulnerable packages') { throw 'Vulnerable field-client dependency detected.' }
+          if ($exitCode -ne 0) { throw "NuGet vulnerability scan failed with exit code $exitCode." }
+          if ($result -match 'has the following vulnerable packages') { throw 'Vulnerable field-client dependency detected.' }
 
   ios:
     name: iOS tests

@@ -13,6 +13,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModelProvider
 import com.xiangshang.youth.app.AppViewModel
+import com.xiangshang.youth.app.logout
+import com.xiangshang.youth.app.refreshDashboard
+import com.xiangshang.youth.app.startSchoolProvisionedTeacherFixtureForUiTest
 import com.xiangshang.youth.app.XiangshangYouthTheme
 import com.xiangshang.youth.app.AppNavHost
 import com.xiangshang.youth.core.model.BodyCaptureQualityGate

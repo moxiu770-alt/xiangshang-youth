@@ -73,6 +73,30 @@ final class LocalFeatureStateTests: XCTestCase {
         }
     }
 
+    func testRemoteGuardianBindingsPopulateANewDeviceWithoutLocalBindingCache() async throws {
+        let suite = "xiangshang.youth.remote-child-scope.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defaults.removePersistentDomain(forName: suite)
+        let state = AppState(
+            repository: IncompleteRemoteRepository(),
+            featureStore: LocalFeatureStore(defaults: defaults)
+        )
+        let dashboard = try await MockRepository.shared.loadDashboard()
+        state.profile = UserProfile(
+            id: "remote-parent", name: "远程家长", phone: "13800000000", role: .parent,
+            schoolName: dashboard.school.name, avatarInitials: "家"
+        )
+        state.data = dashboard
+
+        XCTAssertTrue(state.localFeatures.boundChildIDs.isEmpty)
+        state.reconcileSelectedChildFromDashboard()
+
+        let serverChildIDs = Set(dashboard.parentChildren.map(\.student.id))
+        XCTAssertEqual(state.localFeatures.boundChildIDs, serverChildIDs)
+        XCTAssertEqual(state.selectedChild?.id, dashboard.parentChildren.first?.student.id)
+        XCTAssertEqual(Set(state.boundChildren.map(\.id)), serverChildIDs)
+    }
+
     func testTeacherOverviewContextRejectsAStaleClassOrTaskResponse() {
         let current = TeacherOverviewContext(schoolID: "school-a", classID: "class-a", taskID: "task-a", standardVersion: "standard-v1")
         XCTAssertNotEqual(current, TeacherOverviewContext(schoolID: "school-b", classID: "class-a", taskID: "task-a", standardVersion: "standard-v1"))

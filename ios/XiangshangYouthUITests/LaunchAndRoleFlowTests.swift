@@ -95,6 +95,46 @@ final class LaunchAndRoleFlowTests: XCTestCase {
         XCTAssertTrue(app.secureTextFields.firstMatch.waitForExistence(timeout: 3))
     }
 
+    /// Opt-in pilot verification against a deployed server. Credentials are
+    /// supplied by the local CI/terminal environment and are deliberately not
+    /// stored in source control or in the test bundle. This validates the
+    /// actual URLSession → session → dashboard path on a physical device.
+    func testPilotRemoteParentLoginWhenCredentialsProvided() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let account = environment["PILOT_REMOTE_ACCOUNT"], !account.isEmpty,
+              let password = environment["PILOT_REMOTE_PASSWORD"], !password.isEmpty,
+              let apiBaseURL = environment["PILOT_REMOTE_API_BASE_URL"], !apiBaseURL.isEmpty else {
+            throw XCTSkip("Pilot remote credentials were not supplied to this test run.")
+        }
+
+        app.terminate()
+        app = XCUIApplication()
+        app.launchArguments += ["-ui-testing"]
+        app.launchEnvironment["XS_USE_REMOTE_DATA_SOURCE"] = "1"
+        app.launchEnvironment["XS_API_BASE_URL"] = apiBaseURL
+        app.launch()
+
+        XCTAssertTrue(button(containing: "账号密码登录").waitForExistence(timeout: 10))
+        button(containing: "账号密码登录").tap()
+        let accountField = app.textFields["账号 / 手机号"]
+        XCTAssertTrue(accountField.waitForExistence(timeout: 3))
+        accountField.tap()
+        accountField.typeText(account)
+        let passwordField = app.secureTextFields.firstMatch
+        XCTAssertTrue(passwordField.waitForExistence(timeout: 3))
+        passwordField.tap()
+        passwordField.typeText(password)
+        button(containing: "请阅读并同意").tap()
+        app.buttons["login-submit-button"].tap()
+
+        // The synthetic pilot account owns exactly one child. Seeing its
+        // display name proves that the server session, parent binding and
+        // dashboard response were decoded instead of falling back to Mock.
+        XCTAssertTrue(staticText(containing: "测试同学").waitForExistence(timeout: 15))
+        XCTAssertFalse(staticText(containing: "服务尚未配置").exists)
+        attachScreenshot("pilot-remote-parent-home")
+    }
+
     func testAccessibilityLargeTextKeepsLoginActionsReachable() {
         // Re-launch with the system accessibility content-size override. The
         // login page is intentionally scrollable; this guards against a
@@ -149,9 +189,18 @@ final class LaunchAndRoleFlowTests: XCTestCase {
         let report = button(containing: "查看详细报告")
         XCTAssertTrue(report.waitForExistence(timeout: 3))
         report.tap()
-        XCTAssertTrue(staticText(containing: "7项能力得分").waitForExistence(timeout: 5))
+        XCTAssertTrue(staticText(containing: "七项能力表现").waitForExistence(timeout: 5))
         attachScreenshot("report-detail")
-        XCTAssertTrue(staticText(containing: "规则依据与适用范围").waitForExistence(timeout: 3))
+        let scoreCard = button(containing: "障碍跳")
+        XCTAssertTrue(scoreCard.waitForExistence(timeout: 3))
+        scoreCard.tap()
+        XCTAssertTrue(staticText(containing: "报告说明").waitForExistence(timeout: 3))
+        button(containing: "完成").tap()
+
+        let rules = button(containing: "查看规则版本与适用范围")
+        for _ in 0..<8 where !rules.isHittable { app.swipeUp() }
+        XCTAssertTrue(rules.isHittable)
+        rules.tap()
         XCTAssertTrue(staticText(containing: "规则生效日期").exists)
         let back = button(containing: "返回")
         XCTAssertTrue(back.waitForExistence(timeout: 2))
@@ -207,6 +256,92 @@ final class LaunchAndRoleFlowTests: XCTestCase {
         attachScreenshot("activity-detail-compact")
     }
 
+    func testBodyAssessmentUsesNineStepVisualFlowAndEnvironmentGate() {
+        loginAndWaitForRoleSelection()
+        button(containing: "家庭端").tap()
+        button(containing: "去绑定孩子").tap()
+        button(containing: "绑定孩子").tap()
+        app.textFields["child-name-field"].tap()
+        app.textFields["child-name-field"].typeText("王小明")
+        app.textFields["child-binding-code-field"].tap()
+        app.textFields["child-binding-code-field"].typeText("XS-S01")
+        button(containing: "确认绑定").tap()
+
+        let bodyAssessment = button(containing: "身体测评")
+        XCTAssertTrue(bodyAssessment.waitForExistence(timeout: 4))
+        bodyAssessment.tap()
+        XCTAssertTrue(staticText(containing: "第 1 步 · 共 9 步").waitForExistence(timeout: 4))
+        XCTAssertTrue(staticText(containing: "约 5 分钟完成身体测评").exists)
+        attachScreenshot("body-assessment-overview")
+
+        button(containing: "开始身体测评").tap()
+        XCTAssertTrue(staticText(containing: "第 2 步 · 共 9 步").waitForExistence(timeout: 3))
+        attachScreenshot("body-assessment-consent")
+        app.switches.matching(NSPredicate(format: "label CONTAINS %@", "监护关系确认")).firstMatch.tap()
+        app.switches.matching(NSPredicate(format: "label CONTAINS %@", "摄像头与算法说明")).firstMatch.tap()
+        button(containing: "继续确认孩子资料").tap()
+
+        XCTAssertTrue(staticText(containing: "第 3 步 · 共 9 步").waitForExistence(timeout: 3))
+        XCTAssertTrue(staticText(containing: "三年级1班").exists)
+        button(containing: "确认无误，填写身高体重").tap()
+        XCTAssertTrue(staticText(containing: "第 4 步 · 共 9 步").waitForExistence(timeout: 3))
+        attachScreenshot("body-assessment-bmi")
+
+        let heightField = app.textFields.matching(NSPredicate(format: "label CONTAINS %@", "身高数值")).firstMatch
+        let weightField = app.textFields.matching(NSPredicate(format: "label CONTAINS %@", "体重数值")).firstMatch
+        XCTAssertTrue(heightField.waitForExistence(timeout: 3))
+        heightField.tap()
+        heightField.typeText("135")
+        weightField.tap()
+        weightField.typeText("30")
+        app.keyboards.buttons["完成"].tapIfExists()
+
+        let environmentButton = button(containing: "继续检查拍摄环境")
+        for _ in 0..<4 where !environmentButton.isHittable { app.swipeUp() }
+        XCTAssertTrue(environmentButton.isHittable)
+        environmentButton.tap()
+        XCTAssertTrue(staticText(containing: "第 5 步 · 共 9 步").waitForExistence(timeout: 3))
+        XCTAssertTrue(staticText(containing: "头部到双脚完整入镜").exists)
+        let progressHeader = app.descendants(matching: .any)["assessment-progress-header"]
+        XCTAssertTrue(progressHeader.waitForExistence(timeout: 3))
+        XCTAssertGreaterThanOrEqual(progressHeader.frame.minY, 90, "切换步骤后必须回到页面顶部，不得继承上一页的滚动位置")
+        attachScreenshot("body-assessment-environment")
+
+        addUIInterruptionMonitor(withDescription: "允许相机用于身体测评") { alert in
+            if alert.buttons["允许"].exists {
+                alert.buttons["允许"].tap()
+                return true
+            }
+            if alert.buttons["Allow"].exists {
+                alert.buttons["Allow"].tap()
+                return true
+            }
+            return false
+        }
+
+        app.switches.matching(NSPredicate(format: "label CONTAINS %@", "环境已经准备好")).firstMatch.tap()
+        let captureButton = button(containing: "进入动作采集")
+        XCTAssertTrue(captureButton.waitForExistence(timeout: 3))
+        captureButton.tap()
+        XCTAssertTrue(staticText(containing: "第 6 步 · 共 9 步").waitForExistence(timeout: 3))
+
+        let standingCapture = button(containing: "自然站姿")
+        XCTAssertTrue(standingCapture.waitForExistence(timeout: 3))
+        standingCapture.tap()
+        app.tap() // Gives XCTest a chance to handle the system camera prompt.
+
+        XCTAssertTrue(button(containing: "关闭姿态记录").waitForExistence(timeout: 8))
+        XCTAssertTrue(button(containing: "关闭语音指导").exists)
+        let cameraToggle = button(containing: "切换为前置摄像头")
+        XCTAssertTrue(cameraToggle.exists)
+        let recordButton = button(containing: "开始记录")
+        let cameraReady = NSPredicate(format: "enabled == true")
+        expectation(for: cameraReady, evaluatedWith: recordButton)
+        waitForExpectations(timeout: 12)
+        XCTAssertFalse(staticText(containing: "暂时无法启动相机").exists)
+        attachScreenshot("body-assessment-live-camera")
+    }
+
     private func loginAndWaitForRoleSelection() {
         XCTAssertTrue(button(containing: "微信登录").waitForExistence(timeout: 10))
         XCTAssertTrue(button(containing: "手机号登录").exists)
@@ -248,5 +383,11 @@ final class LaunchAndRoleFlowTests: XCTestCase {
         let screen = XCUIScreen.main.screenshot().image.size
         XCTAssertGreaterThanOrEqual(element.frame.minX, 0, file: file, line: line)
         XCTAssertLessThanOrEqual(element.frame.maxX, screen.width, file: file, line: line)
+    }
+}
+
+private extension XCUIElement {
+    func tapIfExists() {
+        if exists && isHittable { tap() }
     }
 }

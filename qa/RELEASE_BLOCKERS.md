@@ -1,5 +1,14 @@
 # 发布门禁与外部依赖
 
+## 2026-08-27 候选基线复核
+
+- 大文件已按可独立评审的边界继续拆分：iOS `AppState` 为 679 行、身体基础模型为 411 行、姿态模型为 673 行、身体测评主视图为 763 行；Android `AppState` 为 505 行、身体基础模型为 211 行、姿态模型为 784 行；后端学生导入从 `server.js` 抽离，`server.js` 为 3053 行。新增行数预算门禁，后续不能重新合并或继续无界增长。
+- iOS 模拟器 Debug 构建通过，核心 XCTest 100/100 通过；Android Debug 单元测试 115/115 通过，`assembleDebug` 与 `lintDebug` 通过；后端 `npm run check`、OpenAPI lint 和 62/62 单元/契约测试通过；前端契约、225 项跨端模型不变量及本地发布预检通过。
+- RemoteRepository 的协议默认实现保持 Mock-only：远程实现漏接方法时明确抛出 `notConfigured`，不会返回空数组、随机 ID 或 `pending_sync` 冒充服务端成功。
+- 已增加专用远程业务验收脚本和清单。脚本默认只读，只有设置 `REMOTE_E2E_ALLOW_WRITES=1` 并提供专用任务/学生 fixture 时才验证写入、幂等与 409 版本冲突；不会输出令牌或账号密码。
+- 当前仍不能宣称“真实远程全闭环通过”：本机未配置专用家长/教师验收账号、写入 fixture 和独立 `TEST_DATABASE_URL`；当前网络对 `api.risingteen.com` 解析到保留测试地址 `198.18.0.177`，TLS 握手失败。集成测试、远程业务验收和真实推送因此保持阻塞，不以 Mock、本地构建或生产数据库替代。
+- 本轮没有执行 iOS UI Test、Android Compose instrumentation/真机测试；它们需在候选提交进入受保护 CI 后保存证据。当前通过结果只覆盖本地模拟器构建/XCTest、Android JVM 单测/Lint/APK 和后端无数据库测试。
+
 本轮已完成的代码级门禁：
 
 - 后端 `npm run check` 与 59 项单元/契约测试通过；OpenAPI 文件已通过 Redocly lint。集成测试仍需独立 `TEST_DATABASE_URL`，不能连接开发库代替。

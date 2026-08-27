@@ -114,6 +114,8 @@ jobs:
         run: node scripts/test_model_calibration.mjs
       - name: Verify cross-platform frontend contract
         run: python3 scripts/check_frontend_contract.py
+      - name: Enforce domain file boundaries
+        run: python3 scripts/check_large_file_boundaries.py
       - name: Run local release preflight (no secrets, no devices)
         run: python3 scripts/release_preflight.py --target local --allow-missing-devices --json "$RUNNER_TEMP/youth-local-preflight.json"
       - name: Discover device matrix without fabricating results

@@ -7,8 +7,11 @@ struct AppScaffold<Content: View>: View {
     /// Most pages return through the router. Multi-step flows may supply an
     /// in-flow back action so a tap never abandons unfinished input.
     var onBack: (() -> Void)? = nil
+    /// Recreates the scroll container when a multi-step flow changes page so
+    /// the next screen never inherits the previous screen's scroll offset.
+    var scrollResetID: AnyHashable? = nil
     @ViewBuilder var content: Content
-    @ScaledMetric(relativeTo: .headline) private var titleSize: CGFloat = 16
+    @ScaledMetric(relativeTo: .headline) private var titleSize: CGFloat = 19
     var body: some View {
         VStack(spacing: 0) {
             ZStack {
@@ -41,20 +44,21 @@ struct AppScaffold<Content: View>: View {
                     .truncationMode(.tail)
                     .padding(.horizontal, 50)
                     .accessibilityLabel(title)
-            }.padding(.horizontal, 14).frame(height: 52).background { Rectangle().fill(.ultraThinMaterial).ignoresSafeArea(edges: .top) }
+            }.padding(.horizontal, AppTheme.pagePadding).frame(height: 54).background { Rectangle().fill(.ultraThinMaterial).ignoresSafeArea(edges: .top) }
             if let error = state.error, state.data == nil {
                 ErrorStateView(message: error, retry: { Task { await state.refreshDashboard() } }, dismiss: state.clearError)
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, AppTheme.pagePadding)
             } else if state.loading, state.data == nil {
                 LoadingStateView()
             } else {
                 ScrollView {
                     content
                         .padding(.horizontal, 12)
-                        .padding(.bottom, 18)
+                        .padding(.bottom, 32)
                         .frame(maxWidth: 720)
                         .frame(maxWidth: .infinity)
                 }
+                .id(scrollResetID)
             }
         }
         .background(AppTheme.surface.ignoresSafeArea())
@@ -117,6 +121,48 @@ struct TestTaskCard: View {
     private func statusColor(_ status: TaskStatus) -> Color { status == .completed ? AppTheme.teal : status == .review || status == .retest || status == .absent ? AppTheme.danger : AppTheme.primary }
 }
 struct ScoreSummaryCard: View { let title: String; let value: String; let caption: String; var body: some View { VStack(alignment: .leading, spacing: 8) { Text(title).font(.caption).foregroundStyle(AppTheme.muted); Text(value).font(.title2.bold()).foregroundStyle(AppTheme.ink); Text(caption).font(.caption).foregroundStyle(AppTheme.teal) }.frame(maxWidth: .infinity, alignment: .leading).padding(14).background(.white, in: RoundedRectangle(cornerRadius: 16)).accessibilityElement(children: .ignore).accessibilityLabel("\(title)，\(value)，\(caption)") } }
-struct ReportMetricCard: View { let result: ScoreResult; var body: some View { VStack(alignment: .leading, spacing: 8) { Label(result.item.shortName, systemImage: result.item.icon).font(.caption.weight(.medium)).foregroundStyle(AppTheme.muted); Text("\(result.score, specifier: "%.1f")").font(.title3.bold()).foregroundStyle(AppTheme.primary); Text("满分 5 分").font(.caption).foregroundStyle(AppTheme.muted); Text("状态 · \(result.reviewStatus.label)").font(.caption.weight(.semibold)).foregroundStyle(result.reviewStatus == .passed ? AppTheme.teal : AppTheme.danger) }.frame(maxWidth: .infinity, alignment: .leading).padding(12).background(AppTheme.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12)).accessibilityElement(children: .ignore).accessibilityLabel("\(result.item.shortName)，\(result.score, specifier: "%.1f")分，满分5分，状态\(result.reviewStatus.label)") } }
+struct ReportMetricCard: View {
+    let result: ScoreResult
+    private var reviewColor: Color { result.normalizedReviewStatus == .passed ? ReferenceColor.green : AppTheme.warning }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 9) {
+                Image(systemName: result.item.icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(ReferenceColor.blue)
+                    .frame(width: 36, height: 36)
+                    .background(ReferenceColor.blue.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .accessibilityHidden(true)
+                Text(result.item.shortName)
+                    .font(.system(size: AppTheme.secondarySize, weight: .semibold))
+                    .foregroundStyle(ReferenceColor.navy)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text("\(result.normalizedScore, specifier: "%.1f")")
+                    .font(.system(size: 25, weight: .bold, design: .rounded))
+                    .foregroundStyle(ReferenceColor.blue)
+                Text("/ 5")
+                    .font(.system(size: AppTheme.captionSize, weight: .semibold))
+                    .foregroundStyle(AppTheme.muted)
+            }
+            ProgressView(value: result.normalizedScore, total: AssessmentScoreRules.itemMaximum)
+                .tint(result.normalizedScore < AssessmentScoreRules.lowItemThreshold ? AppTheme.warning : ReferenceColor.green)
+            Text(result.normalizedReviewStatus.label)
+                .font(.system(size: AppTheme.captionSize, weight: .semibold))
+                .foregroundStyle(reviewColor)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(reviewColor.opacity(0.10), in: Capsule())
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(.white, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous).stroke(AppTheme.divider.opacity(0.75), lineWidth: 0.8))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(result.item.shortName)，\(result.normalizedScore, specifier: "%.1f")分，满分5分，状态\(result.normalizedReviewStatus.label)")
+    }
+}
 struct FilterBar: View { let options: [String]; @Binding var selection: String; var body: some View { ScrollView(.horizontal, showsIndicators: false) { HStack { ForEach(options, id: \.self) { item in Button(item) { selection = item }.buttonStyle(.bordered).tint(selection == item ? AppTheme.primary : AppTheme.muted).accessibilityLabel("筛选：\(item)").accessibilityValue(selection == item ? "已选中" : "未选中") } } } } }
 struct GradeClassSelector: View { let grades: [Grade]; let classes: [ClassInfo]; @Binding var grade: String; @Binding var className: String; var body: some View { HStack { Menu { ForEach(grades) { item in Button(item.name) { grade = item.name } } } label: { Label(grade, systemImage: "graduationcap") }.accessibilityLabel("选择年级").accessibilityValue("当前为\(grade)"); Divider(); Menu { ForEach(classes) { item in Button(item.name) { className = item.name } } } label: { Label(className, systemImage: "person.3") }.accessibilityLabel("选择班级").accessibilityValue("当前为\(className)") }.font(.subheadline.weight(.medium)).padding(12).background(.white, in: RoundedRectangle(cornerRadius: 12)) } }

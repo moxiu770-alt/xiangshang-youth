@@ -188,6 +188,24 @@ POST  /v1/field/sync/batches
 
 ### 生产部署入口
 
+#### 学校试点部署
+
+在正式微信、对象存储和异地备份资源到位前，可以使用试点编排验证真实 HTTPS、登录、家庭绑定、教师任务和 App 联调。试点环境使用独立数据库卷与本机文件卷，不会通过生产预检，也不得作为正式生产环境或准确率、合规上线证明。
+
+```bash
+cp .env.pilot.example .env.pilot
+# 替换三个随机密钥后执行：
+docker compose --env-file .env.pilot -f docker-compose.pilot.yml config
+docker compose --env-file .env.pilot -f docker-compose.pilot.yml up -d postgres
+docker compose --env-file .env.pilot -f docker-compose.pilot.yml --profile migrate run --rm migrate
+docker compose --env-file .env.pilot -f docker-compose.pilot.yml up -d
+curl -fsS https://api.risingteen.com/readyz
+```
+
+试点环境允许公开创建家庭账号，但不允许自行注册或扩权为教师；学校教师账号仍由管理端或受控脚本发放。切换正式环境前必须停止试点编排，迁移或清除试点数据，再改用下述 `docker-compose.prod.yml`，不得直接把 `.env.pilot` 改名冒充生产配置。
+
+#### 正式生产部署
+
 生产环境使用 `docker-compose.prod.yml`：API 和 PostgreSQL 不对公网发布端口，Caddy 是唯一公网入口，负责自动 HTTPS、HTTP→HTTPS 跳转和 API 健康探测。`worker` 是独立后台执行器，处理隐私导出、通知投递、场地会话后的报告刷新、设备失联回收与重试任务；API 可以独立扩容，不能再把作业轮询嵌入每个 API 副本。每个 Worker 用 `FOR UPDATE SKIP LOCKED` 安全领取至多 `JOB_WORKER_CONCURRENCY`（默认 4）条任务并发执行，不同 Worker 不会重复处理同一记录；收到停止信号后先停止领取，再在 `JOB_WORKER_SHUTDOWN_TIMEOUT_MS`（默认 25 秒、小于容器 30 秒宽限期）内排空已领取任务。`backup` 是独立、只读文件系统的备份执行器：启动后立即执行并按 `BACKUP_INTERVAL_SECONDS`（默认每天）归档到独立 S3 bucket，健康心跳、最近成功时间和失败状态均暴露给监控。应根据数据库连接池、对象存储和学校峰值导出量调优。复制 `.env.production.example` 到受管密钥系统或不入库的 `.env.production`，填入真实域名、数据库、S3/KMS 访问凭据和随机指标令牌；DNS 必须先解析到部署主机，80/443 必须可从公网访问。
 
 ```bash

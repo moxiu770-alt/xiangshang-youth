@@ -56,6 +56,8 @@ def main() -> int:
     ios_api_client = read("ios/XiangshangYouth/Core/Services/ApiClient.swift")
     ios_state = read_all(
         "ios/XiangshangYouth/App/AppState.swift",
+        "ios/XiangshangYouth/App/AppState+AuthSession.swift",
+        "ios/XiangshangYouth/App/AppState+DomainProjection.swift",
         "ios/XiangshangYouth/App/AppStateCourses.swift",
         "ios/XiangshangYouth/App/AppStateHealth.swift",
         "ios/XiangshangYouth/App/AppStateScheduling.swift",
@@ -65,7 +67,10 @@ def main() -> int:
         "ios/XiangshangYouth/App/AppStateSupport.swift",
     )
     ios_body = read("ios/XiangshangYouth/Features/Parent/LiveVisionCapture.swift")
-    ios_body_screen = read("ios/XiangshangYouth/Features/Parent/BodyAssessmentViews.swift")
+    ios_body_screen = read_all(
+        "ios/XiangshangYouth/Features/Parent/BodyAssessmentViews.swift",
+        "ios/XiangshangYouth/Features/Parent/BodyAssessmentResultsView.swift",
+    )
     ios_parent_screen = read("ios/XiangshangYouth/Features/Parent/ParentViews.swift")
     ios_auth = read("ios/XiangshangYouth/Features/Auth/AuthViews.swift")
     ios_auth_api = read("ios/XiangshangYouth/Core/Services/AuthApi.swift")
@@ -93,10 +98,14 @@ def main() -> int:
     android_state = read_all(
         "android/app/src/main/java/com/xiangshang/youth/app/AppState.kt",
         "android/app/src/main/java/com/xiangshang/youth/app/AppStateActivities.kt",
+        "android/app/src/main/java/com/xiangshang/youth/app/AppStateAuthSession.kt",
+        "android/app/src/main/java/com/xiangshang/youth/app/AppStateTeacherTasks.kt",
+        "android/app/src/main/java/com/xiangshang/youth/app/AppStateCommunityHealth.kt",
         "android/app/src/main/java/com/xiangshang/youth/app/AppStateCourses.kt",
         "android/app/src/main/java/com/xiangshang/youth/app/AppStateHealth.kt",
         "android/app/src/main/java/com/xiangshang/youth/app/AppStateNotifications.kt",
         "android/app/src/main/java/com/xiangshang/youth/app/AppStateRemoteTargets.kt",
+        "android/app/src/main/java/com/xiangshang/youth/app/AppStateSupport.kt",
     )
     android_upload_validator = read("android/app/src/main/java/com/xiangshang/youth/core/service/CourseUploadValidator.kt")
     android_body = read("android/app/src/main/java/com/xiangshang/youth/feature/parent/LivePostureCapture.kt")

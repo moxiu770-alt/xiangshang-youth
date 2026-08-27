@@ -7,6 +7,7 @@
     <title>向上少年 · 数据工作台</title>
     <link rel="stylesheet" href="/admin.css" />
     <link rel="stylesheet" href="/content-operations.css" />
+    <link rel="stylesheet" href="/commercial-polish.css" />
   </head>
   <body>
     <div id="loginView" class="login-shell">
@@ -122,6 +123,9 @@
             ><span>工作台</span><span>／</span><strong>数据总览</strong>
           </div>
           <div class="top-actions">
+            <div id="serviceHealth" class="service-health checking" role="status" aria-live="polite">
+              <i aria-hidden="true"></i><span>服务检查中</span>
+            </div>
             <label class="top-search"
               ><span data-icon="search"></span
               ><input
@@ -155,6 +159,13 @@
                 <span data-icon="plus"></span>新建测评任务
               </button>
             </div>
+          </div>
+          <div id="workspaceStatus" class="workspace-status hidden" role="status" aria-live="polite">
+            <div>
+              <strong id="workspaceStatusTitle">正在同步学校数据</strong>
+              <span id="workspaceStatusDetail">请稍候，正在读取最新业务记录。</span>
+            </div>
+            <button id="workspaceRetryBtn" class="secondary-btn hidden" type="button">重新同步</button>
           </div>
           <section class="dashboard-hero">
             <div class="hero-copy">

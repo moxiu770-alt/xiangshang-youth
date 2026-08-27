@@ -38,6 +38,7 @@
 		48923D603036C53C005EC78E /* XiangshangYouth.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = XiangshangYouth.xcodeproj; sourceTree = "<group>"; };
 		48DDA3E6303B035800CE2867 /* XiangshangYouth.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = XiangshangYouth.xcodeproj; sourceTree = "<group>"; };
 		48F0CFCC303D49CE0028C0C8 /* XiangshangYouth.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = XiangshangYouth.xcodeproj; sourceTree = "<group>"; };
+		48F0D0AA303FED110028C0C8 /* XiangshangYouth.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = XiangshangYouth.xcodeproj; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000000000003 /* XiangshangYouth.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = XiangshangYouth.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B2C3D4E5F600000000000001 /* XiangshangYouthTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = XiangshangYouthTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B2C3D4E5F600000000000002 /* ../XiangshangYouthTests/LocalFeatureStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../XiangshangYouthTests/LocalFeatureStateTests.swift; sourceTree = SOURCE_ROOT; };
@@ -123,6 +124,11 @@
 			sourceTree = "<group>";
 		};
 		48F0CFCE303D49CE0028C0C8 /* Products */ = {
+			isa = PBXGroup;
+			name = Products;
+			sourceTree = "<group>";
+		};
+		48F0D0AC303FED110028C0C8 /* Products */ = {
 			isa = PBXGroup;
 			name = Products;
 			sourceTree = "<group>";
@@ -279,6 +285,10 @@
 					ProjectRef = 485C324B303CAA8A00FCC7D1 /* XiangshangYouth.xcodeproj */;
 				},
 				{
+					ProductGroup = 48F0D0AC303FED110028C0C8 /* Products */;
+					ProjectRef = 48F0D0AA303FED110028C0C8 /* XiangshangYouth.xcodeproj */;
+				},
+				{
 					ProductGroup = 48DDA3E8303B035800CE2867 /* Products */;
 					ProjectRef = 48DDA3E6303B035800CE2867 /* XiangshangYouth.xcodeproj */;
 				},
@@ -387,7 +397,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				API_BASE_URL = "https://api.example.com/";
+				API_BASE_URL = "https://api.risingteen.com/";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -402,7 +412,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				API_BASE_URL = "https://api.example.com/";
+				API_BASE_URL = "https://api.risingteen.com/";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -414,7 +424,7 @@
 		A1B2C3D4E5F6000000000014 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				API_BASE_URL = "https://api.example.com/";
+				API_BASE_URL = "https://api.risingteen.com/";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -445,7 +455,7 @@
 		A1B2C3D4E5F6000000000015 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				API_BASE_URL = "https://api.example.com/";
+				API_BASE_URL = "https://api.risingteen.com/";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;

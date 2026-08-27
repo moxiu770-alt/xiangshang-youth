@@ -35,9 +35,6 @@ struct RootView: View {
     // the OS level.
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @StateObject private var networkMonitor = NetworkMonitor()
-    /// Prevent student/health data from appearing in the iOS app-switcher
-    /// snapshot while the application is inactive or in the background.
-    @State private var privacyShielded = false
     var body: some View {
         ZStack {
             navigationRoot
@@ -73,13 +70,11 @@ struct RootView: View {
         .onChange(of: router.path.count) { _, _ in router.syncStackToPathCount() }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active {
-                privacyShielded = !state.isShowingSplash
                 if phase == .background, state.pendingSyncCount > 0 {
                     BackgroundSyncScheduler.schedule()
                 }
                 return
             }
-            privacyShielded = false
             guard !networkMonitor.isOffline, state.profile != nil, state.data != nil else { return }
             Task {
                 await state.refreshDashboard()
@@ -214,7 +209,10 @@ struct RootView: View {
             .zIndex(8)
             }
         }
-        if privacyShielded && !state.isShowingSplash {
+        // Derive the shield directly from scenePhase. Keeping a second Boolean
+        // can race during sheet dismissal or system banners and leave an
+        // invisible full-screen layer over an already-active app.
+        if scenePhase != .active && !state.isShowingSplash {
             ZStack {
                 ReferenceColor.canvas.ignoresSafeArea()
                 VStack(spacing: 10) {

@@ -7,7 +7,7 @@ plugins {
 android {
     namespace = "com.xiangshang.youth"
     compileSdk = 36
-    val configuredApiBaseUrl = providers.gradleProperty("apiBaseUrl").orElse("https://api.example.com/").get().trim()
+    val configuredApiBaseUrl = providers.gradleProperty("apiBaseUrl").orElse("https://api.risingteen.com/").get().trim()
     val configuredSchoolId = providers.gradleProperty("schoolId").orElse("school-1").get()
     val releaseBuildRequested = gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }
     val configuredRemoteDataSource = providers.gradleProperty("useRemoteDataSource").orElse(if (releaseBuildRequested) "true" else "false").get().toBoolean()

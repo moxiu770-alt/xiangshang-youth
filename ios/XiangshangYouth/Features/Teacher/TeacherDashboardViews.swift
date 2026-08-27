@@ -156,12 +156,15 @@ struct TeacherDashboard: View {
     private var riskCount: Int { classStudents.filter { lowScoreStudentIDs.contains($0.id) || state.taskStatus(for: $0) == .review || state.taskStatus(for: $0) == .retest }.count }
     private var reduceMotion: Bool { state.localFeatures.settings.reduceMotion || systemReduceMotion }
     private var actionGridColumns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: 5), count: dynamicTypeSize.isAccessibilitySize || horizontalSizeClass == .compact ? 2 : 4)
+        Array(repeating: GridItem(.flexible(), spacing: AppTheme.cardSpacing), count: dynamicTypeSize.isAccessibilitySize || horizontalSizeClass == .compact ? 2 : 4)
+    }
+    private var metricGridColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 8), count: dynamicTypeSize.isAccessibilitySize ? 1 : 2)
     }
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 10) {
+            VStack(spacing: AppTheme.cardSpacing) {
                 teacherHeader
                 teacherSwitch
                 if isSportsTeacher {
@@ -198,25 +201,18 @@ struct TeacherDashboard: View {
             Image("TeacherAvatar").resizable().scaledToFill()
                 .frame(width: 43, height: 43).background(ReferenceColor.sky, in: Circle()).clipShape(Circle())
             VStack(alignment: .leading, spacing: 2) {
-                Text(state.activeDisplayName).font(.system(size: 14, weight: .bold)).foregroundStyle(ReferenceColor.navy)
-                Text(state.profile?.schoolName ?? "学校").font(.system(size: 12)).foregroundStyle(.secondary)
-                        Text(isSportsTeacher ? "延时课程工作台" : "负责 \(managedClasses.count) 个授权班级").font(.system(size: 12, weight: .semibold)).foregroundStyle(ReferenceColor.green)
+                Text(state.activeDisplayName).font(.system(size: 16, weight: .bold)).foregroundStyle(ReferenceColor.navy)
+                Text(state.profile?.schoolName ?? "学校").font(.system(size: 13)).foregroundStyle(.secondary)
+                Text(isSportsTeacher ? "延时课程工作台" : "负责 \(managedClasses.count) 个授权班级")
+                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(ReferenceColor.green)
             }
             Spacer()
-            if canUseSportsWorkbench {
-                Button {
-                    if reduceMotion { var transaction = Transaction(); transaction.animation = nil; withTransaction(transaction) { isSportsTeacher.toggle() } }
-                    else { withAnimation { isSportsTeacher.toggle() } }
-                } label: { Label("切换角色", systemImage: "arrow.left.arrow.right")
-                    .font(.system(size: 12, weight: .medium)).padding(.horizontal, 9).padding(.vertical, 5)
-                    .background(.white, in: Capsule()).overlay(Capsule().stroke(ReferenceColor.navy.opacity(0.10), lineWidth: 1)) }.buttonStyle(.plain)
-            }
             Button { router.push(.teacherMessages) } label: { Image(systemName: "bell").font(.system(size: 16, weight: .medium)).foregroundStyle(ReferenceColor.navy)
                 .overlay(alignment: .topTrailing) { if state.unreadMessageCount > 0 { Circle().fill(.red).frame(width: 5, height: 5).offset(x: 2, y: -2) } }
                 .frame(width: 44, height: 44).contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityLabel("消息通知").accessibilityHint("打开消息中心")
         }
-        .padding(.horizontal, 13).padding(.vertical, 8)
+        .padding(.horizontal, AppTheme.pagePadding).padding(.vertical, 9)
         // Keep the role workbench consistent with the rest of the iOS chrome:
         // this is a root header, not a white content card.  Native material
         // gives it the requested Apple glass treatment while preserving the
@@ -234,7 +230,7 @@ struct TeacherDashboard: View {
             if canUseSportsWorkbench { roleSwitchButton("延时课程", "figure.run", selected: isSportsTeacher, color: ReferenceColor.blue) { isSportsTeacher = true } }
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 12)
+        .padding(.horizontal, AppTheme.pagePadding)
     }
 
     private func roleSwitchButton(_ title: String, _ icon: String, selected: Bool, color: Color, action: @escaping () -> Void) -> some View {
@@ -246,19 +242,21 @@ struct TeacherDashboard: View {
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(selected ? .white : color)
                 .frame(maxWidth: .infinity)
-                .frame(height: 42)
-                .background(selected ? color : color.opacity(0.14), in: RoundedRectangle(cornerRadius: 9))
-                .overlay(RoundedRectangle(cornerRadius: 9).stroke(color.opacity(selected ? 0 : 0.14), lineWidth: 1))
+                .frame(height: AppTheme.controlHeight)
+                .background(selected ? color : color.opacity(0.10), in: RoundedRectangle(cornerRadius: AppTheme.controlRadius, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: AppTheme.controlRadius, style: .continuous).stroke(color.opacity(selected ? 0 : 0.16), lineWidth: 1))
         }
     }
 
     private var classTeacherContent: some View {
-        VStack(spacing: 10) {
-            Text("🔒 仅查看所有测评数据及授权数据").font(.system(size: 12)).foregroundStyle(.secondary)
+        VStack(spacing: AppTheme.cardSpacing) {
+            Label("仅显示当前账号已授权的班级数据", systemImage: "lock.shield.fill")
+                .font(.system(size: AppTheme.captionSize, weight: .medium))
+                .foregroundStyle(AppTheme.muted)
             ReferenceCard {
                 VStack(spacing: 10) {
                     ReferenceSectionTitle(title: "班级健康概览", trailing: "查看班级看板", action: { router.push(.teacherClassBoard) })
-                    HStack {
+                    LazyVGrid(columns: metricGridColumns, spacing: 8) {
                         count("班级人数", "\(classStudents.count)", "person.3.fill", ReferenceColor.blue) { router.push(.studentList(nil)) }
                         count("已测评", "\(measuredCount)", "checkmark.circle.fill", ReferenceColor.green) { router.push(.studentList(nil)) }
                         count("测评率", "\(classStudents.isEmpty ? 0 : measuredCount * 100 / classStudents.count)%", "circle", ReferenceColor.green) { router.push(.teacherClassBoard) }
@@ -266,15 +264,17 @@ struct TeacherDashboard: View {
                     }
                     Divider()
                     HStack {
-                        Text("问题分布（人）").font(.system(size: 12, weight: .bold))
+                        Text("问题分布（人）").font(.system(size: 14, weight: .bold))
                         Spacer()
                         Text("低分 \(lowScoreStudentIDs.count) · 表现良好 \(highScoreStudentIDs.count) · 待复核 \(classStudents.filter { state.taskStatus(for: $0) == .review }.count) · 待补测 \(classStudents.filter { state.taskStatus(for: $0) == .retest }.count)")
-                            .font(.system(size: 12)).foregroundStyle(.secondary)
+                            .font(.system(size: 13)).foregroundStyle(.secondary)
+                            .multilineTextAlignment(.trailing)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
-            .padding(.horizontal, 12)
-            LazyVGrid(columns: actionGridColumns, spacing: 5) {
+            .padding(.horizontal, AppTheme.pagePadding)
+            LazyVGrid(columns: actionGridColumns, spacing: AppTheme.cardSpacing) {
                 action("rectangle.stack.fill", "班级看板", ReferenceColor.blue, .teacherClassBoard)
                 action("exclamationmark.triangle.fill", "预警中心", .red, .reviewList)
                 action("person.3.fill", "学生列表", ReferenceColor.green, .studentList(nil))
@@ -285,10 +285,10 @@ struct TeacherDashboard: View {
                 // workbench, rather than duplicating the student-list shortcut.
                 action("person.badge.plus", "班级管理", .orange, .teacherClasses)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, AppTheme.pagePadding)
             if state.usesRemoteDataSource {
                 EmptyStateView(title: "暂无今日任务", detail: "学校排期同步后会显示可处理任务.")
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, AppTheme.pagePadding)
             } else {
                 ReferenceCard {
                     VStack(alignment: .leading, spacing: 7) {
@@ -297,7 +297,7 @@ struct TeacherDashboard: View {
                         teacherTaskRow("17:20–18:00 · 体能提升课", "待上传", .orange)
                     }
                 }
-                .padding(.horizontal, 12)
+                .padding(.horizontal, AppTheme.pagePadding)
             }
         }
     }
@@ -306,9 +306,9 @@ struct TeacherDashboard: View {
         Button { router.push(.teacherTasks) } label: {
             HStack(spacing: 8) {
                 Image(systemName: "calendar.badge.clock").foregroundStyle(color)
-                Text(title).font(.system(size: 12, weight: .semibold)).foregroundStyle(ReferenceColor.navy)
+                Text(title).font(.system(size: 14, weight: .semibold)).foregroundStyle(ReferenceColor.navy).lineLimit(2)
                 Spacer()
-                Text(status).font(.system(size: 12, weight: .bold)).foregroundStyle(color)
+                Text(status).font(.system(size: 13, weight: .bold)).foregroundStyle(color)
                 Image(systemName: "chevron.right").font(.system(size: 12)).foregroundStyle(.secondary)
             }
         }
@@ -384,20 +384,42 @@ struct TeacherDashboard: View {
     private func count(_ title: String, _ value: String, _ icon: String, _ color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 4) {
-                Text(title).font(.system(size: 12)).foregroundStyle(.secondary)
+                Text(title).font(.system(size: 13, weight: .medium)).foregroundStyle(.secondary)
                 HStack(spacing: 3) {
-                    Text(value).font(.system(size: 19, weight: .bold)).foregroundStyle(color)
+                    Text(value).font(.system(size: 22, weight: .bold)).foregroundStyle(color)
                     Image(systemName: icon).font(.system(size: 14)).foregroundStyle(color)
                 }
             }
             .frame(maxWidth: .infinity)
+            .padding(12)
+            .background(color.opacity(0.07), in: RoundedRectangle(cornerRadius: AppTheme.controlRadius, style: .continuous))
         }.buttonStyle(.plain).accessibilityLabel("查看\(title)")
     }
 
     private func action(_ icon: String, _ title: String, _ color: Color, _ route: AppRoute) -> some View {
-        Button { router.push(route) } label: { ReferenceAction(icon: icon, title: title, color: color) }
+        Button { router.push(route) } label: {
+            HStack(spacing: 11) {
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(color)
+                    .frame(width: 38, height: 38)
+                    .background(color.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(ReferenceColor.navy)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(AppTheme.muted)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+            .background(.white, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous).stroke(AppTheme.divider.opacity(0.8), lineWidth: 0.75))
+        }
             .buttonStyle(.plain)
             .accessibilityLabel(title)
     }
 }
-

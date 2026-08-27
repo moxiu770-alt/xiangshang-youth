@@ -57,13 +57,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) { setOffline(!capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) }
     }
     internal val repository: YouthRepository = RepositoryProvider.create()
-    private val featureStore = LocalFeatureStore(application)
+    internal val featureStore = LocalFeatureStore(application)
     private val initialLocal = featureStore.load()
     /** A logout may happen while a cold-start restore is awaiting the
      * dashboard.  Keep a cancellable handle and a generation token so the
      * old account can never repopulate state after the user chose to exit. */
-    private var sessionRestoreJob: Job? = null
-    private var sessionGeneration = 0L
+    internal var sessionRestoreJob: Job? = null
+    internal var sessionGeneration = 0L
     internal val _state = MutableStateFlow(AppUiState(local = initialLocal, restoringSession = initialLocal.sessionActive, repositoryAcknowledged = repository.supportsRemoteAcknowledgement))
     val state: StateFlow<AppUiState> = _state.asStateFlow()
     init {
@@ -72,421 +72,28 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             .onSuccess { networkCallbackRegistered = true }
         if (_state.value.local.sessionActive) restoreSession()
     }
-    fun login(identifier: String = "", verificationCode: String? = null, password: String? = null, displayName: String? = null, accountRole: UserRole? = null, onSuccess: () -> Unit = {}) = viewModelScope.launch {
-        // Do not allow a fast double tap on WeChat/phone login to race two
-        // dashboard loads and two session writes.
-        if (_state.value.loading) return@launch
-        if (repository.supportsRemoteAcknowledgement && identifier == AuthIdentity.wechatAuthorizationIdentifier) {
-            _state.value = _state.value.copy(loading = true, error = null)
-            runCatching {
-                ApiClient.retrofit.create(AuthApi::class.java).startWechatAuthorization().data
-                    ?: error("微信授权配置响应为空")
-            }.onSuccess { authorization ->
-                runCatching {
-                    getApplication<Application>().startActivity(Intent(Intent.ACTION_VIEW, authorization.authorizeUrl.toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                }.onFailure { _state.value = _state.value.copy(error = "无法打开微信授权，请确认已安装微信或改用手机号登录。") }
-            }.onFailure { _state.value = _state.value.copy(error = it.localizedMessage ?: "微信授权暂不可用，请稍后重试。") }
-            _state.value = _state.value.copy(loading = false)
-            return@launch
-        }
-        _state.value = _state.value.copy(loading = true, restoringSession = false)
-        runCatching {
-            if (repository.supportsRemoteAcknowledgement) {
-                val payload = ApiClient.retrofit.create(AuthApi::class.java).login(LoginRequest(identifier, verificationCode, password)).data
-                    ?: error("登录响应为空")
-                ApiClient.updateSession(payload.accessToken, payload.refreshToken)
-                val profile = profileFromAuth(payload)
-                repository.configureSession(profile)
-                profile to repository.dashboard()
-            } else {
-                null to repository.dashboard()
-            }
-        }.onSuccess { (remoteProfile, data) ->
-            val profile = remoteProfile ?: run {
-                val profilePhone = AuthIdentity.displayPhone(identifier)
-                val profileName = displayName?.trim().takeUnless { it.isNullOrEmpty() } ?: "王女士"
-                val bucket = accountRole ?: UserRole.Parent
-                UserProfile(
-                    if (bucket == UserRole.Teacher) "teacher_li" else if (bucket == UserRole.Parent) "parent_wang" else "principal_zhou",
-                    profileName, profilePhone, bucket, data.school.name,
-                    // A Mock/offline login is a family-login fallback. Do not
-                    // turn the existence of the teacher workbench into an
-                    // account grant for every newly registered parent.
-                    availableRoles = listOf(bucket),
-                    authorizedClassIds = if (bucket == UserRole.Teacher) listOf("c31", "c32") else emptyList(),
-                    capabilities = if (bucket == UserRole.Teacher) setOf("VIEW_CLASS_DASHBOARD", "MANAGE_CLASS_STUDENTS", "VIEW_TEST_TASKS", "UPDATE_TEST_STATUS", "REVIEW_RESULT", "REQUEST_RETEST", "UPLOAD_AFTER_SCHOOL_COURSE", "PUBLISH_CLASS_NOTICE") else emptySet()
-                )
-            }
-            val bucket = profile.role
-            val selected = data.students.firstOrNull { it.id == _state.value.local.selectedChildId && it.id in _state.value.local.boundChildIds }
-            val local = _state.value.local.copy(
-                sessionActive = true,
-                sessionPhone = profile.phone,
-                sessionRoleName = profile.role.name,
-                accountBucketName = profile.role.name,
-                parentAccountName = if (bucket == UserRole.Parent) profile.name else _state.value.local.parentAccountName,
-                selectedChildId = selected?.id
-            )
-            featureStore.save(local)
-            _state.value = AppUiState(profile, role = if (repository.supportsRemoteAcknowledgement) profile.role else accountRole, data = data, selectedChild = selected, local = local, repositoryAcknowledged = repository.supportsRemoteAcknowledgement)
-            onSuccess()
-        }.onFailure { handleDashboardFailure(it) }
-    }
-
-    /** Completes the one-time native callback from the server relay. */
-    fun exchangeWechat(code: String, state: String, onSuccess: () -> Unit = {}) = viewModelScope.launch {
-        if (_state.value.loading || code.isBlank() || state.isBlank()) return@launch
-        _state.value = _state.value.copy(loading = true, error = null)
-        runCatching {
-            val payload = ApiClient.retrofit.create(AuthApi::class.java).exchangeWechat(WechatExchangeRequest(code, state)).data
-                ?: error("微信登录响应为空")
-            ApiClient.updateSession(payload.accessToken, payload.refreshToken)
-            val profile = profileFromAuth(payload)
-            repository.configureSession(profile)
-            profile to repository.dashboard()
-        }.onSuccess { (profile, data) ->
-            val selected = data.students.firstOrNull { it.id == _state.value.local.selectedChildId && it.id in _state.value.local.boundChildIds }
-            val local = _state.value.local.copy(sessionActive = true, sessionPhone = profile.phone, sessionRoleName = profile.role.name, accountBucketName = profile.role.name, parentAccountName = if (profile.role == UserRole.Parent) profile.name else _state.value.local.parentAccountName, selectedChildId = selected?.id)
-            featureStore.save(local)
-            _state.value = AppUiState(profile, role = profile.role, data = data, selectedChild = selected, local = local, repositoryAcknowledged = true)
-            onSuccess()
-        }.onFailure { handleDashboardFailure(it) }
-        _state.value = _state.value.copy(loading = false)
-    }
-    fun register(name: String, phone: String, verificationCode: String, password: String, role: UserRole, onSuccess: () -> Unit = {}) = viewModelScope.launch {
-        if (_state.value.loading) return@launch
-        if (role != UserRole.Parent) {
-            _state.value = _state.value.copy(error = "教师账号须由学校管理员开通后登录，不能自助注册。")
-            return@launch
-        }
-        _state.value = _state.value.copy(loading = true, error = null)
-        runCatching {
-            if (repository.supportsRemoteAcknowledgement) {
-                val payload = ApiClient.retrofit.create(AuthApi::class.java).register(RegisterRequest(name.trim(), phone, verificationCode, password, role.backendCode)).data
-                    ?: error("注册响应为空")
-                ApiClient.updateSession(payload.accessToken, payload.refreshToken)
-                val profile = profileFromAuth(payload)
-                repository.configureSession(profile)
-                profile to repository.dashboard()
-            } else {
-                null to repository.dashboard()
-            }
-        }.onSuccess { (remoteProfile, data) ->
-            val profile = remoteProfile ?: UserProfile(if (role == UserRole.Teacher) "teacher_li" else if (role == UserRole.Parent) "parent_wang" else "principal_zhou", name.trim(), phone, role, data.school.name, authorizedClassIds = if (role == UserRole.Teacher) listOf("c31", "c32") else emptyList(), capabilities = if (role == UserRole.Teacher) setOf("VIEW_CLASS_DASHBOARD", "MANAGE_CLASS_STUDENTS", "VIEW_TEST_TASKS", "UPDATE_TEST_STATUS", "REVIEW_RESULT", "REQUEST_RETEST", "UPLOAD_AFTER_SCHOOL_COURSE", "PUBLISH_CLASS_NOTICE") else emptySet())
-            val selected = data.students.firstOrNull { it.id == _state.value.local.selectedChildId && it.id in _state.value.local.boundChildIds }
-            val local = _state.value.local.copy(sessionActive = true, sessionPhone = profile.phone, sessionRoleName = profile.role.name, accountBucketName = profile.role.name, parentAccountName = if (profile.role == UserRole.Parent) profile.name else _state.value.local.parentAccountName, selectedChildId = selected?.id)
-            featureStore.save(local)
-            _state.value = AppUiState(profile, role = if (repository.supportsRemoteAcknowledgement) profile.role else role, data = data, selectedChild = selected, local = local, repositoryAcknowledged = repository.supportsRemoteAcknowledgement)
-            onSuccess()
-        }.onFailure { handleDashboardFailure(it) }
-    }
-    fun resetPassword(phone: String, verificationCode: String, password: String, onResult: (Boolean, String?) -> Unit) = viewModelScope.launch {
-        if (!repository.supportsRemoteAcknowledgement) { onResult(true, null); return@launch }
-        runCatching { ApiClient.retrofit.create(AuthApi::class.java).resetPassword(ResetPasswordRequest(phone, verificationCode, password)) }
-            .onSuccess { onResult(true, null) }
-            .onFailure { onResult(false, it.localizedMessage ?: "密码重置失败，请稍后重试") }
-    }
-    fun requestVerificationCode(account: String, purpose: String, onResult: (Boolean, String?) -> Unit) = viewModelScope.launch {
-        if (account.filter(Char::isDigit).length != 11) { onResult(false, "请输入有效的 11 位手机号。"); return@launch }
-        if (!repository.supportsRemoteAcknowledgement) { onResult(true, null); return@launch }
-        runCatching { ApiClient.retrofit.create(AuthApi::class.java).sendVerificationCode(VerificationCodeRequest(account, purpose)) }
-            .onSuccess { onResult(true, null) }
-            .onFailure { onResult(false, it.localizedMessage ?: "验证码发送失败，请稍后重试") }
-    }
-    fun refreshDashboard(onSuccess: () -> Unit = {}) = viewModelScope.launch {
-        // Do not turn an explicit refresh tap into a network request while the
-        // device is offline. Cached/Mock data remains usable and the banner
-        // explains why the refresh is deferred.
-        if (_state.value.profile == null || _state.value.loading || _state.value.isOffline) return@launch
-        _state.value = _state.value.copy(loading = true, error = null)
-        runCatching { repository.dashboard() }.onSuccess { data ->
-            val selected = _state.value.selectedChild?.id?.let { id -> data.students.firstOrNull { it.id == id && id in _state.value.local.boundChildIds } }
-            _state.value = _state.value.copy(data = data, selectedChild = selected, loading = false, studentsLoadError = null)
-            onSuccess()
-        }.onFailure { handleDashboardFailure(it) }
-    }
-    /** Appends the next bounded remote student-directory page. */
-    fun loadMoreStudents() = viewModelScope.launch {
-        val current = _state.value.data ?: return@launch
-        val total = current.studentTotal ?: return@launch
-        val page = current.studentPage ?: return@launch
-        val pageSize = current.studentPageSize ?: return@launch
-        if (_state.value.studentsLoadingMore || _state.value.loading || _state.value.isOffline || total <= current.students.size) return@launch
-        val nextPage = page + 1
-        if ((nextPage - 1) * pageSize >= total) return@launch
-        _state.value = _state.value.copy(studentsLoadingMore = true, studentsLoadError = null)
-        try {
-            val next = repository.dashboard(nextPage, pageSize)
-            val existing = current.students.map { it.id }.toHashSet()
-            val merged = current.students + next.students.filter { existing.add(it.id) }
-            _state.value = _state.value.copy(data = next.copy(students = merged, studentTotal = next.studentTotal ?: total, studentPage = next.studentPage ?: nextPage, studentPageSize = next.studentPageSize ?: pageSize), studentsLoadingMore = false)
-        } catch (error: Throwable) {
-            if (error is ApiError.Unauthorized) handleDashboardFailure(error)
-            else _state.value = _state.value.copy(studentsLoadingMore = false, studentsLoadError = error.localizedMessage ?: "学生名单加载失败，请重试")
-        }
-    }
-    /**
-     * A dashboard row only contains a student's latest summary.  Task detail
-     * must load the selected task's rows, otherwise a student in two tasks can
-     * be shown with the wrong status or optimistic-lock version.
-     */
-    fun loadTaskStudents(taskId: String) = viewModelScope.launch {
-        if (taskId.isBlank() || !repository.supportsRemoteAcknowledgement || _state.value.isOffline) return@launch
-        runCatching { repository.taskStudentRoster(taskId, page = 1, pageSize = 500, status = null, keyword = null) }.onSuccess { rows ->
-            _state.value = _state.value.copy(taskRosterRecords = _state.value.taskRosterRecords + (taskId to rows))
-            mutate { local ->
-                val statuses = rows.associate { "${it.taskId}|${it.studentId}" to it.status }
-                val versions = rows.associate { "${it.taskId}|${it.studentId}" to it.version }
-                local.copy(
-                    taskScopedStatuses = local.taskScopedStatuses + statuses,
-                    taskScopedStatusVersions = local.taskScopedStatusVersions + versions
-                )
-            }
-        }.onFailure { error ->
-            if (error is ApiError.Unauthorized) handleDashboardFailure(error)
-            else _state.value = _state.value.copy(error = error.localizedMessage ?: "任务学生状态加载失败，请重试")
-        }
-    }
-    fun taskRosterStudents(taskId: String, fallbackTask: TestTask? = null): List<Student> {
-        val current = _state.value
-        val rows = current.taskRosterRecords[taskId].orEmpty()
-        if (rows.isEmpty() && !repository.supportsRemoteAcknowledgement) {
-            return fallbackTask?.scopedStudents(current.data?.students.orEmpty()).orEmpty()
-        }
-        return rows.map { row ->
-            current.data?.students?.firstOrNull { it.id == row.studentId } ?: Student(
-                id = row.studentId,
-                name = row.studentName,
-                grade = row.gradeName ?: fallbackTask?.gradeName.orEmpty(),
-                className = row.className,
-                region = current.data?.school?.region.orEmpty(),
-                isPovertyArea = current.data?.school?.isPovertyArea ?: false,
-                taskStatus = row.status,
-                totalScore = null,
-                gender = row.studentGender.orEmpty(),
-                taskVersion = row.version,
-                classId = row.classId
-            )
-        }
-    }
-    /**
-     * A task can span an entire school, while a teacher claim normally covers
-     * only a subset of its classes.  Keep this check close to every local
-     * mutation as well as in the screen filter: hiding a row is not enough if
-     * a stale deep link or a crafted UI event can still invoke the command.
-     */
-    private fun canManageTaskStudent(student: Student): Boolean {
-        return _state.value.isTeacherAuthorizedFor(student)
-    }
-    fun submitTaskStatusBatch(taskId: String, studentIds: List<String>, status: TaskStatus, note: String? = null) = viewModelScope.launch {
-        val ids = studentIds.distinct().filter { it.isNotBlank() }
-        val commandKey = "task-batch:$taskId"
-        if (taskId.isBlank() || ids.isEmpty() || _state.value.workflowStates[commandKey]?.isSubmitting == true) return@launch
-        val roster = taskRosterStudents(taskId, _state.value.data?.tasks?.firstOrNull { it.id == taskId })
-        val studentsById = (_state.value.data?.students.orEmpty() + roster).associateBy { it.id }
-        if (ids.any { studentId -> studentsById[studentId]?.let { canManageTaskStudent(it) } != true }) {
-            setWorkflow(commandKey, WorkflowCommandState(WorkflowCommandStatus.Failed, "只能更新已授权班级内的学生。"))
-            return@launch
-        }
-        setWorkflow(commandKey, WorkflowCommandState(WorkflowCommandStatus.Submitting))
-        val updates = ids.map { studentId ->
-            com.xiangshang.youth.core.service.TaskStatusBatchItem(studentId, status, note, expectedVersion = _state.value.local.taskScopedStatusVersions["$taskId|$studentId"])
-        }
-        runCatching { repository.batchUpdateTaskStatus(taskId, updates) }
-            .onSuccess { acknowledgement ->
-                acknowledgement.items.orEmpty().forEach { row ->
-                    mutate { local ->
-                        val key = "$taskId|${row.studentId}"
-                        local.copy(
-                            taskScopedStatuses = local.taskScopedStatuses + (key to row.status),
-                            taskScopedStatusVersions = local.taskScopedStatusVersions + (key to row.version),
-                            taskScopedSyncStates = local.taskScopedSyncStates + (key to LocalSubmissionStatus.Submitted)
-                        )
-                    }
-                }
-                setWorkflow(commandKey, WorkflowCommandState(WorkflowCommandStatus.Succeeded, "已更新 ${acknowledgement.updated ?: acknowledgement.items.orEmpty().size} 名学生"))
-            }
-            .onFailure { setWorkflow(commandKey, WorkflowCommandState(WorkflowCommandStatus.Failed, it.localizedMessage ?: "批量更新失败，请重试")) }
-    }
-    fun loadTeacherOverview(classId: String, task: TestTask) = viewModelScope.launch {
-        val profile = _state.value.profile ?: return@launch
-        if (!repository.supportsRemoteAcknowledgement || profile.schoolId.isNullOrBlank()) return@launch
-        val context = TeacherOverviewContext(profile.schoolId, classId, task.id, task.ruleVersion)
-        _state.value = _state.value.copy(teacherOverview = null, teacherOverviewContext = context)
-        runCatching { repository.teacherOverview(profile.schoolId, classId, task.id, task.ruleVersion) }
-            .onSuccess { overview ->
-                if (_state.value.teacherOverviewContext == context) {
-                    _state.value = _state.value.copy(teacherOverview = overview)
-                }
-            }
-            .onFailure {
-                if (_state.value.teacherOverviewContext == context) {
-                    _state.value = _state.value.copy(teacherOverview = null, error = it.localizedMessage ?: "班级统计加载失败，请重试")
-                }
-            }
-    }
-    /** A mobile role is usable only when it is present in the signed-in
-     * account claims. `UserRole.mobileRoles` is a product capability list,
-     * never a substitute for a teacher authorization grant. */
-    fun canUseRole(role: UserRole): Boolean = _state.value.profile?.availableRoles?.contains(role) == true
-
-    fun chooseRole(role: UserRole) {
-        val visibleProfile = _state.value.profile
-        if (!canUseRole(role)) return
-        if (_state.value.role != role) _state.value = _state.value.copy(taskRosterRecords = emptyMap())
-        // Preserve the family account name on the first upgrade from the
-        // former session schema, before the active workbench overwrites it
-        // with 李老师/周校长.
-        val local = _state.value.local
-            .let { current ->
-                if (current.parentAccountName.isNullOrBlank() && visibleProfile?.role == UserRole.Parent) {
-                    current.copy(parentAccountName = visibleProfile.name)
-                } else current
-            }
-            .copy(sessionRoleName = role.name)
-        featureStore.save(local)
-        val parentName = local.parentAccountName ?: visibleProfile?.takeIf { it.role == UserRole.Parent }?.name ?: "家长"
-        // Role switching must not overwrite a real account name with the seed
-        // teacher/principal names. The Mock workbench has no separate teacher
-        // account, so derive that display name from the managed class data; a
-        // remote profile keeps the identity returned by the service.
-        val roleName = if (repository.supportsRemoteAcknowledgement) {
-            // The service owns the authenticated identity. A workbench switch
-            // must never turn a real account into the bundled teacher_li demo.
-            visibleProfile?.name ?: ""
-        } else when (role) {
-            UserRole.Parent -> parentName
-            UserRole.Teacher -> if (visibleProfile?.role == UserRole.Teacher) {
-                visibleProfile.name
-            } else {
-                _state.value.data?.classes?.firstOrNull()?.teacherName ?: visibleProfile?.name ?: "教师"
-            }
-            UserRole.Principal -> if (visibleProfile?.role == UserRole.Principal) visibleProfile.name else visibleProfile?.name ?: "校长"
-        }
-        val teacherMode = role == UserRole.Teacher
-        val capabilities = if (teacherMode && !repository.supportsRemoteAcknowledgement && visibleProfile?.capabilities.isNullOrEmpty()) setOf("VIEW_CLASS_DASHBOARD", "MANAGE_CLASS_STUDENTS", "VIEW_TEST_TASKS", "UPDATE_TEST_STATUS", "REVIEW_RESULT", "REQUEST_RETEST", "UPLOAD_AFTER_SCHOOL_COURSE", "PUBLISH_CLASS_NOTICE") else visibleProfile?.capabilities.orEmpty()
-        val classIds = if (teacherMode && !repository.supportsRemoteAcknowledgement && visibleProfile?.authorizedClassIds.isNullOrEmpty()) listOf("c31", "c32") else visibleProfile?.authorizedClassIds.orEmpty()
-        _state.value = _state.value.copy(local = local, role = role, profile = visibleProfile?.copy(role = role, name = roleName, avatarInitials = roleName.take(1), authorizedClassIds = classIds, capabilities = capabilities))
-    }
-    fun clearRoleSelection() {
-        val local = _state.value.local.copy(sessionRoleName = null)
-        featureStore.save(local)
-        _state.value = _state.value.copy(local = local, role = null, taskRosterRecords = emptyMap())
-    }
-    fun selectPrincipalTask(taskId: String) = mutate { it.copy(selectedPrincipalTaskId = taskId) }
-    fun setTeacherSportsWorkbench(enabled: Boolean) = mutate { it.copy(teacherUsesSportsWorkbench = enabled) }
-    fun recordHealthConsent(
-        studentId: String,
-        privacyVersion: String = com.xiangshang.youth.core.model.LegalPolicy.PRIVACY_POLICY_VERSION,
-        cameraVersion: String = com.xiangshang.youth.core.model.LegalPolicy.CAMERA_CONSENT_VERSION,
-        algorithmVersion: String = com.xiangshang.youth.core.model.LegalPolicy.ALGORITHM_NOTICE_VERSION
-    ) {
-        val guardian = _state.value.profile ?: return
-        val consent = com.xiangshang.youth.core.service.HealthConsentRecord(
-            consentId = java.util.UUID.randomUUID().toString(), guardianUserId = guardian.id, childId = studentId,
-            privacyPolicyVersion = privacyVersion, cameraConsentVersion = cameraVersion, algorithmNoticeVersion = algorithmVersion,
-            agreedAt = BusinessClock.format("yyyy-MM-dd'T'HH:mm:ssXXX"), deviceInfo = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}", dataRetentionNoticeAccepted = true
-        )
-        mutate { it.copy(healthConsents = it.healthConsents + (studentId to consent)) }
-    }
-    fun chooseChild(student: Student) {
-        mutate { it.copy(selectedChildId = student.id) }
-        _state.value = _state.value.copy(selectedChild = student)
-        loadHealthCheckins(student.id)
-        if (repository.supportsRemoteAcknowledgement) {
-            loadFamilyHealthObservations(student.id)
-            loadClassPosts()
-            loadActivities()
-        }
-    }
-    fun markMessageRead(messageId: String) {
-        mutate { it.copy(readMessageIds = it.readMessageIds + messageId) }
-        if (repository.supportsRemoteAcknowledgement) viewModelScope.launch {
-            runCatching { repository.markMessageRead(messageId) }.onFailure { if (it is ApiError.Unauthorized) handleDashboardFailure(it) }
-        }
-    }
-    fun markAllMessagesRead() = mutate { local ->
-        local.copy(readMessageIds = local.readMessageIds + (_state.value.data?.messages?.map { it.id }.orEmpty()))
-    }.also {
-        if (repository.supportsRemoteAcknowledgement) _state.value.data?.messages.orEmpty().forEach { message -> viewModelScope.launch { runCatching { repository.markMessageRead(message.id) }.onFailure { if (it is ApiError.Unauthorized) handleDashboardFailure(it) } } }
-    }
-    fun bindChild(name: String, code: String): Boolean {
-        if (repository.supportsRemoteAcknowledgement) {
-            if (name.isBlank() || code.isBlank()) return false
-            _state.value = _state.value.copy(workflowStates = _state.value.workflowStates + ("child-binding" to WorkflowCommandState(WorkflowCommandStatus.Submitting)))
-            viewModelScope.launch {
-                runCatching { repository.bindChild(name.trim(), code.trim().uppercase()) }.onSuccess { binding ->
-                    mutate { it.copy(boundChildIds = it.boundChildIds + binding.student.id, selectedChildId = it.selectedChildId ?: binding.student.id) }
-                    _state.value = _state.value.copy(selectedChild = _state.value.selectedChild ?: binding.student, workflowStates = _state.value.workflowStates + ("child-binding" to WorkflowCommandState(WorkflowCommandStatus.Succeeded, "孩子已绑定")))
-                    refreshDashboard()
-                }.onFailure { error ->
-                    _state.value = _state.value.copy(workflowStates = _state.value.workflowStates + ("child-binding" to WorkflowCommandState(WorkflowCommandStatus.Failed, error.localizedMessage ?: "绑定失败")))
-                    if (error is ApiError.Unauthorized) handleDashboardFailure(error)
-                }
-            }
-            // The request is asynchronous.  The screen observes the workflow
-            // state and must not close the binding dialog until this coroutine
-            // reports Succeeded.
-            return false
-        }
-        val child = ChildBindingValidator.findMatch(_state.value.data?.students.orEmpty(), name, code) ?: return false
-        mutate { it.copy(boundChildIds = it.boundChildIds + child.id) }
-        if (_state.value.selectedChild == null) chooseChild(child)
-        return true
-    }
-    fun logout() {
-        sessionGeneration += 1
-        sessionRestoreJob?.cancel()
-        sessionRestoreJob = null
-        ApiClient.clearToken()
-        com.xiangshang.youth.core.util.FrontendTelemetry.configure(false)
-        featureStore.clear()
-        _state.value = AppUiState()
-    }
 
     /**
-     * Instrumentation-only identity fixture.  Public registration deliberately
-     * never creates a teacher account; UI tests that cover the teacher
-     * workbench must therefore use an explicit school-provisioned identity
-     * with the same scoped claims a server session would provide.
+     * Server-side guardian bindings are authoritative. A parent signing in on
+     * a new device must immediately see children already bound by the school
+     * or another device instead of being sent back to the binding prompt.
      */
-    fun startSchoolProvisionedTeacherFixtureForUiTest() {
-        if (!BuildConfig.DEBUG) return
-        viewModelScope.launch {
-            val data = repository.dashboard()
-            val profile = UserProfile(
-                id = "teacher_ui_fixture",
-                name = "学校授权教师",
-                phone = "13800000001",
-                role = UserRole.Teacher,
-                schoolName = data.school.name,
-                roleCode = "teacher",
-                schoolId = data.school.id,
-                availableRoles = listOf(UserRole.Teacher),
-                authorizedClassIds = listOf("c31", "c32"),
-                capabilities = setOf(
-                    "VIEW_CLASS_DASHBOARD", "MANAGE_CLASS_STUDENTS", "VIEW_TEST_TASKS",
-                    "UPDATE_TEST_STATUS", "REVIEW_RESULT", "REQUEST_RETEST",
-                    "UPLOAD_AFTER_SCHOOL_COURSE", "PUBLISH_CLASS_NOTICE"
-                )
-            )
-            repository.configureSession(profile)
-            val local = _state.value.local.copy(
-                sessionActive = true,
-                sessionPhone = profile.phone,
-                sessionRoleName = UserRole.Teacher.name,
-                accountBucketName = UserRole.Teacher.name
-            )
-            featureStore.save(local)
-            _state.value = AppUiState(
-                profile = profile,
-                role = UserRole.Teacher,
-                data = data,
-                local = local,
-                repositoryAcknowledged = false,
-                uiTestSchoolProvisionedTeacher = true
-            )
+    internal fun reconcileChildScope(
+        profile: UserProfile,
+        data: DashboardData,
+        local: LocalFeatureState
+    ): Pair<LocalFeatureState, Student?> {
+        if (repository.supportsRemoteAcknowledgement && profile.role == UserRole.Parent) {
+            val authorized = data.children.map { it.student }
+            val ids = authorized.map { it.id }.toSet()
+            val selectedId = local.selectedChildId?.takeIf(ids::contains) ?: authorized.firstOrNull()?.id
+            val selected = authorized.firstOrNull { it.id == selectedId }
+            return local.copy(boundChildIds = ids, selectedChildId = selected?.id) to selected
         }
+        val selected = data.students.firstOrNull {
+            it.id == local.selectedChildId && it.id in local.boundChildIds
+        }
+        return local.copy(selectedChildId = selected?.id) to selected
     }
     fun report(student: Student): DiagnosisReport = _state.value.reportOverrides[student.id] ?: repository.report(student)
     /** In remote mode, only render a report that came from ReportApi. */
@@ -773,7 +380,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         connectivityManager.getNetworkCapabilities(network)?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
     } ?: false
     /** Builds a mobile profile from server-owned claims, never from local demo defaults. */
-    private fun profileFromAuth(payload: com.xiangshang.youth.core.service.AuthResponse): UserProfile = profileFromClaims(
+    internal fun profileFromAuth(payload: com.xiangshang.youth.core.service.AuthResponse): UserProfile = profileFromClaims(
         payload.user,
         payload.accountRoles.orEmpty().map { it.roleCode to it },
         payload.roles.map { it.code to null },
@@ -830,7 +437,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     restored to repository.dashboard()
                 } else null to repository.dashboard()
                 if (generation != sessionGeneration) return@launch
-                val selected = data.students.firstOrNull { it.id == local.selectedChildId && it.id in local.boundChildIds }
                 val accountBucket = local.accountBucketName
                     ?.let { name -> UserRole.values().firstOrNull { it.name == name } }
                     ?: UserRole.Parent
@@ -841,7 +447,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     "u1", local.parentAccountName ?: "王女士", local.sessionPhone.ifBlank { "未绑定手机号" }, accountBucket, data.school.name,
                     availableRoles = listOf(accountBucket)
                 )
-                _state.value = _state.value.copy(profile = visibleProfile, role = null, data = data, selectedChild = selected, loading = false, restoringSession = false)
+                val (reconciledLocal, selected) = reconcileChildScope(visibleProfile, data, local)
+                featureStore.save(reconciledLocal)
+                _state.value = _state.value.copy(profile = visibleProfile, role = null, data = data, selectedChild = selected, local = reconciledLocal, loading = false, restoringSession = false)
                 // The network callback may have fired before the asynchronous
                 // session restore populated profile. Retry persisted writes now
                 // that the authenticated dashboard is available.

@@ -1,0 +1,105 @@
+:root {
+  --focus-ring: 0 0 0 3px rgba(23, 105, 224, .18);
+}
+
+/* Operational feedback belongs beside the data it describes. */
+.workspace-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 18px;
+  padding: 13px 15px;
+  border: 1px solid #dce7f4;
+  border-radius: 12px;
+  color: #38506d;
+  background: #f7faff;
+}
+.workspace-status > div { min-width: 0; }
+.workspace-status strong,
+.workspace-status span { display: block; }
+.workspace-status strong { color: var(--ink); font-size: 14px; }
+.workspace-status span { margin-top: 3px; font-size: 12px; line-height: 1.55; }
+.workspace-status.loading { border-color: #d5e5fb; background: #f2f7ff; }
+.workspace-status.success { border-color: #ccebdd; background: #f0fbf6; }
+.workspace-status.warning { border-color: #f3dda8; background: #fff9e9; }
+.workspace-status.error { border-color: #f1c9ce; background: #fff3f5; }
+
+.service-health {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  background: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.service-health i { width: 8px; height: 8px; border-radius: 50%; background: #9aa8ba; }
+.service-health.healthy i { background: var(--green); box-shadow: 0 0 0 4px rgba(33,184,117,.12); }
+.service-health.degraded i { background: var(--orange); box-shadow: 0 0 0 4px rgba(245,158,11,.12); }
+.service-health.checking i { animation: health-pulse 1.2s ease-in-out infinite; }
+
+/* Commercial admin surfaces should remain readable during dense operations. */
+.hint,
+.brand-sub,
+.nav-label,
+.operator span,
+.content-ops-panel-head small,
+.content-catalog-item small,
+.content-selected-item small,
+.content-release-card small,
+.content-status,
+.content-mini-btn,
+.content-summary-chip,
+.message-item span,
+.message-item small,
+.detail-grid span,
+.task-student-item small,
+.field-ops-card small,
+.field-session-row small,
+.field-card-actions .ghost-btn { font-size: 12px; }
+
+.nav-item,
+.content-type-tab,
+.content-draft-note,
+.content-empty,
+.content-ops-error,
+.detail-note,
+.detail-list-head,
+.task-student-item strong { font-size: 13px; }
+
+button,
+[role="button"],
+.content-type-tab,
+.content-mini-btn { min-height: 44px; }
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex="0"]:focus-visible {
+  outline: 0;
+  box-shadow: var(--focus-ring);
+}
+
+.icon-btn.is-loading svg,
+.secondary-btn.is-loading svg { animation: refresh-spin .8s linear infinite; }
+
+@keyframes refresh-spin { to { transform: rotate(360deg); } }
+@keyframes health-pulse { 50% { opacity: .35; transform: scale(.82); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+@media (max-width: 760px) {
+  .service-health span { display: none; }
+  .service-health { width: 38px; justify-content: center; padding: 0; }
+  .workspace-status { align-items: flex-start; flex-direction: column; }
+  .workspace-status .secondary-btn { width: 100%; }
+}

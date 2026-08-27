@@ -24,6 +24,14 @@ struct LiveVisionCaptureSheet: View {
     @State private var cameraReady = false
     @State private var cameraError: String?
     @State private var captureArmed = false
+    private var taskIndex: Int {
+        (BodyAssessmentRecord.CaptureTask.allCases.firstIndex(of: task) ?? 0) + 1
+    }
+    private var phaseIndex: Int {
+        if !captureArmed { return 0 }
+        if captureProgress < 0.65 { return 1 }
+        return 2
+    }
 
     var body: some View {
         ZStack {
@@ -44,20 +52,30 @@ struct LiveVisionCaptureSheet: View {
             LiveBodyGuideOverlay(task: task)
                 .allowsHitTesting(false)
 
-            VStack(spacing: 18) {
-                HStack {
+            VStack(spacing: 16) {
+                HStack(spacing: 10) {
                     Button {
                         cancelled()
                         dismiss()
                     } label: {
-                        Image(systemName: "xmark").font(.headline).frame(width: 42, height: 42)
-                            .background(.black.opacity(0.38), in: Circle())
+                        Image(systemName: "xmark").font(.headline).frame(width: 48, height: 48)
+                            .background(.ultraThinMaterial, in: Circle())
                     }
                     .accessibilityLabel("关闭姿态记录")
                     Spacer()
+                    VStack(spacing: 2) {
+                        Text("动作 \(taskIndex) / \(BodyAssessmentRecord.CaptureTask.allCases.count)")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.72))
+                        Text(task.title)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                    .accessibilityElement(children: .combine)
+                    Spacer()
                     Button { speaksGuidance.toggle() } label: {
-                        Image(systemName: speaksGuidance ? "speaker.wave.2.fill" : "speaker.slash.fill").font(.headline).frame(width: 42, height: 42)
-                            .background(.black.opacity(0.38), in: Circle())
+                        Image(systemName: speaksGuidance ? "speaker.wave.2.fill" : "speaker.slash.fill").font(.headline).frame(width: 48, height: 48)
+                            .background(.ultraThinMaterial, in: Circle())
                     }
                     .accessibilityLabel(speaksGuidance ? "关闭语音指导" : "开启语音指导")
                     Button {
@@ -66,26 +84,57 @@ struct LiveVisionCaptureSheet: View {
                         cameraReady = false
                         usesFrontCamera.toggle()
                     } label: {
-                        Image(systemName: "camera.rotate.fill").font(.headline).frame(width: 42, height: 42)
-                            .background(.black.opacity(0.38), in: Circle())
+                        Image(systemName: "camera.rotate.fill").font(.headline).frame(width: 48, height: 48)
+                            .background(.ultraThinMaterial, in: Circle())
                     }
                     .accessibilityLabel(usesFrontCamera ? "切换为后置摄像头" : "切换为前置摄像头")
                 }
-                .foregroundStyle(.white).padding(.horizontal, 22).padding(.top, 14)
+                .foregroundStyle(.white).padding(.horizontal, 16).padding(.top, 10)
 
                 Spacer()
-                VStack(spacing: 9) {
-                    Text(task.title).font(.title3.bold())
-                    Text(task.instruction).font(.subheadline).multilineTextAlignment(.center)
-                    Text(guidance).font(.caption.weight(.medium)).foregroundStyle(.yellow).multilineTextAlignment(.center)
-                    VStack(spacing: 5) {
+                VStack(spacing: 12) {
+                    Text(task.instruction)
+                        .font(.system(size: 15, weight: .semibold))
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 6) {
+                        capturePhase("站位", index: 0)
+                        capturePhase("保持", index: 1)
+                        capturePhase("完成", index: 2)
+                    }
+                    HStack(alignment: .top, spacing: 9) {
+                        Image(systemName: guidanceIcon)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.yellow)
+                            .frame(width: 22)
+                        Text(guidance)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.white)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(11)
+                    .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                    VStack(spacing: 6) {
                         ProgressView(value: captureProgress).tint(.yellow)
-                        Text(!cameraReady ? "正在连接所选摄像头…" : captureArmed ? (captureProgress == 0 ? "正在确认取景与全身入镜" : "记录稳定度 \(Int(captureProgress * 100))%") : "请先完成取景，再开始记录")
-                            .font(.caption).foregroundStyle(.white.opacity(0.76))
+                        HStack {
+                            Text(!cameraReady ? "正在连接摄像头" : captureArmed ? "稳定度 \(Int(captureProgress * 100))%" : "取景完成后开始记录")
+                            Spacer()
+                            Label("不保存原始画面", systemImage: "lock.fill")
+                        }
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.72))
                     }
                     if captureArmed {
-                        Label("正在记录，请保持当前姿势", systemImage: "waveform.path.ecg")
-                            .font(.caption.weight(.semibold)).foregroundStyle(.yellow)
+                        HStack(spacing: 9) {
+                            ProgressView().tint(.yellow)
+                            Text("正在记录，请保持动作稳定")
+                                .font(.system(size: 15, weight: .semibold))
+                        }
+                        .foregroundStyle(.yellow)
+                        .frame(maxWidth: .infinity, minHeight: 50)
                     } else {
                         Button {
                             captureProgress = 0
@@ -93,16 +142,22 @@ struct LiveVisionCaptureSheet: View {
                             if speaksGuidance { VoiceCoach.shared.say("开始记录，请保持当前姿势。") }
                         } label: {
                             Label("开始记录", systemImage: "record.circle.fill")
-                                .font(.subheadline.bold()).frame(maxWidth: .infinity)
+                                .font(.system(size: 16, weight: .bold))
+                                .frame(maxWidth: .infinity, minHeight: 50)
                         }
-                        .buttonStyle(.borderedProminent).tint(.yellow).foregroundStyle(.black)
+                        .buttonStyle(.borderedProminent)
+                        .buttonBorderShape(.roundedRectangle(radius: 13))
+                        .tint(.yellow).foregroundStyle(.black)
                         .disabled(!cameraReady)
-                            .accessibilityHint("确认孩子已按当前动作站好后开始记录")
+                        .accessibilityHint("确认孩子已按当前动作站好后开始记录")
                     }
                 }
-                .foregroundStyle(.white).padding(18).frame(maxWidth: .infinity)
-                .background(.black.opacity(0.52), in: RoundedRectangle(cornerRadius: 20))
-                .padding(.horizontal, 24).padding(.bottom, 34)
+                .foregroundStyle(.white)
+                .padding(16)
+                .frame(maxWidth: .infinity)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(.white.opacity(0.18), lineWidth: 0.75))
+                .padding(.horizontal, 16).padding(.bottom, 20)
             }
             .allowsHitTesting(cameraError == nil)
 
@@ -149,6 +204,27 @@ struct LiveVisionCaptureSheet: View {
         }
         .onDisappear { VoiceCoach.shared.stop() }
     }
+
+    private var guidanceIcon: String {
+        if !cameraReady { return "camera.aperture" }
+        if guidance.contains("光线") { return "sun.max.fill" }
+        if guidance.contains("多人") { return "person.2.slash.fill" }
+        if guidance.contains("距离") || guidance.contains("入镜") { return "viewfinder" }
+        if guidance.contains("遮挡") { return "eye.slash.fill" }
+        return captureArmed ? "waveform.path.ecg" : "figure.stand"
+    }
+
+    private func capturePhase(_ title: String, index: Int) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: index < phaseIndex ? "checkmark.circle.fill" : index == phaseIndex ? "circle.inset.filled" : "circle")
+            Text(title)
+        }
+        .font(.system(size: 12, weight: .semibold))
+        .foregroundStyle(index <= phaseIndex ? .yellow : .white.opacity(0.52))
+        .frame(maxWidth: .infinity, minHeight: 30)
+        .background(.white.opacity(index == phaseIndex ? 0.12 : 0.05), in: Capsule())
+        .accessibilityLabel("\(title)，\(index < phaseIndex ? "已完成" : index == phaseIndex ? "当前阶段" : "未开始")")
+    }
 }
 
 /// A deliberately neutral framing guide: it verifies framing quality without
@@ -163,7 +239,7 @@ private struct LiveBodyGuideOverlay: View {
             // leave no visible space for the start button on compact screens.
             let aspectRatio = task == .seatedPosture ? 0.88 : 1.48
             let preferredWidth = min(proxy.size.width * 0.74, 330)
-            let height = min(preferredWidth * aspectRatio, max(170, proxy.size.height * 0.52))
+            let height = min(preferredWidth * aspectRatio, max(160, proxy.size.height * 0.43))
             let width = min(preferredWidth, height / aspectRatio)
             VStack(spacing: 10) {
                 Text(task == .gaitVideo ? "从框内自然走过，完成 3 步" : "请将孩子完整置于引导框内")
@@ -185,6 +261,7 @@ private struct LiveBodyGuideOverlay: View {
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .offset(y: -38)
         }
         .ignoresSafeArea()
     }

@@ -49,7 +49,6 @@ struct LoginView: View {
     @EnvironmentObject private var state: AppState
     @Environment(\.openURL) private var openURL
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var phone = ""
     @State private var account = ""
     @State private var password = ""
@@ -69,50 +68,40 @@ struct LoginView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Color(hex: "76B8F7"), Color(hex: "EEF8FF")], startPoint: .top, endPoint: .bottom)
+            LinearGradient(colors: [Color(hex: "E9F4FF"), Color(hex: "F8FBFF")], startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
-            Circle().fill(.white.opacity(0.13)).frame(width: 420).offset(x: 175, y: -290)
+            Circle().fill(ReferenceColor.blue.opacity(0.08)).frame(width: 360).blur(radius: 4).offset(x: 190, y: -300)
 
             GeometryReader { proxy in
                 ScrollView(.vertical, showsIndicators: false) {
-                    // A phone reference layout should not stretch into a desktop-width
-                    // form on iPad. Keep the readable mobile composition centered;
-                    // the additional minimum height is iPad-only so the supplied phone
-                    // layout and its top rhythm remain unchanged.
-                    VStack(spacing: 0) {
-                        VStack(spacing: 7) {
-                            Text("向上少年")
-                                .font(.system(size: 31, weight: .heavy))
-                            Text("身心健康智慧平台")
-                                .font(.system(size: 25, weight: .heavy))
-                            Text("学校体测 · 家庭健康记录 · 成长训练")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(ReferenceColor.yellow)
-                                .padding(.horizontal, 12).padding(.vertical, 4)
-                                .background(.white.opacity(0.18), in: Capsule())
+                    VStack(spacing: 22) {
+                        VStack(spacing: 14) {
+                            Image(systemName: "figure.run.circle.fill")
+                                .symbolRenderingMode(.palette)
+                                .foregroundStyle(.white, ReferenceColor.blue)
+                                .font(.system(size: 62, weight: .semibold))
+                                .accessibilityHidden(true)
+                            VStack(spacing: 6) {
+                                Text("登录向上少年")
+                                    .font(.system(size: AppTheme.displaySize, weight: .bold))
+                                    .foregroundStyle(ReferenceColor.navy)
+                                Text("连接学校与家庭，陪伴孩子健康成长")
+                                    .font(.system(size: AppTheme.secondarySize, weight: .medium))
+                                    .foregroundStyle(AppTheme.muted)
+                                    .multilineTextAlignment(.center)
+                            }
                         }
-                        .foregroundStyle(.white)
-                        .padding(.top, 30)
-                        .padding(.bottom, 12)
+                        .padding(.top, horizontalSizeClass == .compact ? 34 : 56)
 
-                        // The reference login composition uses the white account
-                        // panel as the main visual block.  On modern tall phones a
-                        // content-sized card left a large dead gap before the
-                        // campus artwork, so reserve proportional panel height and
-                        // let its agreement row settle near the lower edge.
-                        // Keep the agreement visible without turning tall-phone
-                        // login cards into a large empty white panel.
-                        // Keep the card tall enough for all login methods, but
-                        // avoid a dead band before the campus illustration on
-                        // modern 6.3-inch/tall iPhones.
-                        loginPanel(minHeight: horizontalSizeClass == .compact && !dynamicTypeSize.isAccessibilitySize ? proxy.size.height * 0.46 : 0)
-                        Spacer(minLength: 4)
+                        loginPanel
+                        Spacer(minLength: 24)
                         landscape
                     }
-                    .frame(maxWidth: 620)
+                    .frame(maxWidth: 520)
                     .frame(maxWidth: .infinity)
-                    .frame(minHeight: horizontalSizeClass == .regular ? proxy.size.height : nil, alignment: .center)
-                    .padding(.bottom, 8)
+                    .frame(minHeight: proxy.size.height, alignment: .top)
+                    .padding(.horizontal, AppTheme.pagePadding)
+                    .padding(.bottom, 16)
                 }
                 .scrollDismissesKeyboard(.interactively)
             }
@@ -123,126 +112,152 @@ struct LoginView: View {
         .sheet(item: $legalDocument) { document in LegalDocumentView(document: document) }
     }
 
-    private func loginPanel(minHeight: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 11) {
-            HStack {
-                Spacer()
-                Text("欢迎登录").font(.system(size: 16, weight: .bold)).foregroundStyle(ReferenceColor.navy)
-                Spacer()
+    private var loginPanel: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("账号登录")
+                    .font(.system(size: AppTheme.sectionTitleSize, weight: .bold))
+                    .foregroundStyle(ReferenceColor.navy)
+                Text("公开注册账号仅进入家庭端，教师账号由学校统一开通")
+                    .font(.system(size: AppTheme.captionSize))
+                    .foregroundStyle(AppTheme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            VStack(spacing: 8) {
-                loginMethodButton(state.loading && method == .wechat ? "正在授权…" : "微信登录", icon: "message.fill", color: ReferenceColor.blue, selected: method == .wechat, showsProgress: state.loading && method == .wechat) {
-                    if method == .wechat { submitLogin() }
-                    else { method = .wechat; clearLoginError() }
+
+            loginMethodButton("微信登录", icon: "message.fill", color: ReferenceColor.blue, selected: method == .wechat, showsProgress: state.loading && method == .wechat) {
+                if method == .wechat { submitLogin() }
+                else { method = .wechat; clearLoginError() }
+            }
+            HStack(spacing: AppTheme.cardSpacing) {
+                loginAlternativeButton("手机号登录", icon: "iphone", selected: method == .phone) {
+                    method = .phone; clearLoginError()
                 }
-                loginMethodButton("手机号登录", icon: "iphone", color: ReferenceColor.blue, selected: method == .phone) { method = .phone; clearLoginError() }
-                loginMethodButton("账号密码登录", icon: "person.crop.circle", color: ReferenceColor.yellow, selected: method == .account) { method = .account; clearLoginError() }
+                loginAlternativeButton("账号密码登录", icon: "person.crop.circle", selected: method == .account) {
+                    method = .account; clearLoginError()
+                }
             }
             .disabled(state.loading)
+
             if method == .phone {
-                TextField("手机号", text: $phone)
-                    .keyboardType(.phonePad)
-                    .textContentType(.telephoneNumber)
-                    .textFieldStyle(.roundedBorder)
-                    .onChange(of: phone) { _, _ in invalidateLoginVerification() }
-                HStack(spacing: 8) {
-                    TextField("短信验证码", text: $verificationCode)
-                        .keyboardType(.numberPad)
+                VStack(spacing: 12) {
+                    TextField("手机号", text: $phone)
+                        .keyboardType(.phonePad)
+                        .textContentType(.telephoneNumber)
                         .textFieldStyle(.roundedBorder)
-                        .onChange(of: verificationCode) { _, _ in clearLoginError() }
-                    Button(codeSending ? "发送中…" : codeCountdown > 0 ? "\(codeCountdown)s 后重试" : codeSent ? "重新获取" : "获取验证码") {
-                        guard phone.filter(\.isNumber).count == 11 else { validationMessage = "请先填写 11 位手机号。"; return }
-                        codeSending = true
-                        Task { @MainActor in
-                            let sent = await state.requestVerificationCode(account: phone, purpose: "login")
-                            codeSending = false
-                            guard sent else { validationMessage = state.error ?? "验证码发送失败，请稍后重试。"; return }
-                            codeSent = true
-                            codeCountdown = 60
-                            countdownTask?.cancel()
-                            countdownTask = Task { @MainActor in
-                                while codeCountdown > 0 {
-                                    try? await Task.sleep(for: .seconds(1))
-                                    guard !Task.isCancelled else { return }
-                                    codeCountdown -= 1
+                        .onChange(of: phone) { _, _ in invalidateLoginVerification() }
+                    HStack(spacing: 10) {
+                        TextField("短信验证码", text: $verificationCode)
+                            .keyboardType(.numberPad)
+                            .textFieldStyle(.roundedBorder)
+                            .onChange(of: verificationCode) { _, _ in clearLoginError() }
+                        Button(codeSending ? "发送中…" : codeCountdown > 0 ? "\(codeCountdown)s" : codeSent ? "重新获取" : "获取验证码") {
+                            guard phone.filter(\.isNumber).count == 11 else { validationMessage = "请先填写 11 位手机号。"; return }
+                            codeSending = true
+                            Task { @MainActor in
+                                let sent = await state.requestVerificationCode(account: phone, purpose: "login")
+                                codeSending = false
+                                guard sent else { validationMessage = state.error ?? "验证码发送失败，请稍后重试。"; return }
+                                codeSent = true
+                                codeCountdown = 60
+                                countdownTask?.cancel()
+                                countdownTask = Task { @MainActor in
+                                    while codeCountdown > 0 {
+                                        try? await Task.sleep(for: .seconds(1))
+                                        guard !Task.isCancelled else { return }
+                                        codeCountdown -= 1
+                                    }
                                 }
                             }
                         }
+                        .font(.system(size: AppTheme.secondarySize, weight: .semibold))
+                        .foregroundStyle(ReferenceColor.blue)
+                        .frame(minWidth: 82, minHeight: AppTheme.minimumTapSize)
+                        .disabled(codeCountdown > 0 || codeSending)
                     }
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(ReferenceColor.blue)
-                    .disabled(codeCountdown > 0 || codeSending)
                 }
             } else if method == .account {
-                TextField("账号 / 手机号", text: $account)
-                    .textContentType(.username)
-                    .textFieldStyle(.roundedBorder)
-                    .onChange(of: account) { _, _ in clearLoginError() }
-                PasswordInput("登录密码（至少 8 位）", text: $password)
-                    .onChange(of: password) { _, _ in clearLoginError() }
+                VStack(spacing: 12) {
+                    TextField("账号 / 手机号", text: $account)
+                        .textContentType(.username)
+                        .textFieldStyle(.roundedBorder)
+                        .onChange(of: account) { _, _ in clearLoginError() }
+                    PasswordInput("登录密码（至少 8 位）", text: $password)
+                        .onChange(of: password) { _, _ in clearLoginError() }
+                }
             }
+
             if method != .wechat {
                 Button(action: submitLogin) {
                     Group {
                         if state.loading { HStack(spacing: 8) { ProgressView().tint(.white); Text("正在登录…") } }
-                        else { Label("登录", systemImage: "arrow.right.circle.fill") }
+                        else { Text("登录") }
                     }
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.system(size: AppTheme.buttonSize, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 42)
-                    .background(ReferenceColor.blue, in: Capsule())
+                    .frame(height: AppTheme.controlHeight)
+                    .background(ReferenceColor.blue, in: RoundedRectangle(cornerRadius: AppTheme.controlRadius, style: .continuous))
                 }
                 .buttonStyle(.plain)
+                // A stable identifier keeps the real remote-login regression
+                // independent from the adjacent "账号密码登录" method picker.
+                .accessibilityIdentifier("login-submit-button")
                 .disabled(state.loading)
             }
+
             if let message = validationMessage ?? state.error {
-                Text(message).font(.system(size: 12)).foregroundStyle(.red)
+                Label(message, systemImage: "exclamationmark.circle.fill")
+                    .font(.system(size: AppTheme.captionSize))
+                    .foregroundStyle(AppTheme.danger)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isStaticText)
             }
+
             HStack {
                 Button { registerPresented = true } label: { Text("家长注册").foregroundStyle(ReferenceColor.blue) }
                 Spacer()
-                Button { resetPasswordPresented = true } label: { Text("忘记密码？").foregroundStyle(.secondary) }
+                Button { resetPasswordPresented = true } label: { Text("忘记密码？").foregroundStyle(AppTheme.muted) }
             }
-            .font(.system(size: 12, weight: .semibold))
-            VStack(alignment: .leading, spacing: 9) {
-                if dynamicTypeSize.isAccessibilitySize {
-                    Text("登录后可查看孩子的测评、健康记录和训练建议。")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                } else {
-                    check("学校体测结果", "查看测评任务与报告")
-                    check("家庭健康记录", "完成居家观察与身体测评")
-                    check("成长训练建议", "按孩子报告安排每日训练")
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, 8)
-            Spacer(minLength: 6)
-            HStack(spacing: 8) {
+            .font(.system(size: AppTheme.secondarySize, weight: .semibold))
+
+            Divider()
+
+            HStack(alignment: .top, spacing: 8) {
                 Button { agreementAccepted.toggle() } label: {
-                    Label(agreementAccepted ? "已阅读并同意相关协议" : "请阅读并同意相关协议", systemImage: agreementAccepted ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 12)).foregroundStyle(agreementAccepted ? ReferenceColor.green : .secondary)
-                }.buttonStyle(.plain)
-                Spacer()
+                    Image(systemName: agreementAccepted ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(agreementAccepted ? ReferenceColor.green : AppTheme.muted)
+                        .frame(width: AppTheme.minimumTapSize, height: AppTheme.minimumTapSize, alignment: .top)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(agreementAccepted ? "已阅读并同意相关协议" : "请阅读并同意相关协议")
+                Text("我已阅读并同意")
+                    .font(.system(size: AppTheme.captionSize))
+                    .foregroundStyle(AppTheme.muted)
+                    .padding(.top, 3)
                 Menu {
                     Button("用户协议") { legalDocument = .userAgreement }
                     Button("隐私政策") { legalDocument = .privacy }
                     Button("儿童隐私政策") { legalDocument = .childPrivacy }
                 } label: {
-                    Text("查看协议")
-                        .font(.system(size: 12, weight: .semibold))
+                    Text("用户协议与隐私政策")
+                        .font(.system(size: AppTheme.captionSize, weight: .semibold))
                         .foregroundStyle(ReferenceColor.blue)
+                        .padding(.top, 3)
                 }
                 .accessibilityLabel("查看用户协议、隐私政策和儿童隐私政策")
+                Spacer(minLength: 0)
             }
+
+            Label("儿童信息按监护关系授权使用", systemImage: "lock.shield.fill")
+                .font(.system(size: AppTheme.captionSize, weight: .medium))
+                .foregroundStyle(AppTheme.muted)
+                .frame(maxWidth: .infinity, alignment: .center)
         }
-        .padding(20)
-        .frame(minHeight: minHeight, alignment: .top)
-        .background(.white, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .padding(.horizontal, 10)
-        .shadow(color: ReferenceColor.blue.opacity(0.08), radius: 12, y: 4)
+        .padding(AppTheme.cardPadding)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(.white.opacity(0.85), lineWidth: 1))
+        .shadow(color: ReferenceColor.navy.opacity(0.10), radius: 24, y: 12)
     }
 
     private var landscape: some View {
@@ -251,9 +266,8 @@ struct LoginView: View {
             .scaledToFit()
             .frame(maxWidth: 560)
             .frame(maxWidth: .infinity)
-            .frame(height: 104)
-            .padding(.horizontal, 3)
-            .padding(.bottom, 3)
+            .frame(height: 78)
+            .padding(.horizontal, 16)
             .clipped()
     }
 
@@ -302,26 +316,29 @@ struct LoginView: View {
                 else { Image(systemName: icon) }
                 Text(title)
             }
-            .font(.system(size: 13, weight: .bold))
+            .font(.system(size: AppTheme.buttonSize, weight: .semibold))
             .foregroundStyle(selected ? .white : color)
             .frame(maxWidth: .infinity)
-            .frame(minHeight: 48)
-            .background(selected ? color : color.opacity(0.07), in: Capsule())
-            .overlay(Capsule().stroke(color, lineWidth: selected ? 0 : 1))
+            .frame(minHeight: AppTheme.controlHeight)
+            .background(selected ? color : color.opacity(0.07), in: RoundedRectangle(cornerRadius: AppTheme.controlRadius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: AppTheme.controlRadius, style: .continuous).stroke(color, lineWidth: selected ? 0 : 1))
         }
         .buttonStyle(.plain)
     }
 
-    private func check(_ title: String, _ subtitle: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "checkmark").font(.system(size: 12, weight: .bold)).foregroundStyle(.white)
-                .frame(width: 18, height: 18).background(ReferenceColor.green, in: Circle())
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(.system(size: 12, weight: .bold))
-                Text(subtitle).font(.system(size: 12)).foregroundStyle(.secondary)
-            }
+    private func loginAlternativeButton(_ title: String, icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .font(.system(size: AppTheme.secondarySize, weight: .semibold))
+                .foregroundStyle(selected ? ReferenceColor.blue : AppTheme.ink)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: AppTheme.controlHeight)
+                .background(selected ? ReferenceColor.sky : AppTheme.surface, in: RoundedRectangle(cornerRadius: AppTheme.controlRadius, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: AppTheme.controlRadius, style: .continuous).stroke(selected ? ReferenceColor.blue.opacity(0.35) : AppTheme.divider, lineWidth: 1))
         }
+        .buttonStyle(.plain)
     }
+
 }
 
 private struct LegalDocumentView: View {
@@ -654,60 +671,90 @@ struct RoleSelectView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(colors: [.white, ReferenceColor.sky], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
-            VStack(spacing: 20) {
-                HStack {
-                    Spacer()
-                    Text("请选择进入方式").font(.system(size: 18, weight: .bold)).foregroundStyle(ReferenceColor.blue)
-                    Image(systemName: "sun.max.fill").foregroundStyle(ReferenceColor.yellow)
-                    Spacer()
-                }
-                .padding(.top, 45)
-                if isRoleAvailable(.parent) {
-                    roleEntry(icon: "house.fill", title: "家庭端", detail: "家长查看孩子测评与成长建议", color: ReferenceColor.blue, role: .parent)
-                        .offset(x: visible ? 0 : -28).opacity(visible ? 1 : 0)
-                }
-                if isRoleAvailable(.teacher) {
-                    roleEntry(icon: "building.2.fill", title: "学校端", detail: "教师管理班级测评与学生状态", color: .white, role: .teacher)
-                        .offset(x: visible ? 0 : 28).opacity(visible ? 1 : 0)
-                }
-                if !isRoleAvailable(.parent) && !isRoleAvailable(.teacher) && isRoleAvailable(.principal) {
-                    Button {
-                        if state.selectRole(.principal) { router.start(.principal) }
-                    } label: {
-                        Label("进入学校后台管理看板", systemImage: "chart.bar.xaxis")
-                            .font(.system(size: 15, weight: .semibold))
-                            .frame(maxWidth: .infinity).frame(height: 52)
+            LinearGradient(colors: [Color(hex: "F5FAFF"), .white], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: AppTheme.sectionSpacing) {
+                    VStack(spacing: 12) {
+                        Image(systemName: "person.crop.circle.badge.checkmark")
+                            .font(.system(size: 48, weight: .semibold))
+                            .foregroundStyle(ReferenceColor.blue)
+                            .accessibilityHidden(true)
+                        Text("选择工作台")
+                            .font(.system(size: AppTheme.pageTitleSize, weight: .bold))
+                            .foregroundStyle(ReferenceColor.navy)
+                        Text("仅显示当前账号已获得授权的入口")
+                            .font(.system(size: AppTheme.secondarySize))
+                            .foregroundStyle(AppTheme.muted)
+                            .multilineTextAlignment(.center)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(ReferenceColor.blue)
-                    .offset(y: visible ? 0 : 12).opacity(visible ? 1 : 0)
+                    .padding(.top, 52)
+
+                    HStack(spacing: 10) {
+                        Image(systemName: "checkmark.shield.fill")
+                            .foregroundStyle(ReferenceColor.green)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(state.activeDisplayName)
+                                .font(.system(size: AppTheme.bodySize, weight: .semibold))
+                                .foregroundStyle(ReferenceColor.navy)
+                            Text("账号权限已验证")
+                                .font(.system(size: AppTheme.captionSize))
+                                .foregroundStyle(AppTheme.muted)
+                        }
+                        Spacer()
+                    }
+                    .padding(14)
+                    .background(.white, in: RoundedRectangle(cornerRadius: AppTheme.controlRadius, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: AppTheme.controlRadius, style: .continuous).stroke(AppTheme.divider, lineWidth: 1))
+
+                    VStack(spacing: AppTheme.cardSpacing) {
+                        if isRoleAvailable(.parent) {
+                            roleEntry(icon: "house.fill", title: "家庭端", detail: "查看孩子测评、健康档案与训练计划", color: ReferenceColor.blue, role: .parent)
+                                .offset(y: visible ? 0 : 14).opacity(visible ? 1 : 0)
+                        }
+                        if isRoleAvailable(.teacher) {
+                            roleEntry(icon: "building.2.fill", title: "学校端", detail: "管理授权班级、任务与学生状态", color: ReferenceColor.blue, role: .teacher)
+                                .offset(y: visible ? 0 : 14).opacity(visible ? 1 : 0)
+                        }
+                        if !isRoleAvailable(.parent) && !isRoleAvailable(.teacher) && isRoleAvailable(.principal) {
+                            Button {
+                                if state.selectRole(.principal) { router.start(.principal) }
+                            } label: {
+                                Label("查看学校后台说明", systemImage: "chart.bar.xaxis")
+                                    .font(.system(size: AppTheme.buttonSize, weight: .semibold))
+                                    .frame(maxWidth: .infinity).frame(height: AppTheme.controlHeight)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(ReferenceColor.blue)
+                        }
+                    }
+
+                    Label("学校管理数据看板通过电脑端后台提供", systemImage: "desktopcomputer")
+                        .font(.system(size: AppTheme.captionSize, weight: .medium))
+                        .foregroundStyle(AppTheme.muted)
+
+                    Button {
+                        state.switchAccount()
+                        router.reset()
+                    } label: {
+                        Text("退出当前账号")
+                            .font(.system(size: AppTheme.secondarySize, weight: .semibold))
+                            .foregroundStyle(AppTheme.muted)
+                            .frame(minHeight: AppTheme.minimumTapSize)
+                    }
+
+                    Spacer(minLength: 24)
+                    Image("CampusFooter")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: 480)
+                        .frame(height: 92)
+                        .clipped()
                 }
-                Text("学校管理数据看板由后台系统提供")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 1)
-                Button {
-                    state.switchAccount()
-                    router.reset()
-                } label: {
-                    Text("退出当前账号").font(.system(size: 12, weight: .medium)).foregroundStyle(.secondary)
-                }
-                Spacer()
-                Image("CampusFooter")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxWidth: 560)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 132)
-                    .padding(.bottom, 4)
-                    .clipped()
+                .frame(maxWidth: 520)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, AppTheme.pagePadding)
+                .padding(.bottom, 16)
             }
-            .padding(.horizontal, 19)
-            // Keep role cards at the same readable portrait width as LoginView
-            // when the app is presented on iPad.
-            .frame(maxWidth: 620)
-            .frame(maxWidth: .infinity)
         }
         .task(id: reduceMotion) {
             guard !reduceMotion else { visible = true; return }
@@ -720,32 +767,33 @@ struct RoleSelectView: View {
     }
 
     private func roleEntry(icon: String, title: String, detail: String, color: Color, role: UserRole) -> some View {
-        let outlined = role == .teacher
         return Button {
             if state.selectRole(role) { router.start(role) }
         } label: {
-            HStack(spacing: 18) {
-                Group {
-                    if role == .parent {
-                        Image("FamilyEntrance").resizable().scaledToFit().padding(4)
-                    } else {
-                        Image("SchoolEntrance").resizable().scaledToFit().padding(4)
-                    }
-                }
-                .frame(width: 64, height: 64)
-                .background(outlined ? ReferenceColor.sky : Color.white.opacity(0.18), in: RoundedRectangle(cornerRadius: 12))
-                .scaleEffect(visible ? 1 : 0.72)
-                .rotationEffect(.degrees(visible ? 0 : (role == .parent ? -7 : 7)))
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title).font(.system(size: 20, weight: .bold)).foregroundStyle(outlined ? ReferenceColor.blue : Color.white)
-                    Text(detail).font(.system(size: 12)).foregroundStyle(outlined ? .secondary : Color.white.opacity(0.85))
+            HStack(spacing: 14) {
+                Image(systemName: icon)
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(color)
+                    .frame(width: 52, height: 52)
+                    .background(color.opacity(0.10), in: RoundedRectangle(cornerRadius: AppTheme.controlRadius, style: .continuous))
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(title)
+                        .font(.system(size: AppTheme.sectionTitleSize, weight: .bold))
+                        .foregroundStyle(ReferenceColor.navy)
+                    Text(detail)
+                        .font(.system(size: AppTheme.secondarySize))
+                        .foregroundStyle(AppTheme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
-                Image(systemName: "chevron.right").font(.system(size: 17, weight: .bold)).foregroundStyle(outlined ? ReferenceColor.yellow : Color.white)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(color)
             }
-            .padding(17)
-            .background(color, in: RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(ReferenceColor.yellow.opacity(outlined ? 1 : 0), lineWidth: 1))
+            .padding(AppTheme.cardPadding)
+            .background(.white, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous).stroke(color.opacity(0.18), lineWidth: 1))
+            .shadow(color: ReferenceColor.navy.opacity(0.06), radius: 12, y: 5)
         }
         .buttonStyle(.plain)
     }

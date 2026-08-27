@@ -57,6 +57,7 @@ const state = {
   classStats: [],
   reports: [],
   search: "",
+  syncIssues: [],
 };
 const refreshAccessToken = async () => {
   try {
@@ -157,6 +158,9 @@ function renderOverview() {
   const school = d.school || {};
   const tasks = (d.tasks || []).filter((t) => t.status !== "draft");
   const students = d.students || [];
+  const studentTotal = Number.isFinite(Number(d.studentTotal))
+    ? Number(d.studentTotal)
+    : students.length;
   const total = tasks.reduce((sum, t) => sum + Number(t.totalCount || 0), 0);
   const completed = tasks.reduce(
     (sum, t) => sum + Number(t.completedCount || 0),
@@ -166,11 +170,11 @@ function renderOverview() {
   const pending = calculatePending();
   $("schoolTitle").textContent = school.name || "学校数据总览";
   $("schoolDescription").textContent =
-    `${school.campus || "本校区"} · 已接入 ${students.length} 名学生、${(d.classes || []).length} 个班级，测评数据持续同步中。`;
+    `${school.campus || "本校区"} · 已接入 ${studentTotal} 名学生、${(d.classes || []).length} 个班级，测评数据持续同步中。`;
   $("schoolRegion").textContent = school.region || "未设置地区";
   $("heroCompletion").textContent = percent(completion);
   $("heroPending").textContent = pending;
-  $("metricStudents").textContent = students.length;
+  $("metricStudents").textContent = studentTotal;
   $("metricTasks").textContent = tasks.length;
   $("metricClasses").textContent = (d.classes || []).length;
   $("metricReports").textContent = pending;
@@ -293,6 +297,10 @@ function renderNotices() {
     .forEach((n) => (n.innerHTML = icon(n.dataset.icon)));
 }
 async function loadAll() {
+  const refreshButtons = [$('refreshBtn'), $('refreshTextBtn')].filter(Boolean);
+  refreshButtons.forEach((button) => { button.disabled = true; button.classList.add('is-loading'); });
+  setWorkspaceStatus('loading', '正在同步学校数据', '正在读取学生、任务、报告和统计记录。');
+  void loadServiceHealth();
   try {
     const id = encodeURIComponent(state.schoolId);
     const dashboard = await api(
@@ -312,10 +320,54 @@ async function loadAll() {
       results[2].status === "fulfilled"
         ? results[2].value?.items || results[2].value || []
         : [];
+    const labels = ["年级统计", "班级统计", "报告中心"];
+    state.syncIssues = results.flatMap((result, index) =>
+      result.status === "rejected" ? [labels[index]] : [],
+    );
     renderOverview();
-    toast("数据已更新");
+    if (state.syncIssues.length) {
+      setWorkspaceStatus(
+        'warning',
+        '部分数据暂未同步',
+        `${state.syncIssues.join('、')}读取失败，已保留其余可用内容。`,
+        true,
+      );
+    } else {
+      setWorkspaceStatus('success', '数据已更新', '学校业务数据已完成同步。');
+      window.setTimeout(() => setWorkspaceStatus('hidden'), 1600);
+    }
   } catch (error) {
+    setWorkspaceStatus('error', '学校数据同步失败', error.message || '网络或服务暂时不可用，请重新同步。', true);
     toast(error.message, true);
+  } finally {
+    refreshButtons.forEach((button) => { button.disabled = false; button.classList.remove('is-loading'); });
+  }
+}
+
+function setWorkspaceStatus(kind, title = '', detail = '', retry = false) {
+  const container = $('workspaceStatus');
+  if (!container) return;
+  if (kind === 'hidden') { container.className = 'workspace-status hidden'; return; }
+  container.className = `workspace-status ${kind}`;
+  $('workspaceStatusTitle').textContent = title;
+  $('workspaceStatusDetail').textContent = detail;
+  $('workspaceRetryBtn').classList.toggle('hidden', !retry);
+}
+
+async function loadServiceHealth() {
+  const node = $('serviceHealth');
+  if (!node) return;
+  node.className = 'service-health checking';
+  node.querySelector('span').textContent = '服务检查中';
+  try {
+    const response = await fetch('/readyz', { credentials: 'same-origin', cache: 'no-store' });
+    const payload = await response.json();
+    const ready = response.ok && payload?.data?.database === 'up' && payload?.data?.migration?.healthy !== false;
+    node.className = `service-health ${ready ? 'healthy' : 'degraded'}`;
+    node.querySelector('span').textContent = ready ? '服务运行正常' : '服务需要检查';
+  } catch {
+    node.className = 'service-health degraded';
+    node.querySelector('span').textContent = '服务连接异常';
   }
 }
 function openTaskModal() {
@@ -448,6 +500,7 @@ $("logoutBtn").addEventListener("click", async () => {
 });
 $("refreshBtn").addEventListener("click", loadAll);
 $("refreshTextBtn").addEventListener("click", loadAll);
+$("workspaceRetryBtn").addEventListener("click", loadAll);
 $("schoolId").addEventListener("change", () => {
   state.schoolId = $("schoolId").value.trim() || "school-1";
   loadAll();

@@ -15,8 +15,8 @@ struct ReferenceHeader: View {
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var state: AppState
     let name: String; let school: String; let initial: String; var showsBell = true; var avatarAsset: String? = nil; var roleAction: (() -> Void)? = nil; var identityAction: (() -> Void)? = nil
-    @ScaledMetric(relativeTo: .headline) private var nameSize: CGFloat = 14
-    @ScaledMetric(relativeTo: .caption) private var schoolSize: CGFloat = 11
+    @ScaledMetric(relativeTo: .headline) private var nameSize: CGFloat = 16
+    @ScaledMetric(relativeTo: .subheadline) private var schoolSize: CGFloat = 13
     var body: some View { HStack(spacing: 9) {
         if let identityAction {
             Button(action: identityAction) { identityContent }.buttonStyle(.plain).accessibilityLabel("切换孩子")
@@ -31,7 +31,7 @@ struct ReferenceHeader: View {
         HStack(spacing: 9) {
             Group {
                 if let avatarAsset {
-                    Image(avatarAsset).resizable().scaledToFill().frame(width: 40, height: 40).background(ReferenceColor.sky, in: Circle()).clipShape(Circle())
+                    Image(avatarAsset).resizable().scaledToFill().frame(width: 42, height: 42).background(ReferenceColor.sky, in: Circle()).clipShape(Circle())
                 } else {
                     Text(initial).font(.system(size: nameSize, weight: .bold)).foregroundStyle(.white).frame(width: 34, height: 34).background(LinearGradient(colors: [ReferenceColor.sky, ReferenceColor.blue], startPoint: .top, endPoint: .bottom), in: Circle())
                 }
@@ -48,8 +48,8 @@ struct ReferenceSectionTitle: View {
     /// Use when the enclosing card owns the tap target.  It keeps the visual
     /// affordance honest without introducing an inaccessible nested button.
     var showsLink: Bool = false
-    @ScaledMetric(relativeTo: .headline) private var titleSize: CGFloat = 14
-    @ScaledMetric(relativeTo: .caption) private var trailingSize: CGFloat = 11
+    @ScaledMetric(relativeTo: .headline) private var titleSize: CGFloat = 17
+    @ScaledMetric(relativeTo: .subheadline) private var trailingSize: CGFloat = 13
     var body: some View {
         HStack {
             Text(title)
@@ -71,15 +71,15 @@ struct ReferenceSectionTitle: View {
     private func trailingLabel(showChevron: Bool) -> some View {
         HStack(spacing: 3) {
             Text(trailing).font(.system(size: trailingSize, weight: .medium)).foregroundStyle(showChevron ? ReferenceColor.blue : .secondary).lineLimit(2)
-            if showChevron { Image(systemName: "chevron.right").font(.system(size: 8, weight: .bold)).foregroundStyle(ReferenceColor.blue) }
+            if showChevron { Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold)).foregroundStyle(ReferenceColor.blue) }
         }
     }
 }
 
 struct ReferenceMetric: View {
     let icon: String; let title: String; let value: String; let color: Color
-    @ScaledMetric(relativeTo: .body) private var titleSize: CGFloat = 13
-    @ScaledMetric(relativeTo: .caption) private var valueSize: CGFloat = 12
+    @ScaledMetric(relativeTo: .body) private var titleSize: CGFloat = 14
+    @ScaledMetric(relativeTo: .subheadline) private var valueSize: CGFloat = 13
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             Image(systemName: icon)
@@ -89,15 +89,15 @@ struct ReferenceMetric: View {
             Text(value).font(.system(size: valueSize)).foregroundStyle(.secondary).lineLimit(2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(11)
-        .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+        .padding(14)
+        .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: AppTheme.controlRadius, style: .continuous))
     }
 }
 
 struct ReferenceAction: View {
     let icon: String; let title: String; let color: Color
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @ScaledMetric(relativeTo: .body) private var titleSize: CGFloat = 12
+    @ScaledMetric(relativeTo: .body) private var titleSize: CGFloat = 14
 
     var body: some View {
         VStack(spacing: 7) {
@@ -116,7 +116,16 @@ struct ReferenceAction: View {
     }
 }
 
-struct ReferenceCard<Content: View>: View { @ViewBuilder let content: Content; var body: some View { content.padding(14).background(.white, in: RoundedRectangle(cornerRadius: 12)).overlay(RoundedRectangle(cornerRadius: 12).stroke(ReferenceColor.blue.opacity(0.08), lineWidth: 1)).shadow(color: .black.opacity(0.025), radius: 4, y: 2) } }
+struct ReferenceCard<Content: View>: View {
+    @ViewBuilder let content: Content
+    var body: some View {
+        content
+            .padding(AppTheme.cardPadding)
+            .background(.white, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous).stroke(AppTheme.divider.opacity(0.75), lineWidth: 0.75))
+            .shadow(color: ReferenceColor.navy.opacity(0.045), radius: 10, y: 4)
+    }
+}
 
 struct AnimatedProgressLine: View {
     let value: Double

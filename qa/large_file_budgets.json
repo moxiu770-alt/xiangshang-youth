@@ -1,0 +1,10 @@
+{
+  "backend/src/server.js": 3100,
+  "ios/XiangshangYouth/App/AppState.swift": 700,
+  "ios/XiangshangYouth/Features/Parent/BodyAssessmentViews.swift": 800,
+  "ios/XiangshangYouth/Core/Models/BodyAssessment.swift": 450,
+  "ios/XiangshangYouth/Core/Models/BodyPostureAssessment.swift": 700,
+  "android/app/src/main/java/com/xiangshang/youth/app/AppState.kt": 550,
+  "android/app/src/main/java/com/xiangshang/youth/core/model/BodyAssessment.kt": 250,
+  "android/app/src/main/java/com/xiangshang/youth/core/model/BodyPostureAssessment.kt": 820
+}

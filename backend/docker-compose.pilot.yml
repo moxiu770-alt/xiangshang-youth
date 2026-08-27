@@ -1,0 +1,100 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - pilot_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    command: node src/server.js
+    environment:
+      NODE_ENV: staging
+      PORT: 8080
+      DATABASE_URL: postgres://${POSTGRES_USER:?set POSTGRES_USER}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:?set POSTGRES_DB}
+      ACCESS_TOKEN_TTL_MINUTES: 30
+      REFRESH_TOKEN_TTL_DAYS: 30
+      MAX_SESSIONS_PER_USER: 5
+      ALLOW_PUBLIC_REGISTRATION: ${ALLOW_PUBLIC_REGISTRATION:-true}
+      CORS_ORIGIN: https://${PUBLIC_HOST:?set PUBLIC_HOST}
+      TRUST_PROXY: "true"
+      REQUIRE_HEALTH_CONSENT: "true"
+      METRICS_TOKEN: ${METRICS_TOKEN:?set METRICS_TOKEN}
+      FILE_STORAGE_DRIVER: local
+      STORAGE_ROOT: /app/storage
+      JOB_WORKER_ENABLED: "true"
+      JOB_WORKER_MODE: embedded
+      JOB_WORKER_CONCURRENCY: 2
+      FIELD_DEVICE_SIGNING_ENCRYPTION_KEY: ${FIELD_DEVICE_SIGNING_ENCRYPTION_KEY:?set FIELD_DEVICE_SIGNING_ENCRYPTION_KEY}
+      FIELD_DEVICE_SIGNED_REQUESTS_REQUIRED: "true"
+    expose:
+      - "8080"
+    volumes:
+      - pilot_file_storage:/app/storage
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  migrate:
+    build: .
+    profiles: ["migrate"]
+    command: node scripts/migrate.js
+    environment:
+      NODE_ENV: staging
+      DATABASE_URL: postgres://${POSTGRES_USER:?set POSTGRES_USER}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:?set POSTGRES_DB}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  gateway:
+    image: caddy:2.11.4-alpine
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:?set PUBLIC_HOST}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile.pilot:/etc/caddy/Caddyfile:ro
+      - pilot_caddy_data:/data
+      - pilot_caddy_config:/config
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+
+volumes:
+  pilot_postgres_data:
+  pilot_file_storage:
+  pilot_caddy_data:
+  pilot_caddy_config:

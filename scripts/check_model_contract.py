@@ -13,14 +13,25 @@ import sys
 
 
 ROOT = Path(__file__).resolve().parents[1]
-IOS_BODY = (ROOT / "ios/XiangshangYouth/Core/Models/BodyAssessment.swift").read_text()
-ANDROID_BODY = (ROOT / "android/app/src/main/java/com/xiangshang/youth/core/model/BodyAssessment.kt").read_text()
+IOS_BODY = "\n".join(
+    path.read_text()
+    for path in (
+        ROOT / "ios/XiangshangYouth/Core/Models/BodyAssessment.swift",
+        ROOT / "ios/XiangshangYouth/Core/Models/BodyPostureAssessment.swift",
+    )
+)
+ANDROID_BODY = "\n".join(
+    path.read_text()
+    for path in (
+        ROOT / "android/app/src/main/java/com/xiangshang/youth/core/model/BodyAssessment.kt",
+        ROOT / "android/app/src/main/java/com/xiangshang/youth/core/model/BodyPostureAssessment.kt",
+    )
+)
 ANDROID_GROWTH = (ROOT / "android/app/src/main/java/com/xiangshang/youth/core/model/GrowthInsight.kt").read_text()
 IOS_SCORE = (ROOT / "ios/XiangshangYouth/Core/Models/DiagnosisReport.swift").read_text()
 IOS_SCORE_RESULT = (ROOT / "ios/XiangshangYouth/Core/Models/ScoreResult.swift").read_text()
 ANDROID_SCORE = (ROOT / "android/app/src/main/java/com/xiangshang/youth/core/model/DiagnosisReport.kt").read_text()
 ANDROID_SCORE_ADAPTER = (ROOT / "android/app/src/main/java/com/xiangshang/youth/core/service/ScoreReviewStatusJsonAdapter.kt").read_text()
-ANDROID_TASK = (ROOT / "android/app/src/main/java/com/xiangshang/youth/core/model/BodyAssessment.kt").read_text()
 BACKEND_SCORE = (ROOT / "backend/src/scoring.js").read_text()
 BACKEND_SERVER = (ROOT / "backend/src/server.js").read_text()
 BACKEND_POSTURE = (ROOT / "backend/src/postureScoring.js").read_text()
@@ -30,7 +41,13 @@ BACKEND_REPORT_REFRESH = (ROOT / "backend/src/reportRefresh.js").read_text()
 BACKEND_AGE = (ROOT / "backend/src/age.js").read_text()
 BACKEND_CALIBRATION = (ROOT / "backend/src/modelCalibration.js").read_text()
 BACKEND_REGISTRY = (ROOT / "backend/src/modelRegistry.js").read_text()
-IOS_FOLLOW = (ROOT / "ios/XiangshangYouth/Features/Parent/FollowAlongTraining.swift").read_text()
+IOS_FOLLOW = (
+    (ROOT / "ios/XiangshangYouth/Features/Parent/FollowAlongTraining.swift").read_text()
+    + "\n"
+    + (ROOT / "ios/XiangshangYouth/Features/Parent/FollowAlongCore.swift").read_text()
+    + "\n"
+    + (ROOT / "ios/XiangshangYouth/Features/Parent/FollowAlongTuning.swift").read_text()
+)
 IOS_GROWTH = (ROOT / "ios/XiangshangYouth/Core/Models/GrowthInsight.swift").read_text()
 IOS_PROJECT = (ROOT / "ios/XiangshangYouth/XiangshangYouth.xcodeproj/project.pbxproj").read_text()
 IOS_REMOTE = (ROOT / "ios/XiangshangYouth/Core/Repositories/RemoteRepository.swift").read_text()
@@ -38,6 +55,8 @@ ANDROID_FOLLOW = (
     (ROOT / "android/app/src/main/java/com/xiangshang/youth/feature/parent/FollowAlongTraining.kt").read_text()
     + "\n"
     + (ROOT / "android/app/src/main/java/com/xiangshang/youth/feature/parent/FollowAlongCaptureEngine.kt").read_text()
+    + "\n"
+    + (ROOT / "android/app/src/main/java/com/xiangshang/youth/feature/parent/FollowAlongTuning.kt").read_text()
 )
 ANDROID_STUDENT_API = (ROOT / "android/app/src/main/java/com/xiangshang/youth/core/service/StudentApi.kt").read_text()
 ANDROID_REMOTE = (ROOT / "android/app/src/main/java/com/xiangshang/youth/core/repository/RemoteRepository.kt").read_text()

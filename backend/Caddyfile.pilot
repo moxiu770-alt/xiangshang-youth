@@ -1,0 +1,19 @@
+{$PUBLIC_HOST} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		Permissions-Policy "camera=(self), microphone=(), geolocation=(), payment=(), usb=()"
+		-Server
+	}
+
+	reverse_proxy api:8080 {
+		health_uri /readyz
+		health_interval 10s
+		transport http {
+			dial_timeout 5s
+			response_header_timeout 30s
+			keepalive 5s
+		}
+	}
+}

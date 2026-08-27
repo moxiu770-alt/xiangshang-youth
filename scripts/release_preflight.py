@@ -73,6 +73,15 @@ def main() -> int:
     ios_project = (ROOT / "ios/XiangshangYouth/XiangshangYouth.xcodeproj/project.pbxproj").read_text(encoding="utf-8")
 
     add(checks, "frontend-contract-script", (ROOT / "scripts/check_frontend_contract.py").is_file(), "跨端契约脚本存在")
+    boundary_check = subprocess.run(
+        [sys.executable, str(ROOT / "scripts/check_large_file_boundaries.py")],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    boundary_detail = (boundary_check.stdout.strip().splitlines()[-1] if boundary_check.stdout.strip() else "大文件边界检查未运行")
+    add(checks, "domain-file-boundaries", boundary_check.returncode == 0, boundary_detail)
     add(checks, "privacy-manifest", (ROOT / "ios/XiangshangYouth/PrivacyInfo.xcprivacy").is_file(), "iOS 隐私清单存在")
     add(checks, "android-cleartext-disabled", 'android:usesCleartextTraffic="false"' in (ROOT / "android/app/src/main/AndroidManifest.xml").read_text(encoding="utf-8"), "Android 明文流量已禁止")
     add(checks, "android-release-guard", "Release build cannot use the placeholder" in android_gradle, "Android Release 会拦截占位地址和 Mock")

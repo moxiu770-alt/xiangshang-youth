@@ -242,16 +242,16 @@ struct LoginView: View {
                     .foregroundStyle(AppTheme.muted)
                     .padding(.top, 3)
                 Menu {
-                    Button("用户协议") { legalDocument = .userAgreement }
+                    Button("用户服务协议") { legalDocument = .userAgreement }
                     Button("隐私政策") { legalDocument = .privacy }
-                    Button("儿童隐私政策") { legalDocument = .childPrivacy }
+                    Button("儿童个人信息保护声明") { legalDocument = .childPrivacy }
                 } label: {
-                    Text("用户协议与隐私政策")
+                    Text("查看相关协议")
                         .font(.system(size: AppTheme.captionSize, weight: .semibold))
                         .foregroundStyle(ReferenceColor.blue)
                         .padding(.top, 3)
                 }
-                .accessibilityLabel("查看用户协议、隐私政策和儿童隐私政策")
+                .accessibilityLabel("查看用户服务协议、隐私政策和儿童个人信息保护声明")
                 Spacer(minLength: 0)
             }
 
@@ -279,7 +279,7 @@ struct LoginView: View {
     }
 
     private func submitLogin() {
-        guard agreementAccepted else { validationMessage = "请先阅读并同意用户协议和儿童隐私政策。"; return }
+        guard agreementAccepted else { validationMessage = "请先阅读并同意用户服务协议、隐私政策和儿童个人信息保护声明。"; return }
         if method == .wechat {
             if state.usesRemoteDataSource {
                 Task {
@@ -348,7 +348,7 @@ struct LoginView: View {
 
 }
 
-private struct LegalDocumentView: View {
+struct LegalDocumentView: View {
     let document: LegalDocument
     @Environment(\.dismiss) private var dismiss
     var body: some View {
@@ -467,13 +467,13 @@ struct RegisterView: View {
                     }
                     Section {
                         Button { confirmed.toggle() } label: {
-                            Label("我已阅读并同意用户协议、隐私政策和儿童隐私政策", systemImage: confirmed ? "checkmark.circle.fill" : "circle")
+                            Label("我已阅读并同意用户服务协议、隐私政策和儿童个人信息保护声明", systemImage: confirmed ? "checkmark.circle.fill" : "circle")
                         }
                         .foregroundStyle(confirmed ? ReferenceColor.green : ReferenceColor.navy)
                         Menu {
-                            Button("用户协议") { legalDocument = .userAgreement }
+                            Button("用户服务协议") { legalDocument = .userAgreement }
                             Button("隐私政策") { legalDocument = .privacy }
-                            Button("儿童隐私政策") { legalDocument = .childPrivacy }
+                            Button("儿童个人信息保护声明") { legalDocument = .childPrivacy }
                         } label: {
                             Label("分别查看三份协议", systemImage: "doc.text.magnifyingglass")
                                 .font(.caption)

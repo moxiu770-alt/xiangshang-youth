@@ -39,6 +39,8 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.xiangshang.youth.BuildConfig
 import com.xiangshang.youth.R
 import com.xiangshang.youth.app.*
@@ -97,7 +99,7 @@ fun LoginScreen(
     }
     fun submitLogin() {
         when {
-            !agreement -> error = "请先阅读并同意用户协议和儿童隐私政策。"
+            !agreement -> error = "请先阅读并同意用户服务协议、隐私政策和儿童个人信息保护声明。"
             method == 0 -> onLogin(AuthIdentity.wechatAuthorizationIdentifier, null, null)
             method == 1 && phone.filter(Char::isDigit).length != 11 -> error = "请输入有效的 11 位手机号。"
             method == 1 && !codeSent -> error = "请先获取短信验证码。"
@@ -180,14 +182,14 @@ fun LoginScreen(
                     }
                     Spacer(Modifier.weight(1f, fill = true))
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Row(Modifier.weight(1f).semantics { role = Role.Checkbox; contentDescription = if (agreement) "已同意用户协议、隐私政策和儿童隐私政策" else "同意用户协议、隐私政策和儿童隐私政策" }.clickable { agreement = !agreement }) {
+                        Row(Modifier.weight(1f).semantics { role = Role.Checkbox; contentDescription = if (agreement) "已同意用户服务协议、隐私政策和儿童个人信息保护声明" else "同意用户服务协议、隐私政策和儿童个人信息保护声明" }.clickable { agreement = !agreement }) {
                             Checkbox(checked = agreement, onCheckedChange = { agreement = it })
                             Text(if (agreement) "已阅读并同意相关协议" else "请阅读并同意相关协议", color = if (agreement) Green else Color.Gray, fontSize = 12.sp)
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
-                            TextButton(onClick = { legalDocument = "用户协议" }, contentPadding = PaddingValues(0.dp)) { Text("用户协议", color = Blue, fontSize = 12.sp) }
+                            TextButton(onClick = { legalDocument = LegalPolicy.USER_AGREEMENT_TITLE }, contentPadding = PaddingValues(0.dp)) { Text("用户服务协议", color = Blue, fontSize = 12.sp) }
                             TextButton(onClick = { legalDocument = "隐私政策" }, contentPadding = PaddingValues(0.dp)) { Text("隐私政策", color = Blue, fontSize = 12.sp) }
-                            TextButton(onClick = { legalDocument = "儿童隐私" }, contentPadding = PaddingValues(0.dp), modifier = Modifier.semantics { contentDescription = "查看儿童隐私政策" }) { Text("儿童隐私", color = Blue, fontSize = 12.sp) }
+                            TextButton(onClick = { legalDocument = LegalPolicy.CHILD_PRIVACY_TITLE }, contentPadding = PaddingValues(0.dp), modifier = Modifier.semantics { contentDescription = "查看儿童个人信息保护声明" }) { Text("儿童保护声明", color = Blue, fontSize = 12.sp) }
                         }
                     }
                 }
@@ -197,9 +199,7 @@ fun LoginScreen(
             Spacer(Modifier.height(3.dp))
         }
     }
-    legalDocument?.let { document ->
-        AlertDialog(onDismissRequest = { legalDocument = null }, title = { Text(document) }, text = { Text(legalText(document), modifier = Modifier.verticalScroll(rememberScrollState())) }, confirmButton = { TextButton(onClick = { legalDocument = null }) { Text("完成") } })
-    }
+    legalDocument?.let { document -> LegalDocumentDialog(document) { legalDocument = null } }
 }
 
 private fun legalText(document: String): String = LegalPolicy.document(document)
@@ -269,11 +269,11 @@ fun RegisterScreen(
             }, enabled = codeCountdown == 0 && !codeSending) { Text(if (codeSending) "发送中…" else if (codeCountdown > 0) "${codeCountdown}s" else if (codeSent) "重新获取" else "获取验证码", fontSize = 12.sp) }
         }
         PasswordField(value = password, onValueChange = { password = it; error = null }, label = "设置密码（至少 8 位）", visible = passwordVisible, onVisibilityChanged = { passwordVisible = it }, modifier = Modifier.fillMaxWidth().padding(top = 9.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp).semantics { role = Role.Checkbox; contentDescription = if (agreement) "已同意用户协议、隐私政策和儿童隐私政策" else "同意用户协议、隐私政策和儿童隐私政策" }.clickable { agreement = !agreement }) { Checkbox(checked = agreement, onCheckedChange = { agreement = it }); Text("我已阅读并同意用户协议、隐私政策和儿童隐私政策", color = Navy, fontSize = 12.sp) }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp).semantics { role = Role.Checkbox; contentDescription = if (agreement) "已同意用户服务协议、隐私政策和儿童个人信息保护声明" else "同意用户服务协议、隐私政策和儿童个人信息保护声明" }.clickable { agreement = !agreement }) { Checkbox(checked = agreement, onCheckedChange = { agreement = it }); Text("我已阅读并同意用户服务协议、隐私政策和儿童个人信息保护声明", color = Navy, fontSize = 12.sp) }
         Row(horizontalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.padding(top = 2.dp)) {
-            TextButton(onClick = { legalDocument = "用户协议" }, contentPadding = PaddingValues(0.dp)) { Text("查看用户协议", color = Blue, fontSize = 12.sp) }
+            TextButton(onClick = { legalDocument = LegalPolicy.USER_AGREEMENT_TITLE }, contentPadding = PaddingValues(0.dp)) { Text("用户服务协议", color = Blue, fontSize = 12.sp) }
             TextButton(onClick = { legalDocument = "隐私政策" }, contentPadding = PaddingValues(0.dp)) { Text("隐私政策", color = Blue, fontSize = 12.sp) }
-            TextButton(onClick = { legalDocument = "儿童隐私" }, contentPadding = PaddingValues(0.dp)) { Text("儿童隐私政策", color = Blue, fontSize = 12.sp) }
+            TextButton(onClick = { legalDocument = LegalPolicy.CHILD_PRIVACY_TITLE }, contentPadding = PaddingValues(0.dp)) { Text("儿童个人信息保护声明", color = Blue, fontSize = 12.sp) }
         }
         error?.let { Text(it, color = Color.Red, fontSize = 12.sp) }
         Button(onClick = {
@@ -293,13 +293,33 @@ fun RegisterScreen(
             }
         }, enabled = agreement && !loading, modifier = Modifier.fillMaxWidth().padding(top = 12.dp).height(44.dp), shape = CircleShape) { Text("注册并登录", fontWeight = FontWeight.Bold) }
     }
-    legalDocument?.let { document ->
-        AlertDialog(
-            onDismissRequest = { legalDocument = null },
-            title = { Text(document) },
-            text = { Text(legalText(document), modifier = Modifier.verticalScroll(rememberScrollState())) },
-            confirmButton = { TextButton(onClick = { legalDocument = null }) { Text("完成") } }
-        )
+    legalDocument?.let { document -> LegalDocumentDialog(document) { legalDocument = null } }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LegalDocumentDialog(document: String, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFFF7F9FC)) {
+            Column {
+                TopAppBar(
+                    title = { Text(document, fontWeight = FontWeight.Bold) },
+                    actions = {
+                        IconButton(onClick = onDismiss, modifier = Modifier.semantics { contentDescription = "关闭$document" }) {
+                            Icon(Icons.Filled.Close, contentDescription = null)
+                        }
+                    }
+                )
+                HorizontalDivider()
+                Text(
+                    legalText(document),
+                    color = Navy,
+                    fontSize = 14.sp,
+                    lineHeight = 23.sp,
+                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 20.dp)
+                )
+            }
+        }
     }
 }
 

@@ -23,7 +23,11 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertNotEqual(LegalPolicy.privacyPolicyVersion, "v1")
         XCTAssertNotEqual(LegalPolicy.cameraConsentVersion, "v1")
         XCTAssertTrue(LegalDocument.privacy.content.contains("不保存原始照片或视频"))
-        XCTAssertTrue(LegalDocument.childPrivacy.content.contains("照片、视频和帧不保存、不上传"))
+        XCTAssertTrue(LegalDocument.userAgreement.content.hasPrefix("向上少年身心健康用户服务协议"))
+        XCTAssertTrue(LegalDocument.userAgreement.content.contains("十八、联系我们"))
+        XCTAssertTrue(LegalDocument.childPrivacy.content.hasPrefix("向上少年身心健康儿童个人信息保护声明"))
+        XCTAssertTrue(LegalDocument.childPrivacy.content.contains("十、联系我们"))
+        XCTAssertTrue(LegalDocument.childPrivacy.content.contains("不保存身份证照片及人脸原始图像"))
         XCTAssertFalse(LegalDocument.childPrivacy.content.contains("原始影像按学校配置"))
         XCTAssertTrue(LegalDocument.privacy.content.contains("发送匿名使用情况"))
     }

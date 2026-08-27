@@ -7,6 +7,7 @@ struct AccountDashboard: View {
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var router: AppRouter
     @State private var dialog: String?
+    @State private var legalDocument: LegalDocument?
     @State private var settingsShown = false
     var body: some View {
         ScrollView {
@@ -77,18 +78,21 @@ struct AccountDashboard: View {
                 accountRow("通知与显示设置", "gearshape.fill", .orange) { settingsShown = true }
                 accountRow("帮助与反馈", "questionmark.circle.fill", ReferenceColor.blue) { dialog = "帮助与反馈" }
                 accountRow("数据与隐私", "hand.raised.fill", ReferenceColor.green) { dialog = "数据与隐私" }
-                accountRow("用户协议与隐私政策", "doc.text.fill", .secondary) { dialog = "用户协议与隐私政策" }
+                accountRow("用户服务协议", "doc.text.fill", .secondary) { legalDocument = .userAgreement }
+                accountRow("隐私政策", "hand.raised.square.fill", .secondary) { legalDocument = .privacy }
+                accountRow("儿童个人信息保护声明", "person.2.fill", .secondary) { legalDocument = .childPrivacy }
                 Button { state.chooseAnotherRole(); router.reset() } label: { Label("切换使用角色", systemImage: "arrow.left.arrow.right").font(.system(size: 12, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 11).foregroundStyle(ReferenceColor.blue).background(ReferenceColor.sky, in: RoundedRectangle(cornerRadius: 10)) }.buttonStyle(.plain).padding(.horizontal, 12)
                 Button { state.switchAccount(); router.reset() } label: { Text("切换账号").font(.system(size: 12, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 11).foregroundStyle(.red).background(.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 10)) }.buttonStyle(.plain).padding(.horizontal, 12)
             }.padding(.bottom, 10)
         }.background(ReferenceColor.canvas)
         .sheet(item: Binding(get: { dialog.map(CourseSheetItem.init) }, set: { dialog = $0?.name })) { item in
-            if ["个人资料", "个人信息", "我的权限", "帮助与反馈", "数据与隐私", "用户协议与隐私政策"].contains(item.name) {
+            if ["个人资料", "个人信息", "我的权限", "帮助与反馈", "数据与隐私"].contains(item.name) {
                 AccountInfoSheet(title: item.name)
             } else {
                 CourseDetailSheet(title: item.name)
             }
         }
+        .sheet(item: $legalDocument) { document in LegalDocumentView(document: document) }
         .sheet(isPresented: $settingsShown) { AppSettingsSheet() }
     }
     private func accountMetric(title: String, value: String, action: @escaping () -> Void) -> some View { Button(action: action) { VStack(spacing: 3) { Text(value).font(.system(size: 18, weight: .bold)).foregroundStyle(ReferenceColor.blue); Text(title).font(.system(size: 12)).foregroundStyle(.secondary) }.frame(maxWidth: .infinity).padding(.vertical, 10).background(.white, in: RoundedRectangle(cornerRadius: 10)) }.buttonStyle(.plain) }

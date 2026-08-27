@@ -180,7 +180,7 @@
 				A1B2C3D4E5F6000000000008 /* Sources */,
 				A1B2C3D4E5F6000000000009 /* Frameworks */,
 				A1B2C3D4E5F6000000000010 /* Resources */,
-				E1F2A3B4C5D6000000000001 /* Shared model assets */,
+				E1F2A3B4C5D6000000000001 /* Shared app assets */,
 				E1F2A3B4C5D6000000000002 /* Release central-service configuration */,
 			);
 			buildRules = (
@@ -317,7 +317,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		E1F2A3B4C5D6000000000001 /* Shared model assets */ = {
+		E1F2A3B4C5D6000000000001 /* Shared app assets */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -325,15 +325,19 @@
 			inputPaths = (
 				"$(SRCROOT)/../../android/app/src/main/assets/body_pose_capture_profiles.json",
 				"$(SRCROOT)/../../android/app/src/main/assets/follow_along_action_profiles.json",
+				"$(SRCROOT)/../../android/app/src/main/assets/user_service_agreement.txt",
+				"$(SRCROOT)/../../android/app/src/main/assets/child_personal_information_protection.txt",
 			);
-			name = "Shared model assets";
+			name = "Shared app assets";
 			outputPaths = (
 				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/body_pose_capture_profiles.json",
 				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/follow_along_action_profiles.json",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/user_service_agreement.txt",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/child_personal_information_protection.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -eu\nDEST_DIR=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH\"\nmkdir -p \"$DEST_DIR\"\nfor NAME in body_pose_capture_profiles follow_along_action_profiles; do\n  SOURCE=\"$SRCROOT/../../android/app/src/main/assets/$NAME.json\"\n  if [ -f \"$SOURCE\" ]; then cp \"$SOURCE\" \"$DEST_DIR/$NAME.json\"; fi\ndone\n";
+			shellScript = "set -eu\nDEST_DIR=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH\"\nASSET_DIR=\"$SRCROOT/../../android/app/src/main/assets\"\nmkdir -p \"$DEST_DIR\"\nfor NAME in body_pose_capture_profiles follow_along_action_profiles; do\n  SOURCE=\"$ASSET_DIR/$NAME.json\"\n  if [ -f \"$SOURCE\" ]; then cp \"$SOURCE\" \"$DEST_DIR/$NAME.json\"; fi\ndone\nfor NAME in user_service_agreement child_personal_information_protection; do\n  SOURCE=\"$ASSET_DIR/$NAME.txt\"\n  if [ -f \"$SOURCE\" ]; then cp \"$SOURCE\" \"$DEST_DIR/$NAME.txt\"; fi\ndone\n";
 		};
 		E1F2A3B4C5D6000000000002 /* Release central-service configuration */ = {
 			isa = PBXShellScriptBuildPhase;

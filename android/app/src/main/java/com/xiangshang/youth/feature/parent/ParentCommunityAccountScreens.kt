@@ -50,6 +50,7 @@ import com.xiangshang.youth.core.model.Student
 import com.xiangshang.youth.core.model.DiagnosisReport
 import com.xiangshang.youth.core.model.UserRole
 import com.xiangshang.youth.core.model.BodyAttentionLevel
+import com.xiangshang.youth.core.model.LegalPolicy
 import com.xiangshang.youth.core.model.bodyAssessmentAgeMonths
 import com.xiangshang.youth.core.service.FeatureRollout
 import com.xiangshang.youth.core.service.ClassPost
@@ -63,6 +64,7 @@ import com.xiangshang.youth.core.service.ExpertAvailableSlot
 import com.xiangshang.youth.core.util.RoleMessageDestination
 import com.xiangshang.youth.core.util.BusinessClock
 import com.xiangshang.youth.shared.component.*
+import com.xiangshang.youth.feature.auth.LegalDocumentDialog
 
 @Composable fun ParentClassCircleScreen(state: AppUiState, nav: NavHostController, publishPost: (String, String) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit, toggleLike: (String) -> Unit, addComment: (String, String) -> Unit, submitPost: (String, String, List<ClassPostAttachment>) -> Unit = { author, content, _ -> publishPost(author, content) }, clearWorkflow: (String) -> Unit = {}, loadClassPosts: () -> Unit = {}, loadClassPostAttachment: (String) -> Unit = {}, deletePost: (ClassPost) -> Unit = {}, reportPost: (ClassPost) -> Unit = {}) {
     var detail by remember { mutableStateOf<String?>(null) }
@@ -300,6 +302,7 @@ private fun ClassPostAttachments(state: AppUiState, attachments: List<ClassPostA
 @Composable fun AccountScreen(state: AppUiState, nav: NavHostController, chooseRole: (UserRole) -> Unit, logout: () -> Unit, updateSettings: (Boolean?, Boolean?, Boolean?, Boolean?) -> Unit, sendSupport: (String) -> Unit, onRoleSelected: (UserRole) -> Unit = chooseRole, submitSupport: (String) -> Unit = sendSupport, clearWorkflow: (String) -> Unit = {}, saveDraft: (String, String) -> Unit = { _, _ -> }, clearDraft: (String) -> Unit = {}, syncPending: () -> Unit = {}, submitPrivacyRequest: (String, String) -> Unit = { _, _ -> }, revokeHealthConsent: (String) -> Unit = {}, submitAccountDeletionRequest: () -> Unit = {}) {
     var settingsOpen by remember { mutableStateOf(false) }
     var accountInfo by remember { mutableStateOf<String?>(null) }
+    var legalDocument by rememberSaveable { mutableStateOf<String?>(null) }
     ParentTabScaffold(nav, Destinations.Account) {
         Text("我的", color = Navy, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 10.dp)); Spacer(Modifier.height(8.dp))
         Surface(Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "查看个人资料" }.clickable { accountInfo = "个人资料" }, color = Color.White, shape = RoundedCornerShape(12.dp)) { Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Surface(Modifier.size(52.dp), color = Sky, shape = CircleShape) { Text(state.activeDisplayName.take(1), color = Blue, fontSize = 20.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 13.dp)) }; Spacer(Modifier.width(11.dp)); Column(Modifier.weight(1f)) { Text(state.activeDisplayName, color = Navy, fontWeight = FontWeight.Bold); Text(state.profile?.schoolName ?: "学校", color = Color.Gray, fontSize = 12.sp); Text(state.role?.label ?: "家长", color = Blue, fontSize = 12.sp) }; Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray) } }
@@ -316,13 +319,14 @@ private fun ClassPostAttachments(state: AppUiState, attachments: List<ClassPostA
                 "设置" -> settingsOpen = true
             }
         } }
-        Text("服务与安全", color = Navy, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)); AccountRow("帮助与反馈", Icons.AutoMirrored.Filled.HelpOutline, Blue) { clearWorkflow("support"); accountInfo = "帮助与反馈" }; AccountRow("数据与隐私", Icons.Filled.PrivacyTip, Green) { accountInfo = "数据与隐私" }; AccountRow("用户协议与隐私政策", Icons.Filled.Description, Color.Gray) { accountInfo = "用户协议与隐私政策" }
+        Text("服务与安全", color = Navy, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)); AccountRow("帮助与反馈", Icons.AutoMirrored.Filled.HelpOutline, Blue) { clearWorkflow("support"); accountInfo = "帮助与反馈" }; AccountRow("数据与隐私", Icons.Filled.PrivacyTip, Green) { accountInfo = "数据与隐私" }; AccountRow("用户服务协议", Icons.Filled.Description, Color.Gray) { legalDocument = LegalPolicy.USER_AGREEMENT_TITLE }; AccountRow("隐私政策", Icons.Filled.PrivacyTip, Color.Gray) { legalDocument = LegalPolicy.PRIVACY_POLICY_TITLE }; AccountRow("儿童个人信息保护声明", Icons.Filled.FamilyRestroom, Color.Gray) { legalDocument = LegalPolicy.CHILD_PRIVACY_TITLE }
         val availableRoles = if (state.repositoryAcknowledged) state.profile?.availableRoles.orEmpty() else UserRole.mobileRoles
         if (availableRoles.isNotEmpty()) { Spacer(Modifier.height(8.dp)); Text("切换使用角色", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) { availableRoles.filter { it in UserRole.mobileRoles }.forEach { role -> OutlinedButton(onClick = { onRoleSelected(role) }, modifier = Modifier.weight(1f)) { Text(role.label, fontSize = 12.sp) } } } }
         OutlinedButton(onClick = { logout(); nav.navigate(Destinations.Login) { popUpTo(nav.graph.id) { inclusive = true } } }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red)) { Text("切换账号") }
     }
     if (settingsOpen) SettingsDialog(state.local.settings.notificationsEnabled, state.local.settings.reduceMotion, state.local.settings.voiceGuidanceEnabled, state.local.settings.analyticsEnabled, state.pendingSyncCount, state.workflowStates["sync-pending"] ?: WorkflowCommandState(), updateSettings, syncPending, clearLocalData = { logout(); nav.navigate(Destinations.Login) { popUpTo(nav.graph.id) { inclusive = true } } }) { settingsOpen = false }
     accountInfo?.let { title -> AccountInfoDialog(title, state, submitSupport, saveDraft, clearDraft, submitPrivacyRequest, revokeHealthConsent, submitAccountDeletionRequest) { accountInfo = null } }
+    legalDocument?.let { document -> LegalDocumentDialog(document) { legalDocument = null } }
 }
 
 @Composable fun SettingsDialog(notifications: Boolean, reduceMotion: Boolean, voiceGuidance: Boolean, analyticsEnabled: Boolean, pendingSyncCount: Int, syncState: WorkflowCommandState, update: (Boolean?, Boolean?, Boolean?, Boolean?) -> Unit, syncNow: () -> Unit = {}, clearLocalData: () -> Unit = {}, dismiss: () -> Unit) {

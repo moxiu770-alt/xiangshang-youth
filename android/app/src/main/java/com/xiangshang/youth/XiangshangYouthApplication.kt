@@ -2,6 +2,7 @@ package com.xiangshang.youth
 
 import android.app.Application
 import com.xiangshang.youth.app.AppUiState
+import com.xiangshang.youth.core.model.LegalPolicy
 import com.xiangshang.youth.core.monitoring.CrashMonitoring
 import com.xiangshang.youth.core.service.ApiClient
 import com.xiangshang.youth.core.service.FeatureRollout
@@ -14,6 +15,7 @@ import com.xiangshang.youth.core.util.FrontendTelemetry
 class XiangshangYouthApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        LegalPolicy.initialize(this)
         CrashMonitoring.initialize(this)
         FeatureRollout.initialize(this)
         ApiClient.initialize(this)

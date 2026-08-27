@@ -3,10 +3,10 @@
 ## 2026-08-27 最新状态（优先于下方历史记录）
 
 - iOS 模拟器 XCTest 100/100；UI Test 共 9 项，8 通过、0 失败、1 项因未提供专用远程账号跳过。
-- Android Debug 单测 116/116，`assembleDebug` 和 `lintDebug` 通过；API 34 AVD Compose UI 6/6 通过。这不代表 Android 真机矩阵已通过。
-- 后端 `npm run check`、64/64 单元/契约测试和 OpenAPI lint 通过；39 个 migration、225 项跨端模型不变量、24 个大文件预算和 local preflight 通过。
-- 本地仍没有独立 `TEST_DATABASE_URL`，Docker daemon 不可用；PostgreSQL 集成套件未在本机通过，不使用开发/生产库代替。
-- 远程闭环仍缺专用家长/教师账号、测试孩子和写入 fixture；模型仍为 `pending-human-validation`。
+- Android Debug 单测 116/116，`assembleDebug` 和 `lintDebug` 通过；API 34 与 API 35 AVD Compose UI 均为 6/6 通过。这不代表 Android 真机矩阵已通过。
+- 后端 `npm run check`、64/64 单元/契约测试、4/4 独立 PostgreSQL 集成和 OpenAPI lint 通过；PostgreSQL 16 备份/恢复演练验证 39 个 migration 与种子数据。225 项跨端模型不变量、24 个大文件预算和 local preflight 通过。
+- 候选提交 `105f0a5` 的平台 CI run `33064133368` 已全绿：后端 PostgreSQL 集成、生产容器、源码完整性、Windows 场地端、iOS 与 Android 六个作业全部通过；Release 中央服务契约 run `33064133327` 也已通过。Android 托管 API 34 和本地 API 35 均 6/6 通过，但仍需 Android 15 真机门禁。
+- 远程闭环仍缺专用家长/教师账号、测试孩子和写入 fixture；广州源站当前把 HTTP 请求重定向至 DNSPod `webblock`，HTTPS 不能正常响应，需先完成或确认大陆域名备案/云侧接入并恢复网关。模型仍为 `pending-human-validation`。
 - 详细可审计证据见 [LOCAL_RELEASE_EVIDENCE_2026-08-27.md](LOCAL_RELEASE_EVIDENCE_2026-08-27.md)。
 
 ## 2026-08-27 候选基线复核

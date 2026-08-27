@@ -184,7 +184,11 @@ jobs:
         continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          # API 34 is the deterministic hosted-runner smoke device. API 35 is
+          # still a release-matrix gate and is exercised on the maintained
+          # local AVD/physical-device lane; the hosted x86_64 image exits
+          # before adb/Gradle starts and therefore cannot produce test XML.
+          api-level: 34
           target: google_apis
           arch: x86_64
           profile: Pixel_2

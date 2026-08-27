@@ -18,6 +18,8 @@ IOS_BODY = "\n".join(
     for path in (
         ROOT / "ios/XiangshangYouth/Core/Models/BodyAssessment.swift",
         ROOT / "ios/XiangshangYouth/Core/Models/BodyPostureAssessment.swift",
+        ROOT / "ios/XiangshangYouth/Core/Models/BodyCaptureQualityGate.swift",
+        ROOT / "ios/XiangshangYouth/Core/Models/PostureMetricCalculator.swift",
     )
 )
 ANDROID_BODY = "\n".join(
@@ -25,6 +27,10 @@ ANDROID_BODY = "\n".join(
     for path in (
         ROOT / "android/app/src/main/java/com/xiangshang/youth/core/model/BodyAssessment.kt",
         ROOT / "android/app/src/main/java/com/xiangshang/youth/core/model/BodyPostureAssessment.kt",
+        ROOT / "android/app/src/main/java/com/xiangshang/youth/core/model/PostureScreeningRules.kt",
+        ROOT / "android/app/src/main/java/com/xiangshang/youth/core/model/PostureAssessmentReport.kt",
+        ROOT / "android/app/src/main/java/com/xiangshang/youth/core/model/PostureMetricCalculator.kt",
+        ROOT / "android/app/src/main/java/com/xiangshang/youth/core/model/BodyCaptureQualityGate.kt",
     )
 )
 ANDROID_GROWTH = (ROOT / "android/app/src/main/java/com/xiangshang/youth/core/model/GrowthInsight.kt").read_text()

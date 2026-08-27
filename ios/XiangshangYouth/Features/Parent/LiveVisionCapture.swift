@@ -193,7 +193,7 @@ struct LiveVisionCaptureSheet: View {
         // phone call, Control Center, or the background deliberately requires
         // the parent to confirm the child is still in the correct pose.
         .onChange(of: scenePhase) { _, phase in
-            guard phase != .active else { return }
+            if phase == .active { return }
             if captureArmed {
                 captureArmed = false
                 captureProgress = 0
@@ -420,7 +420,21 @@ private final class LiveVisionCaptureController: UIViewController, AVCaptureVide
         case .authorized: sessionQueue.async { self.session.startRunning() }
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .video) { granted in
-                if granted { self.sessionQueue.async { self.session.startRunning() } }
+                if granted {
+                    // `configure` may run before the system permission sheet
+                    // resolves. In that state the input can be prepared, but
+                    // the controller deliberately cannot publish readiness.
+                    // Reconfigure after authorization so the committed,
+                    // running session emits `onCameraReady` for first-time
+                    // users as well as returning users.
+                    self.sessionQueue.async {
+                        if let position = self.currentPosition {
+                            self.configureSession(position: position)
+                        } else {
+                            self.session.startRunning()
+                        }
+                    }
+                }
                 else { self.fail("未获得相机权限，请在系统设置中允许相机后重试。") }
             }
         default: fail("未获得相机权限，请在系统设置中允许相机后重试。")

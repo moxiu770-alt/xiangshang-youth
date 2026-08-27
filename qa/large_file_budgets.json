@@ -11,10 +11,16 @@
   "ios/XiangshangYouth/Features/Auth/AuthViews.swift": 700,
   "ios/XiangshangYouth/Features/Auth/AuthRoleViews.swift": 140,
   "ios/XiangshangYouth/Core/Models/BodyAssessment.swift": 450,
-  "ios/XiangshangYouth/Core/Models/BodyPostureAssessment.swift": 700,
+  "ios/XiangshangYouth/Core/Models/BodyPostureAssessment.swift": 420,
+  "ios/XiangshangYouth/Core/Models/BodyCaptureQualityGate.swift": 270,
+  "ios/XiangshangYouth/Core/Models/PostureMetricCalculator.swift": 80,
   "android/app/src/main/java/com/xiangshang/youth/app/AppState.kt": 550,
   "android/app/src/main/java/com/xiangshang/youth/core/model/BodyAssessment.kt": 250,
-  "android/app/src/main/java/com/xiangshang/youth/core/model/BodyPostureAssessment.kt": 820,
+  "android/app/src/main/java/com/xiangshang/youth/core/model/BodyPostureAssessment.kt": 80,
+  "android/app/src/main/java/com/xiangshang/youth/core/model/PostureScreeningRules.kt": 220,
+  "android/app/src/main/java/com/xiangshang/youth/core/model/PostureAssessmentReport.kt": 250,
+  "android/app/src/main/java/com/xiangshang/youth/core/model/PostureMetricCalculator.kt": 60,
+  "android/app/src/main/java/com/xiangshang/youth/core/model/BodyCaptureQualityGate.kt": 360,
   "android/app/src/main/java/com/xiangshang/youth/feature/parent/LivePostureCapture.kt": 470,
   "android/app/src/main/java/com/xiangshang/youth/feature/parent/LivePostureAnalyzer.kt": 520
 }

@@ -15,7 +15,7 @@
 
 禁止进入候选基线：本地 `.env`、账号密码、证书私钥、Provisioning Profile、对象存储密钥、真实儿童健康明细、原始摄像头帧。
 
-大文件预算不是最终目标，而是防止重新合并。后端 `server.js` 下一阶段继续拆分 AuthSession、AdminSchool 和场地编排路由；当前新增业务必须直接进入领域路由文件。
+大文件预算不是最终目标，而是防止重新合并。当前 24 个重点文件已纳入预算；姿态采集质量门、评分规则、报告与度量计算已从原单文件拆分。后端 `server.js` 下一阶段继续拆分 AuthSession、AdminSchool 和场地编排路由；当前新增业务必须直接进入领域路由文件。
 
 当前领域边界：
 
@@ -23,4 +23,4 @@
 - Android：会话恢复与登录、教师任务、社区健康和支持能力分别位于 `AppState*.kt`；身体基础数据、姿态 UI 和实时分析器已分文件。
 - 后端：AuthClaims、FileStorage、Activity、Appointment、ClassCircle、Course、Notification、FamilyHealth、TeacherTask 和场地端路由已有独立模块；学生导入解析已从主服务抽离。主服务剩余 OAuth/AuthSession 写流程、场地编排和管理端路由是后续拆分对象。
 
-真实远程验收必须遵循 [REMOTE_WORKFLOW_ACCEPTANCE.md](REMOTE_WORKFLOW_ACCEPTANCE.md)，并将脱敏后的输出作为候选提交证据。没有专用测试账号、独立测试数据库和可访问的 HTTPS 环境时，候选只能标记为“本地可构建基线”，不能标记为“学校试点远程闭环已验收”。
+真实远程验收必须遵循 [REMOTE_WORKFLOW_ACCEPTANCE.md](REMOTE_WORKFLOW_ACCEPTANCE.md)，并将脱敏后的输出作为候选提交证据。没有专用测试账号、独立测试数据库和可访问的 HTTPS 环境时，候选只能标记为“本地可构建基线”，不能标记为“学校试点远程闭环已验收”。本轮的精确命令、计数与环境边界见 [LOCAL_RELEASE_EVIDENCE_2026-08-27.md](LOCAL_RELEASE_EVIDENCE_2026-08-27.md)。

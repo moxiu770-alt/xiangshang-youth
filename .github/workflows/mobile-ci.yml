@@ -189,7 +189,10 @@ jobs:
           arch: x86_64
           profile: Pixel_2
           disable-animations: true
-          emulator-options: -no-window -noaudio -no-boot-anim
+          # Supplying emulator-options replaces the action defaults. Keep the
+          # software renderer and cold-boot flags explicit; without them the
+          # API 35 AVD can exit before Gradle starts and produces no JUnit XML.
+          emulator-options: -no-window -noaudio -no-boot-anim -gpu swiftshader_indirect -no-snapshot
           script: |
             cd android
             ./gradlew :app:connectedDebugAndroidTest --no-daemon --max-workers=2 --console=plain

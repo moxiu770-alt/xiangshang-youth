@@ -148,7 +148,21 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
       - name: Run Android unit tests
+        id: android-unit-tests
+        continue-on-error: true
         run: ./gradlew :app:testDebugUnitTest --no-daemon --max-workers=1 --console=plain
+      - name: Upload Android unit-test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xiangshang-youth-android-unit-test-reports
+          path: |
+            android/app/build/test-results/testDebugUnitTest
+            android/app/build/reports/tests/testDebugUnitTest
+          if-no-files-found: warn
+      - name: Report Android unit-test failures
+        if: steps.android-unit-tests.outcome == 'failure'
+        run: python3 ../scripts/report_junit_failures.py app/build/test-results/testDebugUnitTest && exit 1
       - name: Run Android lint
         run: ./gradlew :app:lintDebug --no-daemon --max-workers=1 --console=plain
       - name: Build debug and instrumentation APKs

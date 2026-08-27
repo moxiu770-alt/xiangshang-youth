@@ -162,7 +162,7 @@ jobs:
           if-no-files-found: warn
       - name: Report Android unit-test failures
         if: steps.android-unit-tests.outcome == 'failure'
-        run: python3 ../scripts/report_junit_failures.py app/build/test-results/testDebugUnitTest && exit 1
+        run: python3 ../scripts/report_junit_failures.py app/build/test-results/testDebugUnitTest "Android JVM tests" && exit 1
       - name: Run Android lint
         run: ./gradlew :app:lintDebug --no-daemon --max-workers=1 --console=plain
       - name: Build debug and instrumentation APKs
@@ -180,6 +180,8 @@ jobs:
           path: android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
           if-no-files-found: error
       - name: Run Compose instrumentation flow on a clean emulator
+        id: android-instrumentation
+        continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -194,6 +196,18 @@ jobs:
             mkdir -p "$RUNNER_TEMP/android-visual-evidence"
             adb shell run-as com.xiangshang.youth cat files/visual-evidence/launch-poster.png > "$RUNNER_TEMP/android-visual-evidence/launch-poster.png"
             test -s "$RUNNER_TEMP/android-visual-evidence/launch-poster.png"
+      - name: Upload Android instrumentation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xiangshang-youth-android-instrumentation-reports
+          path: |
+            android/app/build/outputs/androidTest-results/connected
+            android/app/build/reports/androidTests/connected
+          if-no-files-found: warn
+      - name: Report Android instrumentation failures
+        if: steps.android-instrumentation.outcome == 'failure'
+        run: python3 ../scripts/report_junit_failures.py app/build/outputs/androidTest-results/connected "Android Compose UI tests" && exit 1
       - name: Upload Android visual evidence
         if: always()
         uses: actions/upload-artifact@v4

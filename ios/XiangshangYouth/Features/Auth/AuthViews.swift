@@ -68,40 +68,46 @@ struct LoginView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Color(hex: "E9F4FF"), Color(hex: "F8FBFF")], startPoint: .top, endPoint: .bottom)
+            // Restore the approved school-campus login composition.  The
+            // stronger sky header and illustrated footer give the screen a
+            // recognisable product identity while the form stays native.
+            LinearGradient(colors: [Color(hex: "76B8F7"), Color(hex: "EFF8FF")], startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
-            Circle().fill(ReferenceColor.blue.opacity(0.08)).frame(width: 360).blur(radius: 4).offset(x: 190, y: -300)
+            Circle()
+                .fill(.white.opacity(0.13))
+                .frame(width: 420, height: 420)
+                .offset(x: 175, y: -290)
+                .accessibilityHidden(true)
 
             GeometryReader { proxy in
                 ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 22) {
-                        VStack(spacing: 14) {
-                            Image(systemName: "figure.run.circle.fill")
-                                .symbolRenderingMode(.palette)
-                                .foregroundStyle(.white, ReferenceColor.blue)
-                                .font(.system(size: 62, weight: .semibold))
-                                .accessibilityHidden(true)
-                            VStack(spacing: 6) {
-                                Text("登录向上少年")
-                                    .font(.system(size: AppTheme.displaySize, weight: .bold))
-                                    .foregroundStyle(ReferenceColor.navy)
-                                Text("连接学校与家庭，陪伴孩子健康成长")
-                                    .font(.system(size: AppTheme.secondarySize, weight: .medium))
-                                    .foregroundStyle(AppTheme.muted)
-                                    .multilineTextAlignment(.center)
-                            }
+                    VStack(spacing: 0) {
+                        VStack(spacing: 5) {
+                            Text("向上少年")
+                                .font(.system(size: 31, weight: .heavy))
+                            Text("身心健康智慧平台")
+                                .font(.system(size: 25, weight: .heavy))
+                            Text("学校体测 · 家庭健康记录 · 成长训练")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(ReferenceColor.yellow)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 4)
+                                .background(.white.opacity(0.18), in: Capsule())
                         }
-                        .padding(.top, horizontalSizeClass == .compact ? 34 : 56)
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, horizontalSizeClass == .compact ? 30 : 50)
+                        .padding(.bottom, 12)
 
                         loginPanel
-                        Spacer(minLength: 24)
+                        Spacer(minLength: 12)
                         landscape
                     }
-                    .frame(maxWidth: 520)
+                    .frame(maxWidth: 620)
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: proxy.size.height, alignment: .top)
                     .padding(.horizontal, AppTheme.pagePadding)
-                    .padding(.bottom, 16)
+                    .padding(.bottom, 8)
                 }
                 .scrollDismissesKeyboard(.interactively)
             }
@@ -255,9 +261,9 @@ struct LoginView: View {
                 .frame(maxWidth: .infinity, alignment: .center)
         }
         .padding(AppTheme.cardPadding)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(.white.opacity(0.85), lineWidth: 1))
-        .shadow(color: ReferenceColor.navy.opacity(0.10), radius: 24, y: 12)
+        .background(.white, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).stroke(.white.opacity(0.9), lineWidth: 1))
+        .shadow(color: ReferenceColor.blue.opacity(0.10), radius: 14, y: 5)
     }
 
     private var landscape: some View {
@@ -266,8 +272,9 @@ struct LoginView: View {
             .scaledToFit()
             .frame(maxWidth: 560)
             .frame(maxWidth: .infinity)
-            .frame(height: 78)
-            .padding(.horizontal, 16)
+            .frame(height: 104)
+            .padding(.horizontal, 3)
+            .padding(.bottom, 3)
             .clipped()
     }
 

@@ -50,10 +50,11 @@ class BodyAssessmentTest {
         assertEquals(1, com.xiangshang.youth.feature.parent.initialBodyAssessmentStage(cameraDraft, false, false))
     }
     private fun resolveBodyCaptureProfileJson(): String {
+        val workingDirectory = File(requireNotNull(System.getProperty("user.dir")))
         val candidates = listOf(
-            File(requireNotNull(System.getProperty("user.dir"))).resolve("android/app/src/main/assets/body_pose_capture_profiles.json"),
-            File(requireNotNull(System.getProperty("user.dir"))).resolve("app/src/main/assets/body_pose_capture_profiles.json"),
-            File("/Users/luyanpeng/Desktop/向上少年/android/app/src/main/assets/body_pose_capture_profiles.json")
+            workingDirectory.resolve("src/main/assets/body_pose_capture_profiles.json"),
+            workingDirectory.resolve("app/src/main/assets/body_pose_capture_profiles.json"),
+            workingDirectory.resolve("android/app/src/main/assets/body_pose_capture_profiles.json")
         )
         return requireNotNull(candidates.firstOrNull { it.exists() }) { "body_pose_capture_profiles.json not found" }.readText()
     }

@@ -10,12 +10,11 @@ import java.io.File
 import org.json.JSONObject
 
 private fun resolveFollowAlongProfileJson(): String {
+    val workingDirectory = File(requireNotNull(System.getProperty("user.dir")))
     val candidatePaths = listOf(
-        File(requireNotNull(System.getProperty("user.dir")))
-            .resolve("android/app/src/main/assets/follow_along_action_profiles.json"),
-        File(requireNotNull(System.getProperty("user.dir")))
-            .resolve("app/src/main/assets/follow_along_action_profiles.json"),
-        File("/Users/luyanpeng/Desktop/向上少年/android/app/src/main/assets/follow_along_action_profiles.json")
+        workingDirectory.resolve("src/main/assets/follow_along_action_profiles.json"),
+        workingDirectory.resolve("app/src/main/assets/follow_along_action_profiles.json"),
+        workingDirectory.resolve("android/app/src/main/assets/follow_along_action_profiles.json")
     )
 
     val file = candidatePaths.firstOrNull { it.exists() }

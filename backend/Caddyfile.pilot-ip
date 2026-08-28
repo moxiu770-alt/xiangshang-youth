@@ -1,5 +1,9 @@
 {
 	email {$ACME_EMAIL}
+	# IP-literal HTTPS clients are allowed to omit SNI. Select the managed IP
+	# certificate explicitly for those handshakes instead of returning a TLS
+	# internal-error alert before the HTTP request reaches the API.
+	default_sni {$PUBLIC_HOST}
 }
 
 # Mainland-domain filing can temporarily block a newly deployed API domain.

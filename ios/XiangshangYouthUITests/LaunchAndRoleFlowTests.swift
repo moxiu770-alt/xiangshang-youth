@@ -130,7 +130,7 @@ final class LaunchAndRoleFlowTests: XCTestCase {
         // The synthetic pilot account owns exactly one child. Seeing its
         // display name proves that the server session, parent binding and
         // dashboard response were decoded instead of falling back to Mock.
-        XCTAssertTrue(staticText(containing: "测试同学").waitForExistence(timeout: 15))
+        XCTAssertTrue(staticText(containing: "验收同学").waitForExistence(timeout: 15))
         XCTAssertFalse(staticText(containing: "服务尚未配置").exists)
         attachScreenshot("pilot-remote-parent-home")
     }

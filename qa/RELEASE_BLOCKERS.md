@@ -5,10 +5,11 @@
 - iOS 已在配对的 iPhone 15 上完成 Debug 签名、安装和冷启动；模拟器构建与 107 项核心 XCTest 通过。该结果不等于八段摄像头采集精度、VoiceOver、大字体或真机性能矩阵已验收。
 - Android Debug 编译、单元测试、APK 和 `lintDebug` 通过；本轮当前无连接的 Android 真机/模拟器，不宣称 Compose 真机验收通过。
 - 八段家庭筛查已增加独立足部近景取景、足部专用质量门和八个问题域失败闭合审批。脊柱排列、肩/骨盆、头颈/上肢、躯干旋转、动态膝、步态、坐姿、足弓任一域未完成独立人工验证时，系统只能重采或转专业复核，不对家庭自动发布风险等级。
-- 真实远程 API 仍阻塞：公网源站 `106.52.164.21` 的 Caddy 会将 HTTP 转到 HTTPS，但 `api.risingteen.com` 经腾讯/DNSPod 返回 `webblock`，TLS 握手无法完成。需甲方/云账号完成大陆域名备案与接入核验，或提供合规的非大陆测试入口。当前本机也无该服务器 SSH 凭据，不能代为修改 Caddy/证书。
+- 广州公网 API 已部署最新候选代码并完成 038–046 号 migration；`https://106.52.164.21/readyz` 从外网返回数据库、48/48 migration 和 worker 健康状态。Caddy 已签发包含该 IPv4 SAN 的 Let's Encrypt 短期证书，并通过 `default_sni` 兼容不发送 SNI 的 IP-literal 客户端。该 IP 仅用于备案完成前的小范围试点；正式交付仍需完成 `api.risingteen.com` 备案与接入核验。
 - 后端 PostgreSQL 真实集成套件已在 GitHub Actions 的独立 PostgreSQL 16 服务和独立 `xiangshang_integration` schema 中通过；未使用开发库或生产库。该证据解决了数据库隔离门禁，但不等于广州公网环境的真实业务闭环已通过。
-- 已增加 `Caddyfile.pilot-ip` 与 Compose overlay，允许备案恢复前用公网 IP + 自动续期的短期 TLS 证书完成试点联调；仍需在腾讯云登录后部署并从外网验证 `/readyz`，正式交付入口仍须恢复 `api.risingteen.com`。
-- 已增加隔离的远程验收 fixture provisioner，包含专用家长、教师、孩子、班级、任务、报告、课程、活动、专家时段和可路由消息；该 provisioner 已在独立 CI 数据库验证，但尚未写入广州远程环境。
+- `Caddyfile.pilot-ip` 与 Compose overlay 已在广州实例生效，Caddy data volume 持久化保留，短期证书可自动续期；部署前已生成 root-only 回滚备份，PostgreSQL 和文件存储 volume 未重建。
+- 隔离远程 fixture 已写入广州环境，并以 `fixture-lifecycle-write` 模式通过家长/教师登录与会话、孩子绑定、报告/课程/消息、活动报名编辑/冲突/取消、专家预约改期/冲突/取消、教师任务版本冲突和通知草稿授权验收。凭据仅保存在服务器 root-only 密钥文件，日志和验收输出不包含密码或 token。
+- iPhone 15 已安装并启动指向 `https://106.52.164.21/` 且强制 RemoteRepository 的 Debug 包，进程在真机上持续运行。单条远程 XCUITest 的 Runner 已成功签名与启动，但在进入测试方法前因 DTX/XCTest IDE 通道断开而退出，本次不宣称真机 UI 自动化通过。
 - 对象存储现已兼容腾讯 COS 的 S3 SigV4 与虚拟主机寻址；真实 COS bucket、最小权限 CAM 子账号和备份 bucket 仍需在腾讯云账号内创建后注入，不能把占位凭据描述为已接通。
 - 推送前置已增加账号自管的 APNs/FCM device installation 接口、令牌 AES-256-GCM 加密、撤销/失效清理和通知网关 targets 合同；生产 Compose 现会真实传入短信、微信、通知网关与推送密钥配置。真实 APNs Key、Firebase 项目和网关凭据仍属外部账号配置，未配置前仅站内消息可验收。
 
@@ -69,7 +70,7 @@
 2. 接入真实短信、微信开放平台和推送服务商，并完成回调域名、AppID/Secret、隐私条款和应用商店审核材料。微信 OAuth 的服务端 state、防重放、身份表、回调中转和双端 API/深链代码已落地，但没有真实凭据时不会伪造登录成功。
 3. iOS 工程已接入 Sentry Cocoa Swift Package 和 `CrashMonitoring` 封装；仍需在可联网 CI/发布机完成依赖解析、配置生产 DSN，并验证真实崩溃上报与告警接收。
 4. 使用经过授权的人类标注集完成姿态、动作跟练和体测模型校准；当前黄金集明确标记为 `pending-human-validation`，不能作为医学或学校正式评分依据。
-5. 完成 iOS/Android 真机矩阵（小屏、平板、横屏、系统字体放大、相机权限、前后台切换）并保存 XCTest/Compose UI、崩溃和性能报告；XCTest/UI target 已补齐 Development Team，但当前 iPhone 真机仍缺少 `com.xiangshang.youth.uitests.xctrunner` 对应的开发 provisioning profile，需要在已登录 Apple Developer 账号的发布机执行签名配置。
+5. 完成 iOS/Android 真机矩阵（小屏、平板、横屏、系统字体放大、相机权限、前后台切换）并保存 XCTest/Compose UI、崩溃和性能报告；iPhone App 和 UI Runner 的 provisioning profile 已可用，当前剩余阻塞是真机 XCUITest 启动时 DTX/XCTest IDE 通道断开，需在设备保持解锁、数据线稳定且 Xcode/设备版本匹配的情况下复跑。
 6. 为正式环境配置 Git 远程仓库、分支保护、签名证书、灰度发布、回滚版本和实际告警接收人；本地仓库不擅自推送或伪造这些外部配置。
 
 本次本机验证记录（2026-08-25）：跨端前端契约门禁通过；local 发布预检通过并生成 JSON；设备矩阵预检如实记录 `xcrun` 与 Android SDK 内的 `adb` 可用、但没有连接设备；Android Debug 单测、Lint、Debug/Release APK 与 instrumentation APK 构建通过；iOS 使用可用的 iPhone 17 / iOS 26.5 模拟器执行 89 个 XCTest、6 个 SwiftUI UI 测试均 0 失败；后端 `npm run check`、Redocly OpenAPI lint 与 59 项单元/契约测试通过；班级圈评论删除权限投影、跟练结构化回执、家庭运动打卡远程契约和健康观察结构化答案在本轮重新验证。Android 真机/AVD 仍因无连接设备未执行；后端集成测试仍因未提供 `TEST_DATABASE_URL` 未执行；iOS 真机测试仍需正式 provisioning profile；场地端 `.NET 8` 核心测试不在本轮重跑范围。剩余未验证项必须在配置签名、真机、联网 CI 和独立测试数据库环境重跑发布命令，详见 [RELEASE_PREFLIGHT.md](RELEASE_PREFLIGHT.md)。

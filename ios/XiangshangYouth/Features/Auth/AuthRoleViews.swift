@@ -25,7 +25,7 @@ struct RoleSelectView: View {
                         }
                         Spacer()
                     }
-                    .padding(14)
+                    .padding(18)
                     .background(.white, in: RoundedRectangle(cornerRadius: AppTheme.controlRadius, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: AppTheme.controlRadius, style: .continuous).stroke(AppTheme.divider, lineWidth: 1))
                     VStack(spacing: AppTheme.cardSpacing) {
@@ -65,7 +65,7 @@ struct RoleSelectView: View {
                     Text(detail).font(.system(size: AppTheme.secondarySize)).foregroundStyle(AppTheme.muted).fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
-                Image(systemName: "chevron.right").font(.system(size: 14, weight: .semibold)).foregroundStyle(color)
+                Image(systemName: "chevron.right").font(.system(size: 16, weight: .semibold)).foregroundStyle(color)
             }
             .padding(AppTheme.cardPadding)
             .background(.white, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
@@ -91,12 +91,12 @@ struct BackendDashboardNoticeView: View {
             VStack(spacing: 14) {
                 Image(systemName: "chart.bar.xaxis").font(.system(size: 54, weight: .semibold)).foregroundStyle(ReferenceColor.blue)
                 Text("学校管理数据看板已迁移至后台系统").font(.title3.bold()).foregroundStyle(ReferenceColor.navy).multilineTextAlignment(.center)
-                Text("校长端不再作为移动端工作台提供。学校总览、年级对比、班级完成率和风险学生数据，请在学校后台数据看板中查看。").font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                Text("校长端不再作为移动端工作台提供。学校总览、年级对比、班级完成率和风险学生数据，请在学校后台数据看板中查看。").font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 Button(adminURL == nil ? "后台地址待配置" : "打开学校管理后台") {
                     guard let adminURL else { openError = "当前版本尚未配置学校后台地址，请联系平台管理员。"; return }
                     openURL(adminURL) { accepted in if !accepted { openError = "无法打开学校后台，请稍后重试。" } }
                 }.buttonStyle(.borderedProminent).disabled(adminURL == nil)
-                if let openError { Text(openError).font(.caption).foregroundStyle(.red).multilineTextAlignment(.center) }
+                if let openError { Text(openError).font(.subheadline).foregroundStyle(.red).multilineTextAlignment(.center) }
                 Button("返回角色选择") { state.chooseAnotherRole(); router.reset() }.buttonStyle(.borderedProminent)
                 Button("退出当前账号") { state.switchAccount(); router.reset() }.buttonStyle(.bordered)
             }.frame(maxWidth: 460).frame(maxWidth: .infinity).padding(.vertical, 72)

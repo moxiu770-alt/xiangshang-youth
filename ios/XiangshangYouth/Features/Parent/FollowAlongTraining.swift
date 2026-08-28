@@ -55,8 +55,8 @@ struct FollowAlongTrainingView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     header
                     Label(AlgorithmReleaseGate.pendingFollowAlongNotice, systemImage: "exclamationmark.shield.fill")
-                        .font(.caption).foregroundStyle(ReferenceColor.navy)
-                        .padding(12)
+                        .font(.subheadline).foregroundStyle(ReferenceColor.navy)
+                        .padding(16)
                         .background(Color.orange.opacity(0.09), in: RoundedRectangle(cornerRadius: 14))
                     if day.exercises.isEmpty {
                         recoveryCard
@@ -127,10 +127,10 @@ struct FollowAlongTrainingView: View {
                 }
                 Spacer()
                 Label("家长陪同", systemImage: "person.2.fill")
-                    .font(.caption.weight(.semibold)).foregroundStyle(ReferenceColor.blue)
+                    .font(.subheadline.weight(.semibold)).foregroundStyle(ReferenceColor.blue)
             }
             Text(day.exercises.isEmpty ? "今天以恢复和身体感受记录为主，不需要强行训练。" : "先看示范，再打开摄像头跟着做。动作质量优先，出现不适请立即停止。")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.subheadline).foregroundStyle(.secondary)
         }
         .padding(16)
         .background(.white, in: RoundedRectangle(cornerRadius: 18))
@@ -142,7 +142,7 @@ struct FollowAlongTrainingView: View {
                 Label("示范视频", systemImage: "play.rectangle.fill")
                     .font(.headline).foregroundStyle(ReferenceColor.navy)
                 Spacer()
-                Text("跟做模式").font(.caption.weight(.semibold)).foregroundStyle(.white)
+                Text("跟做模式").font(.subheadline.weight(.semibold)).foregroundStyle(.white)
                     .padding(.horizontal, 9).padding(.vertical, 5)
                     .background(ReferenceColor.blue, in: Capsule())
             }
@@ -166,7 +166,7 @@ struct FollowAlongTrainingView: View {
                                             Image(systemName: poseFeedback.visible ? "viewfinder.circle.fill" : "person.crop.rectangle")
                                             Text(poseFeedback.visible ? "全身远景" : "取景准备")
                                         }
-                                        .font(.system(size: 12, weight: .semibold))
+                                        .font(.system(size: 16, weight: .semibold))
                                         .foregroundStyle(.white)
                                         .padding(.horizontal, 7)
                                         .padding(.vertical, 4)
@@ -187,7 +187,7 @@ struct FollowAlongTrainingView: View {
                         RoundedRectangle(cornerRadius: 16).fill(ReferenceColor.navy.opacity(0.08))
                         VStack(spacing: 8) {
                             Image(systemName: "video.slash").font(.title2)
-                            Text("示范视频加载失败，可稍后重试").font(.caption)
+                            Text("示范视频加载失败，可稍后重试").font(.subheadline)
                         }.foregroundStyle(.secondary)
                     }
                     .aspectRatio(9 / 16, contentMode: .fit)
@@ -200,7 +200,7 @@ struct FollowAlongTrainingView: View {
                             .font(.headline).foregroundStyle(.white).frame(width: 42, height: 42)
                             .background(ReferenceColor.blue, in: Circle())
                     }
-                    .padding(14)
+                    .padding(18)
                     .accessibilityLabel(isPlaying ? "暂停示范视频" : "播放示范视频")
                 }
             }
@@ -227,7 +227,7 @@ struct FollowAlongTrainingView: View {
                 TimelineView(.periodic(from: .now, by: 1)) { _ in
                     let elapsed = Int(player?.currentTime().seconds ?? 0)
                     Label("已跟做 \(elapsed / 60):\(String(format: "%02d", elapsed % 60))", systemImage: "timer")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.subheadline).foregroundStyle(.secondary)
                 }
             }
             if cameraEnabled {
@@ -235,15 +235,15 @@ struct FollowAlongTrainingView: View {
                     Circle()
                         .fill(poseFeedback.visible ? (poseFeedback.active ? ReferenceColor.green : .orange) : .gray)
                         .frame(width: 8, height: 8)
-                    Text(poseFeedback.message).font(.caption).foregroundStyle(ReferenceColor.navy).lineLimit(2)
+                    Text(poseFeedback.message).font(.subheadline).foregroundStyle(ReferenceColor.navy).lineLimit(2)
                     Spacer()
-                Text("辅助计数 \(visualRepCount) 次 · 连击 \(poseFeedback.comboCount)").font(.caption.weight(.bold)).foregroundStyle(ReferenceColor.blue)
+                Text("辅助计数 \(visualRepCount) 次 · 连击 \(poseFeedback.comboCount)").font(.subheadline.weight(.bold)).foregroundStyle(ReferenceColor.blue)
                 }
                 .padding(.horizontal, 4)
                 cameraGuideCard
             }
         }
-        .padding(12)
+        .padding(16)
         .background(.white, in: RoundedRectangle(cornerRadius: 18))
     }
 
@@ -261,12 +261,12 @@ struct FollowAlongTrainingView: View {
                             .background(index == selectedExercise ? ReferenceColor.blue : ReferenceColor.blue.opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
                         VStack(alignment: .leading, spacing: 4) {
                             Text(exercise.title).font(.subheadline.bold()).foregroundStyle(ReferenceColor.navy)
-                            Text(exercise.cue).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.leading)
+                            Text(exercise.cue).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.leading)
                         }
                         Spacer()
-                        Text("\(exercise.target)\(exercise.unit)").font(.caption.weight(.bold)).foregroundStyle(ReferenceColor.blue)
+                        Text("\(exercise.target)\(exercise.unit)").font(.subheadline.weight(.bold)).foregroundStyle(ReferenceColor.blue)
                     }
-                    .padding(12)
+                    .padding(16)
                     .background(index == selectedExercise ? ReferenceColor.blue.opacity(0.08) : .white, in: RoundedRectangle(cornerRadius: 14))
                     .overlay(RoundedRectangle(cornerRadius: 14).stroke(index == selectedExercise ? ReferenceColor.blue.opacity(0.35) : .clear, lineWidth: 1))
                 }
@@ -284,11 +284,11 @@ struct FollowAlongTrainingView: View {
                 HStack {
                     Text("跟做进度").font(.subheadline.bold()).foregroundStyle(ReferenceColor.navy)
                     Spacer()
-                    Text("\(progress) / \(exercise.target) \(exercise.unit)").font(.caption.weight(.bold)).foregroundStyle(ReferenceColor.blue)
+                    Text("\(progress) / \(exercise.target) \(exercise.unit)").font(.subheadline.weight(.bold)).foregroundStyle(ReferenceColor.blue)
                 }
                 if poseFeedback.visible {
                     Label(poseFeedback.active ? "动作已开始" : "画面已就绪，等待动作幅度", systemImage: poseFeedback.active ? "viewfinder.circle.fill" : "viewfinder")
-                        .font(.caption).foregroundStyle(poseFeedback.active ? ReferenceColor.green : .secondary)
+                        .font(.subheadline).foregroundStyle(poseFeedback.active ? ReferenceColor.green : .secondary)
                 }
                 ProgressView(value: min(Double(progress) / Double(max(exercise.target, 1)), 1)).tint(ReferenceColor.green)
                 HStack(spacing: 9) {
@@ -308,17 +308,17 @@ struct FollowAlongTrainingView: View {
                     .buttonStyle(.bordered).tint(ReferenceColor.green)
                 }
                 Text("家长记录用于确认实际完成量；摄像头仅显示待验证的辅助计数，不作为准确率或标准动作证明。")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.subheadline).foregroundStyle(.secondary)
             }
-            .padding(13)
+            .padding(16)
             .background(ReferenceColor.green.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
         }
     }
 
     private var safetyCard: some View {
         Label("家长陪同提示：保持镜头稳定、留出安全距离；孩子疲劳、疼痛或头晕时马上暂停。跟做数据只用于健康习惯记录，不构成医疗诊断。", systemImage: "heart.text.square.fill")
-            .font(.caption).foregroundStyle(ReferenceColor.navy)
-            .padding(13).background(ReferenceColor.blue.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
+            .font(.subheadline).foregroundStyle(ReferenceColor.navy)
+            .padding(16).background(ReferenceColor.blue.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
     }
 
     private var cameraGuideCard: some View {
@@ -331,21 +331,21 @@ struct FollowAlongTrainingView: View {
                     .font(.subheadline.weight(.bold)).foregroundStyle(ReferenceColor.navy)
                 Spacer()
                 Text(poseFeedback.captureState == .ready ? "已连接" : "需调整")
-                    .font(.caption.weight(.semibold)).foregroundStyle(poseFeedback.visible ? ReferenceColor.green : .secondary)
+                    .font(.subheadline.weight(.semibold)).foregroundStyle(poseFeedback.visible ? ReferenceColor.green : .secondary)
             }
             Text(poseFeedback.message)
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.subheadline).foregroundStyle(.secondary)
                 .lineLimit(2)
             phaseStrip
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text("动作范围").font(.caption.weight(.semibold)).foregroundStyle(ReferenceColor.navy)
+                    Text("动作范围").font(.subheadline.weight(.semibold)).foregroundStyle(ReferenceColor.navy)
                     Spacer()
-                    Text("\(poseFeedback.rangePercent)% · \(poseFeedback.side.rawValue)").font(.caption.weight(.bold)).foregroundStyle(ReferenceColor.blue)
+                    Text("\(poseFeedback.rangePercent)% · \(poseFeedback.side.rawValue)").font(.subheadline.weight(.bold)).foregroundStyle(ReferenceColor.blue)
                 }
                 ProgressView(value: Double(poseFeedback.rangePercent), total: 100).tint(poseFeedback.rangePercent >= 70 ? ReferenceColor.green : ReferenceColor.blue)
                 Text(poseFeedback.tempoScore > 0 ? "节奏匹配 \(poseFeedback.tempoScore)% · 跟随示范停顿后再回位" : "先跟随示范完成一整次，系统会校准你的节奏")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.subheadline).foregroundStyle(.secondary)
             }
             if let exercise {
                 TimelineView(.periodic(from: .now, by: 0.25)) { _ in
@@ -353,7 +353,7 @@ struct FollowAlongTrainingView: View {
                     let cadence = max(exercise.cadenceSeconds, 0.4)
                     let beat = Int(position / cadence).quotientAndRemainder(dividingBy: 4).remainder + 1
                     Label("模板第 \(beat) 拍 · \(String(format: "%.1f", cadence)) 秒/拍 · 实时节拍同步", systemImage: "metronome")
-                        .font(.caption.weight(.semibold)).foregroundStyle(ReferenceColor.blue)
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(ReferenceColor.blue)
                 }
             }
             HStack(spacing: 6) {
@@ -363,11 +363,11 @@ struct FollowAlongTrainingView: View {
             }
             if let exercise {
                 Label("当前动作：\(exercise.title) · \(exercise.cue)", systemImage: "figure.run")
-                    .font(.caption).foregroundStyle(ReferenceColor.navy)
+                    .font(.subheadline).foregroundStyle(ReferenceColor.navy)
                     .lineLimit(2)
             }
         }
-        .padding(12)
+        .padding(16)
         .background(ReferenceColor.blue.opacity(0.07), in: RoundedRectangle(cornerRadius: 14))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("动作引导。\(poseFeedback.message)。请竖屏、保持全身远景并静止两秒完成准备。")
@@ -377,7 +377,7 @@ struct FollowAlongTrainingView: View {
         HStack(spacing: 6) {
             ForEach([FollowAlongStage.setup, .exertion, .returnPhase], id: \.self) { stage in
                 Text(stage.rawValue)
-                    .font(.caption.weight(.bold))
+                    .font(.subheadline.weight(.bold))
                     .foregroundStyle(poseFeedback.stage == stage ? .white : ReferenceColor.navy)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 6)
@@ -389,11 +389,11 @@ struct FollowAlongTrainingView: View {
 
     private func guideStep(number: String, title: String, detail: String) -> some View {
         HStack(spacing: 5) {
-            Text(number).font(.caption.bold()).foregroundStyle(.white)
+            Text(number).font(.subheadline.bold()).foregroundStyle(.white)
                 .frame(width: 18, height: 18).background(ReferenceColor.blue, in: Circle())
             VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(.caption.bold()).foregroundStyle(ReferenceColor.navy)
-                Text(detail).font(.system(size: 12)).foregroundStyle(.secondary)
+                Text(title).font(.subheadline.bold()).foregroundStyle(ReferenceColor.navy)
+                Text(detail).font(.system(size: 16)).foregroundStyle(.secondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -429,7 +429,7 @@ struct FollowAlongTrainingView: View {
             }
             let total = day.exercises.reduce(0) { $0 + exerciseProgress[$1.id, default: 0] }
                 Text("已记录 \(total) 个动作单位（辅助识别 \(visualUnitCount)，家长补录 \(manualUnits)）。辅助识别尚未通过人工标注验证，不作为标准动作评分。")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.subheadline).foregroundStyle(.secondary)
             Button("返回 28 天计划") { dismiss() }
                 .frame(maxWidth: .infinity)
                 .buttonStyle(.borderedProminent).tint(ReferenceColor.green)

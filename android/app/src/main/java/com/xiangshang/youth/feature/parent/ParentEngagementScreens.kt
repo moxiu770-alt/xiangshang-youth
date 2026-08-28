@@ -57,10 +57,10 @@ fun ExpertAvailableSlot.slotLabel(): String {
     return "${time(scheduledStartAt)}-${time(scheduledEndAt)}"
 }
 
-@Composable fun ParentHeader(name: String, subtitle: String, onClick: () -> Unit, onMessages: (() -> Unit)? = null, unreadCount: Int = 0, onRefresh: (() -> Unit)? = null, isRefreshing: Boolean = false) = Row(Modifier.fillMaxWidth().background(Color.White).padding(horizontal = 14.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) { Surface(Modifier.size(40.dp), color = Color(0xFF16AFA5), shape = CircleShape) { Text(name.take(1), color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 9.dp)) }; Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Text(name, color = Navy, fontWeight = FontWeight.Bold, fontSize = 14.sp); Text(subtitle, color = Color.Gray, fontSize = 12.sp) }; IconButton(onClick = onClick) { Icon(Icons.Filled.ChevronRight, "切换孩子", tint = Blue) }; onRefresh?.let { action -> IconButton(onClick = action, enabled = !isRefreshing) { if (isRefreshing) CircularProgressIndicator(Modifier.size(17.dp), color = Blue, strokeWidth = 2.dp) else Icon(Icons.Filled.Refresh, "刷新数据", tint = Navy, modifier = Modifier.size(19.dp)) } }; onMessages?.let { action -> IconButton(onClick = action) { BadgedBox(badge = { if (unreadCount > 0) Badge(containerColor = Color.Red, modifier = Modifier.size(6.dp)) {} }) { Icon(Icons.Filled.NotificationsNone, contentDescription = "消息通知", tint = Navy, modifier = Modifier.size(20.dp)) } } } }
+@Composable fun ParentHeader(name: String, subtitle: String, onClick: () -> Unit, onMessages: (() -> Unit)? = null, unreadCount: Int = 0, onRefresh: (() -> Unit)? = null, isRefreshing: Boolean = false) = Row(Modifier.fillMaxWidth().background(Color.White).padding(horizontal = 14.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) { Surface(Modifier.size(40.dp), color = Color(0xFF16AFA5), shape = CircleShape) { Text(name.take(1), color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 9.dp)) }; Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Text(name, color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp); Text(subtitle, color = Color.Gray, fontSize = 16.sp) }; IconButton(onClick = onClick) { Icon(Icons.Filled.ChevronRight, "切换孩子", tint = Blue) }; onRefresh?.let { action -> IconButton(onClick = action, enabled = !isRefreshing) { if (isRefreshing) CircularProgressIndicator(Modifier.size(17.dp), color = Blue, strokeWidth = 2.dp) else Icon(Icons.Filled.Refresh, "刷新数据", tint = Navy, modifier = Modifier.size(19.dp)) } }; onMessages?.let { action -> IconButton(onClick = action) { BadgedBox(badge = { if (unreadCount > 0) Badge(containerColor = Color.Red, modifier = Modifier.size(6.dp)) {} }) { Icon(Icons.Filled.NotificationsNone, contentDescription = "消息通知", tint = Navy, modifier = Modifier.size(20.dp)) } } } }
 
-@Composable fun ParentMetric(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier, onClick: () -> Unit) = Surface(modifier.heightIn(min = 64.dp).semantics { role = Role.Button; contentDescription = "打开${label}测评" }.clickable(onClick = onClick), color = color.copy(.08f), shape = RoundedCornerShape(12.dp)) { Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = color, modifier = Modifier.size(22.dp)); Spacer(Modifier.width(8.dp)); Column { Text(label, color = Navy, fontWeight = FontWeight.Bold, fontSize = 13.sp); Text(if (label == "体质") "继续测评" else "开始测评", color = Color.Gray, fontSize = 12.sp) } } }
-@Composable private fun ActivityStatusPill(label: String, value: String, color: Color, modifier: Modifier = Modifier) = Surface(modifier, color = color.copy(alpha = .10f), shape = RoundedCornerShape(10.dp)) { Column(Modifier.padding(8.dp)) { Text(value, color = color, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text(label, color = Color.Gray, fontSize = 12.sp) } }
+@Composable fun ParentMetric(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier, onClick: () -> Unit) = Surface(modifier.heightIn(min = 64.dp).semantics { role = Role.Button; contentDescription = "打开${label}测评" }.clickable(onClick = onClick), color = color.copy(.08f), shape = RoundedCornerShape(12.dp)) { Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = color, modifier = Modifier.size(22.dp)); Spacer(Modifier.width(8.dp)); Column { Text(label, color = Navy, fontWeight = FontWeight.Bold, fontSize = 15.sp); Text(if (label == "体质") "继续测评" else "开始测评", color = Color.Gray, fontSize = 16.sp) } } }
+@Composable private fun ActivityStatusPill(label: String, value: String, color: Color, modifier: Modifier = Modifier) = Surface(modifier, color = color.copy(alpha = .10f), shape = RoundedCornerShape(10.dp)) { Column(Modifier.padding(8.dp)) { Text(value, color = color, fontWeight = FontWeight.Bold, fontSize = 16.sp); Text(label, color = Color.Gray, fontSize = 16.sp) } }
 @Composable
 fun ActivityListScreen(
     state: AppUiState,
@@ -131,7 +131,7 @@ fun ActivityListScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(activity.title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                Text(activity.description ?: "活动安排以学校通知为准。", color = Color.Gray, fontSize = 13.sp, maxLines = 2)
+                                Text(activity.description ?: "活动安排以学校通知为准。", color = Color.Gray, fontSize = 15.sp, maxLines = 2)
                             }
                             Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray)
                         }
@@ -149,16 +149,16 @@ fun ActivityListScreen(
         Spacer(Modifier.height(10.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("报名历史", color = Navy, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.weight(1f))
-            TextButton(onClick = { showHistory = true }) { Text("查看全部", fontSize = 13.sp) }
+            TextButton(onClick = { showHistory = true }) { Text("查看全部", fontSize = 15.sp) }
         }
         visibleRegistrationHistory.take(5).forEach { item ->
             Surface(Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(12.dp)) {
-                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(item.activityTitle ?: item.activityId, color = Navy, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        Text(item.updatedAt?.take(16)?.let { "更新时间 · $it" } ?: "报名记录", color = Color.Gray, fontSize = 12.sp)
+                        Text(item.activityTitle ?: item.activityId, color = Navy, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text(item.updatedAt?.take(16)?.let { "更新时间 · $it" } ?: "报名记录", color = Color.Gray, fontSize = 16.sp)
                     }
-                    Text(activityStatusLabel(item.status), color = if (item.status == "cancelled") Color.Red else Blue, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text(activityStatusLabel(item.status), color = if (item.status == "cancelled") Color.Red else Blue, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
             }
         }
@@ -172,17 +172,17 @@ fun ActivityListScreen(
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     visibleRegistrationHistory.forEach { item ->
                         Surface(Modifier.fillMaxWidth(), color = Color(0xFFF7FAFF), shape = RoundedCornerShape(12.dp)) {
-                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Row(verticalAlignment = Alignment.Top) {
                                     Column(Modifier.weight(1f)) {
-                                        Text(item.activityTitle ?: item.activityId, color = Navy, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Text("报名编号 ${item.registrationId}", color = Color.Gray, fontSize = 12.sp)
+                                        Text(item.activityTitle ?: item.activityId, color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                        Text("报名编号 ${item.registrationId}", color = Color.Gray, fontSize = 16.sp)
                                     }
-                                    Text(activityStatusLabel(item.status), color = if (item.status == "cancelled") Color.Red else Blue, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Text(activityStatusLabel(item.status), color = if (item.status == "cancelled") Color.Red else Blue, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                                 }
                                 Row(Modifier.fillMaxWidth()) {
-                                    Text(item.updatedAt?.take(16)?.let { "更新 $it" } ?: "待学校同步时间", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                                    Text("版本 ${item.version}", color = Color.Gray, fontSize = 12.sp)
+                                    Text(item.updatedAt?.take(16)?.let { "更新 $it" } ?: "待学校同步时间", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                                    Text("版本 ${item.version}", color = Color.Gray, fontSize = 16.sp)
                                 }
                             }
                         }
@@ -221,7 +221,7 @@ fun ActivityListScreen(
             text = {
                 Column {
                     if (cancelCommandState.status == WorkflowCommandStatus.Failed) {
-                        Text(cancelCommandState.message ?: "取消报名失败，请重试", color = Color.Red, fontSize = 12.sp)
+                        Text(cancelCommandState.message ?: "取消报名失败，请重试", color = Color.Red, fontSize = 16.sp)
                     }
                     Text(activity.description ?: "报名信息会提交给学校确认，活动时间以学校通知为准。")
                     Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -231,8 +231,8 @@ fun ActivityListScreen(
                     }
                     if (savedAndStable && !editing) {
                         Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = Green, modifier = Modifier.padding(top = 12.dp))
-                        Text(if (state.repositoryAcknowledged) "报名记录已保存，后续状态以学校确认为准。" else "报名信息已保存，联网后自动同步。", color = Green, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
-                        Text("${saved?.contactName.orEmpty()} · ${saved?.phone.orEmpty()}", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                        Text(if (state.repositoryAcknowledged) "报名记录已保存，后续状态以学校确认为准。" else "报名信息已保存，联网后自动同步。", color = Green, fontSize = 15.sp, modifier = Modifier.padding(top = 4.dp))
+                        Text("${saved?.contactName.orEmpty()} · ${saved?.phone.orEmpty()}", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 4.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             TextButton(onClick = {
                                 contactName = saved?.contactName.orEmpty()
@@ -279,10 +279,10 @@ fun ActivityListScreen(
                                     formError = null
                                 }
                             )
-                            Text("已阅读活动说明并同意接收报名通知", fontSize = 12.sp)
+                            Text("已阅读活动说明并同意接收报名通知", fontSize = 16.sp)
                         }
-                        formError?.let { Text(it, color = Color.Red, fontSize = 12.sp) }
-                        if (failed) Text(commandState.message ?: "报名提交失败，请重试。", color = Color.Red, fontSize = 12.sp)
+                        formError?.let { Text(it, color = Color.Red, fontSize = 16.sp) }
+                        if (failed) Text(commandState.message ?: "报名提交失败，请重试。", color = Color.Red, fontSize = 16.sp)
                     }
                 }
             },
@@ -400,8 +400,8 @@ fun ExpertListScreen(
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(expert.name, color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                            Text(expert.title ?: "健康成长专家", color = Blue, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                            Text(expert.bio ?: "学校开通后展示专家简介、服务范围和可预约时段。", color = Color.Gray, fontSize = 13.sp, maxLines = 2)
+                            Text(expert.title ?: "健康成长专家", color = Blue, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                            Text(expert.bio ?: "学校开通后展示专家简介、服务范围和可预约时段。", color = Color.Gray, fontSize = 15.sp, maxLines = 2)
                         }
                         Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray)
                     }
@@ -413,16 +413,16 @@ fun ExpertListScreen(
         Spacer(Modifier.height(10.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("预约历史", color = Navy, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.weight(1f))
-            TextButton(onClick = { showHistory = true }) { Text("查看全部", fontSize = 13.sp) }
+            TextButton(onClick = { showHistory = true }) { Text("查看全部", fontSize = 15.sp) }
         }
         visibleAppointmentHistory.take(5).forEach { item ->
             Surface(Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(12.dp)) {
-                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(item.expertName ?: item.expertId ?: "专家预约", color = Navy, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        Text(item.preferredDate ?: item.scheduledStartAt?.take(16) ?: "预约时间待确认", color = Color.Gray, fontSize = 12.sp)
+                        Text(item.expertName ?: item.expertId ?: "专家预约", color = Navy, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text(item.preferredDate ?: item.scheduledStartAt?.take(16) ?: "预约时间待确认", color = Color.Gray, fontSize = 16.sp)
                     }
-                    Text(appointmentStatusLabel(item.status), color = if (item.status == "cancelled") Color.Red else Blue, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text(appointmentStatusLabel(item.status), color = if (item.status == "cancelled") Color.Red else Blue, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
             }
         }
@@ -436,18 +436,18 @@ fun ExpertListScreen(
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     visibleAppointmentHistory.forEach { item ->
                         Surface(Modifier.fillMaxWidth(), color = Color(0xFFF7FAFF), shape = RoundedCornerShape(12.dp)) {
-                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Row(verticalAlignment = Alignment.Top) {
                                     Column(Modifier.weight(1f)) {
-                                        Text(item.expertName ?: item.expertId ?: "专家预约", color = Navy, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Text("预约编号 ${item.appointmentId}", color = Color.Gray, fontSize = 12.sp)
+                                        Text(item.expertName ?: item.expertId ?: "专家预约", color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                        Text("预约编号 ${item.appointmentId}", color = Color.Gray, fontSize = 16.sp)
                                     }
-                                    Text(appointmentStatusLabel(item.status), color = if (item.status == "cancelled") Color.Red else Blue, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Text(appointmentStatusLabel(item.status), color = if (item.status == "cancelled") Color.Red else Blue, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                                 }
-                                Text(item.preferredDate ?: item.scheduledStartAt?.take(16) ?: "预约时间待确认", color = Navy, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                Text(item.preferredDate ?: item.scheduledStartAt?.take(16) ?: "预约时间待确认", color = Navy, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
                                 Row(Modifier.fillMaxWidth()) {
-                                    Text(item.updatedAt?.take(16)?.let { "更新 $it" } ?: "待学校同步时间", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                                    Text("版本 ${item.version}", color = Color.Gray, fontSize = 12.sp)
+                                    Text(item.updatedAt?.take(16)?.let { "更新 $it" } ?: "待学校同步时间", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                                    Text("版本 ${item.version}", color = Color.Gray, fontSize = 16.sp)
                                 }
                             }
                         }
@@ -489,13 +489,13 @@ fun ExpertListScreen(
             text = {
                 Column {
                     if (cancelCommandState.status == WorkflowCommandStatus.Failed) {
-                        Text(cancelCommandState.message ?: "取消预约失败，请重试", color = Color.Red, fontSize = 12.sp)
+                        Text(cancelCommandState.message ?: "取消预约失败，请重试", color = Color.Red, fontSize = 16.sp)
                     }
                     Text(expert.bio ?: "请选择服务端返回的可预约时段，提交后由学校服务人员跟进确认。")
                     if (savedAndStable && !editing) {
                         Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = Green, modifier = Modifier.padding(top = 12.dp))
-                        Text(if (state.repositoryAcknowledged) "预约记录已保存，后续状态以学校确认为准。" else "预约已保存，联网后自动同步。", color = Green, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
-                        Text(saved?.preferredDate.orEmpty(), color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                        Text(if (state.repositoryAcknowledged) "预约记录已保存，后续状态以学校确认为准。" else "预约已保存，联网后自动同步。", color = Green, fontSize = 15.sp, modifier = Modifier.padding(top = 4.dp))
+                        Text(saved?.preferredDate.orEmpty(), color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 4.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             TextButton(onClick = {
                                 preferredDate = saved?.preferredDate.orEmpty()
@@ -509,9 +509,9 @@ fun ExpertListScreen(
                         }
                     //noinspection SuspiciousIndentation
                     } else {
-                        Text("可预约时段", color = Navy, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
+                        Text("可预约时段", color = Navy, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.padding(top = 10.dp))
                         if (slotLabels.isEmpty()) {
-                            Text(state.expertSlotErrors[expertId] ?: "当前暂无可预约时段", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                            Text(state.expertSlotErrors[expertId] ?: "当前暂无可预约时段", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 6.dp))
                         }
                         slotLabels.chunked(2).forEach { row ->
                             Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -524,7 +524,7 @@ fun ExpertListScreen(
                                             saveDraft(draftKey, "$preferredDate|$note")
                                             formError = null
                                         },
-                                        label = { Text(label, fontSize = 12.sp) },
+                                        label = { Text(label, fontSize = 16.sp) },
                                         modifier = Modifier.weight(1f).heightIn(min = 44.dp)
                                     )
                                 }
@@ -542,8 +542,8 @@ fun ExpertListScreen(
                             minLines = 2,
                             modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                         )
-                        formError?.let { Text(it, color = Color.Red, fontSize = 12.sp) }
-                        if (failed) Text(commandState.message ?: "预约提交失败，请重试。", color = Color.Red, fontSize = 12.sp)
+                        formError?.let { Text(it, color = Color.Red, fontSize = 16.sp) }
+                        if (failed) Text(commandState.message ?: "预约提交失败，请重试。", color = Color.Red, fontSize = 16.sp)
                     }
                 }
             },

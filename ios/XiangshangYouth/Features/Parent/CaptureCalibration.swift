@@ -180,9 +180,9 @@ struct CaptureHumanCalibrationGuide: View {
                      : (recording
                         ? (task == .forwardBend ? "对准前屈轮廓：双脚并拢、双膝伸直、头部放松" : "正在记录：保持手机固定，按语音完成动作")
                         : "将头、肩、髋、膝和双脚对准标定点"))
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(alignment.isReady ? .green : .white)
-                    .padding(.horizontal, 12).padding(.vertical, 7)
+                    .padding(.horizontal, AppTheme.pagePadding).padding(.vertical, 7)
                     .background(.black.opacity(0.50), in: Capsule())
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -213,13 +213,13 @@ private struct DeviceLevelBubble: View {
             .frame(width: 34, height: 34)
             VStack(alignment: .leading, spacing: 1) {
                 Text(alignment.isLevel ? "手机角度已校正" : "请调平手机")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.system(size: 15, weight: .bold))
                 Text(alignment.isAvailable ? "左右 \(Int(alignment.rollDegrees.rounded()))° · 前后 \(Int(alignment.pitchDegrees.rounded()))°" : "正在读取陀螺仪")
-                    .font(.system(size: 12, weight: .medium)).opacity(0.75)
+                    .font(.system(size: 16, weight: .medium)).opacity(0.75)
             }
         }
         .foregroundStyle(.white)
-        .padding(.horizontal, 12).padding(.vertical, 7)
+        .padding(.horizontal, AppTheme.pagePadding).padding(.vertical, 7)
         .background(.black.opacity(0.50), in: Capsule())
     }
 }
@@ -239,7 +239,7 @@ struct CaptureCalibrationStatusRow: View {
 
     private func item(_ title: String, ready: Bool, icon: String) -> some View {
         Label(title, systemImage: ready ? "checkmark.circle.fill" : icon)
-            .font(.system(size: 12, weight: .semibold))
+            .font(.system(size: 16, weight: .semibold))
             .foregroundStyle(ready ? .green : .white.opacity(0.72))
             .frame(maxWidth: .infinity, minHeight: 30)
             .background(.white.opacity(0.07), in: Capsule())

@@ -40,18 +40,18 @@ struct ParentMessagesDashboard: View {
                     HStack {
                         Spacer()
                         Button("全部已读") { state.markAllMessagesRead() }
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(ReferenceColor.blue)
                             .buttonStyle(.plain)
                             .accessibilityLabel("将全部消息标记为已读")
                     }
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, AppTheme.pagePadding)
                 }
                 HStack(spacing: 0) {
                     tab("消息提醒", index: 0)
                     tab("系统通知", index: 1)
                 }
-                .padding(.horizontal, 12)
+                .padding(.horizontal, AppTheme.pagePadding)
                 let visibleMessages = messages.filter { selectedTab == 0 ? $0.category != "系统" : $0.category == "系统" }
                 if visibleMessages.isEmpty {
                     EmptyStateView(title: selectedTab == 0 ? "暂无消息提醒" : "暂无系统通知", detail: "新的测评、班级和系统通知会显示在这里。")
@@ -89,9 +89,9 @@ struct ParentMessagesDashboard: View {
         .sheet(item: $selectedMessage) { item in
             NavigationStack {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text(item.message.category).font(.caption.weight(.semibold)).foregroundStyle(ReferenceColor.blue)
+                    Text(item.message.category).font(.subheadline.weight(.semibold)).foregroundStyle(ReferenceColor.blue)
                     Text(item.message.content).font(.body).foregroundStyle(ReferenceColor.navy)
-                    Text(item.message.time).font(.caption).foregroundStyle(.secondary)
+                    Text(item.message.time).font(.subheadline).foregroundStyle(.secondary)
                     Spacer()
                 }
                 .padding()
@@ -107,7 +107,7 @@ struct ParentMessagesDashboard: View {
             else { withAnimation(.easeInOut(duration: 0.2)) { selectedTab = index } }
         } label: {
             VStack(spacing: 6) {
-                Text(title).font(.system(size: 12, weight: .semibold)).foregroundStyle(selectedTab == index ? ReferenceColor.blue : .secondary)
+                Text(title).font(.system(size: 16, weight: .semibold)).foregroundStyle(selectedTab == index ? ReferenceColor.blue : .secondary)
                 Capsule().fill(selectedTab == index ? ReferenceColor.blue : .clear).frame(height: 2)
             }.frame(maxWidth: .infinity)
         }.buttonStyle(.plain)
@@ -196,18 +196,18 @@ struct ParentMessagesDashboard: View {
             Image(systemName: presentation.icon).font(.system(size: 16, weight: .semibold)).foregroundStyle(presentation.color)
                 .frame(width: 34, height: 34).background(presentation.color.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
             VStack(alignment: .leading, spacing: 3) {
-                Text(item.title).font(.system(size: 12, weight: .bold))
-                Text(item.content).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
-                Text(item.category).font(.system(size: 12, weight: .bold)).foregroundStyle(presentation.color)
+                Text(item.title).font(.system(size: 16, weight: .bold))
+                Text(item.content).font(.system(size: 16)).foregroundStyle(.secondary).lineLimit(2)
+                Text(item.category).font(.system(size: 16, weight: .bold)).foregroundStyle(presentation.color)
                     .padding(.horizontal, 5).padding(.vertical, 2).background(presentation.color.opacity(0.09), in: Capsule())
             }
             Spacer(minLength: 4)
             VStack(alignment: .trailing, spacing: 7) {
                 HStack(spacing: 4) {
                     if unread { Circle().fill(.red).frame(width: 4, height: 4) }
-                    Text(item.time).font(.system(size: 12)).foregroundStyle(.secondary)
+                    Text(item.time).font(.system(size: 16)).foregroundStyle(.secondary)
                 }
-                Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold)).foregroundStyle(.secondary)
+                Image(systemName: "chevron.right").font(.system(size: 16, weight: .bold)).foregroundStyle(.secondary)
             }
         }
         .padding(11)

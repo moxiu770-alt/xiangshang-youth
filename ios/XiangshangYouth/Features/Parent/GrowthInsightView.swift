@@ -47,15 +47,15 @@ struct GrowthInsightView: View {
                                     .rotationEffect(.degrees(-90))
                                 VStack(spacing: 1) {
                                     Text("\(insight.consistencyPercent)%").font(.title2.bold()).foregroundStyle(ReferenceColor.navy)
-                                    Text("完成率").font(.caption).foregroundStyle(.secondary)
+                                    Text("完成率").font(.subheadline).foregroundStyle(.secondary)
                                 }
                             }.frame(width: 104, height: 104)
                             VStack(alignment: .leading, spacing: 6) {
                                 Text("\(student?.name ?? "孩子")的\(period.rawValue)成长报告").font(.headline).foregroundStyle(ReferenceColor.navy)
                                 Text("来自运动打卡、家庭计划和已完成测评，不使用虚构训练数据。")
-                                    .font(.caption).foregroundStyle(.secondary)
+                                    .font(.subheadline).foregroundStyle(.secondary)
                                 Label("活跃 \(insight.activeDays) / \(insight.targetActiveDays) 天", systemImage: "calendar.badge.checkmark")
-                                    .font(.caption.weight(.semibold)).foregroundStyle(ReferenceColor.blue)
+                                    .font(.subheadline.weight(.semibold)).foregroundStyle(ReferenceColor.blue)
                             }
                         }
                     }
@@ -69,9 +69,9 @@ struct GrowthInsightView: View {
                     ReferenceCard {
                         VStack(alignment: .leading, spacing: 10) {
                             Label("计划已更新", systemImage: "slider.horizontal.3")
-                                .font(.caption.weight(.bold)).foregroundStyle(ReferenceColor.green)
+                                .font(.subheadline.weight(.bold)).foregroundStyle(ReferenceColor.green)
                             Text(insight.planTitle).font(.title3.bold()).foregroundStyle(ReferenceColor.navy)
-                            Text(insight.planReason).font(.caption).foregroundStyle(.secondary)
+                            Text(insight.planReason).font(.subheadline).foregroundStyle(.secondary)
                             HStack(spacing: 8) {
                                 planPill("每周 \(insight.sessionsPerWeek) 次", "calendar")
                                 planPill("每次 \(insight.minutesPerSession) 分钟", "clock")
@@ -79,7 +79,7 @@ struct GrowthInsightView: View {
                             Divider()
                             ForEach(Array(insight.actions.enumerated()), id: \.offset) { index, action in
                                 HStack(alignment: .top, spacing: 9) {
-                                    Text("\(index + 1)").font(.caption.bold()).foregroundStyle(.white).frame(width: 20, height: 20).background(ReferenceColor.blue, in: Circle())
+                                    Text("\(index + 1)").font(.subheadline.bold()).foregroundStyle(.white).frame(width: 20, height: 20).background(ReferenceColor.blue, in: Circle())
                                     Text(action).font(.subheadline).foregroundStyle(ReferenceColor.navy)
                                 }
                             }
@@ -95,7 +95,7 @@ struct GrowthInsightView: View {
                     }.buttonStyle(.borderedProminent)
 
                     Text("计划调整属于健康管理建议，不替代医疗诊断；出现疼痛、麻木、无力或持续异常时请停止训练并咨询专业人员。")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.subheadline).foregroundStyle(.secondary)
                 }.padding(16).frame(maxWidth: 720)
             }
             .background(ReferenceColor.canvas)
@@ -116,10 +116,10 @@ struct GrowthInsightView: View {
         VStack(alignment: .leading, spacing: 7) {
             Image(systemName: icon).foregroundStyle(color)
             Text(value).font(.title3.bold()).foregroundStyle(ReferenceColor.navy)
-            Text(title).font(.caption).foregroundStyle(.secondary)
-        }.frame(maxWidth: .infinity, alignment: .leading).padding(12).background(.white, in: RoundedRectangle(cornerRadius: 14))
+            Text(title).font(.subheadline).foregroundStyle(.secondary)
+        }.frame(maxWidth: .infinity, alignment: .leading).padding(16).background(.white, in: RoundedRectangle(cornerRadius: 14))
     }
     private func planPill(_ title: String, _ icon: String) -> some View {
-        Label(title, systemImage: icon).font(.caption.weight(.semibold)).foregroundStyle(ReferenceColor.blue).padding(.horizontal, 9).padding(.vertical, 6).background(ReferenceColor.sky, in: Capsule())
+        Label(title, systemImage: icon).font(.subheadline.weight(.semibold)).foregroundStyle(ReferenceColor.blue).padding(.horizontal, 9).padding(.vertical, 6).background(ReferenceColor.sky, in: Capsule())
     }
 }

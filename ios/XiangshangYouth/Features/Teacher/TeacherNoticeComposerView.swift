@@ -16,7 +16,7 @@ struct TeacherNoticeComposerView: View {
                     .foregroundStyle(.secondary)
                 Button { composerShown = true } label: {
                     Label("新建班级通知", systemImage: "square.and.pencil")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: 16, weight: .bold))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 13)
                         .foregroundStyle(.white)
@@ -62,7 +62,7 @@ private struct TeacherNoticeFormSheet: View {
                     }
                     Toggle("需要家长确认回执", isOn: $parentReceiptEnabled)
                     Text("仅可发送至当前账号已授权班级的家长。")
-                        .font(.footnote)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
                 Section("通知内容") {

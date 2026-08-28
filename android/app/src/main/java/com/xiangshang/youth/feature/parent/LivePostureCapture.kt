@@ -307,7 +307,7 @@ private fun LiveCaptureContent(
                 Column(Modifier.padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(task.title, color = Color.White, style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(8.dp))
-                    Text(task.guide, color = Color.White, fontSize = 14.sp)
+                    Text(task.guide, color = Color.White, fontSize = 16.sp)
                     Spacer(Modifier.height(6.dp))
                     Text(
                         when (task) {
@@ -316,7 +316,7 @@ private fun LiveCaptureContent(
                             else -> "后置 1× 主摄 · ${SpineScreeningStandard.mainCameraPlacement}"
                         },
                         color = Color.White.copy(alpha = .76f),
-                        fontSize = 12.sp
+                        fontSize = 16.sp
                     )
                     Spacer(Modifier.height(8.dp))
                     if (captureArmed) {
@@ -325,7 +325,7 @@ private fun LiveCaptureContent(
                         CaptureCalibrationStatusRow(cameraReady, deviceAlignment.isLevel, bodyAlignment.isReady)
                     }
                     Spacer(Modifier.height(8.dp))
-                    Text(prompt, color = Color(0xFFFFD54F), fontSize = 12.sp)
+                    Text(prompt, color = Color(0xFFFFD54F), fontSize = 16.sp)
                     Spacer(Modifier.height(10.dp))
                     LinearProgressIndicator(progress = { captureProgress }, modifier = Modifier.fillMaxWidth(), color = Color(0xFFFFD54F), trackColor = Color.White.copy(alpha = 0.24f))
                     Text(
@@ -336,7 +336,7 @@ private fun LiveCaptureContent(
                             "请先完成取景，再开始记录"
                         },
                         color = Color.White.copy(alpha = 0.72f),
-                        fontSize = 12.sp,
+                        fontSize = 16.sp,
                         modifier = Modifier.padding(top = 5.dp)
                     )
                     Spacer(Modifier.height(9.dp))
@@ -344,7 +344,7 @@ private fun LiveCaptureContent(
                         Text(
                             if (task == BodyCaptureTask.ForwardBend) "正在识别前屈，请完成动作后保持" else "正在记录，请保持当前姿势",
                             color = Color(0xFFFFD54F),
-                            fontSize = 12.sp
+                            fontSize = 16.sp
                         )
                     } else {
                         Button(
@@ -378,7 +378,7 @@ private fun LiveCaptureContent(
                             )
                         }
                     }
-                    Text("App 内实时记录，不保存照片或视频", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+                    Text("App 内实时记录，不保存照片或视频", color = Color.White.copy(alpha = 0.7f), fontSize = 16.sp, modifier = Modifier.padding(top = 8.dp))
                 }
             }
         }
@@ -397,7 +397,7 @@ private fun LiveCaptureContent(
                     Spacer(Modifier.height(10.dp))
                     Text("暂时无法启动相机", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(7.dp))
-                    Text(message, color = Color.Gray, fontSize = 13.sp)
+                    Text(message, color = Color.Gray, fontSize = 15.sp)
                     Spacer(Modifier.height(16.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         OutlinedButton(onClick = onDismiss) { Text("暂不使用") }
@@ -445,7 +445,7 @@ private fun CapturePhaseRow(task: BodyCaptureTask, phaseIndex: Int) {
                         else -> "○ $label"
                     },
                     color = if (index <= phaseIndex) Color(0xFFFFD54F) else Color.White.copy(alpha = .52f),
-                    fontSize = 12.sp,
+                    fontSize = 16.sp,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp)
                 )
             }

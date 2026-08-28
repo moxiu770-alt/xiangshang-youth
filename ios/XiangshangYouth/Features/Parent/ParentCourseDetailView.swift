@@ -42,11 +42,11 @@ struct CourseDetailSheet: View {
                 if title == "客服咨询" {
                     Image(systemName: "message.fill").font(.system(size: 42)).foregroundStyle(ReferenceColor.blue)
                     Text("课程咨询").font(.title3.bold())
-                    Text("咨询内容会自动保存并同步，提交后由服务团队跟进。", comment: "Support explanation").font(.system(size: 12)).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal, 22)
+                    Text("咨询内容会自动保存并同步，提交后由服务团队跟进。", comment: "Support explanation").font(.system(size: 16)).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal, 22)
                     ScrollView { VStack(alignment: .leading, spacing: 8) { ForEach(state.localFeatures.supportMessages) { message in bubble(message.text, mine: message.isMine, status: message.status) } }.frame(maxWidth: .infinity, alignment: .leading) }.frame(maxHeight: 220).padding(.horizontal, 18)
                     HStack { TextField("输入咨询内容", text: $draft).textFieldStyle(.roundedBorder).onChange(of: draft) { _, value in state.saveDraft(value, key: supportDraftKey) }; Button { let text = draft.trimmingCharacters(in: .whitespacesAndNewlines); guard !text.isEmpty else { replyError = "请输入咨询内容。"; return }; Task { if await state.submitSupportCommand(text) { state.clearDraft(supportDraftKey); draft = ""; replyError = nil } } } label: { HStack(spacing: 4) { if commandState.isSubmitting { ProgressView() }; Text(commandState.isSubmitting ? "发送中" : "发送") } }.buttonStyle(.borderedProminent).disabled(commandState.isSubmitting || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }.padding(.horizontal, 18)
-                    if let replyError { Text(replyError).font(.system(size: 12)).foregroundStyle(.red) }
-                    if case let .failed(message) = commandState { Text(message).font(.system(size: 12)).foregroundStyle(.red) }
+                    if let replyError { Text(replyError).font(.system(size: 16)).foregroundStyle(.red) }
+                    if case let .failed(message) = commandState { Text(message).font(.system(size: 16)).foregroundStyle(.red) }
                 } else {
                     if playbackLoading {
                         ProgressView("正在加载课程…").frame(height: 190).frame(maxWidth: .infinity)
@@ -58,13 +58,13 @@ struct CourseDetailSheet: View {
                         Button("重新加载") { playbackRetryToken += 1 }.buttonStyle(.bordered)
                     }
                     Text(title).font(.title3.bold())
-                    Text("课程播放进度会自动保存，联网后同步到孩子记录。").font(.system(size: 13)).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal, 28)
+                    Text("课程播放进度会自动保存，联网后同步到孩子记录。").font(.system(size: 15)).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal, 28)
                     ProgressView(value: progress).tint(ReferenceColor.green).padding(.horizontal, 30)
-                    if let playbackNotice { Text(playbackNotice).font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center) }
-                    if captionCount > 0 { Label("字幕可在播放器控制中选择", systemImage: "captions.bubble").font(.footnote).foregroundStyle(.secondary) }
+                    if let playbackNotice { Text(playbackNotice).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center) }
+                    if captionCount > 0 { Label("字幕可在播放器控制中选择", systemImage: "captions.bubble").font(.subheadline).foregroundStyle(.secondary) }
                     Button { isPlaying.toggle(); if isPlaying { player?.play() } else { player?.pause() } } label: { Label(isPlaying ? "暂停学习" : "播放课程", systemImage: isPlaying ? "pause.fill" : "play.fill") }.buttonStyle(.borderedProminent).disabled(player == nil)
                     if let playbackError, player != nil {
-                        Text(playbackError).font(.footnote).foregroundStyle(.red).multilineTextAlignment(.center)
+                        Text(playbackError).font(.subheadline).foregroundStyle(.red).multilineTextAlignment(.center)
                         Button("重试同步进度") { Task { await saveRemoteCheckpoint(completed: progress >= 0.999) } }.buttonStyle(.bordered).disabled(remoteSaveInFlight)
                     }
                 }
@@ -189,6 +189,6 @@ struct CourseDetailSheet: View {
         if let timeObserver, let player { player.removeTimeObserver(timeObserver) }
         timeObserver = nil; player = nil; isPlaying = false; bufferingStartedAt = nil
     }
-    private func bubble(_ text: String, mine: Bool, status: LocalSubmissionStatus) -> some View { VStack(alignment: mine ? .trailing : .leading, spacing: 3) { Text(text).font(.system(size: 12)).foregroundStyle(mine ? .white : ReferenceColor.navy).padding(9).background(mine ? ReferenceColor.blue : ReferenceColor.sky, in: RoundedRectangle(cornerRadius: 10)); if mine { Text(supportSyncLabel(status)).font(.system(size: 12)).foregroundStyle(status == .failed ? .red : .secondary) } }.frame(maxWidth: .infinity, alignment: mine ? .trailing : .leading) }
+    private func bubble(_ text: String, mine: Bool, status: LocalSubmissionStatus) -> some View { VStack(alignment: mine ? .trailing : .leading, spacing: 3) { Text(text).font(.system(size: 16)).foregroundStyle(mine ? .white : ReferenceColor.navy).padding(9).background(mine ? ReferenceColor.blue : ReferenceColor.sky, in: RoundedRectangle(cornerRadius: 10)); if mine { Text(supportSyncLabel(status)).font(.system(size: 16)).foregroundStyle(status == .failed ? .red : .secondary) } }.frame(maxWidth: .infinity, alignment: mine ? .trailing : .leading) }
     private func supportSyncLabel(_ status: LocalSubmissionStatus) -> String { switch status { case .submitted: "已同步"; case .failed: "同步失败，可在设置中重试"; case .submitting: "正在同步"; case .draft: "未完成"; case .pendingSync: "已保存，联网后自动同步" } }
 }

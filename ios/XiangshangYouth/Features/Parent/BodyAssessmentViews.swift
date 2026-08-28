@@ -376,7 +376,7 @@ struct BodyAssessmentView: View {
                 Image(systemName: captured ? "arrow.clockwise.camera" : (task == .gaitVideo ? "video.fill" : "camera.fill"))
                     .font(.system(size: 17, weight: .semibold)).foregroundStyle(captured ? ReferenceColor.green : (awaitingSecondTake ? AppTheme.warning : ReferenceColor.blue))
             }
-            .padding(14)
+            .padding(18)
             .background(.white, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous).stroke(captured ? ReferenceColor.green.opacity(0.28) : AppTheme.divider.opacity(0.8), lineWidth: 0.85))
         }
@@ -651,7 +651,7 @@ struct BodyAssessmentView: View {
                 Spacer()
                 HStack(spacing: 4) {
                     Button { value.wrappedValue = BodyMeasurementInput.normalized((value.wrappedValue > 0 ? value.wrappedValue : range.lowerBound) - step, range: range, step: step) } label: {
-                        Image(systemName: "minus").font(.caption.bold()).frame(width: 32, height: 32)
+                        Image(systemName: "minus").font(.subheadline.bold()).frame(width: 32, height: 32)
                     }.buttonStyle(.bordered).tint(bodyCoral).accessibilityLabel("\(title)减少")
                     TextField("输入", text: textValue)
                         .keyboardType(.decimalPad).multilineTextAlignment(.trailing)
@@ -659,7 +659,7 @@ struct BodyAssessmentView: View {
                         .frame(width: 72).accessibilityLabel("\(title)数值")
                     Text(unit).font(.subheadline.weight(.semibold)).foregroundStyle(bodyCoral)
                     Button { value.wrappedValue = BodyMeasurementInput.normalized((value.wrappedValue > 0 ? value.wrappedValue : range.lowerBound) + step, range: range, step: step) } label: {
-                        Image(systemName: "plus").font(.caption.bold()).frame(width: 32, height: 32)
+                        Image(systemName: "plus").font(.subheadline.bold()).frame(width: 32, height: 32)
                     }.buttonStyle(.bordered).tint(bodyCoral).accessibilityLabel("\(title)增加")
                 }
             }
@@ -667,7 +667,7 @@ struct BodyAssessmentView: View {
             HStack(spacing: 0) {
                 ForEach(0..<17, id: \.self) { _ in Rectangle().fill(bodyCoral.opacity(0.22)).frame(width: 1, height: 7); Spacer(minLength: 0) }
             }.padding(.horizontal, 4)
-            HStack { Text(String(format: "%.0f", range.lowerBound)); Spacer(); Text("滑动 / 输入 / 微调"); Spacer(); Text(String(format: "%.0f", range.upperBound)) }.font(.caption).foregroundStyle(.secondary)
+            HStack { Text(String(format: "%.0f", range.lowerBound)); Spacer(); Text("滑动 / 输入 / 微调"); Spacer(); Text(String(format: "%.0f", range.upperBound)) }.font(.subheadline).foregroundStyle(.secondary)
         }
         .padding(AppTheme.cardPadding)
         .background(.white, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
@@ -748,7 +748,7 @@ struct BodyAssessmentView: View {
                 .tint(ReferenceColor.green)
                 .accessibilityLabel(title)
         }
-        .padding(12)
+        .padding(16)
         .background(AppTheme.surface, in: RoundedRectangle(cornerRadius: AppTheme.controlRadius, style: .continuous))
     }
     func confirmationToggle(title: String, detail: String, value: Binding<Bool>) -> some View {

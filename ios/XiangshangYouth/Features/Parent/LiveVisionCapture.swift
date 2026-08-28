@@ -71,7 +71,7 @@ struct LiveVisionCaptureSheet: View {
                     Spacer()
                     VStack(spacing: 2) {
                         Text("家庭采集 \(taskIndex) / \(SpineScreeningStandard.homeCameraItems.count)")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(.white.opacity(0.72))
                         Text(task.title)
                             .font(.system(size: 16, weight: .bold))
@@ -105,7 +105,7 @@ struct LiveVisionCaptureSheet: View {
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                     Label(capturePlacementText, systemImage: "iphone.gen3.radiowaves.left.and.right")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(.white.opacity(0.76))
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
@@ -128,7 +128,7 @@ struct LiveVisionCaptureSheet: View {
                             .foregroundStyle(.yellow)
                             .frame(width: 22)
                         Text(guidance)
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(.white)
                             .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
@@ -144,7 +144,7 @@ struct LiveVisionCaptureSheet: View {
                             Spacer()
                             Label("不保存原始画面", systemImage: "lock.fill")
                         }
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(.white.opacity(0.72))
                     }
                     if captureArmed {
@@ -288,7 +288,7 @@ struct LiveVisionCaptureSheet: View {
             Image(systemName: index < phaseIndex ? "checkmark.circle.fill" : index == phaseIndex ? "circle.inset.filled" : "circle")
             Text(title)
         }
-        .font(.system(size: 12, weight: .semibold))
+        .font(.system(size: 16, weight: .semibold))
         .foregroundStyle(index <= phaseIndex ? .yellow : .white.opacity(0.52))
         .frame(maxWidth: .infinity, minHeight: 30)
         .background(.white.opacity(index == phaseIndex ? 0.12 : 0.05), in: Capsule())

@@ -72,13 +72,13 @@ fun GrowthInsightDialog(state: AppUiState, officialSchoolScore: Double?, dismiss
                         Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(104.dp)) {
                                 CircularProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxSize(), color = Blue, trackColor = Sky, strokeWidth = 10.dp)
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) { Text("${insight.consistencyPercent}%", color = Navy, fontWeight = FontWeight.Bold, fontSize = 20.sp); Text("完成率", color = Color.Gray, fontSize = 12.sp) }
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) { Text("${insight.consistencyPercent}%", color = Navy, fontWeight = FontWeight.Bold, fontSize = 20.sp); Text("完成率", color = Color.Gray, fontSize = 16.sp) }
                             }
                             Spacer(Modifier.width(16.dp))
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                 Text("${child.name}的${period.label}成长报告", color = Navy, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                Text("来自运动打卡、家庭计划和已完成测评，不使用虚构训练数据。", color = Color.Gray, fontSize = 12.sp)
-                                Text("活跃 ${insight.activeDays} / ${insight.targetActiveDays} 天", color = Blue, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                                Text("来自运动打卡、家庭计划和已完成测评，不使用虚构训练数据。", color = Color.Gray, fontSize = 16.sp)
+                                Text("活跃 ${insight.activeDays} / ${insight.targetActiveDays} 天", color = Blue, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                             }
                         }
                     }
@@ -89,9 +89,9 @@ fun GrowthInsightDialog(state: AppUiState, officialSchoolScore: Double?, dismiss
                     }
                     Surface(color = Color.White, shape = RoundedCornerShape(16.dp)) {
                         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                            Text("计划已更新", color = Green, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("计划已更新", color = Green, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                             Text(insight.planTitle, color = Navy, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                            Text(insight.planReason, color = Color.Gray, fontSize = 12.sp)
+                            Text(insight.planReason, color = Color.Gray, fontSize = 16.sp)
                             Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                                 PlanInfoPill("每周 ${insight.sessionsPerWeek} 次", Icons.Filled.CalendarMonth)
                                 PlanInfoPill("每次 ${insight.minutesPerSession} 分钟", Icons.Filled.Schedule)
@@ -99,14 +99,14 @@ fun GrowthInsightDialog(state: AppUiState, officialSchoolScore: Double?, dismiss
                             HorizontalDivider()
                             insight.actions.forEachIndexed { index, action ->
                                 Row(verticalAlignment = Alignment.Top) {
-                                    Text("${index + 1}", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.size(20.dp).clip(CircleShape).background(Blue).padding(top = 3.dp))
-                                    Spacer(Modifier.width(8.dp)); Text(action, color = Navy, fontSize = 12.sp)
+                                    Text("${index + 1}", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.size(20.dp).clip(CircleShape).background(Blue).padding(top = 3.dp))
+                                    Spacer(Modifier.width(8.dp)); Text(action, color = Navy, fontSize = 16.sp)
                                 }
                             }
                         }
                     }
                     Button(onClick = { FrontendTelemetry.record(FrontendEvent.AdaptivePlanOpenedCourses, period.label); dismiss(); openCourses() }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Filled.PlayArrow, null); Spacer(Modifier.width(5.dp)); Text("开始今日训练") }
-                    Text("计划调整属于健康管理建议，不替代医疗诊断；出现疼痛、麻木、无力或持续异常时请停止训练并咨询专业人员。", color = Color.Gray, fontSize = 12.sp)
+                    Text("计划调整属于健康管理建议，不替代医疗诊断；出现疼痛、麻木、无力或持续异常时请停止训练并咨询专业人员。", color = Color.Gray, fontSize = 16.sp)
                 }
             }
         }
@@ -121,7 +121,7 @@ private fun PlanInfoPill(label: String, icon: androidx.compose.ui.graphics.vecto
         Row(Modifier.padding(horizontal = 9.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, tint = Blue, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(5.dp))
-            Text(label, color = Blue, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text(label, color = Blue, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -129,8 +129,8 @@ private fun PlanInfoPill(label: String, icon: androidx.compose.ui.graphics.vecto
 @Composable
 private fun GrowthMetric(title: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier) {
     Surface(modifier, color = Color.White, shape = RoundedCornerShape(13.dp)) {
-        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Icon(icon, null, tint = color, modifier = Modifier.size(19.dp)); Text(value, color = Navy, fontWeight = FontWeight.Bold, fontSize = 14.sp); Text(title, color = Color.Gray, fontSize = 12.sp)
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Icon(icon, null, tint = color, modifier = Modifier.size(19.dp)); Text(value, color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp); Text(title, color = Color.Gray, fontSize = 16.sp)
         }
     }
 }

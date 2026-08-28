@@ -182,7 +182,7 @@ struct AssessmentInfoBanner: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(14)
+        .padding(18)
         .background(tint.opacity(0.065), in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous).stroke(tint.opacity(0.12), lineWidth: 0.75))
         .accessibilityElement(children: .combine)

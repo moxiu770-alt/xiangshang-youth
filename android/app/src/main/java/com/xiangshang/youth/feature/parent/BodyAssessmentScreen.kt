@@ -190,21 +190,21 @@ fun BodyAssessmentScreen(state: AppUiState, nav: NavHostController, save: (Stude
     Scaffold(containerColor = Canvas, topBar = { TopAppBar(title = { Text(assessmentSteps[displayStep], color = Navy, fontWeight = FontWeight.Bold) }, navigationIcon = { IconButton(onClick = { if (viewingSavedRecord && stage == 7) nav.popBackStack() else if (stage > 0) stage-- else nav.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") } }) }) { padding ->
         Column(Modifier.padding(padding).padding(14.dp).fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("家庭身体测评 · ${assessmentSteps[displayStep]}", color = Navy, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                Text("${displayStep + 1} / ${assessmentSteps.size}", color = Blue, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("家庭身体测评 · ${assessmentSteps[displayStep]}", color = Navy, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                Text("${displayStep + 1} / ${assessmentSteps.size}", color = Blue, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
             LinearProgressIndicator(progress = { (displayStep + 1) / assessmentSteps.size.toFloat() }, modifier = Modifier.fillMaxWidth(), color = Color(0xFFF47A59))
             when (stage) {
-                0 -> { Hero("给 ${child.name} 完成一次家庭身体测评", "记录身高、体重，并通过八段家庭相机采集观察全身姿态与动作质量。无需标定板或专业测量器械。") ; Info("App 内相机 · 人形框对齐 · 双次重复性校验"); Info(if (spineStandardApplicable) "家庭姿态观察适用年龄为 6–12 岁；孩子当前档案年龄在适用范围内。" else "当前档案年龄不在范围或出生日期缺失，请先联系学校核对档案。"); previous?.let { saved -> Surface(onClick = { viewingSavedRecord = true; stage = 7 }, modifier = Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(16.dp)) { Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.Assessment, null, tint = Blue); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text("查看最近一次筛查记录", color = Navy, fontWeight = FontWeight.Bold); Text("BMI ${"%.1f".format(saved.bmi)} · ${saved.level(child.bodyAssessmentAgeMonths, child.gender).label} · 建议复测 ${saved.nextFollowUp}", color = Color.Gray, fontSize = 12.sp, maxLines = 2) }; Icon(Icons.Filled.ChevronRight, null, tint = Blue) } } }; Info("完成授权、孩子资料、BMI、环境检查、八段双次相机采集和质量确认后生成结果与训练计划。每一步按当前孩子单独保存，可随时返回。"); Button(onClick = { stage = 1 }, enabled = spineStandardApplicable, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF47A59))) { Text(if (spineStandardApplicable) "开始授权" else "请先核对孩子出生日期") } }
+                0 -> { Hero("给 ${child.name} 完成一次家庭身体测评", "记录身高、体重，并通过八段家庭相机采集观察全身姿态与动作质量。无需标定板或专业测量器械。") ; Info("App 内相机 · 人形框对齐 · 双次重复性校验"); Info(if (spineStandardApplicable) "家庭姿态观察适用年龄为 6–12 岁；孩子当前档案年龄在适用范围内。" else "当前档案年龄不在范围或出生日期缺失，请先联系学校核对档案。"); previous?.let { saved -> Surface(onClick = { viewingSavedRecord = true; stage = 7 }, modifier = Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(16.dp)) { Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.Assessment, null, tint = Blue); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text("查看最近一次筛查记录", color = Navy, fontWeight = FontWeight.Bold); Text("BMI ${"%.1f".format(saved.bmi)} · ${saved.level(child.bodyAssessmentAgeMonths, child.gender).label} · 建议复测 ${saved.nextFollowUp}", color = Color.Gray, fontSize = 16.sp, maxLines = 2) }; Icon(Icons.Filled.ChevronRight, null, tint = Blue) } } }; Info("完成授权、孩子资料、BMI、环境检查、八段双次相机采集和质量确认后生成结果与训练计划。每一步按当前孩子单独保存，可随时返回。"); Button(onClick = { stage = 1 }, enabled = spineStandardApplicable, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF47A59))) { Text(if (spineStandardApplicable) "开始授权" else "请先核对孩子出生日期") } }
                 1 -> { Text("身体测评仅用于家庭运动健康筛查和训练建议，不替代医疗诊断。App 不保存原始照片或视频，只保存测量值、动作结果和质量摘要。", color = Color.Gray); ReadyRow("我确认自己是孩子的监护人，并会全程陪同。", adultReady) { adultReady = it }; ReadyRow("我已阅读摄像头、算法和数据保留说明。", consentAcknowledged) { consentAcknowledged = it }; Button(onClick = { recordHealthConsent(child.id); stage = 2 }, enabled = adultReady && consentAcknowledged, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF47A59))) { Text(if (adultReady && consentAcknowledged) "继续确认孩子资料" else "请完成授权确认") } }
-                2 -> { Text("请确认本次测评使用的孩子资料。年龄别 BMI 会根据孩子资料中的出生日期和本次测量日期计算。", color = Color.Gray); Surface(color = Color.White, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) { Text(child.name, color = Navy, fontWeight = FontWeight.Bold); Text("${child.grade} · ${child.className}", color = Color.Gray); Text("性别：${child.gender} · 年龄参考：${child.bodyAssessmentAgeLabel}", color = Color.Gray); Text("如资料有误，请先在家庭账户中联系学校更正。", color = Color.Gray, fontSize = 12.sp) } }; Button(onClick = { stage = 3 }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF47A59))) { Text("填写身高体重") } }
+                2 -> { Text("请确认本次测评使用的孩子资料。年龄别 BMI 会根据孩子资料中的出生日期和本次测量日期计算。", color = Color.Gray); Surface(color = Color.White, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) { Text(child.name, color = Navy, fontWeight = FontWeight.Bold); Text("${child.grade} · ${child.className}", color = Color.Gray); Text("性别：${child.gender} · 年龄参考：${child.bodyAssessmentAgeLabel}", color = Color.Gray); Text("如资料有误，请先在家庭账户中联系学校更正。", color = Color.Gray, fontSize = 16.sp) } }; Button(onClick = { stage = 3 }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF47A59))) { Text("填写身高体重") } }
                 3 -> {
                     Text("请填写本次实际测量值。BMI = 体重(kg) ÷ 身高²(m²)，不以固定年龄作为录入条件；若孩子资料已有出生日期，报告会额外显示${child.bodyAssessmentAgeLabel}的年龄别筛查参考。", color = Color.Gray)
                     Info("为避免相机成像缩放差异，身高和体重请按身高仪、体重秤的实际读数填写；相机只用于姿态与步态观察。")
                     SliderRow("身高", height, 90f..190f, "cm") { height = it.toDouble() }
                     SliderRow("体重", weight, 15f..90f, "kg") { weight = it.toDouble() }
                     Text("遗传靶身高参考（选填）", color = Navy, fontWeight = FontWeight.Bold)
-                    Text("男孩＝（父亲身高＋母亲身高＋13 cm）÷ 2；女孩＝（父亲身高＋母亲身高−13 cm）÷ 2。区间按中位值 ±5 cm 展示，仅作健康管理参考，不代表成年身高预测。", color = Color.Gray, fontSize = 12.sp)
+                    Text("男孩＝（父亲身高＋母亲身高＋13 cm）÷ 2；女孩＝（父亲身高＋母亲身高−13 cm）÷ 2。区间按中位值 ±5 cm 展示，仅作健康管理参考，不代表成年身高预测。", color = Color.Gray, fontSize = 16.sp)
                     SliderRow("父亲身高", fatherHeight, 120f..230f, "cm") { fatherHeight = it.toDouble() }
                     SliderRow("母亲身高", motherHeight, 120f..230f, "cm") { motherHeight = it.toDouble() }
                     val r = record()
@@ -292,7 +292,7 @@ fun BodyAssessmentScreen(state: AppUiState, nav: NavHostController, save: (Stude
                             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text("人体姿态观察记录", color = Navy, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                                    Text(report.validationStatus.label, color = if (report.canPublishClassification) Color(0xFF25B86A) else Color(0xFFFF8A24), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text(report.validationStatus.label, color = if (report.canPublishClassification) Color(0xFF25B86A) else Color(0xFFFF8A24), fontSize = 16.sp, fontWeight = FontWeight.Bold)
                                 }
                                 if (!report.canPublishClassification) Info(com.xiangshang.youth.core.model.AlgorithmReleaseGate.pendingPostureNotice)
                                 report.screeningDecision?.let { decision ->
@@ -302,24 +302,24 @@ fun BodyAssessmentScreen(state: AppUiState, nav: NavHostController, save: (Stude
                                         com.xiangshang.youth.core.model.BodyScreeningRoute.ProfessionalReview -> Color(0xFFFF8A24)
                                     }
                                     Surface(color = tint.copy(alpha = 0.09f), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) { contentDescription = "身体筛查状态：${decision.route.label}。${decision.route.detail}" }) {
-                                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                             Text(decision.route.label, color = tint, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                                             decision.outcomeLevel?.let { outcome ->
-                                                Text("筛查建议：${outcome.label}", color = Navy, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                                Text("筛查建议：${outcome.label}", color = Navy, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                                             }
-                                            Text(decision.route.detail, color = Navy, fontSize = 14.sp)
-                                            Text("分流规则：${decision.decisionPolicyVersion}", color = Color.Gray, fontSize = 12.sp)
+                                            Text(decision.route.detail, color = Navy, fontSize = 16.sp)
+                                            Text("分流规则：${decision.decisionPolicyVersion}", color = Color.Gray, fontSize = 16.sp)
                                             val review = decision.reviewDecision
                                             if (review != null) {
                                                 HorizontalDivider()
-                                                Text(review.label, color = Navy, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                                decision.reviewComment?.takeIf { it.isNotBlank() }?.let { Text(it, color = Navy, fontSize = 14.sp) }
+                                                Text(review.label, color = Navy, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                                decision.reviewComment?.takeIf { it.isNotBlank() }?.let { Text(it, color = Navy, fontSize = 16.sp) }
                                                 if (review == com.xiangshang.youth.core.model.BodyScreeningReviewDecision.Recapture) {
                                                     val taskLabels = decision.requestedRecaptureTasks.orEmpty().map { code -> com.xiangshang.youth.core.model.BodyCaptureTask.entries.firstOrNull { it.apiCode == code }?.title ?: code }
-                                                    if (taskLabels.isNotEmpty()) Text("需要重采：${taskLabels.joinToString("、")}", color = Color.Gray, fontSize = 12.sp)
+                                                    if (taskLabels.isNotEmpty()) Text("需要重采：${taskLabels.joinToString("、")}", color = Color.Gray, fontSize = 16.sp)
                                                 }
                                             } else if (decision.route == com.xiangshang.youth.core.model.BodyScreeningRoute.ProfessionalReview) {
-                                                Text("当前状态：等待学校专业人员复核", color = Color(0xFFFF8A24), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                                Text("当前状态：等待学校专业人员复核", color = Color(0xFFFF8A24), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                                             }
                                             if (decision.route == com.xiangshang.youth.core.model.BodyScreeningRoute.RecaptureRequired || decision.reviewDecision == com.xiangshang.youth.core.model.BodyScreeningReviewDecision.Recapture) {
                                                 Button(onClick = { stage = 5 }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Blue)) { Text("按提示重新采集") }
@@ -327,10 +327,10 @@ fun BodyAssessmentScreen(state: AppUiState, nav: NavHostController, save: (Stude
                                         }
                                     }
                                 }
-                                Text("本次观察 · ${report.snapshots.values.sumOf { it.sampleCount }} 条记录", color = Color.Gray, fontSize = 12.sp)
+                                Text("本次观察 · ${report.snapshots.values.sumOf { it.sampleCount }} 条记录", color = Color.Gray, fontSize = 16.sp)
                                 report.snapshots.toSortedMap(compareBy { it.name }).values.forEach { snapshot -> PostureSnapshotDetail(snapshot) }
-                                report.reasons.filterNot { it == com.xiangshang.youth.core.model.AlgorithmReleaseGate.pendingPostureNotice }.forEach { Text("• $it", color = Navy, fontSize = 12.sp) }
-                                Text(report.disclaimer, color = Color.Gray, fontSize = 12.sp)
+                                report.reasons.filterNot { it == com.xiangshang.youth.core.model.AlgorithmReleaseGate.pendingPostureNotice }.forEach { Text("• $it", color = Navy, fontSize = 16.sp) }
+                                Text(report.disclaimer, color = Color.Gray, fontSize = 16.sp)
                             }
                         }
                     }
@@ -352,7 +352,7 @@ fun BodyAssessmentScreen(state: AppUiState, nav: NavHostController, save: (Stude
                         followAlongDayIndex = (Calendar.getInstance(BusinessClock.timeZone).get(Calendar.DAY_OF_WEEK) + 5) % 7
                         showFollowAlong = true
                     }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Blue)) {
-                        Icon(Icons.Filled.PlayCircle, null); Spacer(Modifier.width(7.dp)); Column(horizontalAlignment = Alignment.Start) { Text("开始今日训练跟练", fontWeight = FontWeight.Bold); Text("示范视频 + 可选我的画面 + 语音动作提示", fontSize = 12.sp) }
+                        Icon(Icons.Filled.PlayCircle, null); Spacer(Modifier.width(7.dp)); Column(horizontalAlignment = Alignment.Start) { Text("开始今日训练跟练", fontWeight = FontWeight.Bold); Text("示范视频 + 可选我的画面 + 语音动作提示", fontSize = 16.sp) }
                     }
                     (0 until 28).forEach { i ->
                         val date = Calendar.getInstance(BusinessClock.timeZone).apply { add(Calendar.DAY_OF_YEAR, i) }.time
@@ -370,11 +370,11 @@ fun BodyAssessmentScreen(state: AppUiState, nav: NavHostController, save: (Stude
                             color = Color.White,
                             shape = RoundedCornerShape(14.dp)
                         ) {
-                            Row(Modifier.padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Icon(if (done) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked, null, tint = if (done) Color(0xFF25B86A) else Blue)
                                 Spacer(Modifier.width(10.dp))
-                                Column(Modifier.weight(1f)) { Text("第 ${i + 1} 天 · ${planTexts[i % planTexts.size]}", color = Navy, fontWeight = FontWeight.SemiBold); Text(if (done) "已记录今日训练" else "点击进入跟做训练", color = Color.Gray, fontSize = 12.sp) }
-                                Text(if (done) "已完成" else "去完成", color = if (done) Color(0xFF25B86A) else Blue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Column(Modifier.weight(1f)) { Text("第 ${i + 1} 天 · ${planTexts[i % planTexts.size]}", color = Navy, fontWeight = FontWeight.SemiBold); Text(if (done) "已记录今日训练" else "点击进入跟做训练", color = Color.Gray, fontSize = 16.sp) }
+                                Text(if (done) "已完成" else "去完成", color = if (done) Color(0xFF25B86A) else Blue, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -545,12 +545,12 @@ private fun StandardScreeningCaptureStage(
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(item.title, color = Navy, fontWeight = FontWeight.Bold)
-                        if (captured) Text("两次采集已通过", color = Color(0xFF25B86A), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        else if (awaitingSecondTake) Text("第 1 次已保存 · 还需第 2 次", color = Color(0xFFFF8A24), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        Text(item.purpose, color = Blue, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        Text(item.instruction, color = Color.Gray, fontSize = 12.sp)
-                        if (task == BodyCaptureTask.ForwardBend) Text(SpineScreeningStandard.forwardBendAuxiliaryPlacement, color = Color(0xFFFF8A24), fontSize = 12.sp)
-                        captureFeedback[task.name]?.let { Text(it, color = if (captured) Color(0xFF25B86A) else Color(0xFFFF8A24), fontSize = 12.sp) }
+                        if (captured) Text("两次采集已通过", color = Color(0xFF25B86A), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                        else if (awaitingSecondTake) Text("第 1 次已保存 · 还需第 2 次", color = Color(0xFFFF8A24), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                        Text(item.purpose, color = Blue, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                        Text(item.instruction, color = Color.Gray, fontSize = 16.sp)
+                        if (task == BodyCaptureTask.ForwardBend) Text(SpineScreeningStandard.forwardBendAuxiliaryPlacement, color = Color(0xFFFF8A24), fontSize = 16.sp)
+                        captureFeedback[task.name]?.let { Text(it, color = if (captured) Color(0xFF25B86A) else Color(0xFFFF8A24), fontSize = 16.sp) }
                     }
                     Icon(if (captured) Icons.Filled.Refresh else if (task == BodyCaptureTask.GaitVideo) Icons.Filled.Videocam else Icons.Filled.CameraAlt, null, tint = if (captured) Color(0xFF25B86A) else Blue)
                 }
@@ -560,25 +560,25 @@ private fun StandardScreeningCaptureStage(
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment = Alignment.Top) {
                         Surface(color = (if (atrRecorded) Color(0xFF25B86A) else Blue).copy(alpha = .10f), shape = RoundedCornerShape(13.dp), modifier = Modifier.size(46.dp)) { Box(contentAlignment = Alignment.Center) { Text(if (atrRecorded) "✓" else "3", color = if (atrRecorded) Color(0xFF25B86A) else Blue, fontWeight = FontWeight.Bold, fontSize = 18.sp) } }
-                        Spacer(Modifier.width(12.dp)); Column(Modifier.weight(1f)) { Text(item.title, color = Navy, fontWeight = FontWeight.Bold); Text(item.purpose, color = Blue, fontSize = 12.sp, fontWeight = FontWeight.SemiBold); Text(item.instruction, color = Color.Gray, fontSize = 12.sp) }
+                        Spacer(Modifier.width(12.dp)); Column(Modifier.weight(1f)) { Text(item.title, color = Navy, fontWeight = FontWeight.Bold); Text(item.purpose, color = Blue, fontSize = 16.sp, fontWeight = FontWeight.SemiBold); Text(item.instruction, color = Color.Gray, fontSize = 16.sp) }
                     }
                     AtrInputRow("胸段 T4-T8", thoracicAtrText, thoracicAtrSide, onThoracicAtrChanged, onThoracicSideChanged)
                     AtrInputRow("腰段 T12-L3", lumbarAtrText, lumbarAtrSide, onLumbarAtrChanged, onLumbarSideChanged)
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("读数波动较大，启用复测并取算术平均值", color = Navy, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                        Text("读数波动较大，启用复测并取算术平均值", color = Navy, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                         Switch(checked = atrRetestEnabled, onCheckedChange = onAtrRetestChanged)
                     }
                     if (atrRetestEnabled) {
                         AtrInputRow("胸段复测", thoracicAtrRepeatText, thoracicAtrSide, { onThoracicAtrRepeatChanged(standardMeasurementInput(it)) }, onThoracicSideChanged)
                         AtrInputRow("腰段复测", lumbarAtrRepeatText, lumbarAtrSide, { onLumbarAtrRepeatChanged(standardMeasurementInput(it)) }, onLumbarSideChanged)
-                        Text("保留两次原始读数，最终胸段和腰段分别取算术平均值。", color = Color.Gray, fontSize = 12.sp)
+                        Text("保留两次原始读数，最终胸段和腰段分别取算术平均值。", color = Color.Gray, fontSize = 16.sp)
                     }
-                    Text(if (atrRecorded) "ATR 读数完整 · 最大值 ${"%.1f".format(Locale.US, maxOf(thoracicAtr ?: 0.0, lumbarAtr ?: 0.0))}°" else "两段均需录入；非 0° 时选择左/右偏向", color = if (atrRecorded) Color(0xFF25B86A) else Color(0xFFFF8A24), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text(if (atrRecorded) "ATR 读数完整 · 最大值 ${"%.1f".format(Locale.US, maxOf(thoracicAtr ?: 0.0, lumbarAtr ?: 0.0))}°" else "两段均需录入；非 0° 时选择左/右偏向", color = if (atrRecorded) Color(0xFF25B86A) else Color(0xFFFF8A24), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                     val standingMaximum = listOfNotNull(thoracicAtr, lumbarAtr).maxOrNull()
                     if (standingMaximum != null && standingMaximum >= SpineScreeningStandard.atrAttentionDegrees) {
                         HorizontalDivider()
                         Text("坐位前屈 ATR 复核（手册建议）", color = Navy, fontWeight = FontWeight.Bold)
-                        Text("让孩子坐于凳上再次前屈，录入最大 ATR。较站位下降 ≥3° 记录为功能性偏斜可能；变化不足 3° 进入结构异常复核提示。", color = Color.Gray, fontSize = 12.sp)
+                        Text("让孩子坐于凳上再次前屈，录入最大 ATR。较站位下降 ≥3° 记录为功能性偏斜可能；变化不足 3° 进入结构异常复核提示。", color = Color.Gray, fontSize = 16.sp)
                         OutlinedTextField(
                             value = seatedForwardBendAtrText,
                             onValueChange = { onSeatedForwardBendAtrChanged(standardMeasurementInput(it)) },
@@ -602,11 +602,11 @@ private fun SupervisedStandingCard(shoulder: String, pelvis: String, headTilt: S
     Surface(color = Color.White, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("项目 1 现场实测", color = Navy, fontWeight = FontWeight.Bold)
-            Text("指尖轻触双侧肩峰、髂后上棘标记，用 0.1 cm 软尺测量与地面的垂直高度差。", color = Color.Gray, fontSize = 12.sp)
+            Text("指尖轻触双侧肩峰、髂后上棘标记，用 0.1 cm 软尺测量与地面的垂直高度差。", color = Color.Gray, fontSize = 16.sp)
             ManualNumberInput("双肩高度差", shoulder, "cm", onShoulder)
             ManualNumberInput("骨盆高度差", pelvis, "cm", onPelvis)
             ManualNumberInput("头部侧倾", headTilt, "°", onHeadTilt)
-            Text(if (ready) "实测数值已完整记录" else "请录入三项现场实测值", color = if (ready) Color(0xFF25B86A) else Color(0xFFFF8A24), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text(if (ready) "实测数值已完整记录" else "请录入三项现场实测值", color = if (ready) Color(0xFF25B86A) else Color(0xFFFF8A24), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -616,10 +616,10 @@ private fun SupervisedAdamsCard(result: String, side: String, onResult: (String)
     Surface(color = Color.White, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("项目 2 主检员定性记录", color = Navy, fontWeight = FontWeight.Bold)
-            Text("双侧等高为阴性，单侧隆起＜1 cm 为可疑阳性，≥1 cm 为阳性。", color = Color.Gray, fontSize = 12.sp)
+            Text("双侧等高为阴性，单侧隆起＜1 cm 为可疑阳性，≥1 cm 为阳性。", color = Color.Gray, fontSize = 16.sp)
             listOf("unrecorded" to "未记录", "negative" to "阴性 −", "equivocal" to "可疑 ±", "positive" to "阳性 +").chunked(2).forEach { choices ->
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                    choices.forEach { (value, label) -> FilterChip(selected = result == value, onClick = { onResult(value) }, label = { Text(label, fontSize = 12.sp) }, modifier = Modifier.weight(1f)) }
+                    choices.forEach { (value, label) -> FilterChip(selected = result == value, onClick = { onResult(value) }, label = { Text(label, fontSize = 16.sp) }, modifier = Modifier.weight(1f)) }
                 }
             }
             if (result == "equivocal" || result == "positive") Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -634,9 +634,9 @@ private fun SupervisedGaitCard(result: String, note: String, onResult: (String) 
     Surface(color = Color.White, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("项目 4 步态人工观察", color = Navy, fontWeight = FontWeight.Bold)
-            Text("从后方、侧方同步观察肩部摆动、骨盆上下摆动和躯干中线。", color = Color.Gray, fontSize = 12.sp)
+            Text("从后方、侧方同步观察肩部摆动、骨盆上下摆动和躯干中线。", color = Color.Gray, fontSize = 16.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                listOf("unrecorded" to "未记录", "normal" to "无异常", "abnormal" to "存在异常").forEach { (value, label) -> FilterChip(selected = result == value, onClick = { onResult(value) }, label = { Text(label, fontSize = 12.sp) }, modifier = Modifier.weight(1f)) }
+                listOf("unrecorded" to "未记录", "normal" to "无异常", "abnormal" to "存在异常").forEach { (value, label) -> FilterChip(selected = result == value, onClick = { onResult(value) }, label = { Text(label, fontSize = 16.sp) }, modifier = Modifier.weight(1f)) }
             }
             OutlinedTextField(value = note, onValueChange = { onNote(it.take(200)) }, label = { Text("异常描述（选填）") }, minLines = 2, modifier = Modifier.fillMaxWidth())
         }
@@ -651,7 +651,7 @@ private fun SupervisedSeatedCard(midline: String, shoulder: String, kyphosis: St
             ManualNumberInput("棘突中线偏移", midline, "cm", onMidline)
             ManualNumberInput("双肩高度差", shoulder, "cm", onShoulder)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                listOf("unrecorded" to "未记录", "normal" to "未见明显", "abnormal" to "圆肩驼背").forEach { (value, label) -> FilterChip(selected = kyphosis == value, onClick = { onKyphosis(value) }, label = { Text(label, fontSize = 12.sp) }, modifier = Modifier.weight(1f)) }
+                listOf("unrecorded" to "未记录", "normal" to "未见明显", "abnormal" to "圆肩驼背").forEach { (value, label) -> FilterChip(selected = kyphosis == value, onClick = { onKyphosis(value) }, label = { Text(label, fontSize = 16.sp) }, modifier = Modifier.weight(1f)) }
             }
         }
     }
@@ -665,7 +665,7 @@ private fun ManualNumberInput(title: String, value: String, unit: String, onValu
 @Composable
 private fun AtrInputRow(title: String, value: String, side: String, onValueChanged: (String) -> Unit, onSideChanged: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(title, color = Navy, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+        Text(title, color = Navy, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
         OutlinedTextField(value = value, onValueChange = { onValueChanged(standardMeasurementInput(it)) }, label = { Text("最大读数") }, suffix = { Text("°") }, singleLine = true, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("无", "左", "右").forEach { option -> FilterChip(selected = side == option, onClick = { onSideChanged(option) }, label = { Text(option) }) }
@@ -703,10 +703,10 @@ private fun AtrInputRow(title: String, value: String, side: String, onValueChang
     Surface(color = Canvas, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(9.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(snapshot.task.title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                Text("记录稳定度 %.0f%% · %d 条".format(snapshot.confidence * 100, snapshot.sampleCount), color = if (snapshot.confidence >= PostureScreeningRules.minimumConfidence && snapshot.sampleCount >= PostureScreeningRules.minimumSamples) Color(0xFF25B86A) else Color(0xFFF47A59), fontSize = 12.sp)
+                Text(snapshot.task.title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                Text("记录稳定度 %.0f%% · %d 条".format(snapshot.confidence * 100, snapshot.sampleCount), color = if (snapshot.confidence >= PostureScreeningRules.minimumConfidence && snapshot.sampleCount >= PostureScreeningRules.minimumSamples) Color(0xFF25B86A) else Color(0xFFF47A59), fontSize = 16.sp)
             }
-            Text(metrics.ifEmpty { listOf("该段尚未形成有效结构化记录，请重新拍摄") }.joinToString(" · "), color = Color.Gray, fontSize = 12.sp)
+            Text(metrics.ifEmpty { listOf("该段尚未形成有效结构化记录，请重新拍摄") }.joinToString(" · "), color = Color.Gray, fontSize = 16.sp)
             snapshot.captureProtocolVersion?.let { protocol ->
                 val camera = if (snapshot.cameraFacing == "rear-1x") "后置 1×" else "引导镜头"
                 val trace = when (snapshot.repeatabilityStatus) {
@@ -714,14 +714,14 @@ private fun AtrInputRow(title: String, value: String, side: String, onValueChang
                     "awaiting-second-take" -> "$camera · 第 1 次已保存，尚需独立第 2 次采集 · $protocol"
                     else -> "$camera · ${snapshot.qualityChecks?.size ?: 0} 项质量门已通过 · $protocol"
                 }
-                Text(trace, color = Blue, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Text(trace, color = Blue, fontSize = 16.sp, fontWeight = FontWeight.Medium)
             }
         }
     }
 }
 @Composable private fun Hero(title: String, detail: String) = Surface(color = Color(0xFFFFF0CE), shape = RoundedCornerShape(20.dp)) { Column(Modifier.padding(18.dp)) { Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Navy); Spacer(Modifier.height(7.dp)); Text(detail, color = Color.DarkGray) } }
-@Composable private fun Info(text: String) = Surface(color = Color.White, shape = RoundedCornerShape(14.dp)) { Text(text, modifier = Modifier.padding(14.dp), color = Color.Gray, fontSize = 13.sp) }
-@Composable private fun ReadyRow(text: String, checked: Boolean, change: (Boolean) -> Unit) = Surface(color = Color.White, shape = RoundedCornerShape(14.dp)) { Row(Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = checked, onCheckedChange = change); Text(text, color = Navy, fontSize = 12.sp, modifier = Modifier.weight(1f)) } }
+@Composable private fun Info(text: String) = Surface(color = Color.White, shape = RoundedCornerShape(14.dp)) { Text(text, modifier = Modifier.padding(14.dp), color = Color.Gray, fontSize = 15.sp) }
+@Composable private fun ReadyRow(text: String, checked: Boolean, change: (Boolean) -> Unit) = Surface(color = Color.White, shape = RoundedCornerShape(14.dp)) { Row(Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = checked, onCheckedChange = change); Text(text, color = Navy, fontSize = 16.sp, modifier = Modifier.weight(1f)) } }
 @Composable private fun SliderRow(title: String, value: Double, range: ClosedFloatingPointRange<Float>, unit: String, change: (Float) -> Unit) {
     var raw by rememberSaveable(title) { mutableStateOf("") }
     LaunchedEffect(value) { raw = if (value > 0) "%.1f".format(Locale.US, value) else "" }
@@ -736,11 +736,11 @@ private fun AtrInputRow(title: String, value: String, side: String, onValueChang
                 Text(title, fontWeight = FontWeight.Bold, color = Navy)
                 Spacer(Modifier.weight(1f))
                 OutlinedIconButton(onClick = { nudge(if (unit == "kg") -.1f else -.5f) }, modifier = Modifier.size(32.dp)) { Icon(Icons.Filled.Remove, "$title 减少", modifier = Modifier.size(15.dp)) }
-                OutlinedTextField(value = raw, onValueChange = ::update, singleLine = true, placeholder = { Text("输入", fontSize = 12.sp) }, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.width(78.dp).padding(horizontal = 4.dp), textStyle = TextStyle(color = Color(0xFFF47A59), fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.End), suffix = { Text(unit, color = Color(0xFFF47A59), fontSize = 12.sp) })
+                OutlinedTextField(value = raw, onValueChange = ::update, singleLine = true, placeholder = { Text("输入", fontSize = 16.sp) }, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.width(78.dp).padding(horizontal = 4.dp), textStyle = TextStyle(color = Color(0xFFF47A59), fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.End), suffix = { Text(unit, color = Color(0xFFF47A59), fontSize = 16.sp) })
                 OutlinedIconButton(onClick = { nudge(if (unit == "kg") .1f else .5f) }, modifier = Modifier.size(32.dp)) { Icon(Icons.Filled.Add, "$title 增加", modifier = Modifier.size(15.dp)) }
             }
             Slider(value = if (value > 0) value.toFloat() else range.start, onValueChange = { change(BodyMeasurementInput.normalized(it.toDouble(), range.start.toDouble()..range.endInclusive.toDouble(), if (unit == "kg") .1 else .5).toFloat()) }, valueRange = range)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("%.0f".format(range.start), color = Color.Gray, fontSize = 12.sp); Text("滑动 / 输入 / 微调", color = Color.Gray, fontSize = 12.sp); Text("%.0f".format(range.endInclusive), color = Color.Gray, fontSize = 12.sp) }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("%.0f".format(range.start), color = Color.Gray, fontSize = 16.sp); Text("滑动 / 输入 / 微调", color = Color.Gray, fontSize = 16.sp); Text("%.0f".format(range.endInclusive), color = Color.Gray, fontSize = 16.sp) }
         }
     }
 }

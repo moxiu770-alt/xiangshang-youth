@@ -176,8 +176,8 @@ fun CaptureHumanCalibrationGuide(task: BodyCaptureTask, body: CaptureBodyAlignme
                         if (task == BodyCaptureTask.ForwardBend) "对准前屈轮廓：双脚并拢、双膝伸直、头部放松" else "正在记录：保持手机固定，按语音完成动作"
                     } else "将头、肩、髋、膝和双脚对准标定点",
                     color = if (body.isReady) Color(0xFF55E392) else Color.White,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+                    fontSize = 15.sp,
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 7.dp)
                 )
             }
         }
@@ -187,7 +187,7 @@ fun CaptureHumanCalibrationGuide(task: BodyCaptureTask, body: CaptureBodyAlignme
 @Composable
 private fun DeviceLevelBubble(alignment: CaptureDeviceAlignment) {
     Surface(color = Color.Black.copy(alpha = .52f), shape = RoundedCornerShape(50)) {
-        Row(Modifier.padding(horizontal = 12.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.padding(horizontal = 18.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(Modifier.size(34.dp).background(Color.White.copy(alpha = .10f), CircleShape), contentAlignment = Alignment.Center) {
                 Canvas(Modifier.fillMaxSize()) {
                     drawLine(Color.White.copy(alpha = .45f), Offset(size.width / 2, 3f), Offset(size.width / 2, size.height - 3f), 1f)
@@ -200,8 +200,8 @@ private fun DeviceLevelBubble(alignment: CaptureDeviceAlignment) {
                 }
             }
             Column {
-                Text(if (alignment.isLevel) "手机角度已校正" else "请调平手机", color = Color.White, fontSize = 13.sp)
-                Text(if (alignment.available) "左右 ${alignment.rollDegrees.toInt()}° · 前后 ${alignment.pitchDegrees.toInt()}°" else "正在读取陀螺仪", color = Color.White.copy(alpha = .72f), fontSize = 12.sp)
+                Text(if (alignment.isLevel) "手机角度已校正" else "请调平手机", color = Color.White, fontSize = 15.sp)
+                Text(if (alignment.available) "左右 ${alignment.rollDegrees.toInt()}° · 前后 ${alignment.pitchDegrees.toInt()}°" else "正在读取陀螺仪", color = Color.White.copy(alpha = .72f), fontSize = 16.sp)
             }
         }
     }
@@ -221,6 +221,6 @@ private fun CalibrationStatusItem(title: String, ready: Boolean, modifier: Modif
     val icon = if (ready) Icons.Filled.CheckCircle else if (camera) Icons.Filled.CameraAlt else if (title == "手机角度") Icons.Filled.ScreenRotation else Icons.Filled.AccessibilityNew
     Row(modifier.heightIn(min = 32.dp).background(Color.White.copy(alpha = .07f), RoundedCornerShape(50)).padding(horizontal = 7.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
         Icon(icon, null, tint = if (ready) Color(0xFF55E392) else Color.White.copy(alpha = .72f), modifier = Modifier.size(15.dp))
-        Spacer(Modifier.width(3.dp)); Text(title, color = if (ready) Color(0xFF55E392) else Color.White.copy(alpha = .72f), fontSize = 12.sp)
+        Spacer(Modifier.width(3.dp)); Text(title, color = if (ready) Color(0xFF55E392) else Color.White.copy(alpha = .72f), fontSize = 16.sp)
     }
 }

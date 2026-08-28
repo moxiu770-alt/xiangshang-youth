@@ -37,7 +37,7 @@ struct ReportDetailView: View {
                             } else {
                                 LoadingStateView()
                                 Text("正在获取学校已发布的体测报告")
-                                    .font(.footnote)
+                                    .font(.subheadline)
                                     .foregroundStyle(AppTheme.muted)
                             }
                         }
@@ -136,19 +136,19 @@ struct ReportDetailView: View {
                                 .font(.system(size: AppTheme.captionSize)).foregroundStyle(AppTheme.muted)
                             if let geneticHeight = bodyRecord.geneticHeightReference(gender: currentStudent.gender) {
                                 Text("遗传靶身高参考：\(String(format: "%.1f", geneticHeight)) cm（\(bodyRecord.geneticHeightFormula(gender: currentStudent.gender))，仅供健康管理参考）")
-                                    .font(.caption).foregroundStyle(AppTheme.muted)
+                                    .font(.subheadline).foregroundStyle(AppTheme.muted)
                             }
                             if let heightAssessment = bodyRecord.heightDevelopmentAssessment(ageMonths: currentStudent.bodyAssessmentAgeMonths, gender: currentStudent.gender) {
                                 Text("当前身高发育：\(heightAssessment.level.label) · \(heightAssessment.ageYears)岁参考中位 \(String(format: "%.1f", heightAssessment.median)) cm")
-                                    .font(.caption).foregroundStyle(AppTheme.muted)
+                                    .font(.subheadline).foregroundStyle(AppTheme.muted)
                             }
                             if let hint = bodyRecord.visualObservationSummary {
-                                Label(hint, systemImage: "viewfinder.circle.fill").font(.caption).foregroundStyle(.orange)
+                                Label(hint, systemImage: "viewfinder.circle.fill").font(.subheadline).foregroundStyle(.orange)
                             }
                             Text("该记录为家长居家观察与年龄别 BMI 筛查，不属于学校体测的 7 项能力得分，也不构成医学诊断。")
                                 .font(.system(size: AppTheme.captionSize)).foregroundStyle(AppTheme.muted)
                             }
-                            .padding(12)
+                            .padding(16)
                             .background(AppTheme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                         }
                         .buttonStyle(.plain)
@@ -202,7 +202,7 @@ struct ReportDetailView: View {
                         Text(report.isComplete ? String(format: "%.1f", report.totalScore) : "\(report.scoredItemCount)")
                             .font(.system(size: 24, weight: .bold, design: .rounded))
                         Text(report.isComplete ? "/ 35" : "/ 7 项")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 16, weight: .semibold))
                             .opacity(0.78)
                     }
                     .foregroundStyle(.white)
@@ -328,7 +328,7 @@ struct ReportDetailView: View {
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right").foregroundStyle(AppTheme.muted)
             }
-            .padding(12)
+            .padding(16)
             .background(AppTheme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -357,7 +357,7 @@ struct ReportDetailView: View {
             Spacer(minLength: 0)
             Image(systemName: "chevron.right").foregroundStyle(AppTheme.muted)
         }
-        .padding(12)
+        .padding(16)
         .background(AppTheme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("课程建议：\(course.title)，\(course.focus)，\(course.duration)")

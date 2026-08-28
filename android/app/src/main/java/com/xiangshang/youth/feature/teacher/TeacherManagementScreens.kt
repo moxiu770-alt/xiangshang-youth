@@ -69,11 +69,11 @@ fun TeacherAccountScreen(state: AppUiState, nav: NavHostController, logout: () -
     var detail by remember { mutableStateOf<String?>(null) }; var settingsOpen by remember { mutableStateOf(false) }; var accountDeleteConfirmation by remember { mutableStateOf(false) }
     Scaffold(containerColor = Canvas, bottomBar = { TeacherBottomBar(nav, Destinations.Account) }) { padding ->
         Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-        Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().fillMaxHeight().padding(horizontal = 12.dp).verticalScroll(rememberScrollState())) {
+        Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().fillMaxHeight().padding(horizontal = 18.dp).verticalScroll(rememberScrollState())) {
             Text("我的", color = Navy, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 12.dp, bottom = 9.dp))
             val managedClassNames = state.managedTeacherClasses.map { it.name }
             val managedClassText = managedClassNames.joinToString("、").ifBlank { "暂无管理班级" }
-            Surface(Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "查看教师个人资料" }.clickable { detail = "个人信息" }, color = Color.White, shape = RoundedCornerShape(12.dp)) { Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Image(painterResource(R.drawable.teacher_avatar), null, Modifier.size(52.dp).clip(CircleShape), contentScale = ContentScale.Crop); Spacer(Modifier.width(11.dp)); Column(Modifier.weight(1f)) { Text(state.activeDisplayName, color = Navy, fontWeight = FontWeight.Bold); Text("${state.profile?.schoolName ?: "学校"} · $managedClassText", color = Color.Gray, fontSize = 12.sp); Text(teacherCapabilitySummary(state), color = Green, fontSize = 12.sp) }; Icon(Icons.Filled.ChevronRight, "查看教师个人资料", tint = Color.Gray) } }
+            Surface(Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "查看教师个人资料" }.clickable { detail = "个人信息" }, color = Color.White, shape = RoundedCornerShape(12.dp)) { Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Image(painterResource(R.drawable.teacher_avatar), null, Modifier.size(52.dp).clip(CircleShape), contentScale = ContentScale.Crop); Spacer(Modifier.width(11.dp)); Column(Modifier.weight(1f)) { Text(state.activeDisplayName, color = Navy, fontWeight = FontWeight.Bold); Text("${state.profile?.schoolName ?: "学校"} · $managedClassText", color = Color.Gray, fontSize = 16.sp); Text(teacherCapabilitySummary(state), color = Green, fontSize = 16.sp) }; Icon(Icons.Filled.ChevronRight, "查看教师个人资料", tint = Color.Gray) } }
             Spacer(Modifier.height(10.dp))
             listOf("个人信息" to Icons.Filled.Person, "我的权限" to Icons.Filled.AdminPanelSettings, "工作数据" to Icons.Filled.BarChart, "设置" to Icons.Filled.Settings, "消息" to Icons.Filled.Notifications).forEach { (title, icon) -> Surface(Modifier.fillMaxWidth().padding(vertical = 4.dp).semantics { role = Role.Button; contentDescription = "打开$title" }.clickable { when (title) { "工作数据" -> nav.navigateSingleTop(Destinations.TeacherBoard); "设置" -> settingsOpen = true; "消息" -> nav.navigateSingleTop(RoleMessageDestination.resolve(UserRole.Teacher)); else -> detail = title } }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = Blue); Spacer(Modifier.width(10.dp)); Text(title, color = Navy, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f)); Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray) } } }
             Spacer(Modifier.height(9.dp)); OutlinedButton(onClick = onChooseAnotherRole, modifier = Modifier.fillMaxWidth().semantics { contentDescription = "重新选择使用角色" }) { Text("切换使用角色") }
@@ -124,36 +124,36 @@ fun TeacherClassBoardScreen(state: AppUiState, nav: NavHostController, onOpenRep
     fun drillDown(action: () -> Unit) { if (isHistorical) historicalDetailShown = true else action() }
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(vertical = 4.dp)) {
         state.managedTeacherClasses.forEach { item ->
-            FilterChip(selected = item.id == primaryClass?.id, onClick = { selectedClassId = item.id }, label = { Text(item.name, fontSize = 12.sp) })
+            FilterChip(selected = item.id == primaryClass?.id, onClick = { selectedClassId = item.id }, label = { Text(item.name, fontSize = 16.sp) })
         }
         state.data.tasks.forEach { item ->
-            FilterChip(selected = item.id == currentTask?.id, onClick = { selectedTaskId = item.id }, label = { Text(item.title, fontSize = 12.sp, maxLines = 1) })
+            FilterChip(selected = item.id == currentTask?.id, onClick = { selectedTaskId = item.id }, label = { Text(item.title, fontSize = 16.sp, maxLines = 2) })
         }
         listOf("本轮综合测评", "2026春季").forEach { period ->
-            FilterChip(selected = selectedPeriod == period, onClick = { selectedPeriod = period }, label = { Text(period, fontSize = 12.sp) })
+            FilterChip(selected = selectedPeriod == period, onClick = { selectedPeriod = period }, label = { Text(period, fontSize = 16.sp) })
         }
     }
     Spacer(Modifier.height(7.dp))
-    if (isHistorical) Surface(Modifier.fillMaxWidth().padding(bottom = 7.dp).semantics { role = Role.Button; contentDescription = "查看2026春季归档说明" }.clickable { historicalDetailShown = true }, color = Color(0xFFF3EEFF), shape = RoundedCornerShape(9.dp)) { Row(Modifier.padding(9.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.Archive, null, tint = Color(0xFF8A5AF5), modifier = Modifier.size(17.dp)); Spacer(Modifier.width(6.dp)); Text("2026春季为已归档汇总；学生明细请切换回本轮查看", color = Color(0xFF6F4DAD), fontSize = 12.sp, modifier = Modifier.weight(1f)); Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray, modifier = Modifier.size(14.dp)) } }
+    if (isHistorical) Surface(Modifier.fillMaxWidth().padding(bottom = 7.dp).semantics { role = Role.Button; contentDescription = "查看2026春季归档说明" }.clickable { historicalDetailShown = true }, color = Color(0xFFF3EEFF), shape = RoundedCornerShape(9.dp)) { Row(Modifier.padding(9.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.Archive, null, tint = Color(0xFF8A5AF5), modifier = Modifier.size(17.dp)); Spacer(Modifier.width(6.dp)); Text("2026春季为已归档汇总；学生明细请切换回本轮查看", color = Color(0xFF6F4DAD), fontSize = 16.sp, modifier = Modifier.weight(1f)); Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray, modifier = Modifier.size(14.dp)) } }
     if (!isHistorical && useRemoteOverview && remoteOverview == null) {
         EmptyState("当前班级统计正在同步。服务端返回本任务统计后，将显示完成率、风险分布和单项成绩。")
         return@AppScaffold
     }
     BoardCard("${primaryClassName}健康概览", if (isHistorical) "归档说明" else "查看明细", onClick = { drillDown { primaryClass?.id?.let { nav.navigateSingleTop("${Destinations.Students}?classId=$it") } } }) { Row { TeacherMetric("班级人数", "$totalStudents", Icons.Filled.Groups, Blue) { drillDown { primaryClass?.id?.let { nav.navigateSingleTop("${Destinations.Students}?classId=$it") } } }; TeacherMetric("已测评", "$completed", Icons.Filled.Visibility, Green) { drillDown { nav.navigateSingleTop(Destinations.Tasks) } }; TeacherMetric("测评率", "$completionRate%", Icons.Filled.Refresh, Green) { drillDown { nav.navigateSingleTop(Destinations.Tasks) } }; TeacherMetric("待处理预警", "$risk", Icons.Filled.WarningAmber, Color.Red) { drillDown { nav.navigateSingleTop(Destinations.Review) } } } }
     Spacer(Modifier.height(7.dp)); BoardCard("7 项运动项目进度", if (isHistorical) "归档说明" else "查看任务", onClick = { drillDown { nav.navigateSingleTop(Destinations.Tasks) } }) {
-        Text("仅统计学校场地端的综合运动能力测评任务。", color = Color.Gray, fontSize = 12.sp)
+        Text("仅统计学校场地端的综合运动能力测评任务。", color = Color.Gray, fontSize = 16.sp)
         Spacer(Modifier.height(8.dp))
         TestItem.entries.chunked(2).forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { item ->
                     Surface(onClick = { drillDown { nav.navigateSingleTop(Destinations.Tasks) } }, modifier = Modifier.weight(1f).heightIn(min = 72.dp), color = Sky, shape = RoundedCornerShape(12.dp)) {
-                        Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.padding(horizontal = 18.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.AutoMirrored.Filled.DirectionsRun, null, tint = Blue, modifier = Modifier.size(21.dp))
                             Spacer(Modifier.width(8.dp))
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                Text(item.label, color = Navy, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, maxLines = 2)
+                                Text(item.label, color = Navy, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, maxLines = 2)
                                 val metric = remoteOverview?.itemStats?.firstOrNull { it.itemCode == item.label }
-                                Text(metric?.let { "${it.measuredCount}/${it.totalCount}人 · ${"%.1f".format(it.averageScore)}分" } ?: if (state.repositoryAcknowledged) "暂无该项目数据" else "单项数据待同步", color = Color.Gray, fontSize = 12.sp)
+                                Text(metric?.let { "${it.measuredCount}/${it.totalCount}人 · ${"%.1f".format(it.averageScore)}分" } ?: if (state.repositoryAcknowledged) "暂无该项目数据" else "单项数据待同步", color = Color.Gray, fontSize = 16.sp)
                             }
                         }
                     }
@@ -164,18 +164,18 @@ fun TeacherClassBoardScreen(state: AppUiState, nav: NavHostController, onOpenRep
         }
     }
     Spacer(Modifier.height(8.dp)); BoardCard("测评平均完成趋势", if (isHistorical) "归档说明" else "查看详情", onClick = { drillDown { nav.navigateSingleTop(Destinations.Tasks) } }) { EmptyState(if (isHistorical) "暂无历史趋势数据" else "暂无趋势数据。完成多个测评周期后显示真实趋势。") }
-    Spacer(Modifier.height(8.dp)); BoardCard("重点关注学生", if (isHistorical) "归档说明" else "查看全部", onClick = { drillDown { nav.navigateSingleTop(Destinations.Review) } }) { if (isHistorical) Text("历史周期数据尚未同步，不展示演示统计或学生明细。", color = Color.Gray, fontSize = 12.sp) else if (useRemoteOverview && remoteOverview == null) Text("风险学生名单正在同步。", color = Color.Gray, fontSize = 12.sp) else { classStudents.filter { student -> val status = state.taskStatus(student, currentTask?.id); student.id in lowScoreStudentIds || status.name == "Review" || status.name == "Retest" }.take(3).forEach { student -> val status = state.taskStatus(student, currentTask?.id); Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics { role = Role.Button; contentDescription = "查看${student.name}报告，状态${status.label}" }.clickable { onOpenReport(student) }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) { Text("${student.name}   ${student.className}   ${status.label}", color = Navy, fontSize = 12.sp, modifier = Modifier.weight(1f)); Icon(Icons.Filled.ChevronRight, contentDescription = "查看${student.name}报告", tint = Color.Gray, modifier = Modifier.size(16.dp)) } }; if (risk == 0) Text("当前班级暂无重点风险学生", color = Color.Gray, fontSize = 12.sp) } }
+    Spacer(Modifier.height(8.dp)); BoardCard("重点关注学生", if (isHistorical) "归档说明" else "查看全部", onClick = { drillDown { nav.navigateSingleTop(Destinations.Review) } }) { if (isHistorical) Text("历史周期数据尚未同步，不展示演示统计或学生明细。", color = Color.Gray, fontSize = 16.sp) else if (useRemoteOverview && remoteOverview == null) Text("风险学生名单正在同步。", color = Color.Gray, fontSize = 16.sp) else { classStudents.filter { student -> val status = state.taskStatus(student, currentTask?.id); student.id in lowScoreStudentIds || status.name == "Review" || status.name == "Retest" }.take(3).forEach { student -> val status = state.taskStatus(student, currentTask?.id); Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics { role = Role.Button; contentDescription = "查看${student.name}报告，状态${status.label}" }.clickable { onOpenReport(student) }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) { Text("${student.name}   ${student.className}   ${status.label}", color = Navy, fontSize = 16.sp, modifier = Modifier.weight(1f)); Icon(Icons.Filled.ChevronRight, contentDescription = "查看${student.name}报告", tint = Color.Gray, modifier = Modifier.size(16.dp)) } }; if (risk == 0) Text("当前班级暂无重点风险学生", color = Color.Gray, fontSize = 16.sp) } }
     Spacer(Modifier.height(9.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedButton(onClick = {
             val report = "向上少年 · ${primaryClassName}${selectedPeriod}数据报告\\n测评完成率：$completionRate%\\n已完成：$completed / $totalStudents 人\\n待处理预警：$risk 人\\n评测标准：小学综合运动能力标准 v1.0"
             context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, report) }, "导出班级数据报告"))
-        }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Icon(Icons.Filled.IosShare, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text("导出班级报告", fontSize = 12.sp) }
-        Button(onClick = { drillDown { nav.navigateSingleTop(Destinations.Review) } }, modifier = Modifier.weight(1f).heightIn(min = 48.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE35D5B))) { Icon(Icons.Filled.WarningAmber, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text(if (isHistorical) "查看归档说明" else "处理重点预警", fontSize = 12.sp) }
+        }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Icon(Icons.Filled.IosShare, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text("导出班级报告", fontSize = 16.sp) }
+        Button(onClick = { drillDown { nav.navigateSingleTop(Destinations.Review) } }, modifier = Modifier.weight(1f).heightIn(min = 48.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE35D5B))) { Icon(Icons.Filled.WarningAmber, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(5.dp)); Text(if (isHistorical) "查看归档说明" else "处理重点预警", fontSize = 16.sp) }
     }
-    if (historicalDetailShown) AlertDialog(onDismissRequest = { historicalDetailShown = false }, title = { Text("2026春季测评归档") }, text = { Column { Text("历史汇总尚未同步，当前不展示演示人数、完成率或风险数。", color = Navy); Text("历史学生明细需由学校管理端授权后查看。", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp)) } }, confirmButton = { TextButton(onClick = { historicalDetailShown = false }) { Text("关闭") } })
+    if (historicalDetailShown) AlertDialog(onDismissRequest = { historicalDetailShown = false }, title = { Text("2026春季测评归档") }, text = { Column { Text("历史汇总尚未同步，当前不展示演示人数、完成率或风险数。", color = Navy); Text("历史学生明细需由学校管理端授权后查看。", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 10.dp)) } }, confirmButton = { TextButton(onClick = { historicalDetailShown = false }) { Text("关闭") } })
 }
 
-@Composable private fun BoardCard(title: String, action: String, onClick: () -> Unit, body: @Composable ColumnScope.() -> Unit) = Surface(modifier = Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(12.dp), shadowElevation = 1.dp) { Column(Modifier.padding(12.dp)) { SectionHeader(title, action, onClick); Spacer(Modifier.height(8.dp)); body() } }
+@Composable private fun BoardCard(title: String, action: String, onClick: () -> Unit, body: @Composable ColumnScope.() -> Unit) = Surface(modifier = Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(12.dp), shadowElevation = 1.dp) { Column(Modifier.padding(16.dp)) { SectionHeader(title, action, onClick); Spacer(Modifier.height(8.dp)); body() } }
 
 @Composable fun TeacherClassesScreen(state: AppUiState, nav: NavHostController) = AppScaffold("我管理的班级", onBack = { nav.popBackStack() }) {
     val dashboardError = state.error
@@ -189,7 +189,7 @@ fun TeacherClassBoardScreen(state: AppUiState, nav: NavHostController, onOpenRep
             // Student rows can be a paged directory. The class aggregate is
             // the only authoritative completion rate in a remote session.
             val completionRate = if (state.repositoryAcknowledged || classStudents.isEmpty()) item.completionRate else classStudents.count { state.taskStatus(it, data.tasks.firstOrNull()?.id) == com.xiangshang.youth.core.model.TaskStatus.Completed } * 100 / classStudents.size
-            Surface(Modifier.fillMaxWidth().padding(vertical = 5.dp).semantics { role = Role.Button; contentDescription = "查看${item.name}学生列表，完成率${completionRate}%" }.clickable { nav.navigate("${Destinations.Students}?classId=${item.id}") }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(13.dp), verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(item.name, color = Navy, fontWeight = FontWeight.Bold); Text(item.studentCount.toString() + "人 · " + item.teacherName, fontSize = 12.sp, color = Color.Gray) }; Text(completionRate.toString() + "%", color = Green, fontWeight = FontWeight.Bold, fontSize = 18.sp) } }
+            Surface(Modifier.fillMaxWidth().padding(vertical = 5.dp).semantics { role = Role.Button; contentDescription = "查看${item.name}学生列表，完成率${completionRate}%" }.clickable { nav.navigate("${Destinations.Students}?classId=${item.id}") }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(item.name, color = Navy, fontWeight = FontWeight.Bold); Text(item.studentCount.toString() + "人 · " + item.teacherName, fontSize = 16.sp, color = Color.Gray) }; Text(completionRate.toString() + "%", color = Green, fontWeight = FontWeight.Bold, fontSize = 18.sp) } }
         }
     }
 }
@@ -217,7 +217,7 @@ fun StudentListScreen(state: AppUiState, nav: NavHostController, classId: String
                 val loaded = state.data.students.size
                 if (total != null && loaded < total) {
                     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        state.studentsLoadError?.let { Text(it, color = Color.Red, fontSize = 12.sp, textAlign = TextAlign.Center) }
+                        state.studentsLoadError?.let { Text(it, color = Color.Red, fontSize = 16.sp, textAlign = TextAlign.Center) }
                         Button(
                             onClick = loadMoreStudents,
                             enabled = !state.studentsLoadingMore && !state.isOffline,
@@ -248,13 +248,13 @@ fun TeacherTasksScreen(state: AppUiState, nav: NavHostController, saveUpload: (S
                 Surface(Modifier.fillMaxWidth(), color = Color(0xFFFFF2E4), shape = RoundedCornerShape(10.dp)) {
                     Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.CameraAlt, null, tint = Color(0xFFFF8B1F)); Spacer(Modifier.width(8.dp))
-                        Column(Modifier.weight(1f)) { Text("课后上传测评结果与照片", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text("课堂照片、测评记录、出勤名单", color = Color.Gray, fontSize = 12.sp) }
+                        Column(Modifier.weight(1f)) { Text("课后上传测评结果与照片", color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp); Text("课堂照片、测评记录、出勤名单", color = Color.Gray, fontSize = 16.sp) }
                         TextButton(onClick = { formOpen = true }) { Text(if (uploaded) "查看记录" else "去上传") }
                     }
                 }
                 state.local.courseUploads.firstOrNull { it.taskId == taskId }?.let {
                     val label = when (it.status) { LocalSubmissionStatus.PendingSync -> "已保存 · 待同步"; LocalSubmissionStatus.Submitted -> "已同步"; LocalSubmissionStatus.Failed -> "同步失败，可在设置中重试"; else -> "草稿" }
-                    Text("$label · 出勤 ${it.attendanceCount} 人 · ${it.attachmentName}", color = if (it.status == LocalSubmissionStatus.Failed) Color.Red else Green, fontSize = 12.sp, modifier = Modifier.padding(top = 7.dp))
+                    Text("$label · 出勤 ${it.attendanceCount} 人 · ${it.attachmentName}", color = if (it.status == LocalSubmissionStatus.Failed) Color.Red else Green, fontSize = 16.sp, modifier = Modifier.padding(top = 7.dp))
                 }
                 Spacer(Modifier.height(9.dp))
                 if (state.data.tasks.isEmpty()) EmptyState("暂无延时课程任务，学校发布任务后会显示在这里。") else state.data.tasks.forEach {
@@ -265,7 +265,7 @@ fun TeacherTasksScreen(state: AppUiState, nav: NavHostController, saveUpload: (S
     }
     if (root) {
         Scaffold(containerColor = Canvas, bottomBar = { TeacherBottomBar(nav, Destinations.SportsUpload, sportsTeacher = true) }) { padding ->
-            Column(Modifier.padding(padding).padding(horizontal = 12.dp).verticalScroll(rememberScrollState())) { Text("延时课程上传", color = Navy, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 12.dp, bottom = 9.dp)); Content() }
+            Column(Modifier.padding(padding).padding(horizontal = 18.dp).verticalScroll(rememberScrollState())) { Text("延时课程上传", color = Navy, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 12.dp, bottom = 9.dp)); Content() }
         }
     } else AppScaffold("延时课程上传", onBack = { nav.popBackStack() }) { Content() }
     if (formOpen) UploadDialog(taskId, state, saveUpload, submitUpload, saveDraft, clearDraft) { formOpen = false }
@@ -351,11 +351,11 @@ private fun UploadDialog(taskId: String, state: AppUiState, save: (String, Int, 
             } else Column {
                 OutlinedTextField(value = attendance, onValueChange = { attendance = it; error = null; persistDraft() }, label = { Text("出勤人数") }, isError = error != null)
                 OutlinedTextField(value = notes, onValueChange = { notes = it; error = null; persistDraft() }, label = { Text("课堂记录") }, minLines = 2, isError = error != null)
-                Text("附件：${attachment.takeIf { it.isNotBlank() } ?: "未选择照片"}", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                Text("附件：${attachment.takeIf { it.isNotBlank() } ?: "未选择照片"}", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 6.dp))
                 OutlinedButton(onClick = { openCamera() }, modifier = Modifier.padding(top = 4.dp)) { Icon(Icons.Filled.PhotoCamera, null); Spacer(Modifier.width(5.dp)); Text("拍摄课堂照片") }
                 OutlinedButton(onClick = { imagePicker.launch("image/*") }, modifier = Modifier.padding(top = 4.dp)) { Icon(Icons.Filled.Photo, null); Spacer(Modifier.width(5.dp)); Text("选择课堂照片") }
-                error?.let { Text(it, color = Color.Red, fontSize = 12.sp) }
-                if (command.status == WorkflowCommandStatus.Failed) Text(command.message ?: "提交失败，请重试", color = Color.Red, fontSize = 12.sp)
+                error?.let { Text(it, color = Color.Red, fontSize = 16.sp) }
+                if (command.status == WorkflowCommandStatus.Failed) Text(command.message ?: "提交失败，请重试", color = Color.Red, fontSize = 16.sp)
             }
         },
         confirmButton = {
@@ -400,7 +400,7 @@ fun TeacherTaskDetailScreen(state: AppUiState, nav: NavHostController, taskId: S
         }
     }
     Text("学生测评状态", color = Navy, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
-    Text("点击学生按现场队列更新签到、候测、测试、复核或补测状态；不支持跨步骤直接完成。", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(vertical = 5.dp))
+    Text("点击学生按现场队列更新签到、候测、测试、复核或补测状态；不支持跨步骤直接完成。", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(vertical = 5.dp))
     when {
         state.repositoryAcknowledged && state.taskRosterRecords[task.id] == null -> LoadingState()
         else -> {
@@ -455,11 +455,11 @@ fun ReviewListScreen(state: AppUiState, nav: NavHostController, submitDecision: 
         val status = state.taskStatus(student, reviewTaskId)
         status.name == "Review" || status.name == "Retest" || status.name == "Absent"
     }
-    Text("待处理 ${students.size} 人", color = Color.Red, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp, bottom = 6.dp))
+    Text("待处理 ${students.size} 人", color = Color.Red, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(top = 8.dp, bottom = 6.dp))
     students.forEach { student ->
         TeacherStudentStatusRow(student, state.taskStatus(student, reviewTaskId), state.taskSyncStatus(student, reviewTaskId)) { selectedStudent = student }
         state.taskReviewNote(student, reviewTaskId)?.let { note ->
-            Text("复核意见：$note", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(start = 12.dp, top = 3.dp))
+            Text("复核意见：$note", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(start = 12.dp, top = 3.dp))
         }
         Spacer(Modifier.height(7.dp))
     }
@@ -488,7 +488,7 @@ private fun BodyScreeningReviewQueue(state: AppUiState, onOpen: (com.xiangshang.
         state.bodyScreeningReviewsError != null && state.bodyScreeningReviews.isEmpty() -> ErrorState(state.bodyScreeningReviewsError, retry = retry)
         state.bodyScreeningReviews.isEmpty() -> EmptyState("暂无身体观察待复核记录。算法不确定、质量边界或风险候选记录将在这里显示。")
         else -> {
-            Text("待处理 ${state.bodyScreeningReviews.size} 条 · 仅展示结构化证据，不包含原始照片或视频", color = Color.Gray, fontSize = 13.sp, modifier = Modifier.padding(vertical = 9.dp))
+            Text("待处理 ${state.bodyScreeningReviews.size} 条 · 仅展示结构化证据，不包含原始照片或视频", color = Color.Gray, fontSize = 15.sp, modifier = Modifier.padding(vertical = 9.dp))
             state.bodyScreeningReviews.forEach { item ->
                 Surface(
                     modifier = Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "${item.studentDisplayName}身体观察待复核，质量分${item.qualityScore ?: "未知"}" }.clickable { onOpen(item) },
@@ -498,11 +498,11 @@ private fun BodyScreeningReviewQueue(state: AppUiState, onOpen: (com.xiangshang.
                     Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(item.studentDisplayName, color = Navy, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                            Text("质量 ${item.qualityScore ?: "--"}", color = if ((item.qualityScore ?: 0) >= 70) Green else Color(0xFFFF8A24), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text("质量 ${item.qualityScore ?: "--"}", color = if ((item.qualityScore ?: 0) >= 70) Green else Color(0xFFFF8A24), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                             Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray)
                         }
-                        Text("${item.attempts.size} 项结构化证据 · ${item.reasonCodes.joinToString("、") { bodyReviewReason(it) }}", color = Color.Gray, fontSize = 13.sp)
-                        Text("${item.protocolVersion ?: "协议版本待同步"} · v${item.version}", color = Color.Gray, fontSize = 12.sp)
+                        Text("${item.attempts.size} 项结构化证据 · ${item.reasonCodes.joinToString("、") { bodyReviewReason(it) }}", color = Color.Gray, fontSize = 15.sp)
+                        Text("${item.protocolVersion ?: "协议版本待同步"} · v${item.version}", color = Color.Gray, fontSize = 16.sp)
                     }
                 }
                 Spacer(Modifier.height(8.dp))
@@ -535,7 +535,7 @@ private fun BodyScreeningReviewDialog(
                     Surface(color = Canvas, shape = RoundedCornerShape(12.dp)) {
                         Column(Modifier.padding(11.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(bodyCaptureTitle(attempt.captureTask), color = Navy, fontWeight = FontWeight.Bold)
-                            Text("置信度 ${(attempt.confidence * 100).toInt()}% · ${attempt.sampleCount} 个有效样本 · ${attempt.attemptCount} 次采集", color = Color.Gray, fontSize = 13.sp)
+                            Text("置信度 ${(attempt.confidence * 100).toInt()}% · ${attempt.sampleCount} 个有效样本 · ${attempt.attemptCount} 次采集", color = Color.Gray, fontSize = 15.sp)
                             attempt.qualityScore?.let { LinearProgressIndicator(progress = { it / 100f }, modifier = Modifier.fillMaxWidth(), color = if (it >= 70) Green else Color(0xFFFF8A24)) }
                             attempt.evidenceMetrics.forEach { metric ->
                                 Column(
@@ -543,17 +543,17 @@ private fun BodyScreeningReviewDialog(
                                     verticalArrangement = Arrangement.spacedBy(2.dp)
                                 ) {
                                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text(metric.label, color = Navy, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                                        Text(metric.displayedValue, color = Navy, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                        Text(metric.label, color = Navy, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                                        Text(metric.displayedValue, color = Navy, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                                     }
-                                    Text(metric.sourceTitle, color = Color.Gray, fontSize = 12.sp)
+                                    Text(metric.sourceTitle, color = Color.Gray, fontSize = 16.sp)
                                 }
                             }
-                            if (attempt.evidenceMetrics.isEmpty()) Text("本动作暂无可展示的白名单指标，仅可依据采集质量决定是否重采。", color = Color.Gray, fontSize = 12.sp)
+                            if (attempt.evidenceMetrics.isEmpty()) Text("本动作暂无可展示的白名单指标，仅可依据采集质量决定是否重采。", color = Color.Gray, fontSize = 16.sp)
                         }
                     }
                 }
-                Text("“相对投影值”和“摄像头估计”不是物理厘米、ATR 或 Cobb 角。不提供原始照片或视频；复核结论仅用于健康管理与后续行动，不构成医疗诊断。", color = Color.Gray, fontSize = 12.sp)
+                Text("“相对投影值”和“摄像头估计”不是物理厘米、ATR 或 Cobb 角。不提供原始照片或视频；复核结论仅用于健康管理与后续行动，不构成医疗诊断。", color = Color.Gray, fontSize = 16.sp)
                 Text("处理方式", color = Navy, fontWeight = FontWeight.Bold)
                 com.xiangshang.youth.core.model.BodyScreeningReviewDecision.entries.forEach { option ->
                     FilterChip(selected = decision == option, onClick = { decision = option }, label = { Text(option.label) }, modifier = Modifier.fillMaxWidth())
@@ -568,7 +568,7 @@ private fun BodyScreeningReviewDialog(
                         }
                     }
                 }
-                if (command.status == WorkflowCommandStatus.Failed) Text(command.message ?: "提交失败，请重试", color = Color.Red, fontSize = 13.sp)
+                if (command.status == WorkflowCommandStatus.Failed) Text(command.message ?: "提交失败，请重试", color = Color.Red, fontSize = 15.sp)
             }
         },
         confirmButton = { TextButton(onClick = { submit(item, decision, comment, tasks) }, enabled = !command.isSubmitting) { if (command.isSubmitting) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Text("确认提交") } },
@@ -591,10 +591,10 @@ private fun TeacherStudentStatusRow(student: com.xiangshang.youth.core.model.Stu
     Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(student.name.take(1), color = Color.White, modifier = Modifier.background(Blue, CircleShape).padding(9.dp))
         Spacer(Modifier.width(9.dp))
-        Column(Modifier.weight(1f)) { Text(student.name, color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text("${student.grade} · ${student.className}", color = Color.Gray, fontSize = 12.sp) }
+        Column(Modifier.weight(1f)) { Text(student.name, color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp); Text("${student.grade} · ${student.className}", color = Color.Gray, fontSize = 16.sp) }
         Column(horizontalAlignment = Alignment.End) {
-            Text(status.label, color = statusColor(status), fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.background(statusColor(status).copy(alpha = .12f), RoundedCornerShape(12.dp)).padding(horizontal = 8.dp, vertical = 4.dp))
-            syncState?.let { Text(it.taskStatusLabel(), color = if (it == LocalSubmissionStatus.Failed) Color.Red else Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp)) }
+            Text(status.label, color = statusColor(status), fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.background(statusColor(status).copy(alpha = .12f), RoundedCornerShape(12.dp)).padding(horizontal = 8.dp, vertical = 4.dp))
+            syncState?.let { Text(it.taskStatusLabel(), color = if (it == LocalSubmissionStatus.Failed) Color.Red else Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 2.dp)) }
         }
         Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray, modifier = Modifier.padding(start = 5.dp).size(16.dp))
     }
@@ -622,9 +622,9 @@ private fun StatusSelectorDialog(
         text = {
             Column {
                 when (command.status) {
-                    WorkflowCommandStatus.Submitting -> Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp); Spacer(Modifier.width(7.dp)); Text("正在提交状态…", color = Blue, fontSize = 12.sp) }
-                    WorkflowCommandStatus.Succeeded -> Text(command.message ?: "状态已提交。", color = Green, fontSize = 12.sp)
-                    WorkflowCommandStatus.Failed -> Text(command.message ?: "提交失败，请重试。", color = Color.Red, fontSize = 12.sp)
+                    WorkflowCommandStatus.Submitting -> Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp); Spacer(Modifier.width(7.dp)); Text("正在提交状态…", color = Blue, fontSize = 16.sp) }
+                    WorkflowCommandStatus.Succeeded -> Text(command.message ?: "状态已提交。", color = Green, fontSize = 16.sp)
+                    WorkflowCommandStatus.Failed -> Text(command.message ?: "提交失败，请重试。", color = Color.Red, fontSize = 16.sp)
                     WorkflowCommandStatus.Idle -> Unit
                 }
                 current.allowedNextStatuses().forEach { status ->
@@ -662,17 +662,17 @@ private fun ReviewDecisionDialog(
         title = { Text("处理${studentName}预警") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                Text("记录证据核验结果、是否需要补测及后续处理。", color = Color.Gray, fontSize = 12.sp)
+                Text("记录证据核验结果、是否需要补测及后续处理。", color = Color.Gray, fontSize = 16.sp)
                 OutlinedTextField(value = note, onValueChange = { note = it; onDraftChanged(it); validation = null }, label = { Text("复核 / 补测处理意见") }, minLines = 3, isError = validation != null)
-                validation?.let { Text(it, color = Color.Red, fontSize = 12.sp) }
+                validation?.let { Text(it, color = Color.Red, fontSize = 16.sp) }
                 when (command.status) {
-                    WorkflowCommandStatus.Submitting -> Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp); Spacer(Modifier.width(7.dp)); Text("正在提交处理…", color = Blue, fontSize = 12.sp) }
-                    WorkflowCommandStatus.Failed -> Text(command.message ?: "提交失败，请重试。", color = Color.Red, fontSize = 12.sp)
+                    WorkflowCommandStatus.Submitting -> Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp); Spacer(Modifier.width(7.dp)); Text("正在提交处理…", color = Blue, fontSize = 16.sp) }
+                    WorkflowCommandStatus.Failed -> Text(command.message ?: "提交失败，请重试。", color = Color.Red, fontSize = 16.sp)
                     else -> Unit
                 }
-                Text("处理结论", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("处理结论", color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 current.allowedNextStatuses().forEach { status ->
-                    FilterChip(selected = selectedStatus == status, onClick = { selectedStatus = status }, label = { Text(status.label, fontSize = 12.sp) })
+                    FilterChip(selected = selectedStatus == status, onClick = { selectedStatus = status }, label = { Text(status.label, fontSize = 16.sp) })
                 }
             }
         },

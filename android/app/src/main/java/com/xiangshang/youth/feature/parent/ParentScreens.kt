@@ -154,12 +154,12 @@ fun ParentHomeScreen(state: AppUiState, nav: NavHostController, saveDraft: (Stri
     }
     Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().fillMaxHeight().background(Canvas).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(9.dp)) {
         ParentHeader(selectedChild.name, "${selectedChild.grade} · ${selectedChild.className} · 点击切换孩子", { nav.navigate(Destinations.Children) }, { nav.navigateSingleTop(RoleMessageDestination.resolve(UserRole.Parent)) }, state.unreadMessageCount, refreshDashboard, state.loading)
-        Surface(Modifier.padding(horizontal = 12.dp).fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(12.dp), shadowElevation = 1.dp) {
+        Surface(Modifier.padding(horizontal = 18.dp).fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(12.dp), shadowElevation = 1.dp) {
             Column(Modifier.padding(14.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("孩子本周健康任务", color = Navy, fontWeight = FontWeight.Bold, fontSize = 17.sp); Text(bodyAssessmentCardDetail, color = Color.Gray, fontSize = 12.sp) }; Icon(Icons.AutoMirrored.Filled.DirectionsRun, null, tint = Blue, modifier = Modifier.size(25.dp)) }
+                Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("孩子本周健康任务", color = Navy, fontWeight = FontWeight.Bold, fontSize = 17.sp); Text(bodyAssessmentCardDetail, color = Color.Gray, fontSize = 16.sp) }; Icon(Icons.AutoMirrored.Filled.DirectionsRun, null, tint = Blue, modifier = Modifier.size(25.dp)) }
                 Spacer(Modifier.height(8.dp)); Row { ParentMetric("体质", Icons.AutoMirrored.Filled.DirectionsRun, Blue, Modifier.weight(1f)) { nav.navigate(Destinations.BodyAssessment) }; Spacer(Modifier.width(7.dp)); ParentMetric("心理", Icons.Filled.Favorite, Color(0xFFFF6D9B), Modifier.weight(1f)) { nav.navigate("${Destinations.Assessment}/mental") } }
                 Spacer(Modifier.height(7.dp)); Row { ParentMetric("视力", Icons.Filled.RemoveRedEye, Green, Modifier.weight(1f)) { nav.navigate("${Destinations.Assessment}/vision") }; Spacer(Modifier.width(7.dp)); ParentMetric("口腔", Icons.Filled.MedicalServices, Color(0xFFFFBD2E), Modifier.weight(1f)) { nav.navigate("${Destinations.Assessment}/oral") } }
-                Button(onClick = { nav.navigate(Destinations.BodyAssessment) }, modifier = Modifier.fillMaxWidth().padding(top = 10.dp).heightIn(min = 48.dp), shape = RoundedCornerShape(12.dp)) { Text(bodyAssessmentActionTitle, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
+                Button(onClick = { nav.navigate(Destinations.BodyAssessment) }, modifier = Modifier.fillMaxWidth().padding(top = 10.dp).heightIn(min = 48.dp), shape = RoundedCornerShape(12.dp)) { Text(bodyAssessmentActionTitle, fontSize = 16.sp, fontWeight = FontWeight.Bold) }
             }
         }
         ParentQuickActions(nav, state.local.checkedInToday)
@@ -170,7 +170,7 @@ fun ParentHomeScreen(state: AppUiState, nav: NavHostController, saveDraft: (Stri
             LoadingState()
         } else if (firstActivity == null) {
             EmptyState("暂无可报名活动，学校发布后会显示在这里。")
-        } else Surface(Modifier.padding(horizontal = 12.dp).fillMaxWidth().semantics { role = Role.Button; contentDescription = "打开${firstActivity.title}活动报名" }.clickable {
+        } else Surface(Modifier.padding(horizontal = 18.dp).fillMaxWidth().semantics { role = Role.Button; contentDescription = "打开${firstActivity.title}活动报名" }.clickable {
             // The home card is an entry point only. ActivityListScreen owns
             // registration, draft restoration and conflict handling.
             nav.navigate(Destinations.Activities)
@@ -178,19 +178,19 @@ fun ParentHomeScreen(state: AppUiState, nav: NavHostController, saveDraft: (Stri
             Box(Modifier.height(108.dp)) {
                 Image(painterResource(R.drawable.parent_campaign), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 Box(Modifier.fillMaxHeight().fillMaxWidth(.72f).background(Brush.horizontalGradient(listOf(Color.White.copy(.96f), Color.White.copy(.58f), Color.Transparent))))
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(firstActivity.title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    Text(firstActivity.description ?: "综合测评 · 运动表现更出彩", color = Color.Gray, fontSize = 12.sp, maxLines = 1)
+                    Text(firstActivity.description ?: "综合测评 · 运动表现更出彩", color = Color.Gray, fontSize = 16.sp, maxLines = 2)
                     val capacity = firstActivity.capacity
                     val remaining = firstActivity.remainingCapacity
                     if (capacity != null && capacity > 0 && remaining != null && remaining in 0..capacity) {
                         val registered = capacity - remaining
                         LinearProgressIndicator({ (registered.toFloat() / capacity.toFloat()).coerceIn(0f, 1f) }, Modifier.width(145.dp).height(5.dp).clip(CircleShape), color = Green, trackColor = Sky)
-                        Text("已报名 $registered/$capacity", color = Color.Gray, fontSize = 12.sp)
+                        Text("已报名 $registered/$capacity", color = Color.Gray, fontSize = 16.sp)
                     } else if (!state.repositoryAcknowledged) {
-                        Text("报名进度以活动详情为准", color = Color.Gray, fontSize = 12.sp)
+                        Text("报名进度以活动详情为准", color = Color.Gray, fontSize = 16.sp)
                     }
-                    Text(firstActivity.registrationEndAt?.take(10)?.let { "报名截止 · $it" } ?: if (state.repositoryAcknowledged) "活动时间以学校通知为准" else "2026 秋季测评 · 以学校通知为准", color = Color.Gray, fontSize = 12.sp)
+                    Text(firstActivity.registrationEndAt?.take(10)?.let { "报名截止 · $it" } ?: if (state.repositoryAcknowledged) "活动时间以学校通知为准" else "2026 秋季测评 · 以学校通知为准", color = Color.Gray, fontSize = 16.sp)
                 }
             }
         }
@@ -201,20 +201,20 @@ fun ParentHomeScreen(state: AppUiState, nav: NavHostController, saveDraft: (Stri
         } else if (displayExperts.isEmpty()) {
             EmptyState("暂无可预约专家，学校开通后会显示在这里。")
         } else {
-            Row(Modifier.padding(horizontal = 14.dp)) { displayExperts.take(4).forEach { item -> Column(Modifier.weight(1f).heightIn(min = 64.dp).semantics { role = Role.Button; contentDescription = "预约${item.name}" }.clickable { expert = item; expertSlot = ""; selectedSlot = null; expertDate = ""; expertNote = "" }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) { Image(painterResource(expertAvatarRes(item.expertId)), null, Modifier.size(40.dp).clip(CircleShape), contentScale = ContentScale.Crop); Text(item.name, color = Navy, fontSize = 12.sp) } } }
+            Row(Modifier.padding(horizontal = 14.dp)) { displayExperts.take(4).forEach { item -> Column(Modifier.weight(1f).heightIn(min = 64.dp).semantics { role = Role.Button; contentDescription = "预约${item.name}" }.clickable { expert = item; expertSlot = ""; selectedSlot = null; expertDate = ""; expertNote = "" }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) { Image(painterResource(expertAvatarRes(item.expertId)), null, Modifier.size(40.dp).clip(CircleShape), contentScale = ContentScale.Crop); Text(item.name, color = Navy, fontSize = 16.sp) } } }
         }
         ParentSection("健康科普", "点击文章查看")
         if (state.repositoryAcknowledged) {
             EmptyState("暂无健康科普内容，学校或平台发布后会显示在这里。")
         } else {
-            listOf("儿童科学长高的 5 个关键习惯", "居家体态训练 10 分钟").forEach { title -> Surface(Modifier.padding(horizontal = 12.dp, vertical = 3.dp).fillMaxWidth().heightIn(min = 64.dp).semantics { role = Role.Button; contentDescription = "阅读健康科普：$title" }.clickable { wechatError = false; article = title }, color = Color.White, shape = RoundedCornerShape(12.dp)) { Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.AutoMirrored.Filled.MenuBook, null, tint = Green); Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Text(title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 13.sp); Text("健康专栏 · 今日推荐", color = Color.Gray, fontSize = 12.sp) }; Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray) } } }
+            listOf("儿童科学长高的 5 个关键习惯", "居家体态训练 10 分钟").forEach { title -> Surface(Modifier.padding(horizontal = 18.dp, vertical = 3.dp).fillMaxWidth().heightIn(min = 64.dp).semantics { role = Role.Button; contentDescription = "阅读健康科普：$title" }.clickable { wechatError = false; article = title }, color = Color.White, shape = RoundedCornerShape(12.dp)) { Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.AutoMirrored.Filled.MenuBook, null, tint = Green); Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Text(title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 15.sp); Text("健康专栏 · 今日推荐", color = Color.Gray, fontSize = 16.sp) }; Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray) } } }
         }
     } } }
-    expert?.let { selectedExpert -> val expertCommandKey = "expert:${selectedExpert.expertId}${state.selectedChild?.id?.let { ":$it" } ?: ""}"; val expertCommand = state.workflowStates[expertCommandKey] ?: WorkflowCommandState(); val expertFailed = expertCommand.status == WorkflowCommandStatus.Failed; val expertSaved = expertSubmitted && !expertFailed && !expertCommand.isSubmitting; LaunchedEffect(expertCommand.status) { if (expertCommand.status == WorkflowCommandStatus.Succeeded) { expertDraftKey?.let(clearDraft); expertEditing = false } }; AlertDialog(onDismissRequest = { expert = null; expertSubmitted = false; expertEditing = false }, title = { Text("${selectedExpert.name} · ${selectedExpert.title ?: "健康成长专家"}") }, text = { if (expertSaved && !expertEditing) Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = Green, modifier = Modifier.size(42.dp)); Text(if (state.repositoryAcknowledged) "预约已确认。" else "预约已保存，联网后自动同步。", color = Navy, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp)); Text(expertDate, color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp)); TextButton(onClick = { expertEditing = true; clearWorkflow(expertCommandKey) }) { Text("修改预约信息") } } else Column { Text(selectedExpert.bio ?: "请选择服务端可预约时段，提交后会安排跟进。"); OutlinedButton(onClick = { openExpertDatePicker() }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Icon(Icons.Filled.CalendarMonth, null); Spacer(Modifier.width(6.dp)); Text(if (expertDate.isBlank()) "选择预约日期" else expertDate.substringBefore(" ")) }; Text("可预约时段", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp)); if (availableExpertSlots.isEmpty()) Text(state.expertSlotErrors[selectedExpert.expertId] ?: "当前暂无可预约时段", color = Color.Gray, fontSize = 12.sp); availableExpertSlots.chunked(2).forEach { row -> Row(Modifier.fillMaxWidth().padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) { row.forEach { slot -> FilterChip(selected = expertDate.contains(slot), onClick = { expertSlot = slot; selectedSlot = remoteSlots.firstOrNull { it.slotLabel() == slot }; val baseDate = expertDate.substringBefore(" ").ifBlank { "" }; expertDate = if (baseDate.isBlank()) slot else "$baseDate $slot"; saveExpertDraft() }, label = { Text(slot, fontSize = 12.sp) }, modifier = Modifier.weight(1f).heightIn(min = 44.dp)) }; repeat(2 - row.size) { Spacer(Modifier.weight(1f)) } } }; OutlinedTextField(value = expertNote, onValueChange = { value -> expertNote = value; saveExpertDraft() }, label = { Text("咨询说明") }, minLines = 2, modifier = Modifier.fillMaxWidth().padding(top = 7.dp)); if (expertFailed) Text(expertCommand.message ?: "预约提交失败，请重试", color = Color.Red, fontSize = 12.sp) } }, confirmButton = { TextButton(enabled = !expertCommand.isSubmitting && ((expertSaved && !expertEditing) || (expertDate.isNotBlank() && expertNote.isNotBlank())), onClick = { if (expertSaved && !expertEditing) { expert = null; expertSubmitted = false } else submitExpertCommand(selectedExpert.name, expertDate.trim(), expertNote.trim(), selectedExpert.expertId, selectedSlot?.serviceId, selectedSlot?.slotId, selectedSlot?.scheduledStartAt, selectedSlot?.scheduledEndAt) }) { if (expertCommand.isSubmitting) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp) else Text(if (expertSaved && !expertEditing) "完成" else if (expertEditing) "更新预约" else if (expertFailed) "重新提交" else "提交预约") } }, dismissButton = if (expertSaved && !expertEditing) null else ({ TextButton(onClick = { expert = null; expertEditing = false }) { Text("取消") } })) }
-    article?.let { title -> AlertDialog(onDismissRequest = { article = null }, title = { Text(title) }, text = { Column { Text("完整内容由“向上少年健康成长”微信公众号提供。请在微信中搜索公众号查看。"); if (wechatError) Text("当前设备未安装微信，请直接搜索公众号：向上少年健康成长。", color = Color(0xFFD32F2F), fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp)) } }, confirmButton = { TextButton(onClick = { val opened = runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, "weixin://".toUri())) }.isSuccess; if (opened) article = null else wechatError = true }) { Text(if (wechatError) "重试打开微信" else "打开微信") } }, dismissButton = { TextButton(onClick = { article = null }) { Text("关闭") } }) }
+    expert?.let { selectedExpert -> val expertCommandKey = "expert:${selectedExpert.expertId}${state.selectedChild?.id?.let { ":$it" } ?: ""}"; val expertCommand = state.workflowStates[expertCommandKey] ?: WorkflowCommandState(); val expertFailed = expertCommand.status == WorkflowCommandStatus.Failed; val expertSaved = expertSubmitted && !expertFailed && !expertCommand.isSubmitting; LaunchedEffect(expertCommand.status) { if (expertCommand.status == WorkflowCommandStatus.Succeeded) { expertDraftKey?.let(clearDraft); expertEditing = false } }; AlertDialog(onDismissRequest = { expert = null; expertSubmitted = false; expertEditing = false }, title = { Text("${selectedExpert.name} · ${selectedExpert.title ?: "健康成长专家"}") }, text = { if (expertSaved && !expertEditing) Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = Green, modifier = Modifier.size(42.dp)); Text(if (state.repositoryAcknowledged) "预约已确认。" else "预约已保存，联网后自动同步。", color = Navy, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp)); Text(expertDate, color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 5.dp)); TextButton(onClick = { expertEditing = true; clearWorkflow(expertCommandKey) }) { Text("修改预约信息") } } else Column { Text(selectedExpert.bio ?: "请选择服务端可预约时段，提交后会安排跟进。"); OutlinedButton(onClick = { openExpertDatePicker() }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Icon(Icons.Filled.CalendarMonth, null); Spacer(Modifier.width(6.dp)); Text(if (expertDate.isBlank()) "选择预约日期" else expertDate.substringBefore(" ")) }; Text("可预约时段", color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(top = 8.dp)); if (availableExpertSlots.isEmpty()) Text(state.expertSlotErrors[selectedExpert.expertId] ?: "当前暂无可预约时段", color = Color.Gray, fontSize = 16.sp); availableExpertSlots.chunked(2).forEach { row -> Row(Modifier.fillMaxWidth().padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) { row.forEach { slot -> FilterChip(selected = expertDate.contains(slot), onClick = { expertSlot = slot; selectedSlot = remoteSlots.firstOrNull { it.slotLabel() == slot }; val baseDate = expertDate.substringBefore(" ").ifBlank { "" }; expertDate = if (baseDate.isBlank()) slot else "$baseDate $slot"; saveExpertDraft() }, label = { Text(slot, fontSize = 16.sp) }, modifier = Modifier.weight(1f).heightIn(min = 44.dp)) }; repeat(2 - row.size) { Spacer(Modifier.weight(1f)) } } }; OutlinedTextField(value = expertNote, onValueChange = { value -> expertNote = value; saveExpertDraft() }, label = { Text("咨询说明") }, minLines = 2, modifier = Modifier.fillMaxWidth().padding(top = 7.dp)); if (expertFailed) Text(expertCommand.message ?: "预约提交失败，请重试", color = Color.Red, fontSize = 16.sp) } }, confirmButton = { TextButton(enabled = !expertCommand.isSubmitting && ((expertSaved && !expertEditing) || (expertDate.isNotBlank() && expertNote.isNotBlank())), onClick = { if (expertSaved && !expertEditing) { expert = null; expertSubmitted = false } else submitExpertCommand(selectedExpert.name, expertDate.trim(), expertNote.trim(), selectedExpert.expertId, selectedSlot?.serviceId, selectedSlot?.slotId, selectedSlot?.scheduledStartAt, selectedSlot?.scheduledEndAt) }) { if (expertCommand.isSubmitting) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp) else Text(if (expertSaved && !expertEditing) "完成" else if (expertEditing) "更新预约" else if (expertFailed) "重新提交" else "提交预约") } }, dismissButton = if (expertSaved && !expertEditing) null else ({ TextButton(onClick = { expert = null; expertEditing = false }) { Text("取消") } })) }
+    article?.let { title -> AlertDialog(onDismissRequest = { article = null }, title = { Text(title) }, text = { Column { Text("完整内容由“向上少年健康成长”微信公众号提供。请在微信中搜索公众号查看。"); if (wechatError) Text("当前设备未安装微信，请直接搜索公众号：向上少年健康成长。", color = Color(0xFFD32F2F), fontSize = 16.sp, modifier = Modifier.padding(top = 10.dp)) } }, confirmButton = { TextButton(onClick = { val opened = runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, "weixin://".toUri())) }.isSuccess; if (opened) article = null else wechatError = true }) { Text(if (wechatError) "重试打开微信" else "打开微信") } }, dismissButton = { TextButton(onClick = { article = null }) { Text("关闭") } }) }
 }
 
-@Composable private fun ParentAction(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier, onClick: () -> Unit) = Column(modifier.semantics { role = Role.Button; contentDescription = label }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) { FilledIconButton(onClick = onClick, modifier = Modifier.size(44.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = color)) { Icon(icon, contentDescription = label, modifier = Modifier.size(21.dp)) }; Text(label, color = Navy, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, textAlign = TextAlign.Center) }
+@Composable private fun ParentAction(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier, onClick: () -> Unit) = Column(modifier.semantics { role = Role.Button; contentDescription = label }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) { FilledIconButton(onClick = onClick, modifier = Modifier.size(44.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = color)) { Icon(icon, contentDescription = label, modifier = Modifier.size(21.dp)) }; Text(label, color = Navy, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, textAlign = TextAlign.Center) }
 
 /** Keep the reference's compact four-up row at normal type size, but give
  * labels enough width at accessibility sizes instead of truncating them. */
@@ -239,14 +239,14 @@ fun ParentHomeScreen(state: AppUiState, nav: NavHostController, saveDraft: (Stri
 }
 @Composable
 internal fun ParentSection(title: String, action: String, onAction: (() -> Unit)? = null) =
-    Row(Modifier.padding(horizontal = 12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+    Row(Modifier.padding(horizontal = 18.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp)
         Spacer(Modifier.weight(1f))
         if (onAction == null) {
-            Text(action, color = Color.Gray, fontSize = 12.sp)
+            Text(action, color = Color.Gray, fontSize = 16.sp)
         } else {
             TextButton(onClick = onAction, contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)) {
-                Text("$action ›", fontSize = 12.sp)
+                Text("$action ›", fontSize = 16.sp)
             }
         }
     }
@@ -266,7 +266,7 @@ fun ChildrenScreen(state: AppUiState, nav: NavHostController, bindChild: (String
         state.error != null && state.data == null -> ErrorState(state.error, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current)
         state.loading || state.data == null -> LoadingState()
         else -> {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) { Text("已绑定孩子 ${children.size} 人", color = Navy, fontWeight = FontWeight.Bold); Spacer(Modifier.weight(1f)); Button(onClick = { bindingOpen = true }) { Text("绑定孩子", fontSize = 12.sp) } }
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) { Text("已绑定孩子 ${children.size} 人", color = Navy, fontWeight = FontWeight.Bold); Spacer(Modifier.weight(1f)); Button(onClick = { bindingOpen = true }) { Text("绑定孩子", fontSize = 16.sp) } }
             if (children.isEmpty()) {
                 EmptyState("暂无绑定孩子，请使用学校提供的绑定码添加孩子。")
             } else {
@@ -287,7 +287,7 @@ fun ChildrenScreen(state: AppUiState, nav: NavHostController, bindChild: (String
     if (bindingOpen) AlertDialog(
             onDismissRequest = { bindingOpen = false; clearWorkflow("child-binding") },
         title = { Text("绑定孩子") },
-        text = { Column { OutlinedTextField(value = childName, onValueChange = { childName = it; saveDraft("child-binding-name", it); bindingError = null }, label = { Text("孩子姓名") }, modifier = Modifier.fillMaxWidth()); OutlinedTextField(value = bindingCode, onValueChange = { bindingCode = it; saveDraft("child-binding-code", it); bindingError = null }, label = { Text("学校绑定码") }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)); Text("绑定码由学校或班主任提供，用于确认家庭与孩子关系。", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 7.dp)); TextButton(onClick = { bindingHelpOpen = true }, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp), modifier = Modifier.semantics { contentDescription = "查看绑定码获取说明" }) { Text("绑定码在哪找？", color = Blue, fontSize = 12.sp) }; bindingError?.let { Text(it, color = Color.Red, fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp)) } } },
+        text = { Column { OutlinedTextField(value = childName, onValueChange = { childName = it; saveDraft("child-binding-name", it); bindingError = null }, label = { Text("孩子姓名") }, modifier = Modifier.fillMaxWidth()); OutlinedTextField(value = bindingCode, onValueChange = { bindingCode = it; saveDraft("child-binding-code", it); bindingError = null }, label = { Text("学校绑定码") }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)); Text("绑定码由学校或班主任提供，用于确认家庭与孩子关系。", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 7.dp)); TextButton(onClick = { bindingHelpOpen = true }, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp), modifier = Modifier.semantics { contentDescription = "查看绑定码获取说明" }) { Text("绑定码在哪找？", color = Blue, fontSize = 16.sp) }; bindingError?.let { Text(it, color = Color.Red, fontSize = 16.sp, modifier = Modifier.padding(top = 5.dp)) } } },
         confirmButton = { TextButton(
             enabled = !bindingState.isSubmitting,
             onClick = {
@@ -309,7 +309,7 @@ fun ChildrenScreen(state: AppUiState, nav: NavHostController, bindChild: (String
     if (bindingHelpOpen) AlertDialog(
         onDismissRequest = { bindingHelpOpen = false },
         title = { Text("绑定码获取说明") },
-        text = { Text("绑定码由学校后台生成。请联系班主任或学校管理员，在“家长绑定管理/学生档案”中获取孩子专属绑定码。若学校尚未发放，请先向班主任申请；平台不会代填或生成绑定码。", color = Color.Gray, fontSize = 12.sp) },
+        text = { Text("绑定码由学校后台生成。请联系班主任或学校管理员，在“家长绑定管理/学生档案”中获取孩子专属绑定码。若学校尚未发放，请先向班主任申请；平台不会代填或生成绑定码。", color = Color.Gray, fontSize = 16.sp) },
         confirmButton = { TextButton(onClick = { bindingHelpOpen = false }) { Text("知道了") } }
     )
 }
@@ -330,10 +330,10 @@ fun ParentEvaluationsScreen(state: AppUiState, nav: NavHostController, report: D
     if (focusedTaskId != null) {
         Spacer(Modifier.height(8.dp))
         Surface(Modifier.fillMaxWidth(), color = if (focusedTask == null) Color(0xFFFFF4E5) else Sky, shape = RoundedCornerShape(12.dp)) {
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(if (focusedTask == null) "通知关联任务暂不可用" else "通知关联测评", color = Navy, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                Text(focusedTask?.title ?: "任务可能已结束、被撤回，或不属于当前孩子。", color = Color.Gray, fontSize = 12.sp)
-                focusedTask?.let { Text("${it.date} · ${it.location} · ${it.status.label}", color = Blue, fontSize = 12.sp) }
+                Text(focusedTask?.title ?: "任务可能已结束、被撤回，或不属于当前孩子。", color = Color.Gray, fontSize = 16.sp)
+                focusedTask?.let { Text("${it.date} · ${it.location} · ${it.status.label}", color = Blue, fontSize = 16.sp) }
             }
         }
     }
@@ -341,21 +341,21 @@ fun ParentEvaluationsScreen(state: AppUiState, nav: NavHostController, report: D
     val publishedReport = report?.takeIf { state.hasPublishedSchoolReport(selectedChild) }
     val reportAwaitingSync = state.hasPublishedSchoolReport(selectedChild) && publishedReport == null && state.repositoryAcknowledged
     Surface(Modifier.fillMaxWidth(), color = Sky, shape = RoundedCornerShape(12.dp)) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             val progress = (publishedReport?.scoreCompletionRatio ?: 0.0).toFloat().coerceIn(0f, 1f)
             Box(Modifier.size(76.dp).semantics { contentDescription = "学校运动能力测评进度 ${(progress * 100).toInt()}%" }, contentAlignment = Alignment.Center) {
                 CircularProgressIndicator({ progress }, Modifier.fillMaxSize(), color = Blue, trackColor = Blue.copy(alpha = .14f), strokeWidth = 7.dp)
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(1.dp)) {
                     Text("${(progress * 100).toInt()}%", color = Blue, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Text("7 项", color = Color.Gray, fontSize = 12.sp)
+                    Text("7 项", color = Color.Gray, fontSize = 16.sp)
                 }
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text("学校运动能力测评", color = Navy, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                Surface(color = Blue.copy(alpha = .10f), shape = CircleShape) { Text(publishedReport?.let { if (it.isComplete) it.riskLevel.label else "待完成" } ?: if (reportAwaitingSync) "报告更新中" else "等待报告", color = Blue, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)) }
+                Surface(color = Blue.copy(alpha = .10f), shape = CircleShape) { Text(publishedReport?.let { if (it.isComplete) it.riskLevel.label else "待完成" } ?: if (reportAwaitingSync) "报告更新中" else "等待报告", color = Blue, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)) }
                 LinearProgressIndicator({ progress }, Modifier.fillMaxWidth().height(7.dp).clip(CircleShape), color = Green, trackColor = Blue.copy(alpha = .10f))
-                Text(publishedReport?.let { if (it.isComplete) "已完成 7 项 · 总分 ${String.format(java.util.Locale.US, "%.1f", it.totalScore)} / 35" else "已完成 ${it.scoredItemCount} 项 · 进度 ${(progress * 100).toInt()}%" } ?: if (reportAwaitingSync) "报告正在更新，点击刷新" else "完成学校体测后生成报告", color = Color.Gray, fontSize = 12.sp)
+                Text(publishedReport?.let { if (it.isComplete) "已完成 7 项 · 总分 ${String.format(java.util.Locale.US, "%.1f", it.totalScore)} / 35" else "已完成 ${it.scoredItemCount} 项 · 进度 ${(progress * 100).toInt()}%" } ?: if (reportAwaitingSync) "报告正在更新，点击刷新" else "完成学校体测后生成报告", color = Color.Gray, fontSize = 16.sp)
             }
         }
     }
@@ -368,38 +368,38 @@ fun ParentEvaluationsScreen(state: AppUiState, nav: NavHostController, report: D
     }
     Spacer(Modifier.height(10.dp))
     Text("体质成长档案", color = Navy, fontWeight = FontWeight.Bold)
-    Text(latestHeight?.let { "最新实测 ${"%.1f".format(it)} cm" } ?: "等待身体测评实测", color = Color.Gray, fontSize = 12.sp)
+    Text(latestHeight?.let { "最新实测 ${"%.1f".format(it)} cm" } ?: "等待身体测评实测", color = Color.Gray, fontSize = 16.sp)
     Surface(Modifier.fillMaxWidth().padding(top = 6.dp), color = Color.White, shape = RoundedCornerShape(10.dp)) {
         Column(Modifier.padding(11.dp)) {
-            Text("身高实测趋势", color = Navy, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text("身高实测趋势", color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             if (measuredHeights.isEmpty()) {
-                Text("暂无实测趋势，完成身体测评后开始积累。", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.height(72.dp).padding(top = 18.dp))
+                Text("暂无实测趋势，完成身体测评后开始积累。", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.height(72.dp).padding(top = 18.dp))
             } else Row(Modifier.fillMaxWidth().height(72.dp).padding(top = 8.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 val minHeight = measuredHeights.minOrNull() ?: 0.0
                 val range = ((measuredHeights.maxOrNull() ?: minHeight) - minHeight).coerceAtLeast(1.0)
                 measuredHeights.forEachIndexed { index, height ->
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(Modifier.width(22.dp).height((20 + (height - minHeight) / range * 36).dp).background(if (index == measuredHeights.lastIndex) Blue else Blue.copy(.32f), RoundedCornerShape(4.dp)))
-                        Text("%.0f".format(height), color = Color.Gray, fontSize = 12.sp)
+                        Text("%.0f".format(height), color = Color.Gray, fontSize = 16.sp)
                     }
                 }
             }
-            Text(geneticReference?.let { val range = bodyHistory.lastOrNull()?.geneticHeightRange(selectedChild.gender); "遗传靶身高中位：${"%.1f".format(it)} cm · 区间 ${"%.1f".format(range?.start)}–${"%.1f".format(range?.endInclusive)} cm" } ?: "补充父母身高后显示遗传靶身高区间", color = Color.Gray, fontSize = 12.sp)
-            Text(heightDevelopment?.let { "当前身高发育：${it.level.label} · ${it.ageYears}岁参考中位 ${"%.1f".format(it.median)} cm" } ?: "7–18 岁身高发育等级将在生日与实测值完整后显示", color = Color.Gray, fontSize = 12.sp)
+            Text(geneticReference?.let { val range = bodyHistory.lastOrNull()?.geneticHeightRange(selectedChild.gender); "遗传靶身高中位：${"%.1f".format(it)} cm · 区间 ${"%.1f".format(range?.start)}–${"%.1f".format(range?.endInclusive)} cm" } ?: "补充父母身高后显示遗传靶身高区间", color = Color.Gray, fontSize = 16.sp)
+            Text(heightDevelopment?.let { "当前身高发育：${it.level.label} · ${it.ageYears}岁参考中位 ${"%.1f".format(it.median)} cm" } ?: "7–18 岁身高发育等级将在生日与实测值完整后显示", color = Color.Gray, fontSize = 16.sp)
         }
     }
     Spacer(Modifier.height(10.dp))
     Text("家庭健康记录", color = Navy, fontWeight = FontWeight.Bold)
-    Text("家长填写", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+    Text("家长填写", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 2.dp))
     listOf("vision" to "视力" to "用眼习惯与家庭观察", "oral" to "口腔" to "口腔习惯与家庭观察", "mental" to "心理" to "情绪与同伴互动感受").forEach { (pair, detail) ->
         val (category, name) = pair
         val saved = "${selectedChild.id}-$category" in state.local.completedAssessments
         Surface(Modifier.fillMaxWidth().padding(top = 6.dp).semantics { role = Role.Button; contentDescription = if (saved) "查看${name}家庭健康记录" else "填写${name}家庭健康记录" }.clickable { nav.navigate("${Destinations.Assessment}/$category") }, color = Color.White, shape = RoundedCornerShape(9.dp)) {
-            Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(if (name == "视力") Icons.Filled.RemoveRedEye else if (name == "口腔") Icons.Filled.MedicalServices else Icons.Filled.Favorite, null, tint = if (name == "视力") Green else if (name == "口腔") Color(0xFFFFBD2E) else Color(0xFFFF6D9B))
                 Spacer(Modifier.width(9.dp))
-                Column(Modifier.weight(1f)) { Text(name, color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text(detail, color = Color.Gray, fontSize = 12.sp) }
-                Text(if (saved) "已保存 ›" else "去填写 ›", color = if (name == "视力") Green else if (name == "口腔") Color(0xFFFF9D25) else Color(0xFFFF6D9B), fontSize = 12.sp)
+                Column(Modifier.weight(1f)) { Text(name, color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp); Text(detail, color = Color.Gray, fontSize = 16.sp) }
+                Text(if (saved) "已保存 ›" else "去填写 ›", color = if (name == "视力") Green else if (name == "口腔") Color(0xFFFF9D25) else Color(0xFFFF6D9B), fontSize = 16.sp)
             }
         }
     }
@@ -437,18 +437,18 @@ fun HealthProfileScreen(state: AppUiState, nav: NavHostController, checkInToday:
     Row { ScoreSummaryCard("7 项体测", schoolReport?.let { if (it.totalScore >= 25) "良好" else "需关注" } ?: if (reportAwaitingSync) "报告更新中" else "等待报告", schoolReport?.date ?: if (reportAwaitingSync) "报告更新中" else "等待报告", onClick = { nav.navigate(Destinations.Report) }); Spacer(Modifier.width(6.dp)); ScoreSummaryCard("总分", schoolReport?.let { String.format(java.util.Locale.US, "%.1f / 35", it.totalScore) } ?: if (reportAwaitingSync) "报告更新中" else "等待报告", if (schoolReport == null) { if (reportAwaitingSync) "报告更新中" else "完成测评后生成" } else "本轮学校体测", onClick = { nav.navigate(Destinations.Report) }) }
     Spacer(Modifier.height(9.dp))
     if (rolloutRevision >= 0 && FeatureRollout.isEnabled(FeatureRollout.Feature.GrowthInsights)) Surface(onClick = { growthReportOpen = true }, modifier = Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(12.dp)) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Filled.AutoGraph, "成长周报与月报", tint = Blue); Spacer(Modifier.width(9.dp))
-            Column(Modifier.weight(1f)) { Text("成长周报与月报", color = Navy, fontWeight = FontWeight.Bold); Text("汇总真实打卡与测评记录，并说明计划调整原因", color = Color.Gray, fontSize = 12.sp) }
+            Column(Modifier.weight(1f)) { Text("成长周报与月报", color = Navy, fontWeight = FontWeight.Bold); Text("汇总真实打卡与测评记录，并说明计划调整原因", color = Color.Gray, fontSize = 16.sp) }
             Icon(Icons.Filled.ChevronRight, null, tint = Blue)
         }
     }
-    state.selectedChild.let { child -> state.local.bodyAssessments[child.id]?.let { body -> Spacer(Modifier.height(9.dp)); Surface(onClick = { nav.navigate(Destinations.BodyAssessment) }, modifier = Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(12.dp)) { Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.AccessibilityNew, null, tint = Green); Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Text("身体测评", color = Navy, fontWeight = FontWeight.Bold); Text("BMI ${"%.1f".format(body.bmi)} · ${body.level(child.bodyAssessmentAgeMonths, child.gender).label} · 建议复测 ${body.nextFollowUp}", color = Color.Gray, fontSize = 12.sp, maxLines = 2) }; Icon(Icons.Filled.ChevronRight, null, tint = Blue) } } } ?: run { Spacer(Modifier.height(9.dp)); OutlinedButton(onClick = { nav.navigate(Destinations.BodyAssessment) }, modifier = Modifier.fillMaxWidth()) { Text("完成身体测评：BMI 与姿态观察") } } }
+    state.selectedChild.let { child -> state.local.bodyAssessments[child.id]?.let { body -> Spacer(Modifier.height(9.dp)); Surface(onClick = { nav.navigate(Destinations.BodyAssessment) }, modifier = Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(12.dp)) { Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.AccessibilityNew, null, tint = Green); Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Text("身体测评", color = Navy, fontWeight = FontWeight.Bold); Text("BMI ${"%.1f".format(body.bmi)} · ${body.level(child.bodyAssessmentAgeMonths, child.gender).label} · 建议复测 ${body.nextFollowUp}", color = Color.Gray, fontSize = 16.sp, maxLines = 2) }; Icon(Icons.Filled.ChevronRight, null, tint = Blue) } } } ?: run { Spacer(Modifier.height(9.dp)); OutlinedButton(onClick = { nav.navigate(Destinations.BodyAssessment) }, modifier = Modifier.fillMaxWidth()) { Text("完成身体测评：BMI 与姿态观察") } } }
     val archivedCategories = listOf("vision" to "视力", "oral" to "口腔", "mental" to "心理").filter { (key, _) -> state.local.familyHealthRecords.containsKey("${state.selectedChild.id}-$key") }
     if (archivedCategories.isNotEmpty()) {
         Spacer(Modifier.height(9.dp))
         Surface(Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(12.dp)) {
-            Column(Modifier.padding(12.dp)) {
+            Column(Modifier.padding(16.dp)) {
                 Text("家庭健康记录", color = Navy, fontWeight = FontWeight.Bold)
                 archivedCategories.forEach { (key, label) ->
                     Row(
@@ -459,8 +459,8 @@ fun HealthProfileScreen(state: AppUiState, nav: NavHostController, checkInToday:
                     ) {
                         Icon(if (key == "vision") Icons.Filled.RemoveRedEye else if (key == "oral") Icons.Filled.MedicalServices else Icons.Filled.Favorite, null, tint = if (key == "vision") Green else if (key == "oral") Color(0xFFFFBD2E) else Color(0xFFFF6D9B))
                         Spacer(Modifier.width(9.dp))
-                        Column(Modifier.weight(1f)) { Text("${label}家庭记录已保存", color = Navy, fontSize = 12.sp, fontWeight = FontWeight.SemiBold); Text("家长填写 · ${state.local.familyHealthRecords["${state.selectedChild.id}-$key"]?.completedAt ?: "历史记录"}", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp)) }
-                        Text("查看", color = Blue, fontSize = 12.sp)
+                        Column(Modifier.weight(1f)) { Text("${label}家庭记录已保存", color = Navy, fontSize = 16.sp, fontWeight = FontWeight.SemiBold); Text("家长填写 · ${state.local.familyHealthRecords["${state.selectedChild.id}-$key"]?.completedAt ?: "历史记录"}", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 2.dp)) }
+                        Text("查看", color = Blue, fontSize = 16.sp)
                         Icon(Icons.Filled.ChevronRight, null, tint = Blue, modifier = Modifier.size(15.dp))
                     }
                 }
@@ -476,9 +476,9 @@ fun HealthProfileScreen(state: AppUiState, nav: NavHostController, checkInToday:
             // Keep the calendar header actionable; a static label here made
             // the Android health page diverge from the iOS interaction model.
             ParentSection("本月打卡", "查看记录") { checkInDetail = true }
-            Text(BusinessClock.format("yyyy年M月", monthStart.time), color = Navy, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-            Row(Modifier.fillMaxWidth()) { listOf("日", "一", "二", "三", "四", "五", "六").forEach { Text(it, color = Color.Gray, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.weight(1f)) } }
-            monthCells.chunked(7).forEach { week -> Row(Modifier.fillMaxWidth().padding(top = 3.dp)) { week.forEach { day -> Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { if (day != null) { val date = (monthStart.clone() as java.util.Calendar).apply { set(java.util.Calendar.DAY_OF_MONTH, day) }; val key = BusinessClock.day(date.time); Text("$day", color = if (key in selectedChildCheckInDates) Green else Navy, fontSize = 12.sp, fontWeight = if (key in selectedChildCheckInDates) FontWeight.Bold else FontWeight.Normal, modifier = if (key in selectedChildCheckInDates) Modifier.background(Green.copy(alpha = .12f), CircleShape).padding(horizontal = 5.dp, vertical = 2.dp) else Modifier.padding(vertical = 2.dp)) } } } } }
+            Text(BusinessClock.format("yyyy年M月", monthStart.time), color = Navy, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Row(Modifier.fillMaxWidth()) { listOf("日", "一", "二", "三", "四", "五", "六").forEach { Text(it, color = Color.Gray, fontSize = 16.sp, textAlign = TextAlign.Center, modifier = Modifier.weight(1f)) } }
+            monthCells.chunked(7).forEach { week -> Row(Modifier.fillMaxWidth().padding(top = 3.dp)) { week.forEach { day -> Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { if (day != null) { val date = (monthStart.clone() as java.util.Calendar).apply { set(java.util.Calendar.DAY_OF_MONTH, day) }; val key = BusinessClock.day(date.time); Text("$day", color = if (key in selectedChildCheckInDates) Green else Navy, fontSize = 16.sp, fontWeight = if (key in selectedChildCheckInDates) FontWeight.Bold else FontWeight.Normal, modifier = if (key in selectedChildCheckInDates) Modifier.background(Green.copy(alpha = .12f), CircleShape).padding(horizontal = 5.dp, vertical = 2.dp) else Modifier.padding(vertical = 2.dp)) } } } } }
             Button(onClick = { checkInForm = true; checkInError = null }, enabled = !checkedInTodayForChild, modifier = Modifier.fillMaxWidth().padding(top = 9.dp)) { Text(if (checkedInTodayForChild) "今日已打卡" else "记录今日运动") }
         }
     }
@@ -489,7 +489,7 @@ fun HealthProfileScreen(state: AppUiState, nav: NavHostController, checkInToday:
         AlertDialog(
             onDismissRequest = { checkInDetail = false },
             title = { Text("本月运动打卡记录") },
-            text = { val prefix = BusinessClock.format("yyyy-MM"); val count = dialogCheckInDates.count { it.startsWith(prefix) }; Column { Text(if (checkedInTodayForDialog) "本月已完成 $count 次运动打卡，今天已打卡。" else "本月已完成 $count 次运动打卡，今天还可以继续记录。", color = Color.Gray); Text("打卡记录会自动保存并同步。", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp)) } },
+            text = { val prefix = BusinessClock.format("yyyy-MM"); val count = dialogCheckInDates.count { it.startsWith(prefix) }; Column { Text(if (checkedInTodayForDialog) "本月已完成 $count 次运动打卡，今天已打卡。" else "本月已完成 $count 次运动打卡，今天还可以继续记录。", color = Color.Gray); Text("打卡记录会自动保存并同步。", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 8.dp)) } },
             confirmButton = { TextButton(onClick = { checkInDetail = false }) { Text("知道了") } }
         )
     }
@@ -500,12 +500,12 @@ fun HealthProfileScreen(state: AppUiState, nav: NavHostController, checkInToday:
             text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(activityType, { activityType = it; checkInError = null }, label = { Text("运动类型") }, placeholder = { Text("如：跟练、跑步、球类") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(durationText, { durationText = it.filter(Char::isDigit); checkInError = null }, label = { Text("运动时长（分钟）") }, singleLine = true, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-                Text("运动强度", color = Navy, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf("low" to "轻松", "moderate" to "适中", "high" to "较高").forEach { (value, label) -> FilterChip(selected = intensity == value, onClick = { intensity = value }, label = { Text(label, fontSize = 12.sp) }, modifier = Modifier.weight(1f).heightIn(min = 44.dp)) } }
+                Text("运动强度", color = Navy, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf("low" to "轻松", "moderate" to "适中", "high" to "较高").forEach { (value, label) -> FilterChip(selected = intensity == value, onClick = { intensity = value }, label = { Text(label, fontSize = 16.sp) }, modifier = Modifier.weight(1f).heightIn(min = 44.dp)) } }
                 OutlinedTextField(feeling, { feeling = it }, label = { Text("运动后感受（选填）") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
-                Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(completedRecommended, { completedRecommended = it }); Text("完成了今日建议训练", fontSize = 13.sp) }
+                Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(completedRecommended, { completedRecommended = it }); Text("完成了今日建议训练", fontSize = 15.sp) }
                 OutlinedTextField(parentNote, { parentNote = it }, label = { Text("家长备注（选填）") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
-                checkInError?.let { Text(it, color = Color.Red, fontSize = 12.sp) }
+                checkInError?.let { Text(it, color = Color.Red, fontSize = 16.sp) }
             } },
             confirmButton = { TextButton(onClick = {
                 val minutes = durationText.toIntOrNull()
@@ -529,18 +529,18 @@ internal fun ParentActivities(nav: NavHostController) = Column(verticalArrangeme
     ParentSection("最近家庭运动", "查看全部") { nav.navigate(Destinations.Courses) }
     Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth()) { MiniActivity(R.drawable.activity_classroom, "课间活力操", Modifier.weight(1f)) { nav.navigate(Destinations.Courses) }; MiniActivity(R.drawable.activity_football, "足球启蒙", Modifier.weight(1f)) { nav.navigate(Destinations.Courses) }; MiniActivity(R.drawable.activity_balance, "平衡挑战", Modifier.weight(1f)) { nav.navigate(Destinations.Courses) } }
     Surface(Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "查看推荐课程：青少年体姿改善课程" }.clickable { nav.navigate(Destinations.Courses) }, color = Color.White, shape = RoundedCornerShape(11.dp)) {
-        Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Image(painterResource(R.drawable.activity_balance), null, Modifier.size(58.dp).clip(RoundedCornerShape(9.dp)), contentScale = ContentScale.Crop)
             Spacer(Modifier.width(9.dp))
-            Column(Modifier.weight(1f)) { Text("为孩子推荐", color = Color.Gray, fontSize = 12.sp); Text("青少年体姿改善课程", color = Navy, fontWeight = FontWeight.Bold, fontSize = 13.sp); Text("每周 2 次 · 适合 7-10 岁", color = Green, fontSize = 12.sp) }
-            Text("查看课程", color = Color.White, fontSize = 12.sp, modifier = Modifier.background(Color(0xFFFFB521), CircleShape).padding(horizontal = 9.dp, vertical = 5.dp))
+            Column(Modifier.weight(1f)) { Text("为孩子推荐", color = Color.Gray, fontSize = 16.sp); Text("青少年体姿改善课程", color = Navy, fontWeight = FontWeight.Bold, fontSize = 15.sp); Text("每周 2 次 · 适合 7-10 岁", color = Green, fontSize = 16.sp) }
+            Text("查看课程", color = Color.White, fontSize = 16.sp, modifier = Modifier.background(Color(0xFFFFB521), CircleShape).padding(horizontal = 9.dp, vertical = 5.dp))
         }
     }
 }
-@Composable internal fun MiniActivity(image: Int, title: String, modifier: Modifier, onClick: () -> Unit) = Surface(onClick = onClick, modifier = modifier, color = Color.White, shape = RoundedCornerShape(8.dp)) { Column(Modifier.padding(4.dp)) { Image(painterResource(image), null, Modifier.fillMaxWidth().height(44.dp).clip(RoundedCornerShape(6.dp)), contentScale = ContentScale.Crop); Text(title, color = Navy, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.padding(top = 3.dp)) } }
+@Composable internal fun MiniActivity(image: Int, title: String, modifier: Modifier, onClick: () -> Unit) = Surface(onClick = onClick, modifier = modifier, color = Color.White, shape = RoundedCornerShape(10.dp)) { Column(Modifier.padding(6.dp)) { Image(painterResource(image), null, Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop); Text(title, color = Navy, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 2, modifier = Modifier.padding(top = 5.dp)) } }
 @Composable internal fun ParentTabScaffold(nav: NavHostController, selected: String, body: @Composable ColumnScope.() -> Unit) = Scaffold(containerColor = Canvas, bottomBar = { ParentBottomBar(nav, selected) }) { padding ->
     Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-        Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().fillMaxHeight().padding(horizontal = 12.dp).verticalScroll(rememberScrollState()), content = body)
+        Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().fillMaxHeight().padding(horizontal = AppDimens.PagePadding).verticalScroll(rememberScrollState()), content = body)
     }
 }
 @Composable internal fun ParentBottomBar(nav: NavHostController, selected: String) = NavigationBar(containerColor = Color.White, tonalElevation = 1.dp) {
@@ -551,4 +551,4 @@ internal fun ParentActivities(nav: NavHostController) = Column(verticalArrangeme
     ParentNavItem("班级圈", Icons.Filled.Groups, selected == Destinations.Circle) { go(Destinations.Circle) }
     ParentNavItem("我的", Icons.Filled.Person, selected == Destinations.Account) { go(Destinations.Account) }
 }
-@Composable private fun RowScope.ParentNavItem(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean, onClick: () -> Unit) = NavigationBarItem(selected = selected, onClick = onClick, icon = { Icon(icon, null) }, label = { Text(label, fontSize = 12.sp, maxLines = 1) }, modifier = Modifier.semantics { contentDescription = "$label${if (selected) "，当前页面" else ""}" })
+@Composable private fun RowScope.ParentNavItem(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean, onClick: () -> Unit) = NavigationBarItem(selected = selected, onClick = onClick, icon = { Icon(icon, null) }, label = { Text(label, fontSize = 16.sp, maxLines = 1) }, modifier = Modifier.semantics { contentDescription = "$label${if (selected) "，当前页面" else ""}" })

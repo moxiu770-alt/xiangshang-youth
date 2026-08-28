@@ -11,7 +11,7 @@ struct AppScaffold<Content: View>: View {
     /// the next screen never inherits the previous screen's scroll offset.
     var scrollResetID: AnyHashable? = nil
     @ViewBuilder var content: Content
-    @ScaledMetric(relativeTo: .headline) private var titleSize: CGFloat = 19
+    @ScaledMetric(relativeTo: .headline) private var titleSize: CGFloat = 21
     var body: some View {
         VStack(spacing: 0) {
             ZStack {
@@ -44,7 +44,7 @@ struct AppScaffold<Content: View>: View {
                     .truncationMode(.tail)
                     .padding(.horizontal, 50)
                     .accessibilityLabel(title)
-            }.padding(.horizontal, AppTheme.pagePadding).frame(height: 54).background { Rectangle().fill(.ultraThinMaterial).ignoresSafeArea(edges: .top) }
+            }.padding(.horizontal, AppTheme.pagePadding).frame(height: 64).background { Rectangle().fill(.ultraThinMaterial).ignoresSafeArea(edges: .top) }
             if let error = state.error, state.data == nil {
                 ErrorStateView(message: error, retry: { Task { await state.refreshDashboard() } }, dismiss: state.clearError)
                     .padding(.horizontal, AppTheme.pagePadding)
@@ -53,8 +53,8 @@ struct AppScaffold<Content: View>: View {
             } else {
                 ScrollView {
                     content
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 32)
+                        .padding(.horizontal, AppTheme.pagePadding)
+                        .padding(.bottom, 40)
                         .frame(maxWidth: 720)
                         .frame(maxWidth: .infinity)
                 }
@@ -71,7 +71,7 @@ struct OfflineBanner: View {
     var body: some View {
         VStack {
             Text(message)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: AppTheme.captionSize, weight: .semibold))
                 .foregroundStyle(AppTheme.ink)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 14)
@@ -87,14 +87,14 @@ struct OfflineBanner: View {
         .accessibilityLabel(message)
     }
 }
-struct RoleBadge: View { let role: UserRole; var body: some View { Label(role.rawValue, systemImage: role.icon).font(.caption.weight(.semibold)).foregroundStyle(AppTheme.primary).padding(.horizontal, 10).padding(.vertical, 6).background(AppTheme.primary.opacity(0.1), in: Capsule()).accessibilityLabel("当前角色：\(role.rawValue)") } }
+struct RoleBadge: View { let role: UserRole; var body: some View { Label(role.rawValue, systemImage: role.icon).font(.subheadline.weight(.semibold)).foregroundStyle(AppTheme.primary).padding(.horizontal, 12).padding(.vertical, 8).background(AppTheme.primary.opacity(0.1), in: Capsule()).accessibilityLabel("当前角色：\(role.rawValue)") } }
 struct StudentCard: View {
     let student: Student; let action: (() -> Void)?
     @ViewBuilder private var cardContent: some View { HStack(spacing: 12) {
         Text(String(student.name.prefix(1))).font(.title2.bold()).foregroundStyle(.white).frame(width: 46, height: 46).background(AppTheme.teal, in: Circle())
-        VStack(alignment: .leading, spacing: 4) { Text(student.name).font(.headline).foregroundStyle(AppTheme.ink); Text("\(student.grade) · \(student.className) · \(student.gender)").font(.caption).foregroundStyle(AppTheme.muted); Label(student.region, systemImage: "mappin.and.ellipse").font(.caption).foregroundStyle(AppTheme.muted) }
-        Spacer(); if let score = student.totalScore { VStack { Text("\(score, specifier: "%.1f")").font(.headline).foregroundStyle(AppTheme.primary); Text("/ 35分").font(.caption).foregroundStyle(AppTheme.muted) } }; Image(systemName: "chevron.right").foregroundStyle(.tertiary)
-    }.padding(14).background(.white, in: RoundedRectangle(cornerRadius: 16)) }
+        VStack(alignment: .leading, spacing: 6) { Text(student.name).font(.title3.weight(.semibold)).foregroundStyle(AppTheme.ink); Text("\(student.grade) · \(student.className) · \(student.gender)").font(.subheadline).foregroundStyle(AppTheme.muted); Label(student.region, systemImage: "mappin.and.ellipse").font(.subheadline).foregroundStyle(AppTheme.muted) }
+        Spacer(); if let score = student.totalScore { VStack { Text("\(score, specifier: "%.1f")").font(.headline).foregroundStyle(AppTheme.primary); Text("/ 35分").font(.subheadline).foregroundStyle(AppTheme.muted) } }; Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+    }.padding(AppTheme.cardPadding).background(.white, in: RoundedRectangle(cornerRadius: 16)) }
     var body: some View {
         Group {
             if let action { Button(action: action) { cardContent }.buttonStyle(.plain) }
@@ -107,9 +107,9 @@ struct StudentCard: View {
 struct TestTaskCard: View {
     let task: TestTask; let action: (() -> Void)?
     @ViewBuilder private var cardContent: some View { VStack(alignment: .leading, spacing: 10) {
-        HStack { Text(task.title).font(.headline).foregroundStyle(AppTheme.ink); Spacer(); Text(task.status.rawValue).font(.caption.weight(.semibold)).foregroundStyle(statusColor(task.status)).padding(.horizontal, 8).padding(.vertical, 4).background(statusColor(task.status).opacity(0.12), in: Capsule()) }
-        Label(task.date, systemImage: "calendar").font(.subheadline).foregroundStyle(AppTheme.muted); Label(task.location, systemImage: "mappin.and.ellipse").font(.subheadline).foregroundStyle(AppTheme.muted); ProgressView(value: Double(task.completedCount), total: Double(task.totalCount)).tint(AppTheme.teal); Text("已完成 \(task.completedCount) / \(task.totalCount) 人 · 评测标准已应用").font(.caption).foregroundStyle(AppTheme.muted)
-    }.padding(14).background(.white, in: RoundedRectangle(cornerRadius: 16)) }
+        HStack { Text(task.title).font(.title3.weight(.semibold)).foregroundStyle(AppTheme.ink); Spacer(); Text(task.status.rawValue).font(.subheadline.weight(.semibold)).foregroundStyle(statusColor(task.status)).padding(.horizontal, 10).padding(.vertical, 6).background(statusColor(task.status).opacity(0.12), in: Capsule()) }
+        Label(task.date, systemImage: "calendar").font(.body).foregroundStyle(AppTheme.muted); Label(task.location, systemImage: "mappin.and.ellipse").font(.body).foregroundStyle(AppTheme.muted); ProgressView(value: Double(task.completedCount), total: Double(task.totalCount)).tint(AppTheme.teal); Text("已完成 \(task.completedCount) / \(task.totalCount) 人 · 评测标准已应用").font(.subheadline).foregroundStyle(AppTheme.muted)
+    }.padding(AppTheme.cardPadding).background(.white, in: RoundedRectangle(cornerRadius: 16)) }
     var body: some View {
         Group {
             if let action { Button(action: action) { cardContent }.buttonStyle(.plain) }
@@ -120,7 +120,7 @@ struct TestTaskCard: View {
     }
     private func statusColor(_ status: TaskStatus) -> Color { status == .completed ? AppTheme.teal : status == .review || status == .retest || status == .absent ? AppTheme.danger : AppTheme.primary }
 }
-struct ScoreSummaryCard: View { let title: String; let value: String; let caption: String; var body: some View { VStack(alignment: .leading, spacing: 8) { Text(title).font(.caption).foregroundStyle(AppTheme.muted); Text(value).font(.title2.bold()).foregroundStyle(AppTheme.ink); Text(caption).font(.caption).foregroundStyle(AppTheme.teal) }.frame(maxWidth: .infinity, alignment: .leading).padding(14).background(.white, in: RoundedRectangle(cornerRadius: 16)).accessibilityElement(children: .ignore).accessibilityLabel("\(title)，\(value)，\(caption)") } }
+struct ScoreSummaryCard: View { let title: String; let value: String; let caption: String; var body: some View { VStack(alignment: .leading, spacing: 10) { Text(title).font(.subheadline).foregroundStyle(AppTheme.muted); Text(value).font(.title.bold()).foregroundStyle(AppTheme.ink); Text(caption).font(.subheadline).foregroundStyle(AppTheme.teal) }.frame(maxWidth: .infinity, alignment: .leading).padding(AppTheme.cardPadding).background(.white, in: RoundedRectangle(cornerRadius: 16)).accessibilityElement(children: .ignore).accessibilityLabel("\(title)，\(value)，\(caption)") } }
 struct ReportMetricCard: View {
     let result: ScoreResult
     private var reviewColor: Color { result.normalizedReviewStatus == .passed ? ReferenceColor.green : AppTheme.warning }

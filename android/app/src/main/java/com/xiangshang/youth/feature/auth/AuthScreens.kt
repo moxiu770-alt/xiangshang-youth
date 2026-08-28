@@ -142,7 +142,7 @@ fun LoginScreen(
             Column(Modifier.padding(top = 34.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text("向上少年", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Black)
                 Text("身心健康智慧平台", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black)
-                Text("学校体测 · 家庭健康记录 · 成长训练", color = Color(0xFFFFBD2E), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp).background(Color.White.copy(.17f), CircleShape))
+                Text("学校体测 · 家庭健康记录 · 成长训练", color = Color(0xFFFFBD2E), fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp).background(Color.White.copy(.17f), CircleShape))
             }
             Spacer(Modifier.height(10.dp))
             Surface(Modifier.fillMaxWidth().padding(horizontal = 10.dp).heightIn(min = loginPanelMinHeight), color = Color.White, shape = RoundedCornerShape(26.dp), shadowElevation = 4.dp) {
@@ -160,7 +160,7 @@ fun LoginScreen(
                         TextButton(onClick = {
                             if (phone.filter(Char::isDigit).length != 11) error = "请先填写 11 位手机号。"
                             else { codeSending = true; onRequestCode(phone, "login") { sent, message -> codeSending = false; if (sent) { codeSent = true; codeCountdown = 60; error = null } else error = message ?: "验证码发送失败，请稍后重试。" } }
-                        }, enabled = codeCountdown == 0 && !codeSending) { Text(if (codeSending) "发送中…" else if (codeCountdown > 0) "${codeCountdown}s 后重试" else if (codeSent) "重新获取" else "获取验证码", fontSize = 12.sp) }
+                        }, enabled = codeCountdown == 0 && !codeSending) { Text(if (codeSending) "发送中…" else if (codeCountdown > 0) "${codeCountdown}s 后重试" else if (codeSent) "重新获取" else "获取验证码", fontSize = 16.sp) }
                         }
                     } else if (method == 2) {
                         OutlinedTextField(value = account, onValueChange = { account = it; error = null; onClearError() }, label = { Text("账号 / 手机号") }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -170,13 +170,13 @@ fun LoginScreen(
                         if (loading) CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(18.dp)) else Icon(Icons.AutoMirrored.Filled.ArrowForward, null)
                         Spacer(Modifier.width(7.dp)); Text(if (loading) "正在登录…" else "登录", fontWeight = FontWeight.Bold)
                     }
-                    (error ?: serverError)?.let { Text(it, color = Color.Red, fontSize = 12.sp) }
+                    (error ?: serverError)?.let { Text(it, color = Color.Red, fontSize = 16.sp) }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        TextButton(onClick = onRegister, contentPadding = PaddingValues(0.dp)) { Text("家长注册", color = Blue, fontSize = 12.sp) }
-                        TextButton(onClick = onForgotPassword, contentPadding = PaddingValues(0.dp)) { Text("忘记密码？", color = Color.Gray, fontSize = 12.sp) }
+                        TextButton(onClick = onRegister, contentPadding = PaddingValues(0.dp)) { Text("家长注册", color = Blue, fontSize = 16.sp) }
+                        TextButton(onClick = onForgotPassword, contentPadding = PaddingValues(0.dp)) { Text("忘记密码？", color = Color.Gray, fontSize = 16.sp) }
                     }
                     if (accessibilityText) {
-                        Text("登录后可查看孩子的测评、健康记录和训练建议。", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.fillMaxWidth().padding(top = 5.dp))
+                        Text("登录后可查看孩子的测评、健康记录和训练建议。", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.fillMaxWidth().padding(top = 5.dp))
                     } else {
                         Column(Modifier.fillMaxWidth().padding(top = 5.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { LoginCheck("学校体测结果", "查看测评任务与报告"); LoginCheck("家庭健康记录", "完成居家观察与身体测评"); LoginCheck("成长训练建议", "按孩子报告安排每日训练") }
                     }
@@ -184,12 +184,12 @@ fun LoginScreen(
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Row(Modifier.weight(1f).semantics { role = Role.Checkbox; contentDescription = if (agreement) "已同意用户服务协议、隐私政策和儿童个人信息保护声明" else "同意用户服务协议、隐私政策和儿童个人信息保护声明" }.clickable { agreement = !agreement }) {
                             Checkbox(checked = agreement, onCheckedChange = { agreement = it })
-                            Text(if (agreement) "已阅读并同意相关协议" else "请阅读并同意相关协议", color = if (agreement) Green else Color.Gray, fontSize = 12.sp)
+                            Text(if (agreement) "已阅读并同意相关协议" else "请阅读并同意相关协议", color = if (agreement) Green else Color.Gray, fontSize = 16.sp)
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
-                            TextButton(onClick = { legalDocument = LegalPolicy.USER_AGREEMENT_TITLE }, contentPadding = PaddingValues(0.dp)) { Text("用户服务协议", color = Blue, fontSize = 12.sp) }
-                            TextButton(onClick = { legalDocument = "隐私政策" }, contentPadding = PaddingValues(0.dp)) { Text("隐私政策", color = Blue, fontSize = 12.sp) }
-                            TextButton(onClick = { legalDocument = LegalPolicy.CHILD_PRIVACY_TITLE }, contentPadding = PaddingValues(0.dp), modifier = Modifier.semantics { contentDescription = "查看儿童个人信息保护声明" }) { Text("儿童保护声明", color = Blue, fontSize = 12.sp) }
+                            TextButton(onClick = { legalDocument = LegalPolicy.USER_AGREEMENT_TITLE }, contentPadding = PaddingValues(0.dp)) { Text("用户服务协议", color = Blue, fontSize = 16.sp) }
+                            TextButton(onClick = { legalDocument = "隐私政策" }, contentPadding = PaddingValues(0.dp)) { Text("隐私政策", color = Blue, fontSize = 16.sp) }
+                            TextButton(onClick = { legalDocument = LegalPolicy.CHILD_PRIVACY_TITLE }, contentPadding = PaddingValues(0.dp), modifier = Modifier.semantics { contentDescription = "查看儿童个人信息保护声明" }) { Text("儿童保护声明", color = Blue, fontSize = 16.sp) }
                         }
                     }
                 }
@@ -243,19 +243,19 @@ fun RegisterScreen(
             Column(Modifier.fillMaxWidth().padding(top = 80.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 if (loading) CircularProgressIndicator(color = Blue, modifier = Modifier.size(48.dp)) else Icon(Icons.Filled.CheckCircle, null, tint = Green, modifier = Modifier.size(54.dp))
                 Text(if (loading) "正在创建账号" else "账号已创建", color = Navy, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
-                Text(if (loading) "正在进入${accountRole.label}工作区…" else "已归入${accountRole.label}账户", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                Text(if (loading) "正在进入${accountRole.label}工作区…" else "已归入${accountRole.label}账户", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 6.dp))
             }
             return@AppScaffold
         }
         Text("创建向上少年账号", color = Navy, fontSize = 21.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp))
-        Text("注册后可绑定家庭、接收学校通知并保存成长档案。", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp, bottom = 14.dp))
-        Text("账户类型", color = Navy, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp, bottom = 7.dp))
+        Text("注册后可绑定家庭、接收学校通知并保存成长档案。", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 5.dp, bottom = 14.dp))
+        Text("账户类型", color = Navy, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp, bottom = 7.dp))
         Surface(shape = RoundedCornerShape(14.dp), color = Blue.copy(alpha = 0.10f), border = BorderStroke(1.dp, Blue), modifier = Modifier.fillMaxWidth().semantics { contentDescription = "家庭账户" }) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.Home, null, tint = Blue)
                 Column(Modifier.padding(start = 10.dp)) {
-                    Text("家庭账户", color = Navy, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                    Text("绑定孩子、查看测评报告与训练计划。教师和学校管理账号由学校管理员创建。", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+                    Text("家庭账户", color = Navy, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    Text("绑定孩子、查看测评报告与训练计划。教师和学校管理账号由学校管理员创建。", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 2.dp))
                 }
             }
         }
@@ -266,16 +266,16 @@ fun RegisterScreen(
             TextButton(onClick = {
                 if (phone.filter(Char::isDigit).length != 11) error = "请先填写 11 位手机号。"
                 else { codeSending = true; onRequestCode(phone, "register") { sent, message -> codeSending = false; if (sent) { codeSent = true; codeCountdown = 60; error = null } else error = message ?: "验证码发送失败，请稍后重试。" } }
-            }, enabled = codeCountdown == 0 && !codeSending) { Text(if (codeSending) "发送中…" else if (codeCountdown > 0) "${codeCountdown}s" else if (codeSent) "重新获取" else "获取验证码", fontSize = 12.sp) }
+            }, enabled = codeCountdown == 0 && !codeSending) { Text(if (codeSending) "发送中…" else if (codeCountdown > 0) "${codeCountdown}s" else if (codeSent) "重新获取" else "获取验证码", fontSize = 16.sp) }
         }
         PasswordField(value = password, onValueChange = { password = it; error = null }, label = "设置密码（至少 8 位）", visible = passwordVisible, onVisibilityChanged = { passwordVisible = it }, modifier = Modifier.fillMaxWidth().padding(top = 9.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp).semantics { role = Role.Checkbox; contentDescription = if (agreement) "已同意用户服务协议、隐私政策和儿童个人信息保护声明" else "同意用户服务协议、隐私政策和儿童个人信息保护声明" }.clickable { agreement = !agreement }) { Checkbox(checked = agreement, onCheckedChange = { agreement = it }); Text("我已阅读并同意用户服务协议、隐私政策和儿童个人信息保护声明", color = Navy, fontSize = 12.sp) }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp).semantics { role = Role.Checkbox; contentDescription = if (agreement) "已同意用户服务协议、隐私政策和儿童个人信息保护声明" else "同意用户服务协议、隐私政策和儿童个人信息保护声明" }.clickable { agreement = !agreement }) { Checkbox(checked = agreement, onCheckedChange = { agreement = it }); Text("我已阅读并同意用户服务协议、隐私政策和儿童个人信息保护声明", color = Navy, fontSize = 16.sp) }
         Row(horizontalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.padding(top = 2.dp)) {
-            TextButton(onClick = { legalDocument = LegalPolicy.USER_AGREEMENT_TITLE }, contentPadding = PaddingValues(0.dp)) { Text("用户服务协议", color = Blue, fontSize = 12.sp) }
-            TextButton(onClick = { legalDocument = "隐私政策" }, contentPadding = PaddingValues(0.dp)) { Text("隐私政策", color = Blue, fontSize = 12.sp) }
-            TextButton(onClick = { legalDocument = LegalPolicy.CHILD_PRIVACY_TITLE }, contentPadding = PaddingValues(0.dp)) { Text("儿童个人信息保护声明", color = Blue, fontSize = 12.sp) }
+            TextButton(onClick = { legalDocument = LegalPolicy.USER_AGREEMENT_TITLE }, contentPadding = PaddingValues(0.dp)) { Text("用户服务协议", color = Blue, fontSize = 16.sp) }
+            TextButton(onClick = { legalDocument = "隐私政策" }, contentPadding = PaddingValues(0.dp)) { Text("隐私政策", color = Blue, fontSize = 16.sp) }
+            TextButton(onClick = { legalDocument = LegalPolicy.CHILD_PRIVACY_TITLE }, contentPadding = PaddingValues(0.dp)) { Text("儿童个人信息保护声明", color = Blue, fontSize = 16.sp) }
         }
-        error?.let { Text(it, color = Color.Red, fontSize = 12.sp) }
+        error?.let { Text(it, color = Color.Red, fontSize = 16.sp) }
         Button(onClick = {
             when {
                 name.isBlank() -> error = "请输入姓名。"
@@ -314,7 +314,7 @@ fun LegalDocumentDialog(document: String, onDismiss: () -> Unit) {
                 Text(
                     legalText(document),
                     color = Navy,
-                    fontSize = 14.sp,
+                    fontSize = 16.sp,
                     lineHeight = 23.sp,
                     modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 20.dp)
                 )
@@ -359,14 +359,14 @@ fun PasswordResetScreen(onBack: () -> Unit, onReset: (String, String, String, (B
             ) {
                 Icon(Icons.Filled.CheckCircle, null, tint = Green, modifier = Modifier.size(56.dp))
                 Text("密码已重置", color = Navy, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
-                Text("请使用新密码重新登录。", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                Text("请使用新密码重新登录。", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 6.dp))
                 Button(onClick = onBack, modifier = Modifier.padding(top = 20.dp), shape = CircleShape) { Text("返回登录") }
             }
             return@AppScaffold
         }
 
         Text("找回向上少年账号", color = Navy, fontSize = 21.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp))
-        Text("验证手机号后设置新密码，验证码将通过短信发送。", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp, bottom = 14.dp))
+        Text("验证手机号后设置新密码，验证码将通过短信发送。", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 5.dp, bottom = 14.dp))
         OutlinedTextField(
             value = phone,
             onValueChange = { value -> phone = value; error = null; if (codeSent || codeCountdown > 0 || code.isNotEmpty()) { codeSent = false; codeCountdown = 0; code = "" } },
@@ -390,11 +390,11 @@ fun PasswordResetScreen(onBack: () -> Unit, onReset: (String, String, String, (B
                     else { codeSending = true; onRequestCode(phone, "reset-password") { sent, message -> codeSending = false; if (sent) { codeSent = true; codeCountdown = 60; error = null } else error = message ?: "验证码发送失败，请稍后重试。" } }
                 },
                 enabled = codeCountdown == 0 && !codeSending
-            ) { Text(if (codeSending) "发送中…" else if (codeCountdown > 0) "${codeCountdown}s" else if (codeSent) "重新获取" else "获取验证码", fontSize = 12.sp) }
+            ) { Text(if (codeSending) "发送中…" else if (codeCountdown > 0) "${codeCountdown}s" else if (codeSent) "重新获取" else "获取验证码", fontSize = 16.sp) }
         }
         PasswordField(value = password, onValueChange = { password = it; error = null }, label = "新密码（至少 8 位）", visible = passwordVisible, onVisibilityChanged = { passwordVisible = it }, modifier = Modifier.fillMaxWidth().padding(top = 9.dp))
         PasswordField(value = confirmation, onValueChange = { confirmation = it; error = null }, label = "再次输入新密码", visible = confirmationVisible, onVisibilityChanged = { confirmationVisible = it }, modifier = Modifier.fillMaxWidth().padding(top = 9.dp))
-        error?.let { Text(it, color = Color.Red, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp)) }
+        error?.let { Text(it, color = Color.Red, fontSize = 16.sp, modifier = Modifier.padding(top = 8.dp)) }
         Button(
             onClick = {
                 when {
@@ -442,8 +442,8 @@ private fun PasswordField(
 
 @Composable private fun LoginButton(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, background: Color, foreground: Color, onClick: () -> Unit, outlined: Boolean = false, showsProgress: Boolean = false) = Surface(
     onClick = onClick, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics { role = Role.Button; contentDescription = title }, color = background, shape = CircleShape, border = if (outlined) BorderStroke(1.dp, foreground) else null
-) { Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) { if (showsProgress) CircularProgressIndicator(Modifier.size(16.dp), color = foreground, strokeWidth = 2.dp) else Icon(icon, null, tint = foreground, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(7.dp)); Text(title, color = foreground, fontSize = 13.sp, fontWeight = FontWeight.Bold) } }
-@Composable private fun LoginCheck(title: String, note: String) = Row(verticalAlignment = Alignment.CenterVertically) { Surface(Modifier.size(18.dp), color = Green, shape = CircleShape) { Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.padding(4.dp)) }; Spacer(Modifier.width(8.dp)); Column { Text(title, color = Navy, fontSize = 12.sp, fontWeight = FontWeight.Bold); Text(note, color = Color.Gray, fontSize = 12.sp) } }
+) { Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) { if (showsProgress) CircularProgressIndicator(Modifier.size(16.dp), color = foreground, strokeWidth = 2.dp) else Icon(icon, null, tint = foreground, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(7.dp)); Text(title, color = foreground, fontSize = 15.sp, fontWeight = FontWeight.Bold) } }
+@Composable private fun LoginCheck(title: String, note: String) = Row(verticalAlignment = Alignment.CenterVertically) { Surface(Modifier.size(18.dp), color = Green, shape = CircleShape) { Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.padding(4.dp)) }; Spacer(Modifier.width(8.dp)); Column { Text(title, color = Navy, fontSize = 16.sp, fontWeight = FontWeight.Bold); Text(note, color = Color.Gray, fontSize = 16.sp) } }
 
 @Composable
 fun BackendDashboardNoticeScreen(onBack: (() -> Unit)? = null, onLogout: () -> Unit) {
@@ -459,7 +459,7 @@ fun BackendDashboardNoticeScreen(onBack: (() -> Unit)? = null, onLogout: () -> U
         ) {
             Icon(Icons.Filled.BarChart, contentDescription = null, tint = Blue, modifier = Modifier.size(58.dp))
             Text("学校管理数据看板已迁移至后台系统", color = Navy, fontSize = 19.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 16.dp))
-            Text("校长端不再作为移动端工作台提供。学校总览、年级对比、班级完成率和风险学生数据，请在学校后台数据看板中查看。", color = Color.Gray, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 10.dp))
+            Text("校长端不再作为移动端工作台提供。学校总览、年级对比、班级完成率和风险学生数据，请在学校后台数据看板中查看。", color = Color.Gray, fontSize = 16.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 10.dp))
             Button(
                 onClick = {
                     val target = adminURL
@@ -471,7 +471,7 @@ fun BackendDashboardNoticeScreen(onBack: (() -> Unit)? = null, onLogout: () -> U
                 modifier = Modifier.fillMaxWidth().padding(top = 18.dp).height(44.dp),
                 shape = CircleShape
             ) { Text(if (adminURL == null) "后台地址待配置" else "打开学校管理后台") }
-            openError?.let { Text(it, color = Color(0xFFD32F2F), fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp)) }
+            openError?.let { Text(it, color = Color(0xFFD32F2F), fontSize = 16.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp)) }
             Button(onClick = onLogout, modifier = Modifier.fillMaxWidth().padding(top = 28.dp).height(44.dp), shape = CircleShape) { Text("退出当前账号") }
         }
     }
@@ -511,8 +511,8 @@ fun RoleSelectScreen(availableRoles: List<UserRole> = emptyList(), onRole: (User
                     Text("进入学校后台管理看板", fontWeight = FontWeight.SemiBold)
                 }
             }
-            Text("学校管理数据看板由后台系统提供", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp))
-            TextButton(onClick = onLogout) { Text("退出当前账号", color = Color.Gray, fontSize = 12.sp) }
+            Text("学校管理数据看板由后台系统提供", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 3.dp))
+            TextButton(onClick = onLogout) { Text("退出当前账号", color = Color.Gray, fontSize = 16.sp) }
             if (anchoredTabletLayout) Spacer(Modifier.weight(1f)) else Spacer(Modifier.height(16.dp))
             Image(painterResource(R.drawable.campus_footer), null, Modifier.widthIn(max = 560.dp).fillMaxWidth().height(132.dp), contentScale = ContentScale.Fit)
             Spacer(Modifier.height(4.dp))
@@ -522,4 +522,4 @@ fun RoleSelectScreen(availableRoles: List<UserRole> = emptyList(), onRole: (User
 
 @Composable private fun RoleCard(image: Int, title: String, detail: String, background: Color, foreground: Color, appeared: Boolean, onClick: () -> Unit) = Surface(
     onClick = onClick, modifier = Modifier.fillMaxWidth().height(112.dp).scale(if (appeared) 1f else .88f), color = background, shape = RoundedCornerShape(16.dp), border = if (background == Color.White) BorderStroke(1.dp, Color(0xFFFFBD2E)) else null
-) { Row(Modifier.padding(17.dp), verticalAlignment = Alignment.CenterVertically) { Image(painterResource(image), null, Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Fit); Spacer(Modifier.width(17.dp)); Column(Modifier.weight(1f)) { Text(title, color = foreground, fontSize = 20.sp, fontWeight = FontWeight.Bold); Text(detail, color = if (background == Color.White) Color.Gray else Color.White.copy(.85f), fontSize = 12.sp) }; Icon(Icons.Filled.ChevronRight, null, tint = if (background == Color.White) Color(0xFFFFB620) else Color.White) } }
+) { Row(Modifier.padding(17.dp), verticalAlignment = Alignment.CenterVertically) { Image(painterResource(image), null, Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Fit); Spacer(Modifier.width(17.dp)); Column(Modifier.weight(1f)) { Text(title, color = foreground, fontSize = 20.sp, fontWeight = FontWeight.Bold); Text(detail, color = if (background == Color.White) Color.Gray else Color.White.copy(.85f), fontSize = 16.sp) }; Icon(Icons.Filled.ChevronRight, null, tint = if (background == Color.White) Color(0xFFFFB620) else Color.White) } }

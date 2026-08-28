@@ -113,9 +113,9 @@ import com.xiangshang.youth.feature.auth.LegalDocumentDialog
         val visibleClassmates = emptyList<com.xiangshang.youth.core.model.Student>()
         val currentMonthPrefix = BusinessClock.format("yyyy-MM")
         val currentMonthCheckInCount = state.local.checkedInDates.count { it.startsWith(currentMonthPrefix) }
-        Text("${selectedChild.name} · ${selectedChild.className} · ${classMemberCount}人", color = Color.Gray, fontSize = 12.sp)
-        Surface(Modifier.fillMaxWidth().padding(top = 9.dp), color = Sky, shape = RoundedCornerShape(12.dp)) { Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("本班家校圈", color = Navy, fontWeight = FontWeight.Bold, fontSize = 15.sp); Text("分享运动成长，和老师保持联系", color = Color.Gray, fontSize = 12.sp) }; Column(horizontalAlignment = Alignment.End) { Text("$classMemberCount", color = Blue, fontWeight = FontWeight.Bold, fontSize = 20.sp); Text("班级成员", color = Color.Gray, fontSize = 12.sp) } } }
-        Row(Modifier.fillMaxWidth().padding(top = 9.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) { listOf("全部", "老师动态", "家长分享").forEachIndexed { index, title -> FilterChip(selected = filter == index, onClick = { filter = index }, label = { Text(title, fontSize = 12.sp) }) } }
+        Text("${selectedChild.name} · ${selectedChild.className} · ${classMemberCount}人", color = Color.Gray, fontSize = 16.sp)
+        Surface(Modifier.fillMaxWidth().padding(top = 9.dp), color = Sky, shape = RoundedCornerShape(12.dp)) { Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("本班家校圈", color = Navy, fontWeight = FontWeight.Bold, fontSize = 15.sp); Text("分享运动成长，和老师保持联系", color = Color.Gray, fontSize = 16.sp) }; Column(horizontalAlignment = Alignment.End) { Text("$classMemberCount", color = Blue, fontWeight = FontWeight.Bold, fontSize = 20.sp); Text("班级成员", color = Color.Gray, fontSize = 16.sp) } } }
+        Row(Modifier.fillMaxWidth().padding(top = 9.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) { listOf("全部", "老师动态", "家长分享").forEachIndexed { index, title -> FilterChip(selected = filter == index, onClick = { filter = index }, label = { Text(title, fontSize = 16.sp) }) } }
         Button(onClick = {
             clearWorkflow(currentParentKey)
             postDraft = state.local.drafts[currentParentDraftKey] ?: state.local.drafts["class-post-$currentParentName"].orEmpty()
@@ -137,16 +137,16 @@ import com.xiangshang.youth.feature.auth.LegalDocumentDialog
         // It is intentionally excluded only from the parent-sharing filter.
         if (!state.repositoryAcknowledged && filter != 2) {
                 Surface(Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(10.dp)) {
-                    Column(Modifier.padding(12.dp)) {
+                    Column(Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Filled.School, null, tint = Blue); Spacer(Modifier.width(8.dp))
-                            Column { Text(classTeacherName, color = Blue, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text("今天 08:30 · 置顶通知", color = Color.Gray, fontSize = 12.sp) }
+                            Column { Text(classTeacherName, color = Blue, fontWeight = FontWeight.Bold, fontSize = 16.sp); Text("今天 08:30 · 置顶通知", color = Color.Gray, fontSize = 16.sp) }
                         }
-                        Text("本周运动打卡已开启，欢迎家长分享孩子的练习瞬间。", color = Navy, fontSize = 12.sp, modifier = Modifier.padding(top = 7.dp))
+                        Text("本周运动打卡已开启，欢迎家长分享孩子的练习瞬间。", color = Navy, fontSize = 16.sp, modifier = Modifier.padding(top = 7.dp))
                         Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                            Text(if (pinnedAnnouncementLiked) "已赞 13" else "♡ 12", color = if (pinnedAnnouncementLiked) Blue else Color.Gray, fontSize = 12.sp, modifier = Modifier.semantics { role = Role.Button; contentDescription = if (pinnedAnnouncementLiked) "取消点赞" else "点赞" }.clickable { toggleLike(pinnedAnnouncementId) })
-                            Text("评论 ${3 + state.local.postComments[pinnedAnnouncementId].orEmpty().size}", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.semantics { role = Role.Button; contentDescription = "评论置顶通知" }.clickable { openComment(pinnedAnnouncementId) })
-                            Spacer(Modifier.weight(1f)); Text("班级通知", color = Blue, fontSize = 12.sp)
+                            Text(if (pinnedAnnouncementLiked) "已赞 13" else "♡ 12", color = if (pinnedAnnouncementLiked) Blue else Color.Gray, fontSize = 16.sp, modifier = Modifier.semantics { role = Role.Button; contentDescription = if (pinnedAnnouncementLiked) "取消点赞" else "点赞" }.clickable { toggleLike(pinnedAnnouncementId) })
+                            Text("评论 ${3 + state.local.postComments[pinnedAnnouncementId].orEmpty().size}", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.semantics { role = Role.Button; contentDescription = "评论置顶通知" }.clickable { openComment(pinnedAnnouncementId) })
+                            Spacer(Modifier.weight(1f)); Text("班级通知", color = Blue, fontSize = 16.sp)
                         }
                         ClassCircleCommentPreview(state.local.postComments[pinnedAnnouncementId].orEmpty())
                     }
@@ -157,34 +157,34 @@ import com.xiangshang.youth.feature.auth.LegalDocumentDialog
             // confirmed owner or a purely local draft may expose delete.
             val canDelete = post.ownedByCurrentUser || post.postId == null
             Surface(Modifier.padding(vertical = 4.dp).fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(10.dp), shadowElevation = 1.dp) { Column(Modifier.padding(11.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.AccountCircle, null, tint = Sky, modifier = Modifier.size(28.dp)); Spacer(Modifier.width(8.dp)); Column { Text(post.author, color = Blue, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text("刚刚发布 · ${postSyncLabel(post.status)}", color = if (post.status == LocalSubmissionStatus.Failed) Color.Red else Color.Gray, fontSize = 12.sp) }; Spacer(Modifier.weight(1f)); TextButton(onClick = { if (canDelete) deletePost(post) else reportPost(post) }, contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp), modifier = Modifier.semantics { contentDescription = if (canDelete) "删除本人班级动态" else "举报这条班级动态" }) { Text(if (canDelete) "删除" else "举报", fontSize = 12.sp, color = if (canDelete) Color.Red else Color.Gray) } }
-                Text(post.content, color = Navy, fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.AccountCircle, null, tint = Sky, modifier = Modifier.size(28.dp)); Spacer(Modifier.width(8.dp)); Column { Text(post.author, color = Blue, fontWeight = FontWeight.Bold, fontSize = 16.sp); Text("刚刚发布 · ${postSyncLabel(post.status)}", color = if (post.status == LocalSubmissionStatus.Failed) Color.Red else Color.Gray, fontSize = 16.sp) }; Spacer(Modifier.weight(1f)); TextButton(onClick = { if (canDelete) deletePost(post) else reportPost(post) }, contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp), modifier = Modifier.semantics { contentDescription = if (canDelete) "删除本人班级动态" else "举报这条班级动态" }) { Text(if (canDelete) "删除" else "举报", fontSize = 16.sp, color = if (canDelete) Color.Red else Color.Gray) } }
+                Text(post.content, color = Navy, fontSize = 16.sp, modifier = Modifier.padding(top = 5.dp))
                 if (post.attachments.isNotEmpty()) ClassPostAttachments(state, post.attachments, post.moderationStatus, loadClassPostAttachment)
-                Row(Modifier.fillMaxWidth().padding(top = 7.dp), horizontalArrangement = Arrangement.spacedBy(15.dp)) { Text(if (post.id in state.local.likedPostIds) "已赞" else "点赞", color = if (post.id in state.local.likedPostIds) Blue else Color.Gray, fontSize = 12.sp, modifier = Modifier.semantics { role = Role.Button; contentDescription = if (post.id in state.local.likedPostIds) "取消点赞" else "点赞" }.clickable { toggleLike(post.id) }); Text("评论", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.semantics { role = Role.Button; contentDescription = "评论这条动态" }.clickable { openComment(post.id) }); Spacer(Modifier.weight(1f)); Text("分享", color = Blue, fontSize = 12.sp, modifier = Modifier.semantics { role = Role.Button; contentDescription = "分享这条动态" }.clickable { runCatching { context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, post.content) }, "分享班级动态")) } }) }
+                Row(Modifier.fillMaxWidth().padding(top = 7.dp), horizontalArrangement = Arrangement.spacedBy(15.dp)) { Text(if (post.id in state.local.likedPostIds) "已赞" else "点赞", color = if (post.id in state.local.likedPostIds) Blue else Color.Gray, fontSize = 16.sp, modifier = Modifier.semantics { role = Role.Button; contentDescription = if (post.id in state.local.likedPostIds) "取消点赞" else "点赞" }.clickable { toggleLike(post.id) }); Text("评论", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.semantics { role = Role.Button; contentDescription = "评论这条动态" }.clickable { openComment(post.id) }); Spacer(Modifier.weight(1f)); Text("分享", color = Blue, fontSize = 16.sp, modifier = Modifier.semantics { role = Role.Button; contentDescription = "分享这条动态" }.clickable { runCatching { context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, post.content) }, "分享班级动态")) } }) }
                 ClassCircleCommentPreview(state.local.postComments[post.id].orEmpty())
             } }
         }
         ParentSection("本班互动", "查看说明") { detail = "班级互动说明" }
-        if (visibleClassmates.isEmpty()) Text("暂无本班可见名单，学校完成分班后会显示在这里。", color = Color.Gray, fontSize = 12.sp)
+        if (visibleClassmates.isEmpty()) Text("暂无本班可见名单，学校完成分班后会显示在这里。", color = Color.Gray, fontSize = 16.sp)
         else {
             Row(Modifier.fillMaxWidth()) { visibleClassmates.forEach { student ->
                 val isBoundChild = student.id == selectedChild.id
                 val displayName = if (isBoundChild) student.name else "${student.name.take(1)}同学"
                 Column(Modifier.weight(1f).semantics { contentDescription = if (isBoundChild) "当前孩子，${student.className}" else "本班同学，${student.className}" }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Surface(Modifier.size(36.dp), color = Blue, shape = CircleShape) { Text(student.name.take(1), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp)) }
-                    Text(displayName, color = Navy, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                    Text(student.className, color = Color.Gray, fontSize = 12.sp, maxLines = 1)
+                    Surface(Modifier.size(36.dp), color = Blue, shape = CircleShape) { Text(student.name.take(1), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp)) }
+                    Text(displayName, color = Navy, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
+                    Text(student.className, color = Color.Gray, fontSize = 16.sp, maxLines = 2)
                 }
             } }
-            Text("本页不展示或生成班级评优、排名；学校正式表彰以班主任通知为准。", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp))
+            Text("本页不展示或生成班级评优、排名；学校正式表彰以班主任通知为准。", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 5.dp))
         }
-        Spacer(Modifier.height(10.dp)); Surface(Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(10.dp)) { Column(Modifier.padding(12.dp)) { ParentSection("本月打卡", "查看记录") { detail = "本月运动打卡记录" }; Row(verticalAlignment = Alignment.CenterVertically) { Icon(if (currentMonthCheckInCount == 0) Icons.Filled.EventAvailable else Icons.Filled.CheckCircle, null, tint = if (currentMonthCheckInCount == 0) Color.Gray else Green, modifier = Modifier.size(17.dp)); Spacer(Modifier.width(6.dp)); Text(if (currentMonthCheckInCount == 0) "本月尚未开始运动打卡" else "本月已保存 $currentMonthCheckInCount 次运动打卡", color = if (currentMonthCheckInCount == 0) Color.Gray else Green, fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }; Text("打卡记录会自动保存并同步。", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp)) } }
+        Spacer(Modifier.height(10.dp)); Surface(Modifier.fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(10.dp)) { Column(Modifier.padding(16.dp)) { ParentSection("本月打卡", "查看记录") { detail = "本月运动打卡记录" }; Row(verticalAlignment = Alignment.CenterVertically) { Icon(if (currentMonthCheckInCount == 0) Icons.Filled.EventAvailable else Icons.Filled.CheckCircle, null, tint = if (currentMonthCheckInCount == 0) Color.Gray else Green, modifier = Modifier.size(17.dp)); Spacer(Modifier.width(6.dp)); Text(if (currentMonthCheckInCount == 0) "本月尚未开始运动打卡" else "本月已保存 $currentMonthCheckInCount 次运动打卡", color = if (currentMonthCheckInCount == 0) Color.Gray else Green, fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }; Text("打卡记录会自动保存并同步。", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 5.dp)) } }
         if (state.repositoryAcknowledged) {
             ParentSection("课程动态", "进入课程") { nav.navigate(Destinations.Courses) }
             EmptyState("暂无课程动态，学校或平台分配课程后会显示在这里。")
         } else {
             Spacer(Modifier.height(10.dp)); ParentSection("延时课堂精彩瞬间", "点击课程查看") { nav.navigate(Destinations.Courses) }; Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) { MiniActivity(R.drawable.activity_football, "足球启蒙", Modifier.weight(1f)) { nav.navigate(Destinations.Courses) }; MiniActivity(R.drawable.activity_classroom, "健康课堂", Modifier.weight(1f)) { nav.navigate(Destinations.Courses) }; MiniActivity(R.drawable.activity_balance, "亲子平衡", Modifier.weight(1f)) { nav.navigate(Destinations.Courses) } }
-            Spacer(Modifier.height(10.dp)); ParentSection("推荐课程", "查看详情") { nav.navigate(Destinations.Courses) }; ParentActivities(nav); Spacer(Modifier.height(8.dp)); ParentSection("我的课程", "全部课程") { nav.navigate(Destinations.Courses) }; Surface(onClick = { nav.navigate(Destinations.Courses) }, modifier = Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "推荐训练，每周 2 次，足球基础训练，查看课程" }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.CalendarMonth, null, tint = Green); Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Text("推荐训练", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text("每周 2 次 · 足球基础训练", color = Color.Gray, fontSize = 12.sp) }; Text("去查看", color = Green, fontSize = 12.sp); Spacer(Modifier.width(4.dp)); Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Green, modifier = Modifier.size(14.dp)) } }
+            Spacer(Modifier.height(10.dp)); ParentSection("推荐课程", "查看详情") { nav.navigate(Destinations.Courses) }; ParentActivities(nav); Spacer(Modifier.height(8.dp)); ParentSection("我的课程", "全部课程") { nav.navigate(Destinations.Courses) }; Surface(onClick = { nav.navigate(Destinations.Courses) }, modifier = Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "推荐训练，每周 2 次，足球基础训练，查看课程" }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.CalendarMonth, null, tint = Green); Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Text("推荐训练", color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp); Text("每周 2 次 · 足球基础训练", color = Color.Gray, fontSize = 16.sp) }; Text("去查看", color = Green, fontSize = 16.sp); Spacer(Modifier.width(4.dp)); Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Green, modifier = Modifier.size(14.dp)) } }
         }
     }
     detail?.let { title ->
@@ -192,7 +192,7 @@ import com.xiangshang.youth.feature.auth.LegalDocumentDialog
             AlertDialog(
                 onDismissRequest = { detail = null },
                 title = { Text(title) },
-                text = { Column { Text("仅展示当前本班可见学生名单，便于家长确认交流范围。", color = Navy); Text("班级评优、排名及表彰由学校和班主任统一发布，本页不生成。", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 9.dp)) } },
+                text = { Column { Text("仅展示当前本班可见学生名单，便于家长确认交流范围。", color = Navy); Text("班级评优、排名及表彰由学校和班主任统一发布，本页不生成。", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 9.dp)) } },
                 confirmButton = { TextButton(onClick = { detail = null }) { Text("知道了") } }
             )
         } else if (title == "发布班级动态") {
@@ -208,7 +208,7 @@ import com.xiangshang.youth.feature.auth.LegalDocumentDialog
                 title = { Text("发布班级动态") },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                        Text("内容仅本班可见，请勿发布完整学生姓名、证件、病历或无关学生照片。", color = Color.Gray, fontSize = 12.sp)
+                        Text("内容仅本班可见，请勿发布完整学生姓名、证件、病历或无关学生照片。", color = Color.Gray, fontSize = 16.sp)
                         OutlinedTextField(
                             value = postDraft,
                             onValueChange = { value ->
@@ -221,21 +221,21 @@ import com.xiangshang.youth.feature.auth.LegalDocumentDialog
                             modifier = Modifier.fillMaxWidth()
                         )
                         Surface(color = Sky, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
-                            Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Filled.Photo, contentDescription = null, tint = Blue)
                                     Spacer(Modifier.width(7.dp))
-                                    Text(postAttachmentName ?: "可添加 1 个图片或视频附件", color = if (postAttachmentName == null) Color.Gray else Blue, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                                    Text(postAttachmentName ?: "可添加 1 个图片或视频附件", color = if (postAttachmentName == null) Color.Gray else Blue, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                                 }
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     OutlinedButton(onClick = { attachmentPicker.launch(arrayOf("image/jpeg", "image/png", "video/mp4")) }) { Text(if (postAttachmentName == null) "选择附件" else "更换附件") }
                                     if (postAttachmentName != null) TextButton(onClick = { postAttachmentReference = null; postAttachmentName = null; postAttachmentType = "image"; postAttachmentError = null }, colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)) { Text("移除") }
                                 }
-                                Text("仅支持 JPG、PNG 或 MP4，最大 20MB。提交时会通过学校文件服务上传，App 不保存相册原始路径。", color = Color.Gray, fontSize = 12.sp)
-                                postAttachmentError?.let { Text(it, color = Color.Red, fontSize = 12.sp) }
+                                Text("仅支持 JPG、PNG 或 MP4，最大 20MB。提交时会通过学校文件服务上传，App 不保存相册原始路径。", color = Color.Gray, fontSize = 16.sp)
+                                postAttachmentError?.let { Text(it, color = Color.Red, fontSize = 16.sp) }
                             }
                         }
-                        if (command.status == WorkflowCommandStatus.Failed) Text(command.message ?: "发布失败，请重试。", color = Color.Red, fontSize = 12.sp)
+                        if (command.status == WorkflowCommandStatus.Failed) Text(command.message ?: "发布失败，请重试。", color = Color.Red, fontSize = 16.sp)
                     }
                 },
                 confirmButton = {
@@ -263,7 +263,7 @@ import com.xiangshang.youth.feature.auth.LegalDocumentDialog
 @Composable
 private fun ClassPostAttachments(state: AppUiState, attachments: List<ClassPostAttachment>, moderationStatus: String? = null, loadAttachment: (String) -> Unit = {}) {
     Column(Modifier.fillMaxWidth().padding(top = 6.dp)) {
-        Text("${attachments.size} 个附件 · ${if (moderationStatus == "approved" || moderationStatus == "published") "已审核" else "待审核"}", color = Blue, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        Text("${attachments.size} 个附件 · ${if (moderationStatus == "approved" || moderationStatus == "published") "已审核" else "待审核"}", color = Blue, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         Row(Modifier.fillMaxWidth().padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             attachments.take(3).forEach { attachment ->
                 val bytes = attachment.objectId?.let { state.classPostAttachmentBytes[it] }
@@ -280,7 +280,7 @@ private fun ClassPostAttachments(state: AppUiState, attachments: List<ClassPostA
                     if (bitmap != null) Image(bitmap.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                     else Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                         Icon(if (attachment.type == "video") Icons.Filled.Videocam else Icons.Filled.Photo, null, tint = if (attachment.objectId?.let { state.classPostAttachmentErrors[it] } == null) Blue else Color.Red)
-                        Text(if (attachment.objectId?.let { state.classPostAttachmentErrors[it] } == null) "查看附件" else "重试", color = if (attachment.objectId?.let { state.classPostAttachmentErrors[it] } == null) Blue else Color.Red, fontSize = 12.sp)
+                        Text(if (attachment.objectId?.let { state.classPostAttachmentErrors[it] } == null) "查看附件" else "重试", color = if (attachment.objectId?.let { state.classPostAttachmentErrors[it] } == null) Blue else Color.Red, fontSize = 16.sp)
                     }
                 }
             }
@@ -292,9 +292,9 @@ private fun ClassPostAttachments(state: AppUiState, attachments: List<ClassPostA
     if (comments.isEmpty()) return
     Column(Modifier.fillMaxWidth().padding(top = 6.dp)) {
         HorizontalDivider(color = Color(0xFFF0F2F7))
-        Text("最新评论", color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 5.dp))
+        Text("最新评论", color = Color.Gray, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 5.dp))
         comments.takeLast(2).forEach { comment ->
-            Text("我的留言：$comment", color = Navy, fontSize = 12.sp, maxLines = 2, modifier = Modifier.padding(top = 2.dp))
+            Text("我的留言：$comment", color = Navy, fontSize = 16.sp, maxLines = 2, modifier = Modifier.padding(top = 2.dp))
         }
     }
 }
@@ -305,12 +305,12 @@ private fun ClassPostAttachments(state: AppUiState, attachments: List<ClassPostA
     var legalDocument by rememberSaveable { mutableStateOf<String?>(null) }
     ParentTabScaffold(nav, Destinations.Account) {
         Text("我的", color = Navy, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 10.dp)); Spacer(Modifier.height(8.dp))
-        Surface(Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "查看个人资料" }.clickable { accountInfo = "个人资料" }, color = Color.White, shape = RoundedCornerShape(12.dp)) { Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Surface(Modifier.size(52.dp), color = Sky, shape = CircleShape) { Text(state.activeDisplayName.take(1), color = Blue, fontSize = 20.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 13.dp)) }; Spacer(Modifier.width(11.dp)); Column(Modifier.weight(1f)) { Text(state.activeDisplayName, color = Navy, fontWeight = FontWeight.Bold); Text(state.profile?.schoolName ?: "学校", color = Color.Gray, fontSize = 12.sp); Text(state.role?.label ?: "家长", color = Blue, fontSize = 12.sp) }; Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray) } }
+        Surface(Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "查看个人资料" }.clickable { accountInfo = "个人资料" }, color = Color.White, shape = RoundedCornerShape(12.dp)) { Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Surface(Modifier.size(52.dp), color = Sky, shape = CircleShape) { Text(state.activeDisplayName.take(1), color = Blue, fontSize = 20.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 13.dp)) }; Spacer(Modifier.width(11.dp)); Column(Modifier.weight(1f)) { Text(state.activeDisplayName, color = Navy, fontWeight = FontWeight.Bold); Text(state.profile?.schoolName ?: "学校", color = Color.Gray, fontSize = 16.sp); Text(state.role?.label ?: "家长", color = Blue, fontSize = 16.sp) }; Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray) } }
         val publishedReportCount = state.data?.students.orEmpty().count { it.id in state.local.boundChildIds && state.hasPublishedSchoolReport(it) }
         Spacer(Modifier.height(8.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) { AccountMetric("已绑定孩子", state.local.boundChildIds.size.toString(), Blue, Modifier.weight(1f)) { nav.navigate(Destinations.Children) }; AccountMetric("成长报告", publishedReportCount.toString(), Green, Modifier.weight(1f)) { if (state.selectedChild != null) nav.navigate(Destinations.Report) else nav.navigate(Destinations.ChildrenBinding) }; AccountMetric("未读消息", state.unreadMessageCount.toString(), Color(0xFFFF638E), Modifier.weight(1f)) { nav.navigate(Destinations.Messages) } }
-        if (state.pendingSyncCount > 0) Surface(onClick = { settingsOpen = true }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp).semantics { role = Role.Button; contentDescription = "有${state.pendingSyncCount}条记录等待同步，查看同步状态" }, color = Color(0xFFFFF3E0), shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.Sync, null, tint = Color(0xFFFF8B1F)); Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Text("有 ${state.pendingSyncCount} 条记录等待同步", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text("已保存，联网后自动同步", color = Color.Gray, fontSize = 12.sp) }; Text("查看", color = Blue, fontSize = 12.sp); Icon(Icons.Filled.ChevronRight, null, tint = Blue, modifier = Modifier.size(15.dp)) } }
-        Text("家庭服务", color = Navy, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp, bottom = 2.dp)); AccountRow("孩子管理", Icons.Filled.People, Blue) { nav.navigate(Destinations.Children) }
-        Text("账户与设置", color = Navy, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)); listOf("我的健康档案" to Icons.Filled.Favorite, "我的课程" to Icons.Filled.PlayCircle, "客服咨询" to Icons.AutoMirrored.Filled.Message, "设置" to Icons.Filled.Settings, "消息" to Icons.Filled.Notifications).forEach { (title, icon) -> AccountRow(title, icon, Blue) {
+        if (state.pendingSyncCount > 0) Surface(onClick = { settingsOpen = true }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp).semantics { role = Role.Button; contentDescription = "有${state.pendingSyncCount}条记录等待同步，查看同步状态" }, color = Color(0xFFFFF3E0), shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.Sync, null, tint = Color(0xFFFF8B1F)); Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Text("有 ${state.pendingSyncCount} 条记录等待同步", color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp); Text("已保存，联网后自动同步", color = Color.Gray, fontSize = 16.sp) }; Text("查看", color = Blue, fontSize = 16.sp); Icon(Icons.Filled.ChevronRight, null, tint = Blue, modifier = Modifier.size(15.dp)) } }
+        Text("家庭服务", color = Navy, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.padding(top = 12.dp, bottom = 2.dp)); AccountRow("孩子管理", Icons.Filled.People, Blue) { nav.navigate(Destinations.Children) }
+        Text("账户与设置", color = Navy, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)); listOf("我的健康档案" to Icons.Filled.Favorite, "我的课程" to Icons.Filled.PlayCircle, "客服咨询" to Icons.AutoMirrored.Filled.Message, "设置" to Icons.Filled.Settings, "消息" to Icons.Filled.Notifications).forEach { (title, icon) -> AccountRow(title, icon, Blue) {
             when (title) {
                 "我的健康档案" -> nav.navigate(Destinations.Health)
                 "我的课程" -> nav.navigate(Destinations.Courses)
@@ -319,9 +319,9 @@ private fun ClassPostAttachments(state: AppUiState, attachments: List<ClassPostA
                 "设置" -> settingsOpen = true
             }
         } }
-        Text("服务与安全", color = Navy, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)); AccountRow("帮助与反馈", Icons.AutoMirrored.Filled.HelpOutline, Blue) { clearWorkflow("support"); accountInfo = "帮助与反馈" }; AccountRow("数据与隐私", Icons.Filled.PrivacyTip, Green) { accountInfo = "数据与隐私" }; AccountRow("用户服务协议", Icons.Filled.Description, Color.Gray) { legalDocument = LegalPolicy.USER_AGREEMENT_TITLE }; AccountRow("隐私政策", Icons.Filled.PrivacyTip, Color.Gray) { legalDocument = LegalPolicy.PRIVACY_POLICY_TITLE }; AccountRow("儿童个人信息保护声明", Icons.Filled.FamilyRestroom, Color.Gray) { legalDocument = LegalPolicy.CHILD_PRIVACY_TITLE }
+        Text("服务与安全", color = Navy, fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)); AccountRow("帮助与反馈", Icons.AutoMirrored.Filled.HelpOutline, Blue) { clearWorkflow("support"); accountInfo = "帮助与反馈" }; AccountRow("数据与隐私", Icons.Filled.PrivacyTip, Green) { accountInfo = "数据与隐私" }; AccountRow("用户服务协议", Icons.Filled.Description, Color.Gray) { legalDocument = LegalPolicy.USER_AGREEMENT_TITLE }; AccountRow("隐私政策", Icons.Filled.PrivacyTip, Color.Gray) { legalDocument = LegalPolicy.PRIVACY_POLICY_TITLE }; AccountRow("儿童个人信息保护声明", Icons.Filled.FamilyRestroom, Color.Gray) { legalDocument = LegalPolicy.CHILD_PRIVACY_TITLE }
         val availableRoles = if (state.repositoryAcknowledged) state.profile?.availableRoles.orEmpty() else UserRole.mobileRoles
-        if (availableRoles.isNotEmpty()) { Spacer(Modifier.height(8.dp)); Text("切换使用角色", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) { availableRoles.filter { it in UserRole.mobileRoles }.forEach { role -> OutlinedButton(onClick = { onRoleSelected(role) }, modifier = Modifier.weight(1f)) { Text(role.label, fontSize = 12.sp) } } } }
+        if (availableRoles.isNotEmpty()) { Spacer(Modifier.height(8.dp)); Text("切换使用角色", color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) { availableRoles.filter { it in UserRole.mobileRoles }.forEach { role -> OutlinedButton(onClick = { onRoleSelected(role) }, modifier = Modifier.weight(1f)) { Text(role.label, fontSize = 16.sp) } } } }
         OutlinedButton(onClick = { logout(); nav.navigate(Destinations.Login) { popUpTo(nav.graph.id) { inclusive = true } } }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red)) { Text("切换账号") }
     }
     if (settingsOpen) SettingsDialog(state.local.settings.notificationsEnabled, state.local.settings.reduceMotion, state.local.settings.voiceGuidanceEnabled, state.local.settings.analyticsEnabled, state.pendingSyncCount, state.workflowStates["sync-pending"] ?: WorkflowCommandState(), updateSettings, syncPending, clearLocalData = { logout(); nav.navigate(Destinations.Login) { popUpTo(nav.graph.id) { inclusive = true } } }) { settingsOpen = false }
@@ -348,16 +348,16 @@ private fun ClassPostAttachments(state: AppUiState, attachments: List<ClassPostA
             Row(verticalAlignment = Alignment.CenterVertically) { Text("减少动态效果", modifier = Modifier.weight(1f)); Switch(checked = reduce, onCheckedChange = { reduce = it }) }
             Row(verticalAlignment = Alignment.CenterVertically) { Text("语音动作引导", modifier = Modifier.weight(1f)); Switch(checked = voice, onCheckedChange = { voice = it }) }
             Row(verticalAlignment = Alignment.CenterVertically) { Text("发送匿名使用情况", modifier = Modifier.weight(1f)); Switch(checked = analytics, onCheckedChange = { analytics = it }) }
-            Text("仅发送页面事件、App版本和本次启动随机会话；不发送孩子身份、学校、手机号、健康数值或摄像头内容。", color = Color.Gray, fontSize = 12.sp)
-            Text("当前显示应用内消息；开启系统通知后可及时收到提醒。", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 9.dp))
-            Text("同步状态", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp))
-            Text("待同步记录：$pendingSyncCount 条", color = if (pendingSyncCount == 0) Green else Color(0xFFFF8B1F), fontSize = 12.sp)
-            Text(if (pendingSyncCount == 0) "当前没有等待同步的操作。" else "记录已保存，联网后会自动同步。", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp))
-            TextButton(onClick = syncNow, enabled = pendingSyncCount > 0 && !syncState.isSubmitting, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 2.dp)) { if (syncState.isSubmitting) CircularProgressIndicator(Modifier.size(15.dp), strokeWidth = 2.dp) else Text("立即同步", color = Blue, fontSize = 12.sp) }
-            if (syncState.status == WorkflowCommandStatus.Succeeded) Text(syncState.message ?: "同步完成。", color = Green, fontSize = 12.sp)
-            if (syncState.status == WorkflowCommandStatus.Failed) Text(syncState.message ?: "同步失败，请重试。", color = Color.Red, fontSize = 12.sp)
+            Text("仅发送页面事件、App版本和本次启动随机会话；不发送孩子身份、学校、手机号、健康数值或摄像头内容。", color = Color.Gray, fontSize = 16.sp)
+            Text("当前显示应用内消息；开启系统通知后可及时收到提醒。", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 9.dp))
+            Text("同步状态", color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(top = 12.dp))
+            Text("待同步记录：$pendingSyncCount 条", color = if (pendingSyncCount == 0) Green else Color(0xFFFF8B1F), fontSize = 16.sp)
+            Text(if (pendingSyncCount == 0) "当前没有等待同步的操作。" else "记录已保存，联网后会自动同步。", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 3.dp))
+            TextButton(onClick = syncNow, enabled = pendingSyncCount > 0 && !syncState.isSubmitting, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 2.dp)) { if (syncState.isSubmitting) CircularProgressIndicator(Modifier.size(15.dp), strokeWidth = 2.dp) else Text("立即同步", color = Blue, fontSize = 16.sp) }
+            if (syncState.status == WorkflowCommandStatus.Succeeded) Text(syncState.message ?: "同步完成。", color = Green, fontSize = 16.sp)
+            if (syncState.status == WorkflowCommandStatus.Failed) Text(syncState.message ?: "同步失败，请重试。", color = Color.Red, fontSize = 16.sp)
             Spacer(Modifier.height(8.dp))
-            Text("退出登录会清除设备上的绑定孩子、草稿和通知状态；学校测评记录不会受影响。", color = Color.Gray, fontSize = 12.sp)
+            Text("退出登录会清除设备上的绑定孩子、草稿和通知状态；学校测评记录不会受影响。", color = Color.Gray, fontSize = 16.sp)
             TextButton(onClick = { clearConfirmation = true }, colors = ButtonDefaults.textButtonColors(contentColor = Color.Red), modifier = Modifier.align(Alignment.Start)) { Text("清除设备数据并退出登录") }
         } },
         confirmButton = { TextButton(onClick = { update(notify, reduce, voice, analytics); dismiss() }) { Text("保存") } },
@@ -395,9 +395,9 @@ private fun AccountInfoDialog(title: String, state: AppUiState, submitSupport: (
                 if (submitted) Text("反馈已保存，联网后自动同步。", color = Green)
                 else Column {
                     OutlinedTextField(value = feedback, onValueChange = { feedback = it; saveDraft(feedbackDraftKey, it) }, label = { Text("问题描述") }, minLines = 3)
-                    if (command.status == WorkflowCommandStatus.Failed) Text(command.message ?: "提交失败，请重试。", color = Color.Red, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
-                    if (command.isSubmitting) Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) { CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp); Spacer(Modifier.width(7.dp)); Text("正在提交反馈…", color = Blue, fontSize = 12.sp) }
-                    Text("绑定码由学校或班主任提供；报告生成后会在消息中心通知。", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 7.dp))
+                    if (command.status == WorkflowCommandStatus.Failed) Text(command.message ?: "提交失败，请重试。", color = Color.Red, fontSize = 16.sp, modifier = Modifier.padding(top = 6.dp))
+                    if (command.isSubmitting) Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) { CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp); Spacer(Modifier.width(7.dp)); Text("正在提交反馈…", color = Blue, fontSize = 16.sp) }
+                    Text("绑定码由学校或班主任提供；报告生成后会在消息中心通知。", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 7.dp))
                 }
             } else if (title == "个人资料") {
                 val profile = state.profile
@@ -406,7 +406,7 @@ private fun AccountInfoDialog(title: String, state: AppUiState, submitSupport: (
                     val digits = phone.filter(Char::isDigit)
                     "${digits.take(3)}****${digits.takeLast(4)}"
                 } else "未绑定手机号"
-                Text("${state.activeDisplayName}\n绑定学校：${profile?.schoolName ?: "学校"}\n当前角色：${state.role?.label ?: "家长"}\n手机号：$maskedPhone\n\n资料由家庭账户维护，联网后可更新。", color = Color.Gray, fontSize = 12.sp)
+                Text("${state.activeDisplayName}\n绑定学校：${profile?.schoolName ?: "学校"}\n当前角色：${state.role?.label ?: "家长"}\n手机号：$maskedPhone\n\n资料由家庭账户维护，联网后可更新。", color = Color.Gray, fontSize = 16.sp)
             } else if (title == "数据与隐私") {
                 val child = state.selectedChild
                 val exportState = child?.let { state.workflowStates["privacy:${it.id}:export"] } ?: WorkflowCommandState()
@@ -414,23 +414,23 @@ private fun AccountInfoDialog(title: String, state: AppUiState, submitSupport: (
                 val revokeState = child?.let { state.workflowStates["privacy:${it.id}:consent-revoke"] } ?: WorkflowCommandState()
                 val accountDeleteState = state.workflowStates["privacy:account-deletion"] ?: WorkflowCommandState()
                 Column {
-                    Text("当前孩子：${child?.name ?: "请先绑定并选择孩子"}", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    Text("仅可为已绑定孩子提交申请。导出文件生成后会在消息中心通知；删除申请需要学校或平台审核，审核前不会删除任何记录。", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                    Text("当前孩子：${child?.name ?: "请先绑定并选择孩子"}", color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("仅可为已绑定孩子提交申请。导出文件生成后会在消息中心通知；删除申请需要学校或平台审核，审核前不会删除任何记录。", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 6.dp))
                     TextButton(onClick = { child?.let { submitPrivacyRequest(it.id, "export") } }, enabled = child != null && !exportState.isSubmitting, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 6.dp)) { if (exportState.isSubmitting) CircularProgressIndicator(Modifier.size(15.dp), strokeWidth = 2.dp) else Text("申请导出孩子数据", color = Blue) }
-                    if (exportState.status == WorkflowCommandStatus.Succeeded) Text(exportState.message.orEmpty(), color = Green, fontSize = 12.sp)
-                    if (exportState.status == WorkflowCommandStatus.Failed) Text(exportState.message ?: "提交失败，请重试。", color = Color.Red, fontSize = 12.sp)
+                    if (exportState.status == WorkflowCommandStatus.Succeeded) Text(exportState.message.orEmpty(), color = Green, fontSize = 16.sp)
+                    if (exportState.status == WorkflowCommandStatus.Failed) Text(exportState.message ?: "提交失败，请重试。", color = Color.Red, fontSize = 16.sp)
                     TextButton(onClick = { deleteConfirmation = true }, enabled = child != null && !deleteState.isSubmitting, colors = ButtonDefaults.textButtonColors(contentColor = Color.Red), contentPadding = PaddingValues(horizontal = 0.dp, vertical = 6.dp)) { if (deleteState.isSubmitting) CircularProgressIndicator(Modifier.size(15.dp), strokeWidth = 2.dp) else Text("申请删除/匿名化处理") }
-                    if (deleteState.status == WorkflowCommandStatus.Succeeded) Text(deleteState.message.orEmpty(), color = Green, fontSize = 12.sp)
-                    if (deleteState.status == WorkflowCommandStatus.Failed) Text(deleteState.message ?: "提交失败，请重试。", color = Color.Red, fontSize = 12.sp)
+                    if (deleteState.status == WorkflowCommandStatus.Succeeded) Text(deleteState.message.orEmpty(), color = Green, fontSize = 16.sp)
+                    if (deleteState.status == WorkflowCommandStatus.Failed) Text(deleteState.message ?: "提交失败，请重试。", color = Color.Red, fontSize = 16.sp)
                     TextButton(onClick = { revokeConfirmation = true }, enabled = child != null && !revokeState.isSubmitting, colors = ButtonDefaults.textButtonColors(contentColor = Color.Red), contentPadding = PaddingValues(horizontal = 0.dp, vertical = 6.dp)) { if (revokeState.isSubmitting) CircularProgressIndicator(Modifier.size(15.dp), strokeWidth = 2.dp) else Text("撤回身体测评数据使用同意") }
-                    if (revokeState.status == WorkflowCommandStatus.Succeeded) Text(revokeState.message.orEmpty(), color = Green, fontSize = 12.sp)
-                    if (revokeState.status == WorkflowCommandStatus.Failed) Text(revokeState.message ?: "提交失败，请重试。", color = Color.Red, fontSize = 12.sp)
+                    if (revokeState.status == WorkflowCommandStatus.Succeeded) Text(revokeState.message.orEmpty(), color = Green, fontSize = 16.sp)
+                    if (revokeState.status == WorkflowCommandStatus.Failed) Text(revokeState.message ?: "提交失败，请重试。", color = Color.Red, fontSize = 16.sp)
                     TextButton(onClick = { accountDeleteConfirmation = true }, enabled = !accountDeleteState.isSubmitting, colors = ButtonDefaults.textButtonColors(contentColor = Color.Red), contentPadding = PaddingValues(horizontal = 0.dp, vertical = 6.dp)) { if (accountDeleteState.isSubmitting) CircularProgressIndicator(Modifier.size(15.dp), strokeWidth = 2.dp) else Text("申请注销当前账户") }
-                    if (accountDeleteState.status == WorkflowCommandStatus.Succeeded) Text(accountDeleteState.message.orEmpty(), color = Green, fontSize = 12.sp)
-                    if (accountDeleteState.status == WorkflowCommandStatus.Failed) Text(accountDeleteState.message ?: "提交失败，请重试。", color = Color.Red, fontSize = 12.sp)
+                    if (accountDeleteState.status == WorkflowCommandStatus.Succeeded) Text(accountDeleteState.message.orEmpty(), color = Green, fontSize = 16.sp)
+                    if (accountDeleteState.status == WorkflowCommandStatus.Failed) Text(accountDeleteState.message ?: "提交失败，请重试。", color = Color.Red, fontSize = 16.sp)
                 }
             } else {
-                Text("向上少年仅在获得授权后处理学生健康与运动数据，用于测评、报告和课程建议。儿童账号和家庭绑定数据不会用于商业推广。\n\n协议版本：2026.1", color = Color.Gray, fontSize = 12.sp)
+                Text("向上少年仅在获得授权后处理学生健康与运动数据，用于测评、报告和课程建议。儿童账号和家庭绑定数据不会用于商业推广。\n\n协议版本：2026.1", color = Color.Gray, fontSize = 16.sp)
             }
         },
         confirmButton = {
@@ -463,7 +463,7 @@ private fun AccountInfoDialog(title: String, state: AppUiState, submitSupport: (
     )
 }
 
-@Composable private fun AccountMetric(title: String, value: String, color: Color, modifier: Modifier, onClick: () -> Unit) = Surface(onClick = onClick, modifier = modifier, color = Color.White, shape = RoundedCornerShape(10.dp), shadowElevation = 1.dp) { Column(Modifier.padding(vertical = 10.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) { Text(value, color = color, fontWeight = FontWeight.Bold, fontSize = 18.sp); Text(title, color = Color.Gray, fontSize = 12.sp) } }
+@Composable private fun AccountMetric(title: String, value: String, color: Color, modifier: Modifier, onClick: () -> Unit) = Surface(onClick = onClick, modifier = modifier, color = Color.White, shape = RoundedCornerShape(10.dp), shadowElevation = 1.dp) { Column(Modifier.padding(vertical = 10.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) { Text(value, color = color, fontWeight = FontWeight.Bold, fontSize = 18.sp); Text(title, color = Color.Gray, fontSize = 16.sp) } }
 @Composable private fun AccountRow(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, onClick: () -> Unit) = Surface(onClick = onClick, modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp), color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = color); Spacer(Modifier.width(10.dp)); Text(title, color = Navy, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f)); Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray) } }
 
 @Composable
@@ -527,14 +527,14 @@ internal fun SimpleDialog(
                     Text(success.orEmpty(), color = Navy, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
                 }
                 title == "客服咨询" -> Column {
-                    Text("咨询内容会自动保存并同步，提交后由服务团队跟进。", color = Color.Gray, fontSize = 12.sp)
+                    Text("咨询内容会自动保存并同步，提交后由服务团队跟进。", color = Color.Gray, fontSize = 16.sp)
                     OutlinedTextField(value = draft, onValueChange = { draft = it; validation = null; saveDraft(draftKey, it) }, label = { Text("咨询内容") }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), isError = validation != null)
-                    messages.takeLast(4).forEach { message -> Text((if (message.mine) "您：" else "服务团队：") + message.text + if (message.mine) " · ${supportSyncLabel(message.status)}" else "", color = if (message.status == LocalSubmissionStatus.Failed) Color.Red else if (message.mine) Navy else Green, fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp)) }
+                    messages.takeLast(4).forEach { message -> Text((if (message.mine) "您：" else "服务团队：") + message.text + if (message.mine) " · ${supportSyncLabel(message.status)}" else "", color = if (message.status == LocalSubmissionStatus.Failed) Color.Red else if (message.mine) Navy else Green, fontSize = 16.sp, modifier = Modifier.padding(top = 5.dp)) }
                 }
                 title == "发布班级动态" -> OutlinedTextField(value = draft, onValueChange = { draft = it; validation = null; saveDraft(draftKey, it) }, label = { Text("动态内容") }, placeholder = { Text("分享孩子的运动成长") }, modifier = Modifier.fillMaxWidth(), isError = validation != null)
                 else -> Text("内容会自动保存并同步。")
             }
-            validation?.let { Text(it, color = Color.Red, fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp)) }
+            validation?.let { Text(it, color = Color.Red, fontSize = 16.sp, modifier = Modifier.padding(top = 5.dp)) }
         }
     )
 }
@@ -570,11 +570,11 @@ internal fun SimpleDialog(
     }
     Scaffold(containerColor = Canvas) { padding -> Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
         Row(Modifier.fillMaxWidth().background(Color.White).padding(14.dp), verticalAlignment = Alignment.CenterVertically) { IconButton(onClick = { nav.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回") }; Text("${title}测评", color = Navy, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center); Spacer(Modifier.width(48.dp)) }
-        Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) { Icon(icon, null, tint = tint, modifier = Modifier.size(52.dp)); Text("${selectedChild.name}的${title}测评", color = Navy, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 7.dp)); Text(if (category == "fitness") "完成身高、体态与学校运动表现记录" else "请根据孩子最近情况完成本次测评", color = Color.Gray, fontSize = 12.sp) }
-        Row(Modifier.padding(horizontal = 16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { steps.forEachIndexed { index, item -> Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) { Surface(Modifier.size(25.dp), color = if (index <= step) tint else Color.LightGray, shape = CircleShape) { Text("${index + 1}", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 5.dp)) }; Text(item, color = if (index <= step) tint else Color.Gray, fontSize = 12.sp, maxLines = 1) }; if (index < steps.lastIndex) Spacer(Modifier.width(2.dp)) } }
-        Surface(Modifier.padding(16.dp).fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(12.dp)) { Column(Modifier.padding(14.dp)) { val record = state.local.familyHealthRecords["${selectedChild.id}-$category"]; Text(if (done) if (category == "fitness") "学校运动表现记录" else "家庭健康记录已保存" else steps[step], color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp); Spacer(Modifier.height(8.dp)); Text(if (done) if (category == "fitness") "本页只记录学校运动表现信息；正式 7 项体测成绩仍以场地端报告为准。" else "本次家庭健康记录已保存，不会作为学校正式测评结果。" else if (category == "mental") when (step) { 0 -> "请由家长陪同完成。这是家庭观察记录，不会发起第三方授权，也不会生成心理诊断。"; 1 -> "记录孩子最近一周的情绪、睡眠或同伴互动感受；可多选，避免填写不必要的敏感隐私。"; else -> "保存后可在健康档案查看。若持续担忧，请联系学校心理老师或医疗专业人员。" } else if (category == "fitness") when(step) { 0 -> "确认孩子的出生日期、当前身高和体重。"; 1 -> "填写父母身高，系统会计算遗传身高区间。"; 2 -> "按引导上传或记录站立姿态筛查结果。"; else -> "学校场地端完成运动发展测试后，正式 7 项成绩会在上传后同步。" } else "填写健康习惯并确认本次${title}筛查结果。", color = Color.Gray, fontSize = 12.sp); if (record != null) Text("最后保存：${record.completedAt}", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp)); if (done) { steps.forEachIndexed { index, label -> Column(Modifier.fillMaxWidth().padding(top = 9.dp).background(tint.copy(alpha = .06f), RoundedCornerShape(8.dp)).padding(9.dp)) { Text(label, color = tint, fontSize = 12.sp, fontWeight = FontWeight.SemiBold); Text(record?.entries?.get(label).orEmpty().ifBlank { state.local.drafts["assessment-${selectedChild.id}-$category-$index"].orEmpty().ifBlank { "未填写" } }, color = Navy, fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp)) } }; Text(if (category == "fitness") "学校正式体测报告由场地端生成；本页不生成或替代正式 7 项成绩。" else "这是家长填写并保存在设备的家庭健康记录，不替代学校筛查、专业诊断或治疗。", color = Blue, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp)) }; if (category == "mental" && step == 0 && !done) { Text("这是家庭感受记录，不替代专业心理筛查、诊断或治疗。", color = tint, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp)) }; if (!done) { if (category == "fitness") OutlinedTextField(value = answer, onValueChange = { answer = it; saveDraft(draftKey, it); validation = null }, label = { Text("本步骤记录") }, placeholder = { Text("填写后保存为草稿") }, modifier = Modifier.fillMaxWidth().padding(top = 10.dp)) else StructuredObservationOptions(options, tint, answer, category == "mental" && step == 1, if (category == "vision" && step == 1) "用眼频率（可补充说明）" else if (category == "oral" && step == 1) "口腔习惯频率（可补充说明）" else if (category == "mental" && step == 1) "近一周家庭感受（可多选）" else if (category == "mental") "需要关注的程度" else if (category == "vision") "视力观察情况" else "口腔观察情况") { value -> answer = value; saveDraft(draftKey, value); validation = null }; Text("可退出后继续填写。", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp)) }; validation?.let { Text(it, color = Color.Red, fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp)) } } }
+        Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) { Icon(icon, null, tint = tint, modifier = Modifier.size(52.dp)); Text("${selectedChild.name}的${title}测评", color = Navy, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 7.dp)); Text(if (category == "fitness") "完成身高、体态与学校运动表现记录" else "请根据孩子最近情况完成本次测评", color = Color.Gray, fontSize = 16.sp) }
+        Row(Modifier.padding(horizontal = 16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { steps.forEachIndexed { index, item -> Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) { Surface(Modifier.size(28.dp), color = if (index <= step) tint else Color.LightGray, shape = CircleShape) { Text("${index + 1}", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 5.dp)) }; Text(item, color = if (index <= step) tint else Color.Gray, fontSize = 16.sp, maxLines = 2, textAlign = TextAlign.Center) }; if (index < steps.lastIndex) Spacer(Modifier.width(2.dp)) } }
+        Surface(Modifier.padding(16.dp).fillMaxWidth(), color = Color.White, shape = RoundedCornerShape(12.dp)) { Column(Modifier.padding(14.dp)) { val record = state.local.familyHealthRecords["${selectedChild.id}-$category"]; Text(if (done) if (category == "fitness") "学校运动表现记录" else "家庭健康记录已保存" else steps[step], color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp); Spacer(Modifier.height(8.dp)); Text(if (done) if (category == "fitness") "本页只记录学校运动表现信息；正式 7 项体测成绩仍以场地端报告为准。" else "本次家庭健康记录已保存，不会作为学校正式测评结果。" else if (category == "mental") when (step) { 0 -> "请由家长陪同完成。这是家庭观察记录，不会发起第三方授权，也不会生成心理诊断。"; 1 -> "记录孩子最近一周的情绪、睡眠或同伴互动感受；可多选，避免填写不必要的敏感隐私。"; else -> "保存后可在健康档案查看。若持续担忧，请联系学校心理老师或医疗专业人员。" } else if (category == "fitness") when(step) { 0 -> "确认孩子的出生日期、当前身高和体重。"; 1 -> "填写父母身高，系统会计算遗传身高区间。"; 2 -> "按引导上传或记录站立姿态筛查结果。"; else -> "学校场地端完成运动发展测试后，正式 7 项成绩会在上传后同步。" } else "填写健康习惯并确认本次${title}筛查结果。", color = Color.Gray, fontSize = 16.sp); if (record != null) Text("最后保存：${record.completedAt}", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 8.dp)); if (done) { steps.forEachIndexed { index, label -> Column(Modifier.fillMaxWidth().padding(top = 9.dp).background(tint.copy(alpha = .06f), RoundedCornerShape(8.dp)).padding(9.dp)) { Text(label, color = tint, fontSize = 16.sp, fontWeight = FontWeight.SemiBold); Text(record?.entries?.get(label).orEmpty().ifBlank { state.local.drafts["assessment-${selectedChild.id}-$category-$index"].orEmpty().ifBlank { "未填写" } }, color = Navy, fontSize = 16.sp, modifier = Modifier.padding(top = 3.dp)) } }; Text(if (category == "fitness") "学校正式体测报告由场地端生成；本页不生成或替代正式 7 项成绩。" else "这是家长填写并保存在设备的家庭健康记录，不替代学校筛查、专业诊断或治疗。", color = Blue, fontSize = 16.sp, modifier = Modifier.padding(top = 10.dp)) }; if (category == "mental" && step == 0 && !done) { Text("这是家庭感受记录，不替代专业心理筛查、诊断或治疗。", color = tint, fontSize = 16.sp, modifier = Modifier.padding(top = 10.dp)) }; if (!done) { if (category == "fitness") OutlinedTextField(value = answer, onValueChange = { answer = it; saveDraft(draftKey, it); validation = null }, label = { Text("本步骤记录") }, placeholder = { Text("填写后保存为草稿") }, modifier = Modifier.fillMaxWidth().padding(top = 10.dp)) else StructuredObservationOptions(options, tint, answer, category == "mental" && step == 1, if (category == "vision" && step == 1) "用眼频率（可补充说明）" else if (category == "oral" && step == 1) "口腔习惯频率（可补充说明）" else if (category == "mental" && step == 1) "近一周家庭感受（可多选）" else if (category == "mental") "需要关注的程度" else if (category == "vision") "视力观察情况" else "口腔观察情况") { value -> answer = value; saveDraft(draftKey, value); validation = null }; Text("可退出后继续填写。", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 4.dp)) }; validation?.let { Text(it, color = Color.Red, fontSize = 16.sp, modifier = Modifier.padding(top = 5.dp)) } } }
         if (done && category != "fitness") OutlinedButton(onClick = { val saved = state.local.familyHealthRecords["${selectedChild.id}-$category"]?.entries.orEmpty(); steps.forEachIndexed { index, label -> saveDraft(saved[label].orEmpty().ifBlank { state.local.drafts["assessment-${selectedChild.id}-$category-$index"].orEmpty() }, "assessment-${selectedChild.id}-$category-$index") }; step = 0; answer = state.local.drafts["assessment-${selectedChild.id}-$category-0"].orEmpty(); validation = null; done = false }, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth()) { Icon(Icons.Filled.Edit, null); Spacer(Modifier.width(7.dp)); Text("重新填写家庭记录") }
-        if (!done && category != "fitness" && hasArchivedRecord) { Text("正在编辑新版本；完成保存前，原健康记录仍会保留。", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)); TextButton(onClick = { steps.indices.forEach { index -> clearDraft("assessment-${selectedChild.id}-$category-$index") }; clearDraft(progressKey); step = 0; answer = ""; validation = null; done = true }, modifier = Modifier.fillMaxWidth()) { Text("取消本次编辑，保留原记录") } }
+        if (!done && category != "fitness" && hasArchivedRecord) { Text("正在编辑新版本；完成保存前，原健康记录仍会保留。", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)); TextButton(onClick = { steps.indices.forEach { index -> clearDraft("assessment-${selectedChild.id}-$category-$index") }; clearDraft(progressKey); step = 0; answer = ""; validation = null; done = true }, modifier = Modifier.fillMaxWidth()) { Text("取消本次编辑，保留原记录") } }
         Button(onClick = { if (done) { nav.navigate(Destinations.Health) } else if (answer.isBlank()) { validation = "请选择或填写本步骤信息后再继续。" } else if (step < steps.lastIndex) { step += 1; answer = state.local.drafts["assessment-${selectedChild.id}-$category-$step"] ?: "" } else { val base = steps.indices.associate { index -> steps[index] to state.local.drafts["assessment-${selectedChild.id}-$category-$index"].orEmpty() }; val entries = if (category == "fitness") base else base + ("频率" to base[steps.getOrElse(1) { steps.first() }].orEmpty()) + ("严重程度" to base[steps.last()].orEmpty()); clearDraft(progressKey); completeAssessment(category, entries); done = true } }, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth().height(48.dp)) { Text(if (done) "查看健康档案" else if (step == steps.lastIndex) "保存健康记录" else "保存并下一步") }
     } }
 }
@@ -601,7 +601,7 @@ private fun observationOptions(category: String, step: Int): List<String> = when
 @Composable private fun StructuredObservationOptions(options: List<String>, tint: Color, value: String, allowsMultiple: Boolean = false, questionLabel: String = "", onValueChange: (String) -> Unit) {
     var note by rememberSaveable(value) { mutableStateOf(value.substringAfter("｜", "")) }
     Column(Modifier.fillMaxWidth().padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (questionLabel.isNotBlank()) Text(questionLabel, color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        if (questionLabel.isNotBlank()) Text(questionLabel, color = Color.Gray, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         options.chunked(2).forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { option ->
@@ -615,7 +615,7 @@ private fun observationOptions(category: String, step: Int): List<String> = when
                             val next = if (note.isBlank()) selection else "$selection｜$note"
                             onValueChange(next)
                         },
-                        label = { Text(option, fontSize = 12.sp) },
+                        label = { Text(option, fontSize = 16.sp) },
                         modifier = Modifier.weight(1f).heightIn(min = 44.dp),
                         colors = FilterChipDefaults.filterChipColors(selectedContainerColor = tint.copy(alpha = .14f), selectedLabelColor = Navy)
                     )

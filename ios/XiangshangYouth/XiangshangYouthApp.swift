@@ -111,12 +111,12 @@ struct RootView: View {
                     Image(systemName: "internaldrive.trianglebadge.exclamationmark")
                         .foregroundStyle(.red)
                     Text(persistenceError)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(ReferenceColor.navy)
                         .lineLimit(2)
                     Button { state.clearLocalPersistenceError() } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 12, weight: .bold))
+                            .font(.system(size: 16, weight: .bold))
                             .frame(width: 28, height: 28)
                     }
                     .accessibilityLabel("关闭本机保存受限提示")
@@ -142,7 +142,7 @@ struct RootView: View {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small).tint(ReferenceColor.blue)
                     Text("正在刷新数据")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(ReferenceColor.navy)
                 }
                 .padding(.horizontal, 14)
@@ -177,19 +177,19 @@ struct RootView: View {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
                     Text(error)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(ReferenceColor.navy)
                         .lineLimit(2)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     Button("重试") { Task { await state.refreshDashboard() } }
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 16, weight: .bold))
                         .buttonStyle(.borderedProminent)
                         .tint(ReferenceColor.blue)
                     Button {
                         state.error = nil
                     } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 12, weight: .bold))
+                            .font(.system(size: 16, weight: .bold))
                             .foregroundStyle(.secondary)
                             .frame(width: 24, height: 24)
                     }
@@ -218,7 +218,7 @@ struct RootView: View {
                 VStack(spacing: 10) {
                     Image(systemName: "lock.shield.fill").font(.system(size: 34)).foregroundStyle(AppTheme.primary)
                     Text("向上少年").font(.headline).foregroundStyle(ReferenceColor.navy)
-                    Text("已保护学生健康数据").font(.footnote).foregroundStyle(.secondary)
+                    Text("已保护学生健康数据").font(.subheadline).foregroundStyle(.secondary)
                 }
             }
             .accessibilityElement(children: .combine)

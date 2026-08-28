@@ -7,13 +7,13 @@ import UniformTypeIdentifiers
 struct ParentCourseTeaser: View {
     let image: String; let title: String
     @State private var isPresented = false
-    var body: some View { Button { isPresented = true } label: { VStack(alignment: .leading, spacing: 5) { Image(image).resizable().scaledToFill().frame(height: 52).frame(maxWidth: .infinity).clipped(); Text(title).font(.system(size: 12, weight: .bold)).foregroundStyle(ReferenceColor.navy).lineLimit(2); Text("免费学习 ›").font(.system(size: 12)).foregroundStyle(ReferenceColor.green) }.padding(6).background(.white, in: RoundedRectangle(cornerRadius: 12)) }.buttonStyle(.plain).sheet(isPresented: $isPresented) { CourseDetailSheet(title: title) } }
+    var body: some View { Button { isPresented = true } label: { VStack(alignment: .leading, spacing: 5) { Image(image).resizable().scaledToFill().frame(height: 52).frame(maxWidth: .infinity).clipped(); Text(title).font(.system(size: 16, weight: .bold)).foregroundStyle(ReferenceColor.navy).lineLimit(2); Text("免费学习 ›").font(.system(size: 16)).foregroundStyle(ReferenceColor.green) }.padding(6).background(.white, in: RoundedRectangle(cornerRadius: 12)) }.buttonStyle(.plain).sheet(isPresented: $isPresented) { CourseDetailSheet(title: title) } }
 }
 
 struct ParentArticleRow: View {
     let title: String; let detail: String
     @State private var isPresented = false
-    var body: some View { Button { isPresented = true } label: { HStack { Image(systemName: "book.closed.fill").foregroundStyle(ReferenceColor.green).frame(width: 34, height: 34).background(ReferenceColor.green.opacity(0.10), in: RoundedRectangle(cornerRadius: 9)); VStack(alignment: .leading, spacing: 3) { Text(title).font(.system(size: 12, weight: .bold)); Text(detail).font(.system(size: 12)).foregroundStyle(.secondary) }; Spacer(); Image(systemName: "chevron.right").font(.system(size: 12)).foregroundStyle(.secondary) }.foregroundStyle(ReferenceColor.navy).padding(10).background(.white, in: RoundedRectangle(cornerRadius: 10)) }.buttonStyle(.plain).sheet(isPresented: $isPresented) { HealthArticleSheet(title: title) } }
+    var body: some View { Button { isPresented = true } label: { HStack { Image(systemName: "book.closed.fill").foregroundStyle(ReferenceColor.green).frame(width: 34, height: 34).background(ReferenceColor.green.opacity(0.10), in: RoundedRectangle(cornerRadius: 9)); VStack(alignment: .leading, spacing: 3) { Text(title).font(.system(size: 16, weight: .bold)); Text(detail).font(.system(size: 16)).foregroundStyle(.secondary) }; Spacer(); Image(systemName: "chevron.right").font(.system(size: 16)).foregroundStyle(.secondary) }.foregroundStyle(ReferenceColor.navy).padding(10).background(.white, in: RoundedRectangle(cornerRadius: 10)) }.buttonStyle(.plain).sheet(isPresented: $isPresented) { HealthArticleSheet(title: title) } }
 }
 
 /// The two missing parent tabs from the supplied information architecture.
@@ -52,30 +52,30 @@ struct ParentCoursesDashboard: View {
                 ParentPageNavigation(title: "我的课程", showsBell: false)
                 ReferenceHeader(name: state.selectedChild?.name ?? "未选择孩子", school: "\(state.selectedChild?.className ?? "尚未绑定班级") · 成长课程", initial: String((state.selectedChild?.name ?? "孩").prefix(1)), avatarAsset: "ChildAvatar")
                 Picker("课程类型", selection: $selectedKind) { Text("公益课程").tag(0); Text("学校课程").tag(1) }
-                    .pickerStyle(.segmented).padding(.horizontal, 12)
-                ReferenceSectionTitle(title: selectedKind == 0 ? "公益课堂" : "精选学校课程", trailing: "全部课程", action: { catalogShown = true }).padding(.horizontal, 12)
+                    .pickerStyle(.segmented).padding(.horizontal, AppTheme.pagePadding)
+                ReferenceSectionTitle(title: selectedKind == 0 ? "公益课堂" : "精选学校课程", trailing: "全部课程", action: { catalogShown = true }).padding(.horizontal, AppTheme.pagePadding)
                 if state.usesRemoteDataSource {
                     if state.coursesLoading { LoadingStateView() }
                     else if let error = state.coursesError { ErrorStateView(message: error) { if let child = state.selectedChild { Task { await state.loadCourses(for: child) } } } }
                     else if state.remoteCourses.isEmpty { EmptyStateView(title: "暂无已分配课程", detail: "学校或平台分配课程后会显示在这里。") }
                     else { LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) { ForEach(state.remoteCourses.filter { selectedKind == 0 ? $0.videoSource != nil : true }, id: \.lessonID) { course in
-                        Button { selectedRemoteCourse = course } label: { VStack(alignment: .leading, spacing: 7) { Image(systemName: "play.circle.fill").font(.system(size: 23, weight: .semibold)).foregroundStyle(ReferenceColor.blue); Text(course.title).font(.system(size: 13, weight: .bold)).foregroundStyle(ReferenceColor.navy).lineLimit(2); Text(course.completed ? "已完成" : course.lastPositionMs > 0 ? "继续学习" : "开始学习").font(.system(size: 12)).foregroundStyle(ReferenceColor.green) }.frame(maxWidth: .infinity, alignment: .leading).padding(12).background(ReferenceColor.blue.opacity(0.08), in: RoundedRectangle(cornerRadius: 11)) }.buttonStyle(.plain) } }.padding(.horizontal, 12) }
+                        Button { selectedRemoteCourse = course } label: { VStack(alignment: .leading, spacing: 7) { Image(systemName: "play.circle.fill").font(.system(size: 23, weight: .semibold)).foregroundStyle(ReferenceColor.blue); Text(course.title).font(.system(size: 15, weight: .bold)).foregroundStyle(ReferenceColor.navy).lineLimit(2); Text(course.completed ? "已完成" : course.lastPositionMs > 0 ? "继续学习" : "开始学习").font(.system(size: 16)).foregroundStyle(ReferenceColor.green) }.frame(maxWidth: .infinity, alignment: .leading).padding(16).background(ReferenceColor.blue.opacity(0.08), in: RoundedRectangle(cornerRadius: 11)) }.buttonStyle(.plain) } }.padding(.horizontal, AppTheme.pagePadding) }
                 } else { LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                     ForEach(selectedKind == 0 ? publicCourses : schoolCourses) { course in
                         Button { selectedCourse = course } label: {
                             VStack(alignment: .leading, spacing: 7) {
                                 Image(systemName: course.icon).font(.system(size: 23, weight: .semibold)).foregroundStyle(course.color)
-                                Text(course.title).font(.system(size: 13, weight: .bold)).foregroundStyle(ReferenceColor.navy).lineLimit(2)
-                                Text(selectedKind == 0 ? "公益 · 立即学习" : "校内课程 · 查看课程").font(.system(size: 12)).foregroundStyle(course.color)
-                            }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
+                                Text(course.title).font(.system(size: 15, weight: .bold)).foregroundStyle(ReferenceColor.navy).lineLimit(2)
+                                Text(selectedKind == 0 ? "公益 · 立即学习" : "校内课程 · 查看课程").font(.system(size: 16)).foregroundStyle(course.color)
+                            }.frame(maxWidth: .infinity, alignment: .leading).padding(16)
                                 .background(course.color.opacity(0.08), in: RoundedRectangle(cornerRadius: 11))
                         }.buttonStyle(.plain)
                     }
-                }.padding(.horizontal, 12) }
+                }.padding(.horizontal, AppTheme.pagePadding) }
                 Button { selectedCourse = LocalCourseCard(id: "support:course", icon: "message.fill", title: "客服咨询", color: ReferenceColor.blue) } label: {
-                    HStack { Image(systemName: "message.fill"); VStack(alignment: .leading) { Text("课程咨询").font(.system(size: 12, weight: .bold)); Text("填写后自动保存并同步").font(.system(size: 12)) }; Spacer(); Image(systemName: "chevron.right") }
-                        .foregroundStyle(ReferenceColor.blue).padding(12).background(.white, in: RoundedRectangle(cornerRadius: 10))
-                }.buttonStyle(.plain).padding(.horizontal, 12)
+                    HStack { Image(systemName: "message.fill"); VStack(alignment: .leading) { Text("课程咨询").font(.system(size: 16, weight: .bold)); Text("填写后自动保存并同步").font(.system(size: 16)) }; Spacer(); Image(systemName: "chevron.right") }
+                        .foregroundStyle(ReferenceColor.blue).padding(16).background(.white, in: RoundedRectangle(cornerRadius: 10))
+                }.buttonStyle(.plain).padding(.horizontal, AppTheme.pagePadding)
             }.padding(.bottom, 10)
         }.background(ReferenceColor.canvas)
         .task {
@@ -220,7 +220,7 @@ struct ParentClassCircleDashboard: View {
             }
         }
         .sheet(item: Binding(get: { commentPostID.map(CommentSheetItem.init) }, set: { commentPostID = $0?.id })) { item in
-            NavigationStack { VStack(spacing: 14) { if commentSubmitted { Image(systemName: "checkmark.circle.fill").font(.system(size: 44)).foregroundStyle(ReferenceColor.green); Text("评论已保存").font(.headline); Text(state.usesRemoteDataSource ? "评论已提交到班级圈，审核状态以学校服务为准。" : "评论已保存，联网后自动同步到班级圈。").font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center); Button("完成") { commentPostID = nil }.buttonStyle(.borderedProminent) } else { Text("给这条动态留言").font(.headline); TextField("说点鼓励的话…", text: $commentDraft, axis: .vertical).textFieldStyle(.roundedBorder); Button("保存评论") { if let postID = commentPostID { state.addClassPostComment(postID: postID, text: commentDraft); state.clearDraft(commentDraftKey(for: postID)) }; commentSubmitted = true }.buttonStyle(.borderedProminent).disabled(commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }; Spacer() }.padding(20).navigationTitle("评论").toolbar { ToolbarItem(placement: .topBarTrailing) { Button("取消") { commentPostID = nil } } } }
+            NavigationStack { VStack(spacing: 14) { if commentSubmitted { Image(systemName: "checkmark.circle.fill").font(.system(size: 44)).foregroundStyle(ReferenceColor.green); Text("评论已保存").font(.headline); Text(state.usesRemoteDataSource ? "评论已提交到班级圈，审核状态以学校服务为准。" : "评论已保存，联网后自动同步到班级圈。").font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center); Button("完成") { commentPostID = nil }.buttonStyle(.borderedProminent) } else { Text("给这条动态留言").font(.headline); TextField("说点鼓励的话…", text: $commentDraft, axis: .vertical).textFieldStyle(.roundedBorder); Button("保存评论") { if let postID = commentPostID { state.addClassPostComment(postID: postID, text: commentDraft); state.clearDraft(commentDraftKey(for: postID)) }; commentSubmitted = true }.buttonStyle(.borderedProminent).disabled(commentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }; Spacer() }.padding(20).navigationTitle("评论").toolbar { ToolbarItem(placement: .topBarTrailing) { Button("取消") { commentPostID = nil } } } }
         }
         .onChange(of: commentDraft) { _, value in
             guard let postID = commentPostID, !commentSubmitted else { return }
@@ -245,23 +245,23 @@ struct ParentClassCircleDashboard: View {
             HStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("本班家校圈").font(.system(size: 16, weight: .bold))
-                    Text("分享运动成长，和老师保持联系").font(.system(size: 12)).foregroundStyle(.secondary)
+                    Text("分享运动成长，和老师保持联系").font(.system(size: 16)).foregroundStyle(.secondary)
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 3) {
                     Text("\(classMemberCount)").font(.system(size: 20, weight: .bold)).foregroundStyle(ReferenceColor.blue)
-                    Text("班级成员").font(.system(size: 12)).foregroundStyle(.secondary)
+                    Text("班级成员").font(.system(size: 16)).foregroundStyle(.secondary)
                 }
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, AppTheme.pagePadding)
         HStack(spacing: 8) {
             ForEach(["全部", "老师动态", "家长分享"], id: \.self) { filter in
                 Button { selectedFilter = filter } label: {
                     Text(filter)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(selectedFilter == filter ? Color.white : ReferenceColor.blue)
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, AppTheme.pagePadding)
                         .padding(.vertical, 6)
                         .background(selectedFilter == filter ? ReferenceColor.blue : ReferenceColor.sky, in: Capsule())
                 }
@@ -269,17 +269,17 @@ struct ParentClassCircleDashboard: View {
             }
             Spacer()
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, AppTheme.pagePadding)
         Button { isComposerShown = true } label: {
             Label("发布班级动态", systemImage: "square.and.pencil")
-                .font(.system(size: 12, weight: .bold))
+                .font(.system(size: 16, weight: .bold))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
                 .foregroundStyle(.white)
                 .background(ReferenceColor.blue, in: RoundedRectangle(cornerRadius: 10))
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 12)
+        .padding(.horizontal, AppTheme.pagePadding)
     }
     private var classInteractionSection: some View {
         ReferenceCard {
@@ -287,17 +287,17 @@ struct ParentClassCircleDashboard: View {
                 ReferenceSectionTitle(title: "本班互动", trailing: "查看说明", action: { selectedMoment = "班级互动说明" })
                 if visibleClassmates.isEmpty {
                     Text("暂无本班可见名单，学校完成分班后会显示在这里。")
-                        .font(.system(size: 12))
+                        .font(.system(size: 16))
                         .foregroundStyle(.secondary)
                 } else {
                     HStack { ForEach(visibleClassmates) { student in classmate(student) } }
                     Text("本页不展示或生成班级评优、排名；学校正式表彰以班主任通知为准。")
-                        .font(.system(size: 12))
+                        .font(.system(size: 16))
                         .foregroundStyle(.secondary)
                 }
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, AppTheme.pagePadding)
     }
     private var checkInSection: some View {
         let hasCheckIns = currentMonthCheckInCount > 0
@@ -308,37 +308,37 @@ struct ParentClassCircleDashboard: View {
             VStack(alignment: .leading, spacing: 7) {
                 ReferenceSectionTitle(title: "本月打卡", trailing: "查看记录", action: { selectedMoment = "本月运动打卡记录" })
                 Label(title, systemImage: icon)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(color)
                 Text("打卡记录会自动保存并同步。")
-                    .font(.system(size: 12))
+                    .font(.system(size: 16))
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, AppTheme.pagePadding)
     }
     @ViewBuilder private var courseSections: some View {
         if state.usesRemoteDataSource {
             ReferenceSectionTitle(title: "课程动态", trailing: "进入课程", action: { router.push(.parentCourses) })
-                .padding(.horizontal, 12)
+                .padding(.horizontal, AppTheme.pagePadding)
             EmptyStateView(title: "暂无课程动态", detail: "学校或平台分配课程后会显示在这里。")
-                .padding(.horizontal, 12)
+                .padding(.horizontal, AppTheme.pagePadding)
         } else {
             ReferenceSectionTitle(title: "延时课堂精彩瞬间", trailing: "查看全部", action: { router.push(.parentCourses) })
-                .padding(.horizontal, 12)
+                .padding(.horizontal, AppTheme.pagePadding)
             HStack(spacing: 8) {
                 moment("ActivityFootball", "足球启蒙")
                 moment("ActivityClassroom", "健康课堂")
                 moment("ActivityBalance", "亲子平衡")
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, AppTheme.pagePadding)
             ReferenceSectionTitle(title: "推荐课程", trailing: "查看详情", action: { router.push(.parentCourses) })
-                .padding(.horizontal, 12)
-            CourseSuggestionBanner().padding(.horizontal, 12)
+                .padding(.horizontal, AppTheme.pagePadding)
+            CourseSuggestionBanner().padding(.horizontal, AppTheme.pagePadding)
             ReferenceSectionTitle(title: "我的课程", trailing: "全部课程", action: { router.push(.parentCourses) })
-                .padding(.horizontal, 12)
+                .padding(.horizontal, AppTheme.pagePadding)
             UpcomingTrainingCard(action: { router.push(.parentCourses) })
-                .padding(.horizontal, 12)
+                .padding(.horizontal, AppTheme.pagePadding)
         }
     }
     private var visiblePosts: [ClassPostDraft] {
@@ -353,10 +353,10 @@ struct ParentClassCircleDashboard: View {
             ProgressView("正在加载班级动态…").frame(maxWidth: .infinity).padding(.vertical, 18)
         } else if state.usesRemoteDataSource, let error = state.classPostsError {
             ErrorStateView(message: error) { Task { await state.loadClassPosts() } }
-                .padding(.horizontal, 12)
+                .padding(.horizontal, AppTheme.pagePadding)
         } else if state.usesRemoteDataSource, visiblePosts.isEmpty {
             EmptyStateView(title: "暂无班级动态", detail: "学校发布或家长分享后会显示在这里。")
-                .padding(.horizontal, 12)
+                .padding(.horizontal, AppTheme.pagePadding)
         }
         // 置顶通知属于班级的固定信息，不应在家长发布动态后消失；仅在“家长分享”筛选中隐藏。
         if !state.usesRemoteDataSource && selectedFilter != "家长分享" {
@@ -392,14 +392,14 @@ struct ParentClassCircleDashboard: View {
             )
         }
     }
-    private func pinnedAnnouncementPost(author: String, content: String, isTeacher: Bool, isLiked: Binding<Bool>, commentCount: Int, comments: [ClassPostComment], onComment: @escaping () -> Void) -> some View { ReferenceCard { VStack(alignment: .leading, spacing: 7) { HStack { Image(systemName: isTeacher ? "graduationcap.circle.fill" : "person.crop.circle.fill").font(.system(size: 28)).foregroundStyle(ReferenceColor.blue); VStack(alignment: .leading, spacing: 1) { Text(author).font(.system(size: 12, weight: .bold)).foregroundStyle(ReferenceColor.blue); Text("今天 08:30 · 本班可见").font(.system(size: 12)).foregroundStyle(.secondary) }; Spacer(); Text("置顶").font(.system(size: 12, weight: .bold)).foregroundStyle(ReferenceColor.yellow) }; Text(content).font(.system(size: 12)).foregroundStyle(ReferenceColor.navy); HStack { Button { isLiked.wrappedValue.toggle() } label: { Label(isLiked.wrappedValue ? "已赞" : "点赞", systemImage: isLiked.wrappedValue ? "hand.thumbsup.fill" : "hand.thumbsup") }.buttonStyle(.plain); Button(action: onComment) { Label("评论 \(3 + commentCount)", systemImage: "bubble.left") }.buttonStyle(.plain); Spacer(); ShareLink(item: content) { Label("分享", systemImage: "square.and.arrow.up") } }.font(.system(size: 12, weight: .semibold)).foregroundStyle(isLiked.wrappedValue ? ReferenceColor.blue : .secondary); commentPreview(comments) }.accessibilityElement(children: .contain) }.padding(.horizontal, 12) }
+    private func pinnedAnnouncementPost(author: String, content: String, isTeacher: Bool, isLiked: Binding<Bool>, commentCount: Int, comments: [ClassPostComment], onComment: @escaping () -> Void) -> some View { ReferenceCard { VStack(alignment: .leading, spacing: 7) { HStack { Image(systemName: isTeacher ? "graduationcap.circle.fill" : "person.crop.circle.fill").font(.system(size: 28)).foregroundStyle(ReferenceColor.blue); VStack(alignment: .leading, spacing: 1) { Text(author).font(.system(size: 16, weight: .bold)).foregroundStyle(ReferenceColor.blue); Text("今天 08:30 · 本班可见").font(.system(size: 16)).foregroundStyle(.secondary) }; Spacer(); Text("置顶").font(.system(size: 16, weight: .bold)).foregroundStyle(ReferenceColor.yellow) }; Text(content).font(.system(size: 16)).foregroundStyle(ReferenceColor.navy); HStack { Button { isLiked.wrappedValue.toggle() } label: { Label(isLiked.wrappedValue ? "已赞" : "点赞", systemImage: isLiked.wrappedValue ? "hand.thumbsup.fill" : "hand.thumbsup") }.buttonStyle(.plain); Button(action: onComment) { Label("评论 \(3 + commentCount)", systemImage: "bubble.left") }.buttonStyle(.plain); Spacer(); ShareLink(item: content) { Label("分享", systemImage: "square.and.arrow.up") } }.font(.system(size: 16, weight: .semibold)).foregroundStyle(isLiked.wrappedValue ? ReferenceColor.blue : .secondary); commentPreview(comments) }.accessibilityElement(children: .contain) }.padding(.horizontal, AppTheme.pagePadding) }
     @ViewBuilder private func commentPreview(_ comments: [ClassPostComment]) -> some View {
         if !comments.isEmpty {
             VStack(alignment: .leading, spacing: 3) {
                 Divider()
-                Text("最新评论").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+                Text("最新评论").font(.system(size: 16, weight: .semibold)).foregroundStyle(.secondary)
                 ForEach(Array(comments.suffix(2))) { comment in
-                    Text("\(comment.author)：\(comment.text)").font(.system(size: 12)).foregroundStyle(ReferenceColor.navy).lineLimit(2)
+                    Text("\(comment.author)：\(comment.text)").font(.system(size: 16)).foregroundStyle(ReferenceColor.navy).lineLimit(2)
                 }
             }
             .padding(.top, 1)
@@ -411,15 +411,15 @@ struct ParentClassCircleDashboard: View {
         let isBoundChild = student.id == state.selectedChild?.id
         let displayName = isBoundChild ? student.name : "\(student.name.prefix(1))同学"
         return VStack(spacing: 4) {
-            Text(String(student.name.prefix(1))).font(.system(size: 14, weight: .bold)).foregroundStyle(.white).frame(width: 36, height: 36).background(ReferenceColor.blue.opacity(0.85), in: Circle())
-            Text(displayName).font(.system(size: 12, weight: .semibold)).lineLimit(1)
-            Text(student.className).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
+            Text(String(student.name.prefix(1))).font(.system(size: 16, weight: .bold)).foregroundStyle(.white).frame(width: 36, height: 36).background(ReferenceColor.blue.opacity(0.85), in: Circle())
+            Text(displayName).font(.system(size: 16, weight: .semibold)).lineLimit(2)
+            Text(student.className).font(.system(size: 16)).foregroundStyle(.secondary).lineLimit(2)
         }
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(isBoundChild ? "当前孩子 \(student.name)，\(student.className)" : "本班同学，\(student.className)")
     }
-    private func moment(_ image: String, _ title: String) -> some View { Button { selectedMoment = title } label: { VStack(alignment: .leading, spacing: 4) { Image(image).resizable().scaledToFill().frame(height: 48).frame(maxWidth: .infinity).clipped().clipShape(RoundedRectangle(cornerRadius: 7)); Text(title).font(.system(size: 12, weight: .bold)).foregroundStyle(ReferenceColor.navy) }.frame(maxWidth: .infinity) }.buttonStyle(.plain) }
+    private func moment(_ image: String, _ title: String) -> some View { Button { selectedMoment = title } label: { VStack(alignment: .leading, spacing: 4) { Image(image).resizable().scaledToFill().frame(height: 48).frame(maxWidth: .infinity).clipped().clipShape(RoundedRectangle(cornerRadius: 7)); Text(title).font(.system(size: 16, weight: .bold)).foregroundStyle(ReferenceColor.navy) }.frame(maxWidth: .infinity) }.buttonStyle(.plain) }
     private static let monthKeyFormatter: DateFormatter = { let formatter = DateFormatter(); formatter.locale = Locale(identifier: "en_US_POSIX"); formatter.dateFormat = "yyyy-MM"; return formatter }()
 }
 
@@ -440,7 +440,7 @@ private struct ClassPostCard: View {
             VStack(alignment: .leading, spacing: 7) {
                 header
                 Text(post.content)
-                    .font(.system(size: 12))
+                    .font(.system(size: 16))
                     .foregroundStyle(ReferenceColor.navy)
                 if let attachments = post.attachments, !attachments.isEmpty {
                     attachmentPreview(attachments)
@@ -449,7 +449,7 @@ private struct ClassPostCard: View {
                 commentPreview
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, AppTheme.pagePadding)
     }
 
     private var header: some View {
@@ -459,10 +459,10 @@ private struct ClassPostCard: View {
                 .foregroundStyle(ReferenceColor.sky)
             VStack(alignment: .leading, spacing: 1) {
                 Text(post.author)
-                    .font(.system(size: 12, weight: .bold))
+                    .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(ReferenceColor.blue)
                 Text("刚刚发布 · \(syncLabel)")
-                    .font(.system(size: 12))
+                    .font(.system(size: 16))
                     .foregroundStyle(post.status == .failed ? Color.red : Color.secondary)
             }
             Spacer()
@@ -473,10 +473,10 @@ private struct ClassPostCard: View {
                     Button("删除", action: onDelete)
                         .foregroundStyle(.red)
                 }
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
             } else {
                 Button("举报", action: onReport)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.secondary)
             }
         }
@@ -497,7 +497,7 @@ private struct ClassPostCard: View {
                 Label("分享", systemImage: "square.and.arrow.up")
             }
         }
-        .font(.system(size: 12, weight: .semibold))
+        .font(.system(size: 16, weight: .semibold))
         .foregroundStyle(isLiked ? ReferenceColor.blue : Color.secondary)
     }
 
@@ -512,7 +512,7 @@ private struct ClassPostCard: View {
                     } else {
                         VStack(spacing: 4) {
                             Image(systemName: attachment.type == "video" ? "video.fill" : "photo").font(.system(size: 18, weight: .semibold))
-                            Text(state.classPostAttachmentErrors[attachment.objectID ?? ""] == nil ? "查看附件" : "加载失败，重试").font(.system(size: 12, weight: .semibold))
+                            Text(state.classPostAttachmentErrors[attachment.objectID ?? ""] == nil ? "查看附件" : "加载失败，重试").font(.system(size: 16, weight: .semibold))
                         }
                         .frame(maxWidth: .infinity, minHeight: 76)
                         .foregroundStyle(state.classPostAttachmentErrors[attachment.objectID ?? ""] == nil ? ReferenceColor.blue : Color.red)
@@ -532,11 +532,11 @@ private struct ClassPostCard: View {
             VStack(alignment: .leading, spacing: 3) {
                 Divider()
                 Text("最新评论")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.secondary)
                 ForEach(Array(comments.suffix(2))) { comment in
                     Text("\(comment.author)：\(comment.text)")
-                        .font(.system(size: 12))
+                        .font(.system(size: 16))
                         .foregroundStyle(ReferenceColor.navy)
                         .lineLimit(2)
                 }
@@ -574,19 +574,19 @@ private struct CircleInfoSheet: View {
                     Section("班级通知评论") {
                         Text("你可以在班级通知下留言，与老师和家长交流。")
                         Text("请注意保护孩子隐私，避免发布个人敏感信息。")
-                            .font(.footnote).foregroundStyle(.secondary)
+                            .font(.subheadline).foregroundStyle(.secondary)
                     }
                 } else if title.contains("互动") {
                     Section("本班互动说明") {
                         Text("仅展示当前本班可见学生名单，便于家长确认交流范围。")
                         Text("班级评优、排名及表彰由学校和班主任统一发布，本页不生成。")
-                            .font(.footnote).foregroundStyle(.secondary)
+                            .font(.subheadline).foregroundStyle(.secondary)
                     }
                 } else {
                     Section("\(state.selectedChild?.name ?? "孩子")的运动打卡") {
                         LabeledContent("本月完成", value: "\(currentMonthCheckInCount) 次")
                         Text(currentMonthCheckInCount == 0 ? "完成一次家庭运动后即可打卡。" : "打卡记录会自动保存并同步。")
-                            .font(.footnote).foregroundStyle(.secondary)
+                            .font(.subheadline).foregroundStyle(.secondary)
                     }
                 }
             }

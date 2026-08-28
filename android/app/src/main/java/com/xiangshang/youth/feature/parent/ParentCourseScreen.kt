@@ -105,8 +105,8 @@ private fun remoteCourseSelectionKey(lesson: RemoteLesson): String =
             }
             if (state.coursesError == null) clearRecommendedCourse()
         }
-        Text("我的课程", color = Navy, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 10.dp)); Text("${selectedChild.name} · ${selectedChild.className}", color = Color.Gray, fontSize = 12.sp); Spacer(Modifier.height(8.dp))
-        Row(Modifier.fillMaxWidth().background(Sky, RoundedCornerShape(9.dp))) { listOf("公益课程", "学校课程").forEachIndexed { index, text -> Text(text, color = if (paid == (index == 1)) Color.White else Blue, fontWeight = FontWeight.Bold, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.weight(1f).padding(8.dp).semantics { role = Role.Tab; contentDescription = "切换到$text" }.background(if (paid == (index == 1)) Blue else Color.Transparent, RoundedCornerShape(8.dp)).clickable { paid = index == 1 }) } }
+        Text("我的课程", color = Navy, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 10.dp)); Text("${selectedChild.name} · ${selectedChild.className}", color = Color.Gray, fontSize = 16.sp); Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth().background(Sky, RoundedCornerShape(9.dp))) { listOf("公益课程", "学校课程").forEachIndexed { index, text -> Text(text, color = if (paid == (index == 1)) Color.White else Blue, fontWeight = FontWeight.Bold, fontSize = 16.sp, textAlign = TextAlign.Center, modifier = Modifier.weight(1f).padding(8.dp).semantics { role = Role.Tab; contentDescription = "切换到$text" }.background(if (paid == (index == 1)) Blue else Color.Transparent, RoundedCornerShape(8.dp)).clickable { paid = index == 1 }) } }
         Spacer(Modifier.height(10.dp)); ParentSection(if (paid) "精选学校课程" else "公益课堂", "全部课程") { catalogOpen = true }
         val items = if (state.repositoryAcknowledged) state.remoteCourses.map { Triple(remoteCourseSelectionKey(it), it.title, Icons.Filled.PlayCircle) } else if (paid) {
             listOf(
@@ -127,9 +127,9 @@ private fun remoteCourseSelectionKey(lesson: RemoteLesson): String =
             state.repositoryAcknowledged && state.coursesLoading -> LoadingState()
             state.repositoryAcknowledged && state.coursesError != null -> ErrorState(state.coursesError, retry = { loadCourses(selectedChild.id) })
             state.repositoryAcknowledged && items.isEmpty() -> EmptyState("暂无已分配课程，学校或平台分配后会显示在这里。")
-            else -> items.chunked(2).forEach { row -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { row.forEach { (itemKey, displayTitle, icon) -> val remote = state.remoteCourses.firstOrNull { remoteCourseSelectionKey(it) == itemKey }; Surface(Modifier.weight(1f).height(105.dp).semantics { role = Role.Button; contentDescription = "打开课程：$displayTitle" }.clickable { selectedCourseKey = itemKey; selectedCourseTitle = displayTitle }, color = Sky, shape = RoundedCornerShape(10.dp)) { Column(Modifier.padding(12.dp)) { Icon(icon, null, tint = Blue); Spacer(Modifier.height(8.dp)); Text(displayTitle, color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); val key = if (remote == null) com.xiangshang.youth.app.AppViewModel.courseProgressKey(selectedChild.id, itemKey, lessonId = itemKey) else com.xiangshang.youth.app.AppViewModel.courseProgressKey(selectedChild.id, remote.courseId, remote.moduleId ?: "default", remote.lessonId); val progress = state.local.courseProgress[key] ?: remote?.let { if (it.completed) 1f else (it.lastPositionMs.toFloat() / it.durationMs.coerceAtLeast(1)).coerceIn(0f,1f) } ?: 0f; Text(if (progress > 0f) "学习进度 ${(progress * 100).toInt()}%" else "开始学习", color = Green, fontSize = 12.sp) } } }; if (row.size == 1) Spacer(Modifier.weight(1f)) }; Spacer(Modifier.height(8.dp)) }
+            else -> items.chunked(2).forEach { row -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { row.forEach { (itemKey, displayTitle, icon) -> val remote = state.remoteCourses.firstOrNull { remoteCourseSelectionKey(it) == itemKey }; Surface(Modifier.weight(1f).height(132.dp).semantics { role = Role.Button; contentDescription = "打开课程：$displayTitle" }.clickable { selectedCourseKey = itemKey; selectedCourseTitle = displayTitle }, color = Sky, shape = RoundedCornerShape(10.dp)) { Column(Modifier.padding(16.dp)) { Icon(icon, null, tint = Blue); Spacer(Modifier.height(8.dp)); Text(displayTitle, color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp); val key = if (remote == null) com.xiangshang.youth.app.AppViewModel.courseProgressKey(selectedChild.id, itemKey, lessonId = itemKey) else com.xiangshang.youth.app.AppViewModel.courseProgressKey(selectedChild.id, remote.courseId, remote.moduleId ?: "default", remote.lessonId); val progress = state.local.courseProgress[key] ?: remote?.let { if (it.completed) 1f else (it.lastPositionMs.toFloat() / it.durationMs.coerceAtLeast(1)).coerceIn(0f,1f) } ?: 0f; Text(if (progress > 0f) "学习进度 ${(progress * 100).toInt()}%" else "开始学习", color = Green, fontSize = 16.sp) } } }; if (row.size == 1) Spacer(Modifier.weight(1f)) }; Spacer(Modifier.height(8.dp)) }
         }
-        Surface(Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "打开课程咨询" }.clickable { clearWorkflow("support"); detail = "客服咨询" }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.AutoMirrored.Filled.Message, null, tint = Blue); Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Text("课程咨询", color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text("填写后自动保存并同步", color = Color.Gray, fontSize = 12.sp) }; Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray) } }
+        Surface(Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "打开课程咨询" }.clickable { clearWorkflow("support"); detail = "客服咨询" }, color = Color.White, shape = RoundedCornerShape(10.dp)) { Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.AutoMirrored.Filled.Message, null, tint = Blue); Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Text("课程咨询", color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp); Text("填写后自动保存并同步", color = Color.Gray, fontSize = 16.sp) }; Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray) } }
     }
     detail?.let { title -> SimpleDialog(title = title, messages = state.local.supportMessages, drafts = state.local.drafts, send = sendSupport, submit = submitSupport, command = state.workflowStates["support"] ?: WorkflowCommandState(), commandDriven = title == "客服咨询", saveDraft = saveDraft, clearDraft = clearDraft, dismiss = { detail = null }) }
     if (catalogOpen) CourseCatalogDialog(
@@ -255,11 +255,11 @@ private fun CourseLessonDialog(
                     else -> Box(Modifier.fillMaxWidth().height(160.dp).background(Color(0xFF101828), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) { Text("课程视频待同步", color = Color.White) }
                 }
                 (playbackError ?: snapshot.errorMessage)?.let { error ->
-                    Text(error, color = Color(0xFFD64545), fontSize = 12.sp, modifier = Modifier.padding(top = 7.dp))
+                    Text(error, color = Color(0xFFD64545), fontSize = 16.sp, modifier = Modifier.padding(top = 7.dp))
                     TextButton(onClick = { if (playbackError != null) retryPlayback() else { retryToken += 1; playRequested = true } }) { Text("重试播放") }
                 }
                 progressSaveError?.let { error ->
-                    Text(error, color = Color(0xFFD64545), fontSize = 12.sp, modifier = Modifier.padding(top = 7.dp))
+                    Text(error, color = Color(0xFFD64545), fontSize = 16.sp, modifier = Modifier.padding(top = 7.dp))
                     TextButton(onClick = {
                         if (progressSaveConflict) refreshProgressVersion()
                         else { lastSavedPositionMs = -1L; persist() }
@@ -267,11 +267,11 @@ private fun CourseLessonDialog(
                 }
                 if (progressSaving) Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.width(6.dp)); Text("正在同步播放进度", color = Color.Gray, fontSize = 12.sp)
+                    Spacer(Modifier.width(6.dp)); Text("正在同步播放进度", color = Color.Gray, fontSize = 16.sp)
                 }
-                Text("课程播放进度会自动保存，联网后同步。", color = Color.Gray, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
+                Text("课程播放进度会自动保存，联网后同步。", color = Color.Gray, fontSize = 16.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
                 LinearProgressIndicator({ progress }, Modifier.fillMaxWidth().padding(top = 16.dp).height(7.dp).clip(CircleShape), color = Green, trackColor = Sky)
-                Text("学习进度 ${(progress * 100).toInt()}%", color = Green, fontSize = 12.sp, modifier = Modifier.padding(top = 7.dp))
+                Text("学习进度 ${(progress * 100).toInt()}%", color = Green, fontSize = 16.sp, modifier = Modifier.padding(top = 7.dp))
             }
         },
         confirmButton = {
@@ -295,7 +295,7 @@ private fun CourseCatalogDialog(paid: Boolean, onOpenCourse: (String, String) ->
         title = { Text(if (paid) "学校课程目录" else "公益课程目录") },
         text = {
             Column {
-                Text("选择课程后可开始学习，进度会自动保存。", color = Color.Gray, fontSize = 12.sp)
+                Text("选择课程后可开始学习，进度会自动保存。", color = Color.Gray, fontSize = 16.sp)
                 courses.forEach { (courseId, course) ->
                     Row(
                         Modifier.fillMaxWidth().padding(top = 8.dp).semantics { role = Role.Button; contentDescription = "学习$course" }.clickable { onOpenCourse(courseId, course) }.padding(vertical = 6.dp),

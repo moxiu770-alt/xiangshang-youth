@@ -88,9 +88,9 @@ struct LoginView: View {
                             Text("身心健康智慧平台")
                                 .font(.system(size: 25, weight: .heavy))
                             Text("学校体测 · 家庭健康记录 · 成长训练")
-                                .font(.system(size: 12, weight: .bold))
+                                .font(.system(size: 16, weight: .bold))
                                 .foregroundStyle(ReferenceColor.yellow)
-                                .padding(.horizontal, 12)
+                                .padding(.horizontal, AppTheme.pagePadding)
                                 .padding(.vertical, 4)
                                 .background(.white.opacity(0.18), in: Capsule())
                         }
@@ -423,7 +423,7 @@ struct RegisterView: View {
                         VStack(spacing: 12) {
                             Image(systemName: "checkmark.seal.fill").font(.system(size: 48)).foregroundStyle(ReferenceColor.green)
                             Text("注册成功").font(.title3.bold())
-                            Text("账号已创建，正在进入\(accountRole.rawValue)工作区。").font(.footnote).foregroundStyle(.secondary)
+                            Text("账号已创建，正在进入\(accountRole.rawValue)工作区。").font(.subheadline).foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 30)
@@ -453,7 +453,7 @@ struct RegisterView: View {
                                     }
                                 }
                             }
-                            .font(.caption.weight(.semibold))
+                            .font(.subheadline.weight(.semibold))
                             .disabled(codeCountdown > 0 || codeSending)
                         }
                         PasswordInput("设置密码（至少 8 位）", text: $password)
@@ -463,7 +463,7 @@ struct RegisterView: View {
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(ReferenceColor.navy)
                         Text("用于绑定孩子、查看测评报告与训练计划。教师及学校管理账号由学校管理员创建。")
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(.subheadline).foregroundStyle(.secondary)
                     }
                     Section {
                         Button { confirmed.toggle() } label: {
@@ -476,10 +476,10 @@ struct RegisterView: View {
                             Button("儿童个人信息保护声明") { legalDocument = .childPrivacy }
                         } label: {
                             Label("分别查看三份协议", systemImage: "doc.text.magnifyingglass")
-                                .font(.caption)
+                                .font(.subheadline)
                                 .foregroundStyle(ReferenceColor.blue)
                         }
-                        if let error { Text(error).font(.caption).foregroundStyle(.red) }
+                        if let error { Text(error).font(.subheadline).foregroundStyle(.red) }
                         Button("注册并登录") { register() }
                             .frame(maxWidth: .infinity)
                             .disabled(!confirmed)
@@ -555,7 +555,7 @@ struct ResetPasswordView: View {
             Form {
                 if !submitted {
                     Text(verificationHint)
-                        .font(.footnote)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
                 if submitted {
@@ -566,7 +566,7 @@ struct ResetPasswordView: View {
                                 .foregroundStyle(ReferenceColor.green)
                             Text("密码已重置").font(.title3.bold())
                             Text("请使用新密码重新登录。")
-                                .font(.footnote)
+                                .font(.subheadline)
                                 .foregroundStyle(.secondary)
                             Button("返回登录") { dismiss() }
                                 .buttonStyle(.borderedProminent)
@@ -586,7 +586,7 @@ struct ResetPasswordView: View {
                             Button(codeSending ? "发送中…" : codeCountdown > 0 ? "\(codeCountdown)s" : codeSent ? "重新获取" : "获取验证码") {
                                 sendCode()
                             }
-                            .font(.caption.weight(.semibold))
+                            .font(.subheadline.weight(.semibold))
                             .disabled(codeCountdown > 0 || codeSending)
                         }
                     }
@@ -595,7 +595,7 @@ struct ResetPasswordView: View {
                         PasswordInput("再次输入新密码", text: $confirmation)
                     }
                     if let error {
-                        Section { Text(error).font(.caption).foregroundStyle(.red) }
+                        Section { Text(error).font(.subheadline).foregroundStyle(.red) }
                     }
                     Section {
                         Button("确认重置密码") { reset() }

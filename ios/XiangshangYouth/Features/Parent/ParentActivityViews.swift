@@ -18,28 +18,28 @@ struct ActivityListView: View {
                     LoadingStateView().padding(.top, 24)
                 } else if state.usesRemoteDataSource, let error = state.activitiesError {
                     ErrorStateView(message: error) { Task { await state.loadActivities() } }
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, AppTheme.pagePadding)
                 } else if displayActivities.isEmpty {
                     EmptyStateView(title: "暂无可报名活动", detail: "学校发布活动后会显示在这里。")
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, AppTheme.pagePadding)
                 } else {
                     ForEach(displayActivities) { activity in
                         Button { selected = activity } label: {
                             HStack(spacing: 12) {
                                 Image("ParentCampaign").resizable().scaledToFill().frame(width: 64, height: 54).clipShape(RoundedRectangle(cornerRadius: 12))
                                 VStack(alignment: .leading, spacing: 5) {
-                                    Text(activity.title).font(.system(size: 14, weight: .bold)).foregroundStyle(ReferenceColor.navy)
-                                    Text(activity.description ?? "活动说明以学校通知为准").font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(2)
-                                    Text(activity.registrationEndAt.map { "报名截止 · \($0.prefix(10))" } ?? "报名时间待通知").font(.system(size: 12, weight: .semibold)).foregroundStyle(ReferenceColor.blue)
+                                    Text(activity.title).font(.system(size: 16, weight: .bold)).foregroundStyle(ReferenceColor.navy)
+                                    Text(activity.description ?? "活动说明以学校通知为准").font(.system(size: 16)).foregroundStyle(.secondary).lineLimit(2)
+                                    Text(activity.registrationEndAt.map { "报名截止 · \($0.prefix(10))" } ?? "报名时间待通知").font(.system(size: 16, weight: .semibold)).foregroundStyle(ReferenceColor.blue)
                                 }
                                 Spacer()
-                                Image(systemName: "chevron.right").font(.system(size: 12)).foregroundStyle(.secondary)
+                                Image(systemName: "chevron.right").font(.system(size: 16)).foregroundStyle(.secondary)
                             }
-                            .padding(12)
+                            .padding(16)
                             .background(.white, in: RoundedRectangle(cornerRadius: 12))
                         }
                         .buttonStyle(.plain)
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, AppTheme.pagePadding)
                     }
                 }
                 if !visibleRegistrationHistory.isEmpty {
@@ -48,22 +48,22 @@ struct ActivityListView: View {
                             Text("报名历史").font(.system(size: 15, weight: .bold)).foregroundStyle(ReferenceColor.navy)
                             Spacer()
                             Button("查看全部") { showingHistory = true }
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.system(size: 16, weight: .semibold))
                                 .frame(minHeight: 44)
                         }
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, AppTheme.pagePadding)
                         ForEach(visibleRegistrationHistory.prefix(5)) { item in
                             HStack {
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(item.activityTitle ?? item.activityID).font(.system(size: 13, weight: .bold)).foregroundStyle(ReferenceColor.navy)
-                                    Text(item.updatedAt.map { "更新时间 · \(String($0.prefix(16)))" } ?? "报名记录").font(.system(size: 12)).foregroundStyle(.secondary)
+                                    Text(item.activityTitle ?? item.activityID).font(.system(size: 15, weight: .bold)).foregroundStyle(ReferenceColor.navy)
+                                    Text(item.updatedAt.map { "更新时间 · \(String($0.prefix(16)))" } ?? "报名记录").font(.system(size: 16)).foregroundStyle(.secondary)
                                 }
                                 Spacer()
-                                Text(activityHistoryStatus(item.status)).font(.system(size: 12, weight: .bold)).foregroundStyle(item.status == "cancelled" ? .red : ReferenceColor.blue)
+                                Text(activityHistoryStatus(item.status)).font(.system(size: 16, weight: .bold)).foregroundStyle(item.status == "cancelled" ? .red : ReferenceColor.blue)
                             }
-                            .padding(12)
+                            .padding(16)
                             .background(.white, in: RoundedRectangle(cornerRadius: 12))
-                            .padding(.horizontal, 12)
+                            .padding(.horizontal, AppTheme.pagePadding)
                         }
                     }
                     .padding(.top, 6)
@@ -111,12 +111,12 @@ private struct ActivityRegistrationHistorySheet: View {
                                             .font(.system(size: 15, weight: .bold))
                                             .foregroundStyle(ReferenceColor.navy)
                                         Text("报名编号 \(item.registrationID)")
-                                            .font(.system(size: 12))
+                                            .font(.system(size: 16))
                                             .foregroundStyle(.secondary)
                                     }
                                     Spacer()
                                     Text(activityStatus(item.status))
-                                        .font(.system(size: 12, weight: .bold))
+                                        .font(.system(size: 16, weight: .bold))
                                         .foregroundStyle(item.status == "cancelled" ? .red : ReferenceColor.blue)
                                 }
                                 HStack {
@@ -124,10 +124,10 @@ private struct ActivityRegistrationHistorySheet: View {
                                     Spacer()
                                     Text(item.version.map { "版本 \($0)" } ?? "版本待同步")
                                 }
-                                .font(.system(size: 12))
+                                .font(.system(size: 16))
                                 .foregroundStyle(.secondary)
                             }
-                            .padding(14)
+                            .padding(18)
                             .background(.white, in: RoundedRectangle(cornerRadius: 14))
                         }
                     }
@@ -189,31 +189,31 @@ struct ActivityDetailSheet: View {
                 .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 16))
             Text(title).font(.title3.bold()).fixedSize(horizontal: false, vertical: true)
-            Label(activity?.startsAt.map { "\($0.prefix(10)) · 以学校通知为准" } ?? (state.repository.supportsRemoteAcknowledgement ? "活动时间以学校通知为准" : "2026 秋季测评 · 以学校通知为准"), systemImage: "calendar").font(.system(size: 12)).foregroundStyle(.secondary)
+            Label(activity?.startsAt.map { "\($0.prefix(10)) · 以学校通知为准" } ?? (state.repository.supportsRemoteAcknowledgement ? "活动时间以学校通知为准" : "2026 秋季测评 · 以学校通知为准"), systemImage: "calendar").font(.system(size: 16)).foregroundStyle(.secondary)
             Text(activity?.description ?? (state.repository.supportsRemoteAcknowledgement
                  ? "完成综合健康测评，了解孩子的运动发展与健康成长情况。提交后将同步至孩子成长档案。"
                  : "完成综合健康测评，了解孩子的运动发展与健康成长情况。报名信息会自动保存并同步。"))
-                .font(.system(size: 14)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            VStack(alignment: .leading, spacing: 8) { Text("活动说明").font(.system(size: 16, weight: .bold)); Text("• 完成四项健康测评\n• 查看个性化成长报告\n• 可预约学校体测场地") .font(.system(size: 14)).foregroundStyle(ReferenceColor.navy).fixedSize(horizontal: false, vertical: true) }.frame(maxWidth: .infinity, alignment: .leading).padding(14).background(ReferenceColor.sky, in: RoundedRectangle(cornerRadius: 12))
+                .font(.system(size: 16)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 8) { Text("活动说明").font(.system(size: 16, weight: .bold)); Text("• 完成四项健康测评\n• 查看个性化成长报告\n• 可预约学校体测场地") .font(.system(size: 16)).foregroundStyle(ReferenceColor.navy).fixedSize(horizontal: false, vertical: true) }.frame(maxWidth: .infinity, alignment: .leading).padding(18).background(ReferenceColor.sky, in: RoundedRectangle(cornerRadius: 12))
             HStack(spacing: 10) {
                 activityMetric("剩余名额", capacityText, ReferenceColor.green)
                 activityMetric("报名截止", deadlineText, ReferenceColor.blue)
                 activityMetric("学校确认", registrationStatusText(registered: registered), ReferenceColor.yellow)
             }
             if case let .failed(message) = cancelCommandState {
-                Text(message).font(.system(size: 12)).foregroundStyle(.red)
+                Text(message).font(.system(size: 16)).foregroundStyle(.red)
             }
             if registered && !hasFailure && !isEditingRegistration {
                 VStack(alignment: .leading, spacing: 8) {
                     Label(state.repository.supportsRemoteAcknowledgement
                           ? "报名已确认，活动开始前将通过消息中心通知您。"
                           : "报名信息已保存，联网后自动同步。", systemImage: "checkmark.circle.fill")
-                        .font(.system(size: 12, weight: .medium)).foregroundStyle(ReferenceColor.green)
+                        .font(.system(size: 16, weight: .medium)).foregroundStyle(ReferenceColor.green)
                     Button("修改报名信息") {
                         if let record = state.localFeatures.activityRegistrations.first(where: { $0.activityID == activityID && ($0.childID == selectedChildID || $0.childID == nil) }) { contactName = record.contactName; phone = record.phone }
                         isEditingRegistration = true
                         state.clearWorkflowState(commandKey)
-                    }.font(.system(size: 12, weight: .semibold))
+                    }.font(.system(size: 16, weight: .semibold))
                     Button("取消报名") {
                         Task {
                             if await state.cancelActivityRegistrationCommand(activityID) {
@@ -221,7 +221,7 @@ struct ActivityDetailSheet: View {
                             }
                         }
                     }
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.red)
                 }
             } else {
@@ -229,13 +229,13 @@ struct ActivityDetailSheet: View {
                     Text("报名信息").font(.system(size: 15, weight: .bold))
                     TextField("联系人姓名", text: $contactName).textFieldStyle(.roundedBorder)
                     TextField("手机号", text: $phone).keyboardType(.phonePad).textFieldStyle(.roundedBorder)
-                    Toggle("已阅读活动说明并同意接收报名通知", isOn: $consented).font(.system(size: 13)).fixedSize(horizontal: false, vertical: true)
+                    Toggle("已阅读活动说明并同意接收报名通知", isOn: $consented).font(.system(size: 15)).fixedSize(horizontal: false, vertical: true)
                 }
                 .onChange(of: contactName) { _, _ in saveDraft() }
                 .onChange(of: phone) { _, _ in saveDraft() }
                 .onChange(of: consented) { _, _ in saveDraft() }
-                if let validationMessage { Text(validationMessage).font(.system(size: 12)).foregroundStyle(.red) }
-                if case let .failed(message) = commandState { Text(message).font(.system(size: 12)).foregroundStyle(.red) }
+                if let validationMessage { Text(validationMessage).font(.system(size: 16)).foregroundStyle(.red) }
+                if case let .failed(message) = commandState { Text(message).font(.system(size: 16)).foregroundStyle(.red) }
             }
             Button {
                 guard !contactName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { validationMessage = "请填写联系人姓名。"; return }
@@ -251,7 +251,7 @@ struct ActivityDetailSheet: View {
                     if commandState.isSubmitting { ProgressView().tint(.white) }
                     Text(commandState.isSubmitting ? "正在提交…" : isEditingRegistration ? "更新报名信息" : registered ? "已保存待同步" : "确认报名")
                 }
-                .font(.system(size: 14, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 12).foregroundStyle(.white).background(hasFailure ? .orange : registered ? ReferenceColor.green : ReferenceColor.blue, in: RoundedRectangle(cornerRadius: 12))
+                .font(.system(size: 16, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 12).foregroundStyle(.white).background(hasFailure ? .orange : registered ? ReferenceColor.green : ReferenceColor.blue, in: RoundedRectangle(cornerRadius: 12))
             }
             .buttonStyle(.plain).disabled(commandState.isSubmitting || (registered && !hasFailure && !isEditingRegistration))
         }
@@ -304,8 +304,8 @@ struct ActivityDetailSheet: View {
     }
     private func activityMetric(_ label: String, _ value: String, _ color: Color) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(value).font(.system(size: 14, weight: .bold)).foregroundStyle(color)
-            Text(label).font(.system(size: 12)).foregroundStyle(.secondary)
+            Text(value).font(.system(size: 16, weight: .bold)).foregroundStyle(color)
+            Text(label).font(.system(size: 16)).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)

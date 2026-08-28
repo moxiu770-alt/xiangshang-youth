@@ -9,24 +9,24 @@ struct TeacherClassCircleDashboard: View {
     private var primaryClassName: String { state.managedTeacherClasses.first?.name ?? "我的班级" }
     var body: some View { ScrollView { VStack(spacing: 10) {
         ParentPageNavigation(title: "\(primaryClassName) · 班级圈")
-        if !state.usesRemoteDataSource { ReferenceCard { VStack(alignment: .leading, spacing: 7) { HStack { Image(systemName: "megaphone.fill").foregroundStyle(ReferenceColor.blue); Text("班级公告").font(.system(size: 13, weight: .bold)); Spacer(); Button("全部公告 ›") { selectedNotice = "全部班级公告\n请家长于 9 月 12 日前完成孩子健康信息确认，并留意测评时间与场地安排。" }.font(.system(size: 12)).foregroundStyle(ReferenceColor.blue).buttonStyle(.plain) }; Button { selectedNotice = "秋季综合测评通知\n请家长于 9 月 12 日前完成孩子健康信息确认。测评当天请为孩子准备舒适运动服和饮水。" } label: { VStack(alignment: .leading, spacing: 4) { Text("秋季综合测评通知").font(.system(size: 12, weight: .bold)); Text("请家长于 9 月 12 日前完成孩子健康信息确认。") .font(.system(size: 12)).foregroundStyle(.secondary) }.frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.plain) } }.padding(.horizontal, 12) }
-        Button { composerShown = true } label: { Label("发布公告或班级动态", systemImage: "square.and.pencil").font(.system(size: 15, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 12).foregroundStyle(.white).background(ReferenceColor.blue, in: RoundedRectangle(cornerRadius: 10)) }.buttonStyle(.plain).padding(.horizontal, 12)
-        ReferenceSectionTitle(title: "班级动态", trailing: state.classPostsNextCursor == nil ? "本班最新" : "可继续加载").padding(.horizontal, 12)
+        if !state.usesRemoteDataSource { ReferenceCard { VStack(alignment: .leading, spacing: 7) { HStack { Image(systemName: "megaphone.fill").foregroundStyle(ReferenceColor.blue); Text("班级公告").font(.system(size: 15, weight: .bold)); Spacer(); Button("全部公告 ›") { selectedNotice = "全部班级公告\n请家长于 9 月 12 日前完成孩子健康信息确认，并留意测评时间与场地安排。" }.font(.system(size: 16)).foregroundStyle(ReferenceColor.blue).buttonStyle(.plain) }; Button { selectedNotice = "秋季综合测评通知\n请家长于 9 月 12 日前完成孩子健康信息确认。测评当天请为孩子准备舒适运动服和饮水。" } label: { VStack(alignment: .leading, spacing: 4) { Text("秋季综合测评通知").font(.system(size: 16, weight: .bold)); Text("请家长于 9 月 12 日前完成孩子健康信息确认。") .font(.system(size: 16)).foregroundStyle(.secondary) }.frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.plain) } }.padding(.horizontal, AppTheme.pagePadding) }
+        Button { composerShown = true } label: { Label("发布公告或班级动态", systemImage: "square.and.pencil").font(.system(size: 15, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 12).foregroundStyle(.white).background(ReferenceColor.blue, in: RoundedRectangle(cornerRadius: 10)) }.buttonStyle(.plain).padding(.horizontal, AppTheme.pagePadding)
+        ReferenceSectionTitle(title: "班级动态", trailing: state.classPostsNextCursor == nil ? "本班最新" : "可继续加载").padding(.horizontal, AppTheme.pagePadding)
         if state.usesRemoteDataSource, state.classPostsLoading, state.localFeatures.classPosts.isEmpty {
             LoadingStateView().padding(.vertical, 20)
         } else if state.usesRemoteDataSource, let error = state.classPostsError, state.localFeatures.classPosts.isEmpty {
-            ErrorStateView(message: error) { Task { await state.loadClassPosts() } }.padding(.horizontal, 12)
+            ErrorStateView(message: error) { Task { await state.loadClassPosts() } }.padding(.horizontal, AppTheme.pagePadding)
         } else if state.localFeatures.classPosts.isEmpty {
-            EmptyStateView(title: "暂无班级动态", detail: "发布班级通知或动态后，会按审核状态显示在这里。").padding(.horizontal, 12)
+            EmptyStateView(title: "暂无班级动态", detail: "发布班级通知或动态后，会按审核状态显示在这里。").padding(.horizontal, AppTheme.pagePadding)
         } else {
             ForEach(state.localFeatures.classPosts) { post in
                 ReferenceCard {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(alignment: .top) {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(post.displayName ?? post.author).font(.system(size: 14, weight: .bold)).foregroundStyle(ReferenceColor.blue)
+                                Text(post.displayName ?? post.author).font(.system(size: 16, weight: .bold)).foregroundStyle(ReferenceColor.blue)
                                 Text("\(post.status.taskStatusLabel) · \(post.moderationStatus == "approved" || post.moderationStatus == "published" ? "已审核" : "待审核")")
-                                    .font(.system(size: 12)).foregroundStyle(post.status == .failed ? .red : .secondary)
+                                    .font(.system(size: 16)).foregroundStyle(post.status == .failed ? .red : .secondary)
                             }
                             Spacer()
                             Menu {
@@ -46,25 +46,25 @@ struct TeacherClassCircleDashboard: View {
                                 Image(systemName: "ellipsis.circle").font(.system(size: 20)).foregroundStyle(ReferenceColor.blue)
                             }.accessibilityLabel("管理班级动态")
                         }
-                        Text(post.content).font(.system(size: 14)).foregroundStyle(ReferenceColor.navy).fixedSize(horizontal: false, vertical: true)
+                        Text(post.content).font(.system(size: 16)).foregroundStyle(ReferenceColor.navy).fixedSize(horizontal: false, vertical: true)
                         HStack(spacing: 8) {
                             if post.isPinned == true { Label("置顶", systemImage: "pin.fill").foregroundStyle(ReferenceColor.yellow) }
                             if post.reportStatus == "reported" { Label("已举报", systemImage: "exclamationmark.bubble.fill").foregroundStyle(.orange) }
                             Spacer()
                             Text(post.createdAt.formatted(date: .abbreviated, time: .shortened)).foregroundStyle(.secondary)
-                        }.font(.system(size: 12))
+                        }.font(.system(size: 16))
                     }
-                }.padding(.horizontal, 12)
+                }.padding(.horizontal, AppTheme.pagePadding)
             }
             if state.usesRemoteDataSource, let cursor = state.classPostsNextCursor {
                 Button { Task { await state.loadClassPosts(cursor: cursor) } } label: {
                     Text(state.classPostsLoading ? "加载中…" : "加载更多动态").font(.system(size: 15, weight: .semibold)).frame(maxWidth: .infinity).padding(.vertical, 11)
-                }.buttonStyle(.bordered).disabled(state.classPostsLoading).padding(.horizontal, 12)
+                }.buttonStyle(.bordered).disabled(state.classPostsLoading).padding(.horizontal, AppTheme.pagePadding)
             } else if state.usesRemoteDataSource, let error = state.classPostsError {
-                ErrorStateView(message: error) { Task { await state.loadClassPosts(cursor: state.classPostsNextCursor) } }.padding(.horizontal, 12)
+                ErrorStateView(message: error) { Task { await state.loadClassPosts(cursor: state.classPostsNextCursor) } }.padding(.horizontal, AppTheme.pagePadding)
             }
         }
-        if !state.usesRemoteDataSource { ForEach([("今日体能活动", "孩子们完成了侧向滑步与障碍跳练习，表现很棒！"), ("家校共育小贴士", "建议每天安排 20 分钟亲子运动时间。")], id: \.0) { item in Button { selectedNotice = "\(item.0)\n\(item.1)" } label: { ReferenceCard { HStack { VStack(alignment: .leading, spacing: 5) { Text(item.0).font(.system(size: 12, weight: .bold)); Text(item.1).font(.system(size: 12)).foregroundStyle(.secondary); Text("\(currentTeacherName) · 今天").font(.system(size: 12)).foregroundStyle(ReferenceColor.green) }; Spacer(); Image(systemName: "chevron.right").font(.system(size: 12)).foregroundStyle(.secondary) } }.padding(.horizontal, 12) }.buttonStyle(.plain).accessibilityLabel("查看\(item.0)") } }
+        if !state.usesRemoteDataSource { ForEach([("今日体能活动", "孩子们完成了侧向滑步与障碍跳练习，表现很棒！"), ("家校共育小贴士", "建议每天安排 20 分钟亲子运动时间。")], id: \.0) { item in Button { selectedNotice = "\(item.0)\n\(item.1)" } label: { ReferenceCard { HStack { VStack(alignment: .leading, spacing: 5) { Text(item.0).font(.system(size: 16, weight: .bold)); Text(item.1).font(.system(size: 16)).foregroundStyle(.secondary); Text("\(currentTeacherName) · 今天").font(.system(size: 16)).foregroundStyle(ReferenceColor.green) }; Spacer(); Image(systemName: "chevron.right").font(.system(size: 16)).foregroundStyle(.secondary) } }.padding(.horizontal, AppTheme.pagePadding) }.buttonStyle(.plain).accessibilityLabel("查看\(item.0)") } }
     }.padding(.bottom, 10) }
         .background(ReferenceColor.canvas)
         .overlay {
@@ -103,11 +103,11 @@ private struct TeacherNoticeDetailSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     Label("\(author) · 今天", systemImage: "person.crop.circle.fill")
-                        .font(.footnote).foregroundStyle(ReferenceColor.blue)
+                        .font(.subheadline).foregroundStyle(ReferenceColor.blue)
                     Text(detail.isEmpty ? "暂无补充说明。" : detail)
                         .font(.body).foregroundStyle(ReferenceColor.navy)
                     Label("本班可见", systemImage: "lock.fill")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.subheadline).foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading).padding(20)
             }
@@ -202,9 +202,9 @@ struct TeacherDashboard: View {
                 .frame(width: 43, height: 43).background(ReferenceColor.sky, in: Circle()).clipShape(Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(state.activeDisplayName).font(.system(size: 16, weight: .bold)).foregroundStyle(ReferenceColor.navy)
-                Text(state.profile?.schoolName ?? "学校").font(.system(size: 13)).foregroundStyle(.secondary)
+                Text(state.profile?.schoolName ?? "学校").font(.system(size: 15)).foregroundStyle(.secondary)
                 Text(isSportsTeacher ? "延时课程工作台" : "负责 \(managedClasses.count) 个授权班级")
-                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(ReferenceColor.green)
+                    .font(.system(size: 15, weight: .semibold)).foregroundStyle(ReferenceColor.green)
             }
             Spacer()
             Button { router.push(.teacherMessages) } label: { Image(systemName: "bell").font(.system(size: 16, weight: .medium)).foregroundStyle(ReferenceColor.navy)
@@ -239,7 +239,7 @@ struct TeacherDashboard: View {
             else { withAnimation(.spring(response: 0.38, dampingFraction: 0.78)) { action() } }
         } label: {
             Label(title, systemImage: icon)
-                .font(.system(size: 14, weight: .bold))
+                .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(selected ? .white : color)
                 .frame(maxWidth: .infinity)
                 .frame(height: AppTheme.controlHeight)
@@ -264,10 +264,10 @@ struct TeacherDashboard: View {
                     }
                     Divider()
                     HStack {
-                        Text("问题分布（人）").font(.system(size: 14, weight: .bold))
+                        Text("问题分布（人）").font(.system(size: 16, weight: .bold))
                         Spacer()
                         Text("低分 \(lowScoreStudentIDs.count) · 表现良好 \(highScoreStudentIDs.count) · 待复核 \(classStudents.filter { state.taskStatus(for: $0) == .review }.count) · 待补测 \(classStudents.filter { state.taskStatus(for: $0) == .retest }.count)")
-                            .font(.system(size: 13)).foregroundStyle(.secondary)
+                            .font(.system(size: 15)).foregroundStyle(.secondary)
                             .multilineTextAlignment(.trailing)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -306,10 +306,10 @@ struct TeacherDashboard: View {
         Button { router.push(.teacherTasks) } label: {
             HStack(spacing: 8) {
                 Image(systemName: "calendar.badge.clock").foregroundStyle(color)
-                Text(title).font(.system(size: 14, weight: .semibold)).foregroundStyle(ReferenceColor.navy).lineLimit(2)
+                Text(title).font(.system(size: 16, weight: .semibold)).foregroundStyle(ReferenceColor.navy).lineLimit(2)
                 Spacer()
-                Text(status).font(.system(size: 13, weight: .bold)).foregroundStyle(color)
-                Image(systemName: "chevron.right").font(.system(size: 12)).foregroundStyle(.secondary)
+                Text(status).font(.system(size: 15, weight: .bold)).foregroundStyle(color)
+                Image(systemName: "chevron.right").font(.system(size: 16)).foregroundStyle(.secondary)
             }
         }
         .buttonStyle(.plain)
@@ -330,21 +330,21 @@ struct TeacherDashboard: View {
                     let completed = state.data?.tasks.reduce(0) { $0 + $1.completedCount } ?? 0
                     let progress = total == 0 ? 0 : Double(completed) / Double(total)
                     AnimatedProgressLine(value: progress, colors: [ReferenceColor.green, ReferenceColor.blue])
-                    Text("已完成 \(completed) / \(total) 人    \(Int(progress * 100))%").font(.system(size: 12, weight: .bold)).foregroundStyle(ReferenceColor.green)
+                    Text("已完成 \(completed) / \(total) 人    \(Int(progress * 100))%").font(.system(size: 16, weight: .bold)).foregroundStyle(ReferenceColor.green)
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, AppTheme.pagePadding)
             HStack(spacing: 8) {
                 action("person.3.sequence.fill", "学生管理", ReferenceColor.green, .studentList(nil))
                 action("calendar.badge.clock", "班级排课", ReferenceColor.blue, .teacherTasks)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, AppTheme.pagePadding)
             ReferenceCard {
                 VStack(alignment: .leading, spacing: 8) {
                     ReferenceSectionTitle(title: "今日任务", trailing: "查看全部", action: { router.push(.teacherTasks) })
                     let tasks = Array((state.data?.tasks ?? []).prefix(2))
                     if tasks.isEmpty {
-                        Text("暂无已排期任务").font(.system(size: 12)).foregroundStyle(.secondary).padding(.vertical, 8)
+                        Text("暂无已排期任务").font(.system(size: 16)).foregroundStyle(.secondary).padding(.vertical, 8)
                     } else {
                         ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
                             let time = task.date.split(separator: " ").last.map(String.init) ?? "待排期"
@@ -353,30 +353,30 @@ struct TeacherDashboard: View {
                     }
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, AppTheme.pagePadding)
             Button { router.push(.teacherTasks) } label: {
                 Label("课后上传测评结果记录与照片", systemImage: "camera.fill")
-                    .font(.system(size: 12, weight: .bold))
+                    .font(.system(size: 16, weight: .bold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
                     .foregroundStyle(.white)
                     .background(.orange, in: RoundedRectangle(cornerRadius: 9))
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, AppTheme.pagePadding)
         }
     }
 
     private func taskRow(_ time: String, _ duration: String, _ title: String, _ state: String, _ color: Color) -> some View {
         Button { router.push(.teacherTasks) } label: {
             HStack {
-                Text(time).font(.system(size: 12, weight: .bold)).foregroundStyle(color).frame(width: 34)
+                Text(time).font(.system(size: 16, weight: .bold)).foregroundStyle(color).frame(width: 34)
                 VStack(alignment: .leading) {
-                    Text(duration).font(.system(size: 12)).foregroundStyle(.secondary)
-                    Text(title).font(.system(size: 12, weight: .bold))
+                    Text(duration).font(.system(size: 16)).foregroundStyle(.secondary)
+                    Text(title).font(.system(size: 16, weight: .bold))
                 }
                 Spacer()
-                Text(state).font(.system(size: 12, weight: .bold)).foregroundStyle(color)
-                Image(systemName: "chevron.right").font(.system(size: 12)).foregroundStyle(.secondary)
+                Text(state).font(.system(size: 16, weight: .bold)).foregroundStyle(color)
+                Image(systemName: "chevron.right").font(.system(size: 16)).foregroundStyle(.secondary)
             }
         }.buttonStyle(.plain).accessibilityLabel("查看\(title)任务")
     }
@@ -384,14 +384,14 @@ struct TeacherDashboard: View {
     private func count(_ title: String, _ value: String, _ icon: String, _ color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 4) {
-                Text(title).font(.system(size: 13, weight: .medium)).foregroundStyle(.secondary)
+                Text(title).font(.system(size: 15, weight: .medium)).foregroundStyle(.secondary)
                 HStack(spacing: 3) {
                     Text(value).font(.system(size: 22, weight: .bold)).foregroundStyle(color)
-                    Image(systemName: icon).font(.system(size: 14)).foregroundStyle(color)
+                    Image(systemName: icon).font(.system(size: 16)).foregroundStyle(color)
                 }
             }
             .frame(maxWidth: .infinity)
-            .padding(12)
+            .padding(16)
             .background(color.opacity(0.07), in: RoundedRectangle(cornerRadius: AppTheme.controlRadius, style: .continuous))
         }.buttonStyle(.plain).accessibilityLabel("查看\(title)")
     }
@@ -405,16 +405,16 @@ struct TeacherDashboard: View {
                     .frame(width: 38, height: 38)
                     .background(color.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 Text(title)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(ReferenceColor.navy)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(AppTheme.muted)
             }
-            .padding(12)
+            .padding(16)
             .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
             .background(.white, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous).stroke(AppTheme.divider.opacity(0.8), lineWidth: 0.75))

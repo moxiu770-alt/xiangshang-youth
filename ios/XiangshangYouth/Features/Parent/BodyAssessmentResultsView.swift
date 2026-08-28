@@ -46,8 +46,8 @@ extension BodyAssessmentView {
                 postureReportCard(report)
             }
             ForEach(activeRecord.observations(ageMonths: student.bodyAssessmentAgeMonths, gender: student.gender)) { item in
-                HStack(spacing: 12) { Image(systemName: icon(for: item.level)).foregroundStyle(color(for: item.level)).frame(width: 24); VStack(alignment: .leading, spacing: 3) { Text(item.title).font(.subheadline.bold()).foregroundStyle(ReferenceColor.navy); Text(item.detail).font(.caption).foregroundStyle(.secondary) }; Spacer(); attentionBadge(item.level) }
-                    .padding(12).background(.white, in: RoundedRectangle(cornerRadius: 14))
+                HStack(spacing: 12) { Image(systemName: icon(for: item.level)).foregroundStyle(color(for: item.level)).frame(width: 24); VStack(alignment: .leading, spacing: 3) { Text(item.title).font(.subheadline.bold()).foregroundStyle(ReferenceColor.navy); Text(item.detail).font(.subheadline).foregroundStyle(.secondary) }; Spacer(); attentionBadge(item.level) }
+                    .padding(16).background(.white, in: RoundedRectangle(cornerRadius: 14))
             }
             AssessmentInfoBanner(
                 icon: "calendar.badge.clock",
@@ -73,14 +73,14 @@ extension BodyAssessmentView {
                     .font(.headline).foregroundStyle(ReferenceColor.navy)
                 Spacer()
                 Text(report.validationStatus.userFacingLabel)
-                    .font(.caption.weight(.semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(report.canPublishClassification ? ReferenceColor.green : .orange)
                     .padding(.horizontal, 9).padding(.vertical, 5)
                     .background((report.canPublishClassification ? ReferenceColor.green : Color.orange).opacity(0.10), in: Capsule())
             }
             if !report.canPublishClassification {
                 Label(AlgorithmReleaseGate.pendingPostureNotice, systemImage: "exclamationmark.shield.fill")
-                    .font(.caption).foregroundStyle(ReferenceColor.navy)
+                    .font(.subheadline).foregroundStyle(ReferenceColor.navy)
                     .padding(10)
                     .background(Color.orange.opacity(0.09), in: RoundedRectangle(cornerRadius: 10))
             }
@@ -133,13 +133,13 @@ extension BodyAssessmentView {
                         .tint(ReferenceColor.blue)
                     }
                 }
-                .padding(12)
+                .padding(16)
                 .background(screeningDecisionColor(decision.route).opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("身体筛查状态：\(decision.route.label)。\(decision.route.detail)")
             }
             Text("本次观察 · \(report.snapshots.values.map(\.sampleCount).reduce(0, +)) 条记录")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.subheadline).foregroundStyle(.secondary)
             ForEach(BodyAssessmentRecord.CaptureTask.allCases) { task in
                 if let snapshot = report.snapshots[task] {
                     VStack(alignment: .leading, spacing: 4) {
@@ -147,10 +147,10 @@ extension BodyAssessmentView {
                             Text(task.title).font(.subheadline.bold()).foregroundStyle(ReferenceColor.navy)
                             Spacer()
                             Text(String(format: "记录稳定度 %.0f%% · %d 条", snapshot.confidence * 100, snapshot.sampleCount))
-                                .font(.caption).foregroundStyle(snapshot.confidence >= PostureScreeningRules.minimumConfidence && snapshot.sampleCount >= PostureScreeningRules.minimumSamples ? ReferenceColor.green : bodyCoral)
+                                .font(.subheadline).foregroundStyle(snapshot.confidence >= PostureScreeningRules.minimumConfidence && snapshot.sampleCount >= PostureScreeningRules.minimumSamples ? ReferenceColor.green : bodyCoral)
                         }
                         Text(postureMetricSummary(snapshot))
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(.subheadline).foregroundStyle(.secondary)
                         if let protocolVersion = snapshot.captureProtocolVersion {
                             Label(captureTraceSummary(snapshot, protocolVersion: protocolVersion), systemImage: "viewfinder.circle")
                                 .font(.system(size: AppTheme.captionSize, weight: .medium))
@@ -166,11 +166,11 @@ extension BodyAssessmentView {
             ForEach(report.reasons.filter { $0 != AlgorithmReleaseGate.pendingPostureNotice }, id: \.self) { reason in
                 HStack(alignment: .top, spacing: 7) {
                     Image(systemName: "waveform.path.ecg").foregroundStyle(ReferenceColor.blue)
-                    Text(reason).font(.caption).foregroundStyle(ReferenceColor.navy)
+                    Text(reason).font(.subheadline).foregroundStyle(ReferenceColor.navy)
                 }
             }
             Text(report.disclaimer)
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.subheadline).foregroundStyle(.secondary)
                 .padding(10).background(ReferenceColor.blue.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
             if !report.isComplete {
                 Button {
@@ -183,7 +183,7 @@ extension BodyAssessmentView {
                 .tint(ReferenceColor.blue)
             }
         }
-        .padding(14)
+        .padding(18)
         .background(.white, in: RoundedRectangle(cornerRadius: 16))
     }
 
@@ -255,7 +255,7 @@ extension BodyAssessmentView {
            let status = state.localFeatures.bodyAssessmentSyncStates[student.id] {
             let presentation = bodySyncPresentation(for: status)
             Label(presentation.message, systemImage: presentation.icon)
-                .font(.caption)
+                .font(.subheadline)
                 .foregroundStyle(presentation.tint)
                 .padding(11)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -358,7 +358,7 @@ extension BodyAssessmentView {
                             .font(.system(size: AppTheme.captionSize, weight: .semibold))
                             .foregroundStyle(done ? ReferenceColor.green : ReferenceColor.blue)
                     }
-                    .padding(14)
+                    .padding(18)
                     .background(.white, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous).stroke(AppTheme.divider.opacity(0.75), lineWidth: 0.75))
                 }.buttonStyle(.plain)
@@ -373,7 +373,7 @@ extension BodyAssessmentView {
         }
     }
 
-    func attentionBadge(_ level: BodyAssessmentRecord.AttentionLevel, label: String? = nil) -> some View { Text(label ?? level.label).font(.caption.weight(.bold)).foregroundStyle(color(for: level)).padding(.horizontal, 8).padding(.vertical, 5).background(color(for: level).opacity(0.12), in: Capsule()) }
+    func attentionBadge(_ level: BodyAssessmentRecord.AttentionLevel, label: String? = nil) -> some View { Text(label ?? level.label).font(.subheadline.weight(.bold)).foregroundStyle(color(for: level)).padding(.horizontal, 8).padding(.vertical, 5).background(color(for: level).opacity(0.12), in: Capsule()) }
     private func color(for level: BodyAssessmentRecord.AttentionLevel) -> Color { switch level { case .pending: ReferenceColor.blue; case .green: ReferenceColor.green; case .yellow: .orange; case .red: .red; case .unavailable: .secondary } }
     private func icon(for level: BodyAssessmentRecord.AttentionLevel) -> String { switch level { case .pending: "camera.viewfinder"; case .green: "checkmark.shield.fill"; case .yellow: "exclamationmark.triangle.fill"; case .red: "exclamationmark.shield.fill"; case .unavailable: "calendar.badge.exclamationmark" } }
     private func primaryButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View { AssessmentPrimaryAction(title: title, icon: icon, action: action) }
@@ -404,8 +404,8 @@ extension BodyAssessmentView {
         case .unavailable: "当前资料不足，完善孩子信息后可获得年龄别参考。"
         }
     }
-    private func bmiTrend(history: [BodyAssessmentRecord], fallback: BodyAssessmentRecord) -> some View { VStack(alignment: .leading, spacing: 7) { Text("BMI 趋势").font(.caption.weight(.semibold)).foregroundStyle(.secondary); if history.count < 2 { Text("完成下一次实测后，将显示真实趋势；不会虚构历史或目标数据。") .font(.caption).foregroundStyle(.secondary) } else { let values = Array(history.suffix(3)); HStack(alignment: .bottom, spacing: 10) { ForEach(Array(values.enumerated()), id: \.offset) { index, item in trendBar(index == values.count - 1 ? "本次" : dateText(item.measuredAt), item.bmi, values.map(\.bmi).max() ?? fallback.bmi) } } } } }
-    private func trendBar(_ label: String, _ value: Double, _ maxValue: Double) -> some View { VStack(spacing: 4) { Text(String(format: "%.1f", value)).font(.caption.bold()).foregroundStyle(ReferenceColor.navy); Capsule().fill(bodyCoral.opacity(0.18)).frame(width: 48, height: 44).overlay(alignment: .bottom) { Capsule().fill(label == "本次" ? bodyCoral : ReferenceColor.blue).frame(width: 48, height: max(10, 44 * value / max(maxValue, 1))) }; Text(label).font(.caption).foregroundStyle(.secondary) } }
+    private func bmiTrend(history: [BodyAssessmentRecord], fallback: BodyAssessmentRecord) -> some View { VStack(alignment: .leading, spacing: 7) { Text("BMI 趋势").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary); if history.count < 2 { Text("完成下一次实测后，将显示真实趋势；不会虚构历史或目标数据。") .font(.subheadline).foregroundStyle(.secondary) } else { let values = Array(history.suffix(3)); HStack(alignment: .bottom, spacing: 10) { ForEach(Array(values.enumerated()), id: \.offset) { index, item in trendBar(index == values.count - 1 ? "本次" : dateText(item.measuredAt), item.bmi, values.map(\.bmi).max() ?? fallback.bmi) } } } } }
+    private func trendBar(_ label: String, _ value: Double, _ maxValue: Double) -> some View { VStack(spacing: 4) { Text(String(format: "%.1f", value)).font(.subheadline.bold()).foregroundStyle(ReferenceColor.navy); Capsule().fill(bodyCoral.opacity(0.18)).frame(width: 48, height: 44).overlay(alignment: .bottom) { Capsule().fill(label == "本次" ? bodyCoral : ReferenceColor.blue).frame(width: 48, height: max(10, 44 * value / max(maxValue, 1))) }; Text(label).font(.subheadline).foregroundStyle(.secondary) } }
     func dateText(_ date: Date) -> String { Self.dateFormatter.string(from: date) }
     private func dayKey(_ date: Date) -> String { Self.dayFormatter.string(from: date) }
     private func weekday(_ date: Date) -> String { Self.weekdayFormatter.string(from: date) }

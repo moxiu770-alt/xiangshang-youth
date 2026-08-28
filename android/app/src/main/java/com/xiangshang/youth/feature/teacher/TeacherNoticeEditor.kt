@@ -90,7 +90,7 @@ fun TeacherNoticeEditorDialog(
                     Text("通知已提交，家长将在消息中心收到。", color = Navy, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
                 }
             } else Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
-                Text("接收班级", color = Navy, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 14.sp)
+                Text("接收班级", color = Navy, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 16.sp)
                 classes.forEach { target ->
                     Row(Modifier.fillMaxWidth().clickable(enabled = !command.isSubmitting) {
                         if (target.id in selectedClassIds) selectedClassIds.remove(target.id) else selectedClassIds.add(target.id)
@@ -107,15 +107,15 @@ fun TeacherNoticeEditorDialog(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Switch(checked = parentReceiptEnabled, onCheckedChange = { parentReceiptEnabled = it }, enabled = !command.isSubmitting)
                     Spacer(Modifier.width(8.dp))
-                    Text("需要家长确认回执", color = Navy, fontSize = 13.sp)
+                    Text("需要家长确认回执", color = Navy, fontSize = 15.sp)
                 }
-                Text("仅发送给当前教师已授权的班级", color = Color.Gray, fontSize = 12.sp)
-                if (state.notificationDraftsLoading) Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp); Spacer(Modifier.width(7.dp)); Text("正在恢复服务端草稿…", color = Blue, fontSize = 12.sp) }
-                state.notificationDraftsError?.let { Text(it, color = Color.Red, fontSize = 12.sp) }
-                error?.let { Text(it, color = Color.Red, fontSize = 12.sp) }
-                if (draftCommand.status == WorkflowCommandStatus.Failed) Text(draftCommand.message ?: "保存失败，请重试。", color = Color.Red, fontSize = 12.sp)
-                if (sendCommand.status == WorkflowCommandStatus.Failed) Text(sendCommand.message ?: "发送失败，请重试。", color = Color.Red, fontSize = 12.sp)
-                if (command.isSubmitting) Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp); Spacer(Modifier.width(7.dp)); Text("正在处理…", color = Blue, fontSize = 12.sp) }
+                Text("仅发送给当前教师已授权的班级", color = Color.Gray, fontSize = 16.sp)
+                if (state.notificationDraftsLoading) Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp); Spacer(Modifier.width(7.dp)); Text("正在恢复服务端草稿…", color = Blue, fontSize = 16.sp) }
+                state.notificationDraftsError?.let { Text(it, color = Color.Red, fontSize = 16.sp) }
+                error?.let { Text(it, color = Color.Red, fontSize = 16.sp) }
+                if (draftCommand.status == WorkflowCommandStatus.Failed) Text(draftCommand.message ?: "保存失败，请重试。", color = Color.Red, fontSize = 16.sp)
+                if (sendCommand.status == WorkflowCommandStatus.Failed) Text(sendCommand.message ?: "发送失败，请重试。", color = Color.Red, fontSize = 16.sp)
+                if (command.isSubmitting) Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp); Spacer(Modifier.width(7.dp)); Text("正在处理…", color = Blue, fontSize = 16.sp) }
             }
         },
         confirmButton = {

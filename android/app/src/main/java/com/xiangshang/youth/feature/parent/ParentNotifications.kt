@@ -119,13 +119,13 @@ fun NotificationsScreen(
     if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current); return@AppScaffold }
     if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }
     if (state.data.messages.isEmpty()) { EmptyState("暂无消息通知"); return@AppScaffold }
-    Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) { Text("全部通知", color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp); Spacer(Modifier.weight(1f)); if (state.unreadMessageCount > 0) TextButton(onClick = markAllMessagesRead, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp), modifier = Modifier.semantics { contentDescription = "将全部通知标记为已读" }) { Text("全部已读", fontSize = 12.sp) }; Text("未读 ${state.unreadMessageCount}", color = Blue, fontSize = 12.sp) }
+    Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) { Text("全部通知", color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp); Spacer(Modifier.weight(1f)); if (state.unreadMessageCount > 0) TextButton(onClick = markAllMessagesRead, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp), modifier = Modifier.semantics { contentDescription = "将全部通知标记为已读" }) { Text("全部已读", fontSize = 16.sp) }; Text("未读 ${state.unreadMessageCount}", color = Blue, fontSize = 16.sp) }
     state.data.messages.forEachIndexed { index, item ->
         var detail by remember { mutableStateOf(false) }
         Surface(Modifier.fillMaxWidth().padding(vertical = 4.dp).semantics { role = Role.Button; contentDescription = "查看通知：${item.title}" }.clickable { markMessageRead(item.id); if (!openMessageBusinessRoute(item, state, nav, UserRole.Parent, openCourseTarget, openActivityTarget, openExpertAppointmentTarget, selectChildTarget, openClassNoticeTarget = { detail = true })) detail = true }, color = Color.White, shape = RoundedCornerShape(11.dp), shadowElevation = 1.dp) {
             Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(if (item.category == "报告") Icons.Filled.Description else Icons.Filled.Notifications, null, tint = if (index == 0) Blue else Color(0xFFFF9D25), modifier = Modifier.size(25.dp))
-                Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Row(verticalAlignment = Alignment.CenterVertically) { Text(item.title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); if (!item.isRead && item.id !in state.local.readMessageIds) Spacer(Modifier.width(5.dp)); if (!item.isRead && item.id !in state.local.readMessageIds) Box(Modifier.size(5.dp).background(Color.Red, CircleShape)) }; Text(item.content, color = Color.Gray, fontSize = 12.sp, maxLines = 2); Text("${item.category} · ${item.time}", color = Color.Gray, fontSize = 12.sp) }; Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray, modifier = Modifier.size(15.dp))
+                Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Row(verticalAlignment = Alignment.CenterVertically) { Text(item.title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp); if (!item.isRead && item.id !in state.local.readMessageIds) Spacer(Modifier.width(5.dp)); if (!item.isRead && item.id !in state.local.readMessageIds) Box(Modifier.size(5.dp).background(Color.Red, CircleShape)) }; Text(item.content, color = Color.Gray, fontSize = 16.sp, maxLines = 2); Text("${item.category} · ${item.time}", color = Color.Gray, fontSize = 16.sp) }; Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray, modifier = Modifier.size(15.dp))
             }
         }
         if (detail) {
@@ -133,7 +133,7 @@ fun NotificationsScreen(
             if (noticeId != null) {
                 ClassNoticeDetailDialog(item, noticeId, state, loadClassNoticeDetail, acknowledgeClassNotice) { detail = false }
             } else {
-                AlertDialog(onDismissRequest = { detail = false }, title = { Text(item.title) }, text = { Column { if (item.expiresAt?.let { runCatching { Instant.parse(it) }.getOrNull()?.isBefore(Instant.now()) } == true) Text("该通知已过期，不能继续打开。", color = Color.Gray) else Text(item.content); Text("${item.category} · ${item.time}", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp)) } }, confirmButton = { TextButton(onClick = { detail = false }) { Text("关闭") } })
+                AlertDialog(onDismissRequest = { detail = false }, title = { Text(item.title) }, text = { Column { if (item.expiresAt?.let { runCatching { Instant.parse(it) }.getOrNull()?.isBefore(Instant.now()) } == true) Text("该通知已过期，不能继续打开。", color = Color.Gray) else Text(item.content); Text("${item.category} · ${item.time}", color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 10.dp)) } }, confirmButton = { TextButton(onClick = { detail = false }) { Text("关闭") } })
             }
         }
     }
@@ -167,12 +167,12 @@ fun ParentMessagesScreen(
         }
         if (state.unreadMessageCount > 0) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = markAllMessagesRead, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp), modifier = Modifier.semantics { contentDescription = "将全部消息标记为已读" }) { Text("全部已读", fontSize = 12.sp) }
+                TextButton(onClick = markAllMessagesRead, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp), modifier = Modifier.semantics { contentDescription = "将全部消息标记为已读" }) { Text("全部已读", fontSize = 16.sp) }
             }
         }
         Row(Modifier.fillMaxWidth().padding(bottom = 7.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             listOf("消息提醒", "系统通知").forEachIndexed { index, title ->
-                FilterChip(selected = selectedTab == index, onClick = { selectedTab = index }, label = { Text(title, fontSize = 12.sp) }, modifier = Modifier.weight(1f))
+                FilterChip(selected = selectedTab == index, onClick = { selectedTab = index }, label = { Text(title, fontSize = 16.sp) }, modifier = Modifier.weight(1f))
             }
         }
         val bodyReminder = state.selectedChild?.let { child ->
@@ -214,13 +214,13 @@ fun ParentMessagesScreen(
                         Spacer(Modifier.width(9.dp))
                         Column(Modifier.weight(1f)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(item.title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Text(item.title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                                 if (!item.isRead && item.id !in state.local.readMessageIds) Box(Modifier.size(5.dp).background(Color.Red, CircleShape).padding(start = 4.dp))
                             }
-                            Text(item.content, color = Color.Gray, fontSize = 12.sp, maxLines = 1)
-                            Text(item.category, color = Blue, fontSize = 12.sp)
+                            Text(item.content, color = Color.Gray, fontSize = 16.sp, maxLines = 2)
+                            Text(item.category, color = Blue, fontSize = 16.sp)
                         }
-                        Text(item.time, color = Color.Gray, fontSize = 12.sp)
+                        Text(item.time, color = Color.Gray, fontSize = 16.sp)
                     }
                 }
             }
@@ -230,7 +230,7 @@ fun ParentMessagesScreen(
         AlertDialog(
             onDismissRequest = { selectedTitle = null },
             title = { Text(title) },
-            text = { Column { Text(selectedContent); Text(selectedTime, color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp)) } },
+            text = { Column { Text(selectedContent); Text(selectedTime, color = Color.Gray, fontSize = 16.sp, modifier = Modifier.padding(top = 10.dp)) } },
             confirmButton = { TextButton(onClick = { selectedTitle = null }) { Text("关闭") } }
         )
     }
@@ -265,21 +265,21 @@ fun ClassNoticeDetailDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 when {
-                    detailState.status == WorkflowCommandStatus.Submitting && detail == null -> Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp); Spacer(Modifier.width(8.dp)); Text("正在加载通知详情", fontSize = 14.sp) }
+                    detailState.status == WorkflowCommandStatus.Submitting && detail == null -> Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp); Spacer(Modifier.width(8.dp)); Text("正在加载通知详情", fontSize = 16.sp) }
                     detailState.status == WorkflowCommandStatus.Failed && detail == null -> {
-                        Text(detailState.message ?: "通知详情加载失败", color = Color(0xFFD64545), fontSize = 14.sp)
+                        Text(detailState.message ?: "通知详情加载失败", color = Color(0xFFD64545), fontSize = 16.sp)
                         TextButton(onClick = { loadClassNoticeDetail(notificationId) { detail = it } }) { Text("重试") }
                     }
                     else -> {
                         val notice = detail
-                        Text(notice?.content ?: item.content, color = Navy, fontSize = 14.sp)
-                        Text(notice?.sentAt?.let { "发送时间 $it" } ?: "${item.category} · ${item.time}", color = Color.Gray, fontSize = 12.sp)
+                        Text(notice?.content ?: item.content, color = Navy, fontSize = 16.sp)
+                        Text(notice?.sentAt?.let { "发送时间 $it" } ?: "${item.category} · ${item.time}", color = Color.Gray, fontSize = 16.sp)
                         if (notice?.parentReceiptEnabled == true) {
                             val acknowledged = notice.userReceiptStatus == "acknowledged"
                             Surface(color = if (acknowledged) Green.copy(.10f) else Blue.copy(.08f), shape = RoundedCornerShape(10.dp)) {
-                                Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Text(if (acknowledged) "已确认收到" else "需要家长确认", color = if (acknowledged) Green else Navy, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                    if (notice.receiptStats != null && state.role == UserRole.Teacher) Text("已确认 ${notice.receiptStats.acknowledged}/${notice.receiptStats.total}，待确认 ${notice.receiptStats.pending}", color = Blue, fontSize = 12.sp)
+                                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(if (acknowledged) "已确认收到" else "需要家长确认", color = if (acknowledged) Green else Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    if (notice.receiptStats != null && state.role == UserRole.Teacher) Text("已确认 ${notice.receiptStats.acknowledged}/${notice.receiptStats.total}，待确认 ${notice.receiptStats.pending}", color = Blue, fontSize = 16.sp)
                                     if (!acknowledged && state.role == UserRole.Parent) Button(onClick = { acknowledgeClassNotice(notificationId) { if (it) loadClassNoticeDetail(notificationId) { loaded -> detail = loaded } } }, enabled = receiptState.status != WorkflowCommandStatus.Submitting) { Text(if (receiptState.status == WorkflowCommandStatus.Submitting) "提交中" else "确认收到") }
                                 }
                             }

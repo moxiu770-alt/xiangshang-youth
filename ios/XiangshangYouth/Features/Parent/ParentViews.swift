@@ -47,58 +47,58 @@ struct ParentLandingView: View {
     }
     var body: some View { ScrollView { VStack(spacing: 9) {
         ReferenceHeader(name: state.selectedChild?.name ?? "未选择孩子", school: "\(state.selectedChild?.className ?? "尚未绑定班级") · 点击切换孩子", initial: String((state.selectedChild?.name ?? "孩").prefix(1)), avatarAsset: "ChildAvatar", identityAction: { router.push(.children(returnAfterBinding: false)) })
-        ReferenceCard { VStack(spacing: 12) { HStack { VStack(alignment: .leading, spacing: 3) { Text("孩子本周健康任务").font(.system(size: 17, weight: .bold)).foregroundStyle(ReferenceColor.navy); Text(bodyAssessmentCardDetail).font(.system(size: 12)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }; Spacer(); Image(systemName: "figure.run.circle.fill").font(.system(size: 24)).foregroundStyle(ReferenceColor.blue) }; LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) { assessmentMetric(.fitness); assessmentMetric(.mental); assessmentMetric(.vision); assessmentMetric(.oral) }; Button(bodyAssessmentActionTitle) { router.push(.bodyAssessment) }.font(.system(size: 14, weight: .bold)).frame(maxWidth: .infinity, minHeight: 46).background(ReferenceColor.blue, in: RoundedRectangle(cornerRadius: 12)).foregroundStyle(.white) }.padding(2) }.padding(.horizontal, 12)
+        ReferenceCard { VStack(spacing: 12) { HStack { VStack(alignment: .leading, spacing: 3) { Text("孩子本周健康任务").font(.system(size: 17, weight: .bold)).foregroundStyle(ReferenceColor.navy); Text(bodyAssessmentCardDetail).font(.system(size: 16)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }; Spacer(); Image(systemName: "figure.run.circle.fill").font(.system(size: 24)).foregroundStyle(ReferenceColor.blue) }; LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) { assessmentMetric(.fitness); assessmentMetric(.mental); assessmentMetric(.vision); assessmentMetric(.oral) }; Button(bodyAssessmentActionTitle) { router.push(.bodyAssessment) }.font(.system(size: 16, weight: .bold)).frame(maxWidth: .infinity, minHeight: 46).background(ReferenceColor.blue, in: RoundedRectangle(cornerRadius: 12)).foregroundStyle(.white) }.padding(2) }.padding(.horizontal, AppTheme.pagePadding)
         LazyVGrid(columns: quickActionColumns, spacing: 8) {
             Button { if let child = state.selectedChild { router.push(.report(child)) } else { router.push(.children(returnAfterBinding: true)) } } label: { ReferenceAction(icon: "calendar", title: "测评报告", color: ReferenceColor.blue) }.buttonStyle(.plain)
             Button { router.push(.parentMessages) } label: { ReferenceAction(icon: "exclamationmark.circle.fill", title: "健康提醒", color: .red) }.buttonStyle(.plain)
             Button { router.push(.bodyAssessment) } label: { ReferenceAction(icon: "figure.walk.motion", title: "身体测评", color: ReferenceColor.green) }.buttonStyle(.plain)
             Button { router.push(.parentCourses) } label: { ReferenceAction(icon: "play.rectangle.fill", title: "推荐课程", color: .orange) }.buttonStyle(.plain)
-        }.padding(.horizontal, 12)
-        ReferenceSectionTitle(title: "成长活动", trailing: "查看全部", action: { router.push(.activityList) }).padding(.horizontal, 12)
+        }.padding(.horizontal, AppTheme.pagePadding)
+        ReferenceSectionTitle(title: "成长活动", trailing: "查看全部", action: { router.push(.activityList) }).padding(.horizontal, AppTheme.pagePadding)
         if state.activitiesLoading {
-            LoadingStateView().padding(.horizontal, 12)
+            LoadingStateView().padding(.horizontal, AppTheme.pagePadding)
         } else if let activity = state.remoteActivities.first {
-            Button { selectedActivity = activity } label: { ParentCampaignCard(activity: activity) }.buttonStyle(.plain).padding(.horizontal, 12)
+            Button { selectedActivity = activity } label: { ParentCampaignCard(activity: activity) }.buttonStyle(.plain).padding(.horizontal, AppTheme.pagePadding)
         } else if state.usesRemoteDataSource {
-            EmptyStateView(title: "暂无可报名活动", detail: "学校发布活动后会显示在这里。").padding(.horizontal, 12)
+            EmptyStateView(title: "暂无可报名活动", detail: "学校发布活动后会显示在这里。").padding(.horizontal, AppTheme.pagePadding)
         } else {
-            Button { selectedActivity = RemoteActivity(activityID: "health-growth-season-2026", schoolID: nil, title: "向上少年健康成长季", description: "2026 秋季测评，活动时间以学校通知为准。", startsAt: nil, endsAt: nil, capacity: 60, registrationStartAt: nil, registrationEndAt: "2026-09-10", status: "open", version: 1, registeredCount: 42, remainingCapacity: 18, registrationID: nil, registrationStatus: nil, childID: nil) } label: { ParentCampaignCard() }.buttonStyle(.plain).padding(.horizontal, 12)
+            Button { selectedActivity = RemoteActivity(activityID: "health-growth-season-2026", schoolID: nil, title: "向上少年健康成长季", description: "2026 秋季测评，活动时间以学校通知为准。", startsAt: nil, endsAt: nil, capacity: 60, registrationStartAt: nil, registrationEndAt: "2026-09-10", status: "open", version: 1, registeredCount: 42, remainingCapacity: 18, registrationID: nil, registrationStatus: nil, childID: nil) } label: { ParentCampaignCard() }.buttonStyle(.plain).padding(.horizontal, AppTheme.pagePadding)
         }
-        HStack { Text("专家团队").font(.system(size: 14, weight: .bold)); Spacer(); Button("查看全部 ›") { router.push(.expertList) }.font(.system(size: 12, weight: .semibold)).foregroundStyle(ReferenceColor.blue).frame(minHeight: 44) }.padding(.horizontal, 12)
+        HStack { Text("专家团队").font(.system(size: 16, weight: .bold)); Spacer(); Button("查看全部 ›") { router.push(.expertList) }.font(.system(size: 16, weight: .semibold)).foregroundStyle(ReferenceColor.blue).frame(minHeight: 44) }.padding(.horizontal, AppTheme.pagePadding)
         if state.expertsLoading {
-            LoadingStateView().padding(.horizontal, 12)
+            LoadingStateView().padding(.horizontal, AppTheme.pagePadding)
         } else if !state.remoteExperts.isEmpty || !state.usesRemoteDataSource {
             HStack {
                 ForEach(displayExperts.prefix(4)) { expert in
                     Button { selectedExpert = expert } label: { VStack(spacing: 4) {
                         Image(expertAvatarAsset(expert.expertID)).resizable().scaledToFit().frame(width: 37, height: 37).background(ReferenceColor.sky, in: Circle()).clipShape(Circle())
-                        Text(expert.name).font(.system(size: 12, weight: .medium))
+                        Text(expert.name).font(.system(size: 16, weight: .medium))
                     }
                     .frame(maxWidth: .infinity) }.buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, AppTheme.pagePadding)
         } else {
-            EmptyStateView(title: "暂无可预约专家", detail: "学校开通专家服务后会显示可预约人员。").padding(.horizontal, 12)
+            EmptyStateView(title: "暂无可预约专家", detail: "学校开通专家服务后会显示可预约人员。").padding(.horizontal, AppTheme.pagePadding)
         }
-        ReferenceSectionTitle(title: "公益课堂", trailing: "全部课程", action: { router.push(.parentCourses) }).padding(.horizontal, 12)
+        ReferenceSectionTitle(title: "公益课堂", trailing: "全部课程", action: { router.push(.parentCourses) }).padding(.horizontal, AppTheme.pagePadding)
         if state.usesRemoteDataSource {
-            EmptyStateView(title: "暂无课程内容", detail: "学校或平台分配课程后会显示在这里。").padding(.horizontal, 12)
+            EmptyStateView(title: "暂无课程内容", detail: "学校或平台分配课程后会显示在这里。").padding(.horizontal, AppTheme.pagePadding)
         } else {
             HStack(spacing: 8) {
                 ParentCourseTeaser(image: "ActivityClassroom", title: "体质成长课")
                 ParentCourseTeaser(image: "ActivityFootball", title: "运动表现课")
                 ParentCourseTeaser(image: "ActivityBalance", title: "心理舒展课")
-            }.padding(.horizontal, 12)
+            }.padding(.horizontal, AppTheme.pagePadding)
         }
-        ReferenceSectionTitle(title: "健康科普", trailing: "关注公众号", action: { healthChannelDetail = "向上少年健康成长公众号" }).padding(.horizontal, 12)
+        ReferenceSectionTitle(title: "健康科普", trailing: "关注公众号", action: { healthChannelDetail = "向上少年健康成长公众号" }).padding(.horizontal, AppTheme.pagePadding)
         if state.usesRemoteDataSource {
-            EmptyStateView(title: "暂无健康科普内容", detail: "学校或平台发布内容后会显示在这里。").padding(.horizontal, 12)
+            EmptyStateView(title: "暂无健康科普内容", detail: "学校或平台发布内容后会显示在这里。").padding(.horizontal, AppTheme.pagePadding)
         } else {
             VStack(spacing: 7) {
                 ParentArticleRow(title: "儿童科学长高的 5 个关键习惯", detail: "成长专栏 · 3分钟前")
                 ParentArticleRow(title: "居家体态训练 10 分钟", detail: "健康专栏 · 今日推荐")
-            }.padding(.horizontal, 12)
+            }.padding(.horizontal, AppTheme.pagePadding)
         }
     }.padding(.bottom, 8) }.background(ReferenceColor.canvas)
         .refreshable { await state.refreshDashboard() }
@@ -170,7 +170,7 @@ struct ParentCampaignCard: View {
             LinearGradient(colors: [.white.opacity(0.96), .white.opacity(0.62), .clear], startPoint: .leading, endPoint: .trailing)
             VStack(alignment: .leading, spacing: 4) {
                 Text(activity?.title ?? "向上少年健康成长季").font(.system(size: 15, weight: .bold)).foregroundStyle(ReferenceColor.navy)
-                Text(activity?.description ?? "综合测评 · 运动表现更出彩").font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
+                Text(activity?.description ?? "综合测评 · 运动表现更出彩").font(.system(size: 16)).foregroundStyle(.secondary).lineLimit(2)
                 if let capacity = activity?.capacity,
                    capacity > 0,
                    let remaining = activity?.remainingCapacity,
@@ -180,14 +180,14 @@ struct ParentCampaignCard: View {
                     AnimatedProgressLine(value: min(1, max(0, Double(registered) / Double(capacity))))
                         .frame(width: 145)
                     Text("已报名 \(registered)/\(capacity)")
-                        .font(.system(size: 12))
+                        .font(.system(size: 16))
                         .foregroundStyle(.secondary)
                 } else if activity == nil {
                     AnimatedProgressLine(value: 0.75).frame(width: 145)
                 }
-                Text(activity?.registrationEndAt.map { "报名截止 · \($0.prefix(10))" } ?? "2026 秋季测评 · 以学校通知为准").font(.system(size: 12)).foregroundStyle(.secondary)
+                Text(activity?.registrationEndAt.map { "报名截止 · \($0.prefix(10))" } ?? "2026 秋季测评 · 以学校通知为准").font(.system(size: 16)).foregroundStyle(.secondary)
             }
-            .padding(12)
+            .padding(16)
         }
         .frame(height: 108)
         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -244,16 +244,16 @@ struct ChildrenView: View {
                             Image(systemName: "info.circle.fill").foregroundStyle(ReferenceColor.blue)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("绑定码由学校或班主任提供，用于确认家庭与孩子关系。")
-                                    .font(.caption)
+                                    .font(.subheadline)
                                     .foregroundStyle(.secondary)
                                 Button("绑定码在哪找？") { bindingHelpPresented = true }
-                                    .font(.caption.weight(.semibold))
+                                    .font(.subheadline.weight(.semibold))
                                     .buttonStyle(.plain)
                                     .foregroundStyle(ReferenceColor.blue)
                                     .accessibilityLabel("查看绑定码获取说明")
                             }
                         }
-                        if let bindingError { Text(bindingError).font(.caption).foregroundStyle(.red) }
+                        if let bindingError { Text(bindingError).font(.subheadline).foregroundStyle(.red) }
                     }
                     Section { Button {
                         let name = childName
@@ -340,7 +340,7 @@ struct ParentPageNavigation: View {
             if showsBack || !router.path.isEmpty {
                 Button { router.pop() } label: {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: 16, weight: .bold))
                         .frame(width: 32, height: 32)
                         .background(.ultraThinMaterial, in: Circle())
                         .frame(width: 44, height: 44)
@@ -362,7 +362,7 @@ struct ParentPageNavigation: View {
                 HStack {
                     Spacer()
                     Button { router.push(.messageCenter(for: state.selectedRole)) } label: {
-                        Image(systemName: "bell").font(.system(size: 14, weight: .medium))
+                        Image(systemName: "bell").font(.system(size: 16, weight: .medium))
                             .overlay(alignment: .topTrailing) {
                                 if state.unreadMessageCount > 0 {
                                     Circle().fill(.red).frame(width: 4, height: 4).offset(x: 2, y: -2)
@@ -420,11 +420,11 @@ struct ParentEvaluationDashboard: View {
             ReferenceCard {
                 VStack(alignment: .leading, spacing: 5) {
                     Text("通知关联测评").font(.system(size: 15, weight: .bold)).foregroundStyle(ReferenceColor.navy)
-                    Text(focusedTask.title).font(.system(size: 13, weight: .semibold)).foregroundStyle(ReferenceColor.blue)
-                    Text("\(focusedTask.date) · \(focusedTask.location) · \(focusedTask.status.rawValue)").font(.system(size: 12)).foregroundStyle(.secondary)
+                    Text(focusedTask.title).font(.system(size: 15, weight: .semibold)).foregroundStyle(ReferenceColor.blue)
+                    Text("\(focusedTask.date) · \(focusedTask.location) · \(focusedTask.status.rawValue)").font(.system(size: 16)).foregroundStyle(.secondary)
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, AppTheme.pagePadding)
             .accessibilityElement(children: .combine)
             .accessibilityLabel("通知关联测评，\(focusedTask.title)，\(focusedTask.date)，状态\(focusedTask.status.rawValue)")
         }
@@ -434,7 +434,7 @@ struct ParentEvaluationDashboard: View {
                 Circle().trim(from: 0, to: ringProgress).stroke(LinearGradient(colors: [ReferenceColor.blue, ReferenceColor.green], startPoint: .top, endPoint: .bottom), style: StrokeStyle(lineWidth: 8, lineCap: .round)).rotationEffect(.degrees(-90))
                 VStack(spacing: 1) {
                     Text("\(Int(reportProgress * 100))%").font(.system(size: 16, weight: .bold)).foregroundStyle(ReferenceColor.blue)
-                    Text("7 项").font(.system(size: 12)).foregroundStyle(.secondary)
+                    Text("7 项").font(.system(size: 16)).foregroundStyle(.secondary)
                 }
             }
             .frame(width: 78, height: 78)
@@ -443,30 +443,30 @@ struct ParentEvaluationDashboard: View {
             VStack(alignment: .leading, spacing: 5) {
                 Text("学校运动能力测评").font(.system(size: 15, weight: .bold)).foregroundStyle(ReferenceColor.navy).fixedSize(horizontal: false, vertical: true)
                 Text(report.map { $0.isComplete ? $0.riskLevel.label : "待完成" } ?? (reportAwaitingSync ? "报告更新中" : "等待报告"))
-                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(ReferenceColor.blue)
+                    .font(.system(size: 16, weight: .semibold)).foregroundStyle(ReferenceColor.blue)
                     .padding(.horizontal, 8).padding(.vertical, 3).background(ReferenceColor.blue.opacity(0.10), in: Capsule())
                 AnimatedProgressLine(value: reportProgress).frame(height: 7)
                 Text(report.map { $0.isComplete ? "已完成 7 项 · 总分 \(String(format: "%.1f", $0.totalScore)) / 35" : "已完成 \($0.scoredItemCount) 项 · 进度 \(Int(reportProgress * 100))%" } ?? (reportAwaitingSync ? "报告正在更新，点击刷新" : "完成学校体测后生成报告"))
-                    .font(.system(size: 12)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    .font(.system(size: 16)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Image("ChildAvatar").resizable().scaledToFit().frame(width: 48, height: 48).accessibilityHidden(true)
         }
-        .padding(12)
+        .padding(16)
         .background(LinearGradient(colors: [ReferenceColor.sky, Color.white], startPoint: .leading, endPoint: .trailing), in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(ReferenceColor.blue.opacity(0.12), lineWidth: 1))
-        .padding(.horizontal, 12)
+        .padding(.horizontal, AppTheme.pagePadding)
         if let child = selectedChild, (!state.repository.supportsRemoteAcknowledgement || report != nil) {
             Button("查看详细报告") { router.push(.report(child)) }
                 .buttonStyle(.borderedProminent)
                 .tint(ReferenceColor.blue)
                 .accessibilityLabel("查看详细报告")
-                .padding(.horizontal, 12)
+                .padding(.horizontal, AppTheme.pagePadding)
         }
-        ReferenceSectionTitle(title: "体质成长档案", trailing: latestHeightText).padding(.horizontal, 12)
-        ReferenceCard { VStack(alignment: .leading, spacing: 8) { Text("身高实测趋势").font(.system(size: 14, weight: .bold)); if measuredHeights.isEmpty { Label("暂无实测趋势，完成身体测评后开始积累。", systemImage: "figure.stand").font(.system(size: 13)).foregroundStyle(.secondary).frame(maxWidth: .infinity, minHeight: 58, alignment: .leading) } else { HStack(alignment: .bottom, spacing: 13) { ForEach(Array(measuredHeights.enumerated()), id: \.offset) { index, value in VStack(spacing: 3) { RoundedRectangle(cornerRadius: 4).fill(ReferenceColor.blue.opacity(index == measuredHeights.count - 1 ? 1 : 0.35)).frame(width: 22, height: heightBarHeight(value)); Text(String(format: "%.0f", value)).font(.system(size: 12)).foregroundStyle(.secondary) } }; Spacer() } }; Text(geneticHeightText).font(.system(size: 12)).foregroundStyle(.secondary); Text(heightDevelopmentText).font(.system(size: 12)).foregroundStyle(.secondary) } }.padding(.horizontal, 12)
-        ReferenceSectionTitle(title: "家庭健康记录", trailing: "家长填写").padding(.horizontal, 12)
-        VStack(spacing: 7) { ParentHealthDimension(category: .vision, detail: "用眼习惯与家庭观察", color: ReferenceColor.green); ParentHealthDimension(category: .oral, detail: "口腔习惯与家庭观察", color: ReferenceColor.purple); ParentHealthDimension(category: .mental, detail: "情绪与同伴互动感受", color: ReferenceColor.pink) }.padding(.horizontal, 12)
+        ReferenceSectionTitle(title: "体质成长档案", trailing: latestHeightText).padding(.horizontal, AppTheme.pagePadding)
+        ReferenceCard { VStack(alignment: .leading, spacing: 8) { Text("身高实测趋势").font(.system(size: 16, weight: .bold)); if measuredHeights.isEmpty { Label("暂无实测趋势，完成身体测评后开始积累。", systemImage: "figure.stand").font(.system(size: 15)).foregroundStyle(.secondary).frame(maxWidth: .infinity, minHeight: 58, alignment: .leading) } else { HStack(alignment: .bottom, spacing: 13) { ForEach(Array(measuredHeights.enumerated()), id: \.offset) { index, value in VStack(spacing: 3) { RoundedRectangle(cornerRadius: 4).fill(ReferenceColor.blue.opacity(index == measuredHeights.count - 1 ? 1 : 0.35)).frame(width: 22, height: heightBarHeight(value)); Text(String(format: "%.0f", value)).font(.system(size: 16)).foregroundStyle(.secondary) } }; Spacer() } }; Text(geneticHeightText).font(.system(size: 16)).foregroundStyle(.secondary); Text(heightDevelopmentText).font(.system(size: 16)).foregroundStyle(.secondary) } }.padding(.horizontal, AppTheme.pagePadding)
+        ReferenceSectionTitle(title: "家庭健康记录", trailing: "家长填写").padding(.horizontal, AppTheme.pagePadding)
+        VStack(spacing: 7) { ParentHealthDimension(category: .vision, detail: "用眼习惯与家庭观察", color: ReferenceColor.green); ParentHealthDimension(category: .oral, detail: "口腔习惯与家庭观察", color: ReferenceColor.purple); ParentHealthDimension(category: .mental, detail: "情绪与同伴互动感受", color: ReferenceColor.pink) }.padding(.horizontal, AppTheme.pagePadding)
     } }.background(ReferenceColor.canvas)
         .refreshable { await state.refreshDashboard() }
         .task(id: "\(reportProgress)-\(reduceMotion)") {
@@ -533,20 +533,20 @@ struct HealthDashboard: View {
     }
     private var checkedInToday: Bool { selectedChildCheckInDates.contains(Self.todayKey) }
     private func key(forMonthDay day: Int) -> String { BusinessClock.day(BusinessClock.calendar.date(byAdding: .day, value: day - 1, to: currentMonthStart) ?? currentMonthStart) }
-    var body: some View { ScrollView { VStack(spacing: 10) { ParentPageNavigation(title: "健康档案"); ReferenceHeader(name: state.selectedChild?.name ?? "未选择孩子", school: state.selectedChild?.className ?? "尚未绑定班级", initial: String((state.selectedChild?.name ?? "孩").prefix(1)), showsBell: false, avatarAsset: "ChildAvatar"); ReferenceSectionTitle(title: "学校运动体测报告", trailing: report != nil ? "查看 7 项报告" : (reportAwaitingSync ? "获取报告" : "等待报告"), action: { if let child = state.selectedChild { router.push(.report(child)) } }).padding(.horizontal, 12); HStack(spacing: 7) { healthMetric("figure.run", "7 项体测", reportSummary, ReferenceColor.blue); healthMetric("chart.bar.xaxis", "总分", totalScoreSummary, ReferenceColor.green) }.padding(.horizontal, 12)
+    var body: some View { ScrollView { VStack(spacing: 10) { ParentPageNavigation(title: "健康档案"); ReferenceHeader(name: state.selectedChild?.name ?? "未选择孩子", school: state.selectedChild?.className ?? "尚未绑定班级", initial: String((state.selectedChild?.name ?? "孩").prefix(1)), showsBell: false, avatarAsset: "ChildAvatar"); ReferenceSectionTitle(title: "学校运动体测报告", trailing: report != nil ? "查看 7 项报告" : (reportAwaitingSync ? "获取报告" : "等待报告"), action: { if let child = state.selectedChild { router.push(.report(child)) } }).padding(.horizontal, AppTheme.pagePadding); HStack(spacing: 7) { healthMetric("figure.run", "7 项体测", reportSummary, ReferenceColor.blue); healthMetric("chart.bar.xaxis", "总分", totalScoreSummary, ReferenceColor.green) }.padding(.horizontal, AppTheme.pagePadding)
         if featureRollout.isEnabled(.growthInsights) { Button { growthReportShown = true } label: {
             ReferenceCard {
                 HStack(spacing: 11) {
                     Image(systemName: "chart.line.uptrend.xyaxis.circle.fill").font(.title2).foregroundStyle(ReferenceColor.blue)
                     VStack(alignment: .leading, spacing: 3) {
                         Text("成长周报与月报").font(.headline).foregroundStyle(ReferenceColor.navy)
-                        Text("汇总真实打卡与测评记录，并说明计划调整原因").font(.caption).foregroundStyle(.secondary)
+                        Text("汇总真实打卡与测评记录，并说明计划调整原因").font(.subheadline).foregroundStyle(.secondary)
                     }
                     Spacer(); Image(systemName: "chevron.right").foregroundStyle(ReferenceColor.blue)
                 }
             }
-        }.buttonStyle(.plain).padding(.horizontal, 12).accessibilityLabel("查看成长周报与月报") }
-        if let child = state.selectedChild, let body = state.bodyAssessment(for: child) { Button { router.push(.bodyAssessment) } label: { ReferenceCard { HStack(spacing: 11) { Image(systemName: "figure.stand").font(.title2).foregroundStyle(ReferenceColor.green); VStack(alignment: .leading, spacing: 3) { Text("身体测评").font(.headline).foregroundStyle(ReferenceColor.navy); Text(String(format: "BMI %.1f · %@ · 建议复测 %@", body.bmi, body.attention(ageMonths: child.bodyAssessmentAgeMonths, gender: child.gender).label, Self.bodyDateFormatter.string(from: body.nextFollowUpDate))).font(.caption).foregroundStyle(.secondary).lineLimit(2) }; Spacer(); Image(systemName: "chevron.right").foregroundStyle(ReferenceColor.blue) } } }.buttonStyle(.plain).padding(.horizontal, 12) } else { Button { router.push(.bodyAssessment) } label: { ReferenceCard { Label("尚未完成身体测评，去录入 BMI 与姿态观察", systemImage: "figure.walk.motion").font(.subheadline.bold()).foregroundStyle(ReferenceColor.blue) } }.buttonStyle(.plain).padding(.horizontal, 12) }
+        }.buttonStyle(.plain).padding(.horizontal, AppTheme.pagePadding).accessibilityLabel("查看成长周报与月报") }
+        if let child = state.selectedChild, let body = state.bodyAssessment(for: child) { Button { router.push(.bodyAssessment) } label: { ReferenceCard { HStack(spacing: 11) { Image(systemName: "figure.stand").font(.title2).foregroundStyle(ReferenceColor.green); VStack(alignment: .leading, spacing: 3) { Text("身体测评").font(.headline).foregroundStyle(ReferenceColor.navy); Text(String(format: "BMI %.1f · %@ · 建议复测 %@", body.bmi, body.attention(ageMonths: child.bodyAssessmentAgeMonths, gender: child.gender).label, Self.bodyDateFormatter.string(from: body.nextFollowUpDate))).font(.subheadline).foregroundStyle(.secondary).lineLimit(2) }; Spacer(); Image(systemName: "chevron.right").foregroundStyle(ReferenceColor.blue) } } }.buttonStyle(.plain).padding(.horizontal, AppTheme.pagePadding) } else { Button { router.push(.bodyAssessment) } label: { ReferenceCard { Label("尚未完成身体测评，去录入 BMI 与姿态观察", systemImage: "figure.walk.motion").font(.subheadline.bold()).foregroundStyle(ReferenceColor.blue) } }.buttonStyle(.plain).padding(.horizontal, AppTheme.pagePadding) }
         if let child = state.selectedChild {
             let archivedCategories = AssessmentCategory.allCases.filter { category in
                 category != .fitness && state.familyHealthRecord(for: child, category: category) != nil
@@ -558,33 +558,33 @@ struct HealthDashboard: View {
                         ForEach(archivedCategories, id: \.self) { category in
                             let savedAt = state.familyHealthRecord(for: child, category: category).map { Self.familyRecordDateFormatter.string(from: $0.completedAt) } ?? "历史记录"
                             Button { router.push(.assessment(category)) } label: {
-                                HStack { Image(systemName: category.icon).foregroundStyle(category.color); VStack(alignment: .leading, spacing: 2) { Text("\(category.rawValue)家庭记录已保存").font(.subheadline.weight(.semibold)).foregroundStyle(ReferenceColor.navy); Text("家长填写 · \(savedAt)").font(.caption).foregroundStyle(.secondary) }; Spacer(); Text("查看").font(.caption.weight(.semibold)).foregroundStyle(ReferenceColor.blue); Image(systemName: "chevron.right").font(.caption).foregroundStyle(ReferenceColor.blue) }
+                                HStack { Image(systemName: category.icon).foregroundStyle(category.color); VStack(alignment: .leading, spacing: 2) { Text("\(category.rawValue)家庭记录已保存").font(.subheadline.weight(.semibold)).foregroundStyle(ReferenceColor.navy); Text("家长填写 · \(savedAt)").font(.subheadline).foregroundStyle(.secondary) }; Spacer(); Text("查看").font(.subheadline.weight(.semibold)).foregroundStyle(ReferenceColor.blue); Image(systemName: "chevron.right").font(.subheadline).foregroundStyle(ReferenceColor.blue) }
                             }.buttonStyle(.plain)
                         }
-                    }.padding(12)
-                }.padding(.horizontal, 12)
+                    }.padding(16)
+                }.padding(.horizontal, AppTheme.pagePadding)
             }
         }
         ReferenceCard {
             VStack(alignment: .leading, spacing: 8) {
                 ReferenceSectionTitle(title: "本月打卡", trailing: "查看记录", action: { checkInDetailShown = true })
-                Text(Self.monthTitleFormatter.string(from: currentMonthStart)).font(.caption.weight(.semibold)).foregroundStyle(ReferenceColor.navy)
+                Text(Self.monthTitleFormatter.string(from: currentMonthStart)).font(.subheadline.weight(.semibold)).foregroundStyle(ReferenceColor.navy)
                 let weekdays = ["日", "一", "二", "三", "四", "五", "六"]
-                HStack { ForEach(weekdays, id: \.self) { Text($0).font(.system(size: 12)).frame(maxWidth: .infinity).foregroundStyle(.secondary) } }
+                HStack { ForEach(weekdays, id: \.self) { Text($0).font(.system(size: 16)).frame(maxWidth: .infinity).foregroundStyle(.secondary) } }
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 8) {
                     ForEach(Array(currentMonthCells.enumerated()), id: \.offset) { _, day in
                         if let day {
                             let key = key(forMonthDay: day)
-                            Text("\(day)").font(.system(size: 12, weight: key == Self.todayKey ? .bold : .regular)).foregroundStyle(selectedChildCheckInDates.contains(key) ? ReferenceColor.green : ReferenceColor.navy).frame(width: 17, height: 17).background(selectedChildCheckInDates.contains(key) ? ReferenceColor.green.opacity(0.12) : .clear, in: Circle())
+                            Text("\(day)").font(.system(size: 16, weight: key == Self.todayKey ? .bold : .regular)).foregroundStyle(selectedChildCheckInDates.contains(key) ? ReferenceColor.green : ReferenceColor.navy).frame(width: 17, height: 17).background(selectedChildCheckInDates.contains(key) ? ReferenceColor.green.opacity(0.12) : .clear, in: Circle())
                         } else { Color.clear.frame(width: 17, height: 17) }
                     }
                 }
-                Button { checkInValidationError = nil; checkInFormShown = true } label: { Label(checkedInToday ? "今日已打卡" : "记录今日运动", systemImage: checkedInToday ? "checkmark.circle.fill" : "checkmark.seal.fill").font(.system(size: 12, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 9).foregroundStyle(.white).background(checkedInToday ? ReferenceColor.green : ReferenceColor.blue, in: RoundedRectangle(cornerRadius: 9)) }.buttonStyle(.plain).disabled(checkedInToday)
+                Button { checkInValidationError = nil; checkInFormShown = true } label: { Label(checkedInToday ? "今日已打卡" : "记录今日运动", systemImage: checkedInToday ? "checkmark.circle.fill" : "checkmark.seal.fill").font(.system(size: 16, weight: .bold)).frame(maxWidth: .infinity).padding(.vertical, 9).foregroundStyle(.white).background(checkedInToday ? ReferenceColor.green : ReferenceColor.blue, in: RoundedRectangle(cornerRadius: 9)) }.buttonStyle(.plain).disabled(checkedInToday)
             }
-        }.padding(.horizontal, 12)
-        RecentFamilyActivities().padding(.horizontal, 12)
-        CourseSuggestionBanner().padding(.horizontal, 12)
-        UpcomingTrainingCard { router.push(.parentCourses) }.padding(.horizontal, 12)
+        }.padding(.horizontal, AppTheme.pagePadding)
+        RecentFamilyActivities().padding(.horizontal, AppTheme.pagePadding)
+        CourseSuggestionBanner().padding(.horizontal, AppTheme.pagePadding)
+        UpcomingTrainingCard { router.push(.parentCourses) }.padding(.horizontal, AppTheme.pagePadding)
         }.padding(.bottom, 8) }.background(ReferenceColor.canvas)
             .overlay {
                 if let error = state.error, state.data == nil {
@@ -603,7 +603,7 @@ struct HealthDashboard: View {
                     Image(systemName: "checkmark.seal.fill").font(.system(size: 44)).foregroundStyle(ReferenceColor.green)
                     Text("本月已保存 \(currentMonthCheckInCount) 次运动打卡").font(.headline)
                     Text("打卡记录会自动保存并同步。")
-                        .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                        .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
                     Spacer()
                 }.padding(24)
                 .navigationTitle("本月运动打卡")
@@ -695,8 +695,8 @@ struct RecentFamilyActivities: View {
     private func activityTile(_ image: String, _ title: String, _ note: String, _ color: Color) -> some View {
         Button { selectedActivity = title } label: { VStack(alignment: .leading, spacing: 4) {
             Image(image).resizable().scaledToFill().frame(height: 48).frame(maxWidth: .infinity).clipped()
-            Text(title).font(.system(size: 12, weight: .bold)).lineLimit(2)
-            Text(note).font(.system(size: 12)).foregroundStyle(color).lineLimit(2)
+            Text(title).font(.system(size: 16, weight: .bold)).lineLimit(2)
+            Text(note).font(.system(size: 16)).foregroundStyle(color).lineLimit(2)
         }
         .padding(4)
         .background(.white, in: RoundedRectangle(cornerRadius: 12))
@@ -715,12 +715,12 @@ struct CourseSuggestionBanner: View {
                     .resizable().scaledToFill().frame(width: 58, height: 58)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("为孩子推荐").font(.system(size: 12)).foregroundStyle(.secondary)
-                    Text("青少年体姿改善课程").font(.system(size: 14, weight: .bold))
-                    Text("每周 2 次 · 适合 7-10 岁").font(.system(size: 12)).foregroundStyle(ReferenceColor.green)
+                    Text("为孩子推荐").font(.system(size: 16)).foregroundStyle(.secondary)
+                    Text("青少年体姿改善课程").font(.system(size: 16, weight: .bold))
+                    Text("每周 2 次 · 适合 7-10 岁").font(.system(size: 16)).foregroundStyle(ReferenceColor.green)
                 }
                 Spacer()
-                Text("查看课程").font(.system(size: 12, weight: .bold))
+                Text("查看课程").font(.system(size: 16, weight: .bold))
                     .padding(.horizontal, 10).padding(.vertical, 6)
                     .background(ReferenceColor.yellow, in: Capsule()).foregroundStyle(.white)
             }
@@ -743,12 +743,12 @@ struct UpcomingTrainingCard: View {
                 Image(systemName: "calendar.badge.clock").font(.system(size: 18, weight: .semibold)).foregroundStyle(ReferenceColor.green)
                     .frame(width: 37, height: 37).background(ReferenceColor.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("推荐训练").font(.system(size: 12, weight: .bold))
-                    Text("每周 2 次 · 足球基础训练").font(.system(size: 12)).foregroundStyle(.secondary)
+                    Text("推荐训练").font(.system(size: 16, weight: .bold))
+                    Text("每周 2 次 · 足球基础训练").font(.system(size: 16)).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Text("去查看").font(.system(size: 12, weight: .bold)).foregroundStyle(ReferenceColor.green)
-                Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold)).foregroundStyle(ReferenceColor.green)
+                Text("去查看").font(.system(size: 16, weight: .bold)).foregroundStyle(ReferenceColor.green)
+                Image(systemName: "chevron.right").font(.system(size: 16, weight: .bold)).foregroundStyle(ReferenceColor.green)
             }
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)

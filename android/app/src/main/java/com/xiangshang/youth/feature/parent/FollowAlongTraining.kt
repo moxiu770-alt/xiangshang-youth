@@ -293,22 +293,22 @@ fun FollowAlongTrainingDialog(
                                     Text("给 $studentName 的今日训练", color = Navy, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                                     Text("第 ${day.id} 天 · ${day.title}", color = Blue, fontWeight = FontWeight.SemiBold)
                                 }
-                                Text("家长陪同", color = Blue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text("家长陪同", color = Blue, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                             }
-                            Text(if (day.exercises.isEmpty()) "今天以恢复和身体感受记录为主，不需要强行训练。" else "先看示范，再打开摄像头跟着做。动作质量优先，出现不适请立即停止。", color = Color.Gray, fontSize = 12.sp)
+                            Text(if (day.exercises.isEmpty()) "今天以恢复和身体感受记录为主，不需要强行训练。" else "先看示范，再打开摄像头跟着做。动作质量优先，出现不适请立即停止。", color = Color.Gray, fontSize = 16.sp)
                         }
                     }
                     Surface(color = Color(0xFFFFF4E8), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
-                        Text(AlgorithmReleaseGate.pendingFollowAlongNotice, color = Navy, fontSize = 12.sp, modifier = Modifier.padding(12.dp))
+                        Text(AlgorithmReleaseGate.pendingFollowAlongNotice, color = Navy, fontSize = 16.sp, modifier = Modifier.padding(16.dp))
                     }
                     if (day.exercises.isEmpty()) {
                         RecoveryCard(onComplete = { completed = true; saveSession(); onComplete(); onDismiss() })
                     } else {
                         Surface(color = Color.White, shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth()) {
-                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text("示范视频", color = Navy, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                                    Text("跟做模式", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.background(Blue, RoundedCornerShape(50)).padding(horizontal = 9.dp, vertical = 5.dp))
+                                    Text("跟做模式", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.background(Blue, RoundedCornerShape(50)).padding(horizontal = 9.dp, vertical = 5.dp))
                                 }
                                 Box(Modifier.fillMaxWidth().aspectRatio(9f / 16f).clip(RoundedCornerShape(16.dp)).background(Color(0xFF101828))) {
                                     CourseVideoPlayer(
@@ -336,14 +336,14 @@ fun FollowAlongTrainingDialog(
                                             shape = RoundedCornerShape(12.dp)
                                         ) {
                                             Column(Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                                Text("示范视频暂时无法播放", color = Color.White, fontSize = 12.sp)
+                                                Text("示范视频暂时无法播放", color = Color.White, fontSize = 16.sp)
                                                 TextButton(onClick = { templateVideoRetryToken += 1 }) { Text("重新加载") }
                                             }
                                         }
                                     }
                                     if (cameraEnabled) {
                                         Box(
-                                            modifier = Modifier.padding(10.dp).size(width = 118.dp, height = 166.dp).clip(RoundedCornerShape(12.dp))
+                                            modifier = Modifier.padding(14.dp).size(width = 118.dp, height = 166.dp).clip(RoundedCornerShape(12.dp))
                                         ) {
                                             AndroidView(
                                                 factory = { cameraContext ->
@@ -369,7 +369,7 @@ fun FollowAlongTrainingDialog(
                                                 Row(Modifier.padding(horizontal = 7.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                                                     Icon(if (poseFeedback.visible) Icons.Filled.CenterFocusStrong else Icons.Filled.Person, null, tint = Color.White, modifier = Modifier.size(11.dp))
                                                     Spacer(Modifier.width(3.dp))
-                                                    Text(if (poseFeedback.visible) "全身远景" else "取景准备", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                    Text(if (poseFeedback.visible) "全身远景" else "取景准备", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                                                 }
                                             }
                                         }
@@ -379,8 +379,8 @@ fun FollowAlongTrainingDialog(
                                     Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                                         Surface(color = if (poseFeedback.visible) (if (poseFeedback.active) Green else Color(0xFFFFA726)) else Color.Gray, shape = RoundedCornerShape(50)) { Spacer(Modifier.size(8.dp)) }
                                         Spacer(Modifier.width(7.dp))
-                                        Text(poseFeedback.message, color = Navy, fontSize = 12.sp, modifier = Modifier.weight(1f), maxLines = 2)
-                                        Text("辅助计数 ${poseFeedback.repCount} 次 · 连击 ${poseFeedback.comboCount}", color = Blue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        Text(poseFeedback.message, color = Navy, fontSize = 16.sp, modifier = Modifier.weight(1f), maxLines = 2)
+                                        Text("辅助计数 ${poseFeedback.repCount} 次 · 连击 ${poseFeedback.comboCount}", color = Blue, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                                     }
                                     FollowAlongGuideCard(poseFeedback = poseFeedback, exercise = day.exercises.getOrNull(selectedExercise), templateBeat = templateBeat)
                                 }
@@ -408,28 +408,28 @@ fun FollowAlongTrainingDialog(
                                     if (speakerEnabled) coach.say("${exercise.title}，目标 ${exercise.target}${exercise.unit}。${exercise.cue}")
                                 }
                             ) {
-                                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Icon(exercise.icon, null, tint = if (selected) Blue else Blue.copy(alpha = .7f), modifier = Modifier.size(34.dp))
                                     Spacer(Modifier.width(10.dp))
                                     Column(Modifier.weight(1f)) {
                                         Text(exercise.title, color = Navy, fontWeight = FontWeight.Bold)
-                                        Text(exercise.cue, color = Color.Gray, fontSize = 12.sp)
+                                        Text(exercise.cue, color = Color.Gray, fontSize = 16.sp)
                                     }
-                                    Text("${exercise.target} ${exercise.unit}", color = Blue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text("${exercise.target} ${exercise.unit}", color = Blue, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
                         day.exercises.getOrNull(selectedExercise)?.let { exercise ->
                             val progress = exerciseProgress[exercise.id] ?: 0
                             Surface(color = Green.copy(alpha = .08f), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
-                                Column(Modifier.padding(13.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text("跟做进度", color = Navy, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                                        Text("$progress / ${exercise.target} ${exercise.unit}", color = Blue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        Text("$progress / ${exercise.target} ${exercise.unit}", color = Blue, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                                     }
                                     LinearProgressIndicator(progress = { (progress.toFloat() / exercise.target.coerceAtLeast(1)).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth(), color = Green)
                                     if (poseFeedback.visible) {
-                                        Text(if (poseFeedback.active) "动作已开始" else "画面已就绪，等待动作幅度", color = if (poseFeedback.active) Green else Color.Gray, fontSize = 12.sp)
+                                        Text(if (poseFeedback.active) "动作已开始" else "画面已就绪，等待动作幅度", color = if (poseFeedback.active) Green else Color.Gray, fontSize = 16.sp)
                                     }
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                                         Button(onClick = {
@@ -449,11 +449,11 @@ fun FollowAlongTrainingDialog(
                                             if (speakerEnabled) coach.say("${exercise.title} 已完成，做得很好。")
                                         }) { Text("本组完成") }
                                     }
-                                    Text("家长记录用于确认实际完成量；摄像头仅显示待验证的辅助计数，不作为准确率或标准动作证明。", color = Color.Gray, fontSize = 12.sp)
+                                    Text("家长记录用于确认实际完成量；摄像头仅显示待验证的辅助计数，不作为准确率或标准动作证明。", color = Color.Gray, fontSize = 16.sp)
                                 }
                             }
                         }
-                        Text("家长陪同提示：保持镜头稳定、留出安全距离；孩子疲劳、疼痛或头晕时马上暂停。跟做数据只用于健康习惯记录，不构成医疗诊断。", color = Navy, fontSize = 12.sp, modifier = Modifier.fillMaxWidth().background(Blue.copy(alpha = .08f), RoundedCornerShape(14.dp)).padding(13.dp))
+                        Text("家长陪同提示：保持镜头稳定、留出安全距离；孩子疲劳、疼痛或头晕时马上暂停。跟做数据只用于健康习惯记录，不构成医疗诊断。", color = Navy, fontSize = 16.sp, modifier = Modifier.fillMaxWidth().background(Blue.copy(alpha = .08f), RoundedCornerShape(14.dp)).padding(16.dp))
                     }
                 }
                 if (day.exercises.isNotEmpty()) {
@@ -467,7 +467,7 @@ fun FollowAlongTrainingDialog(
                                     Spacer(Modifier.width(8.dp))
                                     Text("本次训练已由家长确认", color = Navy, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                                 }
-                                    Text("已记录 $total 个动作单位（辅助识别 ${visualUnits.values.sum()}，家长补录 $manualUnits）。辅助识别尚未通过人工标注验证，不作为标准动作评分。", color = Color.Gray, fontSize = 12.sp)
+                                    Text("已记录 $total 个动作单位（辅助识别 ${visualUnits.values.sum()}，家长补录 $manualUnits）。辅助识别尚未通过人工标注验证，不作为标准动作评分。", color = Color.Gray, fontSize = 16.sp)
                                 Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text("返回 28 天计划") }
                             }
                         }
@@ -520,7 +520,7 @@ private fun RecoveryCard(onComplete: () -> Unit) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Icon(Icons.Filled.Bedtime, null, tint = Blue, modifier = Modifier.size(34.dp))
             Text("今天是恢复日", color = Navy, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            Text("做 5 分钟轻松呼吸、肩背舒展和户外散步即可。让身体恢复，是训练计划的一部分。", color = Color.Gray, fontSize = 13.sp)
+            Text("做 5 分钟轻松呼吸、肩背舒展和户外散步即可。让身体恢复，是训练计划的一部分。", color = Color.Gray, fontSize = 15.sp)
             Button(onClick = onComplete, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text("记录今天已恢复") }
         }
     }
@@ -541,7 +541,7 @@ private fun FollowAlongGuideCard(
                 contentDescription = "动作引导。${poseFeedback.message}。请竖屏、保持全身远景并静止两秒完成准备。"
             }
     ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     if (poseFeedback.visible) Icons.Filled.VerifiedUser else Icons.Filled.CenterFocusStrong,
@@ -554,28 +554,28 @@ private fun FollowAlongGuideCard(
                     if (poseFeedback.captureState == FollowAlongCaptureState.Ready) "取景已就绪，跟随语音完成动作" else poseFeedback.captureState.label,
                     color = Navy,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
+                    fontSize = 15.sp,
                     modifier = Modifier.weight(1f)
                 )
-                Text(if (poseFeedback.captureState == FollowAlongCaptureState.Ready) "已连接" else "需调整", color = if (poseFeedback.captureState == FollowAlongCaptureState.Ready) Green else Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(if (poseFeedback.captureState == FollowAlongCaptureState.Ready) "已连接" else "需调整", color = if (poseFeedback.captureState == FollowAlongCaptureState.Ready) Green else Color.Gray, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
-            Text(poseFeedback.message, color = Color.Gray, fontSize = 12.sp, maxLines = 2)
+            Text(poseFeedback.message, color = Color.Gray, fontSize = 16.sp, maxLines = 2)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
                 FollowAlongStage.values().forEach { stage ->
                     Surface(color = if (poseFeedback.stage == stage) Blue else Blue.copy(alpha = .10f), shape = RoundedCornerShape(50), modifier = Modifier.weight(1f)) {
-                        Text(stage.label, color = if (poseFeedback.stage == stage) Color.White else Navy, fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(vertical = 6.dp).fillMaxWidth())
+                        Text(stage.label, color = if (poseFeedback.stage == stage) Color.White else Navy, fontSize = 16.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.padding(vertical = 6.dp).fillMaxWidth())
                     }
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("动作范围", color = Navy, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Text("动作范围", color = Navy, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.width(6.dp))
                 LinearProgressIndicator(progress = { poseFeedback.rangePercent / 100f }, modifier = Modifier.weight(1f), color = if (poseFeedback.rangePercent >= 70) Green else Blue)
                 Spacer(Modifier.width(6.dp))
-                Text("${poseFeedback.rangePercent}% · ${poseFeedback.side.label}", color = Blue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text("${poseFeedback.rangePercent}% · ${poseFeedback.side.label}", color = Blue, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
-            Text(if (poseFeedback.tempoScore > 0) "节奏匹配 ${poseFeedback.tempoScore}% · 跟随示范停顿后再回位" else "先完成一整次动作，系统会校准你的节奏", color = Color.Gray, fontSize = 12.sp)
-            exercise?.let { Text("模板第 $templateBeat 拍 · ${"%.1f".format(Locale.US, it.cadenceSeconds)} 秒/拍 · 实时节拍同步", color = Blue, fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
+            Text(if (poseFeedback.tempoScore > 0) "节奏匹配 ${poseFeedback.tempoScore}% · 跟随示范停顿后再回位" else "先完成一整次动作，系统会校准你的节奏", color = Color.Gray, fontSize = 16.sp)
+            exercise?.let { Text("模板第 $templateBeat 拍 · ${"%.1f".format(Locale.US, it.cadenceSeconds)} 秒/拍 · 实时节拍同步", color = Blue, fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
                 GuideStep(number = "1", title = "竖屏", detail = "手机稳定", modifier = Modifier.weight(1f))
                 GuideStep(number = "2", title = "全身", detail = "头肩髋脚", modifier = Modifier.weight(1f))
@@ -585,7 +585,7 @@ private fun FollowAlongGuideCard(
                 Row(verticalAlignment = Alignment.Top) {
                     Icon(Icons.AutoMirrored.Filled.DirectionsRun, null, tint = Navy, modifier = Modifier.size(14.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("当前动作：${it.title} · ${it.cue}", color = Navy, fontSize = 12.sp, maxLines = 2)
+                    Text("当前动作：${it.title} · ${it.cue}", color = Navy, fontSize = 16.sp, maxLines = 2)
                 }
             }
         }
@@ -597,13 +597,13 @@ private fun GuideStep(number: String, title: String, detail: String, modifier: M
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         Surface(color = Blue, shape = androidx.compose.foundation.shape.CircleShape, modifier = Modifier.size(18.dp)) {
             Box(contentAlignment = Alignment.Center) {
-                Text(number, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(number, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
         Spacer(Modifier.width(4.dp))
         Column {
-            Text(title, color = Navy, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            Text(detail, color = Color.Gray, fontSize = 12.sp)
+            Text(title, color = Navy, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text(detail, color = Color.Gray, fontSize = 16.sp)
         }
     }
 }

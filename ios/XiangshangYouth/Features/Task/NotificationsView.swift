@@ -27,15 +27,15 @@ struct NotificationsView: View {
                         Spacer()
                         if state.unreadMessageCount > 0 {
                             Button("全部已读") { state.markAllMessagesRead() }
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(ReferenceColor.blue)
                                 .buttonStyle(.plain)
                                 .accessibilityLabel("将全部通知标记为已读")
                         }
                         Text("未读 \(state.unreadMessageCount)")
-                            .font(.system(size: 12, weight: .semibold)).foregroundStyle(ReferenceColor.blue)
+                            .font(.system(size: 16, weight: .semibold)).foregroundStyle(ReferenceColor.blue)
                     }
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, AppTheme.pagePadding)
 
                     ForEach(messages) { message in
                         Button {
@@ -52,20 +52,20 @@ struct NotificationsView: View {
                                     .background((message.category == "报告" ? ReferenceColor.blue : Color.orange).opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
                                 VStack(alignment: .leading, spacing: 3) {
                                     HStack(spacing: 5) {
-                                        Text(message.title).font(.system(size: 12, weight: .bold)).foregroundStyle(ReferenceColor.navy)
+                                        Text(message.title).font(.system(size: 16, weight: .bold)).foregroundStyle(ReferenceColor.navy)
                                         if !message.isRead && !state.localFeatures.readMessageIDs.contains(message.id) { Circle().fill(.red).frame(width: 5, height: 5) }
                                     }
-                                    Text(message.content).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(2)
-                                    Text("\(message.category) · \(message.time)").font(.system(size: 12)).foregroundStyle(.secondary)
+                                    Text(message.content).font(.system(size: 16)).foregroundStyle(.secondary).lineLimit(2)
+                                    Text("\(message.category) · \(message.time)").font(.system(size: 16)).foregroundStyle(.secondary)
                                 }
                                 Spacer()
-                                Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+                                Image(systemName: "chevron.right").font(.system(size: 16, weight: .semibold)).foregroundStyle(.secondary)
                             }
                             .padding(11)
                             .background(.white, in: RoundedRectangle(cornerRadius: 11))
                         }
                         .buttonStyle(.plain)
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, AppTheme.pagePadding)
                     }
                 }
             }
@@ -77,7 +77,7 @@ struct NotificationsView: View {
                 NavigationStack {
                     VStack(alignment: .leading, spacing: 13) {
                         Text(message.title).font(.title3.bold()).foregroundStyle(ReferenceColor.navy)
-                        Text("\(message.category) · \(message.time)").font(.caption).foregroundStyle(.secondary)
+                        Text("\(message.category) · \(message.time)").font(.subheadline).foregroundStyle(.secondary)
                         Divider()
                         Text(message.content).font(.body).foregroundStyle(ReferenceColor.navy)
                         Spacer()
@@ -190,7 +190,7 @@ private struct ClassNoticeDetailSheet: View {
                         VStack(alignment: .leading, spacing: 14) {
                             Text(detail.title).font(.title3.bold()).foregroundStyle(ReferenceColor.navy)
                             Text(detail.sentAt.map { "发送时间 \($0)" } ?? "\(message.category) · \(message.time)")
-                                .font(.system(size: 13))
+                                .font(.system(size: 15))
                                 .foregroundStyle(.secondary)
                             Text(detail.content)
                                 .font(.system(size: 15))
@@ -201,9 +201,9 @@ private struct ClassNoticeDetailSheet: View {
                             }
                             if let stats = detail.receiptStats {
                                 Text("回执统计：已确认 \(stats.acknowledged) / \(stats.total)，待确认 \(stats.pending)")
-                                    .font(.system(size: 13, weight: .semibold))
+                                    .font(.system(size: 15, weight: .semibold))
                                     .foregroundStyle(ReferenceColor.blue)
-                                    .padding(12)
+                                    .padding(16)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .background(ReferenceColor.blue.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
                             }
@@ -228,7 +228,7 @@ private struct ClassNoticeDetailSheet: View {
                 .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(acknowledged ? ReferenceColor.green : ReferenceColor.navy)
             Text(acknowledged ? "学校已收到您的确认回执。" : "请确认已阅读本通知，学校会用于统计家长回执。")
-                .font(.system(size: 13))
+                .font(.system(size: 15))
                 .foregroundStyle(.secondary)
             if !acknowledged && state.selectedRole == .parent {
                 let command = state.workflowState(for: "notice:receipt:\(notificationID)")
@@ -248,7 +248,7 @@ private struct ClassNoticeDetailSheet: View {
                 .disabled(command.isSubmitting)
             }
         }
-        .padding(12)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.white, in: RoundedRectangle(cornerRadius: 12))
     }

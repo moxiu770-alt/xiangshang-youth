@@ -49,6 +49,16 @@ jobs:
           psql postgres://xiangshang:ci_password@127.0.0.1:5432/xiangshang_youth -v ON_ERROR_STOP=1 -c 'CREATE SCHEMA IF NOT EXISTS xiangshang_integration AUTHORIZATION xiangshang'
           npm run migrate
           npm run seed
+      - name: Provision isolated remote-acceptance fixture contract
+        env:
+          DATABASE_URL: postgres://xiangshang:ci_password@127.0.0.1:5432/xiangshang_youth?options=-csearch_path%3Dxiangshang_integration%2Cpublic
+          REMOTE_FIXTURE_CONFIRM: "1"
+          REMOTE_FIXTURE_SCOPE: ci
+          REMOTE_FIXTURE_PARENT_ACCOUNT: "13990000001"
+          REMOTE_FIXTURE_PARENT_PASSWORD: AcceptanceParent123!
+          REMOTE_FIXTURE_TEACHER_ACCOUNT: "13990000002"
+          REMOTE_FIXTURE_TEACHER_PASSWORD: AcceptanceTeacher123!
+        run: npm run provision:remote-acceptance
       - name: Run backend checks and unit tests
         run: npm run check && npm test
       - name: Run backend integration tests

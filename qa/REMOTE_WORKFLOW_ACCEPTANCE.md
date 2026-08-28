@@ -2,6 +2,22 @@
 
 `backend/scripts/remote-workflow-smoke.js` 不读取 Mock，也不会输出账号、密码或 Token。
 
+首次为试点环境建立隔离验收学校、家长/教师账号、专用学生、任务、报告、课程、活动、专家和两个时段时，使用显式保护的幂等命令。该命令不会写入真实学校；密码不会出现在输出中：
+
+```bash
+cd backend
+DATABASE_URL=<由服务器密钥文件注入> \
+REMOTE_FIXTURE_CONFIRM=1 \
+REMOTE_FIXTURE_SCOPE=pilot \
+REMOTE_FIXTURE_PARENT_ACCOUNT=<专用11位测试账号> \
+REMOTE_FIXTURE_PARENT_PASSWORD=<至少12位强密码> \
+REMOTE_FIXTURE_TEACHER_ACCOUNT=<另一个专用11位测试账号> \
+REMOTE_FIXTURE_TEACHER_PASSWORD=<至少12位强密码> \
+npm run provision:remote-acceptance
+```
+
+输出的稳定 ID 对应下方 `REMOTE_E2E_*` secrets。重复执行会轮换两个验收账号的密码并刷新活动/时段窗口，不会创建重复学校或学生。验收 fixture 必须保留在独立验收学校中，不能指向真实儿童、真实教学任务或真实专家服务。
+
 默认只读验收覆盖：
 
 - 服务就绪与数据库 migration；

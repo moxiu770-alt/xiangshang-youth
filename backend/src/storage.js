@@ -27,13 +27,23 @@ function localStorage(rootValue) {
   };
 }
 
-function s3Storage({ endpoint, bucket, accessKey, secretKey, region = 'auto' }) {
+function s3Storage({ endpoint, bucket, accessKey, secretKey, region = 'auto', addressingStyle = 'auto' }) {
   if (!endpoint || !bucket || !accessKey || !secretKey) throw new Error('S3 存储需要 S3_STORAGE_ENDPOINT、S3_BUCKET、S3_ACCESS_KEY 和 S3_SECRET_KEY');
   const base = new URL(endpoint);
+  if (!['auto', 'path', 'virtual'].includes(addressingStyle)) throw new Error('S3_ADDRESSING_STYLE 只能是 auto、path 或 virtual');
+  const providerRequiresVirtualHost = /(^|\.)cos\.[a-z0-9-]+\.myqcloud\.com$/i.test(base.hostname)
+    || /(^|\.)s3[.-][a-z0-9-]+\.amazonaws\.com$/i.test(base.hostname);
+  const virtualHosted = addressingStyle === 'virtual' || (addressingStyle === 'auto' && providerRequiresVirtualHost);
 
   async function request(method, objectKey, bytes = null, contentType = null) {
-    const canonicalUri = `${base.pathname.replace(/\/$/, '')}/${encodeURIComponent(bucket)}/${encodePath(objectKey)}`;
+    const basePath = base.pathname.replace(/\/$/, '');
+    const canonicalUri = virtualHosted
+      ? `${basePath}/${encodePath(objectKey)}`
+      : `${basePath}/${encodeURIComponent(bucket)}/${encodePath(objectKey)}`;
     const target = new URL(`${base.origin}${canonicalUri}`);
+    if (virtualHosted && !target.hostname.toLowerCase().startsWith(`${bucket.toLowerCase()}.`)) {
+      target.hostname = `${bucket}.${target.hostname}`;
+    }
     const now = new Date();
     const amzDate = now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
     const date = amzDate.slice(0, 8);
@@ -74,7 +84,8 @@ export function createStorage(config) {
       bucket: config.storageBucket || config.bucket,
       accessKey: config.storageAccessKey || config.accessKey,
       secretKey: config.storageSecretKey || config.secretKey,
-      region: config.storageRegion || config.region
+      region: config.storageRegion || config.region,
+      addressingStyle: config.storageAddressingStyle || config.addressingStyle || 'auto'
     });
   }
   throw new Error(`不支持的文件存储驱动: ${config.storageDriver}`);

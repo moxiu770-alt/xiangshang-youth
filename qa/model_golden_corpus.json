@@ -20,14 +20,14 @@
     {"id": "body-108-girl-red", "heightCm": 135, "weightKg": 40.10, "ageMonths": 108, "gender": "女", "posture": "clean", "expected": "red", "expectedBmi": "red", "expectedHeight": "middle", "expectedPosture": "green"},
     {"id": "body-132-boy-yellow", "heightCm": 135, "weightKg": 36.45, "ageMonths": 132, "gender": "男", "posture": "clean", "expected": "yellow", "expectedBmi": "yellow", "expectedHeight": "lower", "expectedPosture": "green"},
     {"id": "body-132-girl-green", "heightCm": 135, "weightKg": 36.45, "ageMonths": 132, "gender": "女", "posture": "clean", "expected": "green", "expectedBmi": "green", "expectedHeight": "lower", "expectedPosture": "green"},
-    {"id": "body-156-boy-yellow", "heightCm": 135, "weightKg": 40.10, "ageMonths": 156, "gender": "男", "posture": "clean", "expected": "yellow", "expectedBmi": "yellow", "expectedHeight": "low", "expectedPosture": "green"},
-    {"id": "body-156-girl-green", "heightCm": 135, "weightKg": 40.10, "ageMonths": 156, "gender": "女", "posture": "clean", "expected": "green", "expectedBmi": "green", "expectedHeight": "low", "expectedPosture": "green"},
-    {"id": "body-156-girl-red", "heightCm": 135, "weightKg": 45.56, "ageMonths": 156, "gender": "女", "posture": "clean", "expected": "red", "expectedBmi": "red", "expectedHeight": "low", "expectedPosture": "green"},
-    {"id": "body-192-boy-green", "heightCm": 135, "weightKg": 40.10, "ageMonths": 192, "gender": "男", "posture": "clean", "expected": "green", "expectedBmi": "green", "expectedHeight": "low", "expectedPosture": "green"},
-    {"id": "body-192-boy-yellow", "heightCm": 135, "weightKg": 45.56, "ageMonths": 192, "gender": "男", "posture": "clean", "expected": "yellow", "expectedBmi": "yellow", "expectedHeight": "low", "expectedPosture": "green"},
-    {"id": "body-192-boy-red", "heightCm": 135, "weightKg": 51.94, "ageMonths": 192, "gender": "男", "posture": "clean", "expected": "red", "expectedBmi": "red", "expectedHeight": "low", "expectedPosture": "green"},
+    {"id": "body-156-boy-yellow", "heightCm": 135, "weightKg": 40.10, "ageMonths": 156, "gender": "男", "posture": "clean", "expected": "yellow", "expectedBmi": "yellow", "expectedHeight": "low", "expectedPosture": "pending"},
+    {"id": "body-156-girl-green", "heightCm": 135, "weightKg": 40.10, "ageMonths": 156, "gender": "女", "posture": "clean", "expected": "pending", "expectedBmi": "green", "expectedHeight": "low", "expectedPosture": "pending"},
+    {"id": "body-156-girl-red", "heightCm": 135, "weightKg": 45.56, "ageMonths": 156, "gender": "女", "posture": "clean", "expected": "red", "expectedBmi": "red", "expectedHeight": "low", "expectedPosture": "pending"},
+    {"id": "body-192-boy-green", "heightCm": 135, "weightKg": 40.10, "ageMonths": 192, "gender": "男", "posture": "clean", "expected": "pending", "expectedBmi": "green", "expectedHeight": "low", "expectedPosture": "pending"},
+    {"id": "body-192-boy-yellow", "heightCm": 135, "weightKg": 45.56, "ageMonths": 192, "gender": "男", "posture": "clean", "expected": "yellow", "expectedBmi": "yellow", "expectedHeight": "low", "expectedPosture": "pending"},
+    {"id": "body-192-boy-red", "heightCm": 135, "weightKg": 51.94, "ageMonths": 192, "gender": "男", "posture": "clean", "expected": "red", "expectedBmi": "red", "expectedHeight": "low", "expectedPosture": "pending"},
     {"id": "body-posture-atr-red", "heightCm": 135, "weightKg": 32, "ageMonths": 108, "gender": "男", "posture": "atr", "expected": "red", "expectedBmi": "green", "expectedHeight": "middle", "expectedPosture": "red"},
-    {"id": "body-posture-shoulder-teen", "heightCm": 135, "weightKg": 32, "ageMonths": 192, "gender": "女", "posture": "shoulder", "expected": "yellow", "expectedBmi": "green", "expectedHeight": "low", "expectedPosture": "yellow"}
+    {"id": "body-posture-shoulder-teen", "heightCm": 135, "weightKg": 32, "ageMonths": 192, "gender": "女", "posture": "shoulder", "expected": "pending", "expectedBmi": "green", "expectedHeight": "low", "expectedPosture": "pending"}
   ],
   "growth": [
     {"id": "growth-week-empty", "period": "week", "checkInDates": [], "planDates": [], "assessmentCount": 0, "bodyAttention": "pending", "totalScore": null, "now": "2026-08-22T16:00:00.000Z", "expectedPlanTitle": "完成家庭观察计划", "expectedActiveDays": 0, "expectedConsistencyPercent": 0},

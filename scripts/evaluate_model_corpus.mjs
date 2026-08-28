@@ -43,13 +43,27 @@ const cleanMetrics = {
   forwardHeadAngleDegrees: 5,
   gaitShoulderSwingDifferenceCm: 0.2,
   gaitPelvicSwingDifferenceCm: 0.2,
-  gaitTrunkSwayCm: 0.2
+  gaitTrunkSwayCm: 0.2,
+  shoulderProtractionProxyDegrees: 2,
+  pelvicTiltProxyDegrees: 2,
+  kneeAlignmentProxyRatio: 1,
+  lowerLimbAxisAsymmetryDegrees: 1,
+  leftKneeValgusProxyDegrees: 2,
+  rightKneeValgusProxyDegrees: 2,
+  kneeTrackingAsymmetryRatio: 0.05,
+  squatDepthRatio: 0.65,
+  movementRepetitionCount: 3,
+  occiputWallDistanceCm: 1,
+  footArchVisibilityScore: 0.95,
+  leftArchProxyIndex: 0.25,
+  rightArchProxyIndex: 0.25,
+  heelAlignmentProxyDegrees: 2
 };
 const snapshotsFor = (kind) => {
   const tasks = ['standingFront', 'standingBack', 'standingSide', 'forwardBend', 'dynamicKneeControl', 'gaitVideo', 'seatedPosture', 'footArch'];
   const snapshots = tasks.map((captureTask) => ({ captureTask, sampleCount: 18, confidence: 0.82, metrics: { ...cleanMetrics } }));
-  if (kind === 'shoulder') snapshots[0].metrics.shoulderHeightDifferenceCm = 2.0;
-  if (kind === 'atr') snapshots[1].metrics.instrumentAtrDegrees = 7.0;
+  if (kind === 'shoulder') snapshots.find((row) => row.captureTask === 'standingBack').metrics.shoulderHeightDifferenceCm = 2.0;
+  if (kind === 'atr') snapshots.find((row) => row.captureTask === 'forwardBend').metrics.instrumentAtrDegrees = 7.0;
   if (kind === 'incomplete') snapshots.pop();
   return snapshots;
 };

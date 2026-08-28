@@ -41,6 +41,7 @@ export const config = {
   storageAccessKey: process.env.S3_ACCESS_KEY || '',
   storageSecretKey: process.env.S3_SECRET_KEY || '',
   storageRegion: process.env.S3_REGION || 'auto',
+  storageAddressingStyle: process.env.S3_ADDRESSING_STYLE || 'auto',
   jobWorkerEnabled: process.env.JOB_WORKER_ENABLED !== 'false',
   jobWorkerMode: process.env.JOB_WORKER_MODE || (process.env.JOB_WORKER_ENABLED === 'false' ? 'external' : 'embedded'),
   jobWorkerIntervalMs: Math.max(250, Number(process.env.JOB_WORKER_INTERVAL_MS || 1000) || 1000),

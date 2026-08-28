@@ -323,3 +323,28 @@ test('S3-compatible storage signs and routes object operations', async () => {
     globalThis.fetch = previousFetch;
   }
 });
+
+test('Tencent COS uses the required virtual-hosted S3 endpoint', async () => {
+  const calls = [];
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url: String(url), options });
+    return new Response(null, { status: 200 });
+  };
+  try {
+    const storage = createStorage({
+      storageDriver: 's3',
+      storageEndpoint: 'https://cos.ap-guangzhou.myqcloud.com',
+      storageBucket: 'xiangshang-evidence-1250000000',
+      storageAccessKey: 'access',
+      storageSecretKey: 'secret',
+      storageRegion: 'ap-guangzhou'
+    });
+    await storage.put('evidence/student-1.json', Buffer.from('{}'), 'application/json');
+    assert.equal(calls[0].url, 'https://xiangshang-evidence-1250000000.cos.ap-guangzhou.myqcloud.com/evidence/student-1.json');
+    assert.equal(calls[0].options.headers.host, 'xiangshang-evidence-1250000000.cos.ap-guangzhou.myqcloud.com');
+    assert.match(calls[0].options.headers.authorization, /\/ap-guangzhou\/s3\/aws4_request/);
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+});

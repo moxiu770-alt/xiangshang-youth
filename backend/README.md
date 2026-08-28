@@ -333,4 +333,24 @@ DATABASE_URL="$TEST_DATABASE_URL" npm run seed
 TEST_DATABASE_URL="$TEST_DATABASE_URL" SEED_PASSWORD=ChangeMe123! npm run test:integration
 ```
 
+### 备案恢复前的公网 IP HTTPS 试点入口
+
+大陆域名因备案/接入核验被拦截时，可临时使用公网 IP 做小范围远程联调。该入口使用 Let's Encrypt `shortlived` 配置签发 IP 证书，仅用于试点，不替代正式备案域名：
+
+```bash
+cd backend
+cp .env.pilot-ip.example .env.pilot-ip
+# 修改 .env.pilot-ip 中的公网 IP、ACME 邮箱与全部随机密钥
+docker compose --env-file .env.pilot-ip \
+  -f docker-compose.pilot.yml \
+  -f docker-compose.pilot-ip.yml \
+  --profile migrate run --rm migrate
+docker compose --env-file .env.pilot-ip \
+  -f docker-compose.pilot.yml \
+  -f docker-compose.pilot-ip.yml up -d
+curl --fail --show-error "https://$(sed -n 's/^PUBLIC_HOST=//p' .env.pilot-ip)/readyz"
+```
+
+必须保留 `pilot_caddy_data` 数据卷并保证 80/443 入站可达。IP 证书有效期很短，Caddy 需要持续自动续期；备案恢复后把移动端 API 地址切回正式域名并撤掉该临时入口。
+
 测试会校验当前 schema 必须为非 `public`，并在结束时清理它为幂等性验证创建的任务，避免把测试任务、会话和审计记录写入业务数据库。

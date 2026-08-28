@@ -187,6 +187,29 @@ test('auth, scope, idempotency and file guardrails', async () => {
   assert.equal(me.response.status, 200);
   const sessions = await request('/v1/me/sessions', { headers: { Authorization: `Bearer ${admin.accessToken}` } });
   assert.equal(sessions.response.status, 200);
+  const pushToken = `integration-apns-token-${crypto.randomBytes(32).toString('hex')}`;
+  const deviceRegistration = await request('/v1/notification-devices', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${admin.accessToken}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ platform: 'ios', provider: 'apns', environment: 'sandbox', deviceInstanceId: `integration-device-${crypto.randomUUID()}`, pushToken, appVersion: 'integration', locale: 'zh-CN' })
+  });
+  assert.equal(deviceRegistration.response.status, 201, JSON.stringify(deviceRegistration.body));
+  assert.equal(deviceRegistration.body.data.tokenLastFour, pushToken.slice(-4));
+  assert.equal(JSON.stringify(deviceRegistration.body).includes(pushToken), false);
+  const registeredDevices = await request('/v1/notification-devices', { headers: { Authorization: `Bearer ${admin.accessToken}` } });
+  assert.equal(registeredDevices.response.status, 200, JSON.stringify(registeredDevices.body));
+  assert.ok(registeredDevices.body.data.some((item) => item.installationId === deviceRegistration.body.data.installationId));
+  const deviceStorage = new Pool({ connectionString: databaseUrl });
+  try {
+    const storedDevice = await deviceStorage.query('SELECT token_ciphertext,token_hash FROM device_installations WHERE id=$1', [deviceRegistration.body.data.installationId]);
+    assert.equal(storedDevice.rowCount, 1);
+    assert.notEqual(storedDevice.rows[0].token_ciphertext, pushToken);
+    assert.equal(storedDevice.rows[0].token_hash.includes(pushToken), false);
+  } finally { await deviceStorage.end(); }
+  const revokedDevice = await request(`/v1/notification-devices/${deviceRegistration.body.data.installationId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${admin.accessToken}` } });
+  assert.equal(revokedDevice.response.status, 200, JSON.stringify(revokedDevice.body));
+  const devicesAfterRevoke = await request('/v1/notification-devices', { headers: { Authorization: `Bearer ${admin.accessToken}` } });
+  assert.equal(devicesAfterRevoke.body.data.some((item) => item.installationId === deviceRegistration.body.data.installationId), false);
   const auditLogs = await request('/v1/admin/audit-logs?schoolId=school-1&paged=1&page=1&pageSize=20', { headers: { Authorization: `Bearer ${admin.accessToken}` } });
   assert.equal(auditLogs.response.status, 200);
 

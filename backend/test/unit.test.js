@@ -19,6 +19,18 @@ import { summarizeFieldOperations } from '../src/fieldOperationsSummary.js';
 import { normalizeFieldTaskItems, normalizeStationItemCode, scoreScopeDifference, stationTaskCompatibility } from '../src/fieldTaskScope.js';
 import { dateOnlyText } from '../src/dateOnly.js';
 import { BASELINE_ASSESSMENT_PROTOCOL_ITEMS, baselineAssessmentProtocolSnapshot, protocolSnapshotFromTask } from '../src/assessmentProtocols.js';
+import { decryptPushToken, encryptPushToken, pushTokenHash } from '../src/pushTokens.js';
+
+test('push installation tokens are encrypted, authenticated and provider-scoped', () => {
+  const secret = 'unit-test-push-token-encryption-key-32-bytes';
+  const token = 'device-token-with-sufficient-length-1234567890';
+  const encrypted = encryptPushToken(token, secret);
+  assert.notEqual(encrypted, token);
+  assert.equal(decryptPushToken(encrypted, secret), token);
+  assert.notEqual(pushTokenHash('apns', token), pushTokenHash('fcm', token));
+  assert.throws(() => decryptPushToken(`${encrypted.slice(0, -1)}x`, secret), /无法解密/);
+  assert.throws(() => encryptPushToken(token, 'short'), /加密密钥未配置/);
+});
 
 test('baseline field protocol preserves the fixed seven-action complete-lane order', () => {
   const snapshot = baselineAssessmentProtocolSnapshot(MOVEMENT_ITEM_CODES);

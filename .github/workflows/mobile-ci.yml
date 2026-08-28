@@ -110,6 +110,22 @@ jobs:
           -e ACME_EMAIL=ops@example.edu.cn
           -v "$GITHUB_WORKSPACE/backend/Caddyfile:/etc/caddy/Caddyfile:ro"
           caddy:2.11.4-alpine validate --config /etc/caddy/Caddyfile --adapter caddyfile
+      - name: Validate pilot IP HTTPS gateway configuration
+        run: >-
+          docker run --rm --network none --entrypoint caddy
+          -e PUBLIC_HOST=106.52.164.21
+          -e ACME_EMAIL=ops@example.com
+          -v "$GITHUB_WORKSPACE/backend/Caddyfile.pilot-ip:/etc/caddy/Caddyfile:ro"
+          caddy:2.11.4-alpine validate --config /etc/caddy/Caddyfile --adapter caddyfile
+      - name: Validate pilot IP Compose overlay
+        working-directory: backend
+        run: >-
+          PUBLIC_HOST=106.52.164.21 ACME_EMAIL=ops@example.com
+          POSTGRES_DB=xiangshang_youth POSTGRES_USER=xiangshang POSTGRES_PASSWORD=ci-password
+          METRICS_TOKEN=ci-metrics-token
+          FIELD_DEVICE_SIGNING_ENCRYPTION_KEY=ci-field-device-key
+          PUSH_TOKEN_ENCRYPTION_KEY=ci-push-token-encryption-key-long
+          docker compose -f docker-compose.pilot.yml -f docker-compose.pilot-ip.yml config --quiet
 
   source-integrity:
     name: Source integrity

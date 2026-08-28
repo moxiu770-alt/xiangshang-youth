@@ -1,5 +1,11 @@
 # 真实远程业务验收
 
+## 隔离 fixture 与推送设备
+
+专用验收账号和业务对象必须通过下方 provisioner 写入隔离 school scope，禁止复用真实学校和儿童记录。移动端取得 APNs/FCM token 后，使用当前登录会话调用 `POST /v1/notification-devices`；服务端仅保存 provider-scoped hash 与 AES-256-GCM 密文，列表接口不会返回原 token。退出账号或关闭通知时调用 `DELETE /v1/notification-devices/{installationId}`。
+
+外部通知网关接收 `targets` 后直接调用 APNs/FCM，不得持久化或记录 token，并用 `invalidDeviceIds` 回传已经失效的 installationId。没有 Apple/Firebase 正式凭据时，验收范围必须标记为“站内消息通过、系统推送未验收”。
+
 `backend/scripts/remote-workflow-smoke.js` 不读取 Mock，也不会输出账号、密码或 Token。
 
 首次为试点环境建立隔离验收学校、家长/教师账号、专用学生、任务、报告、课程、活动、专家和两个时段时，使用显式保护的幂等命令。该命令不会写入真实学校；密码不会出现在输出中：

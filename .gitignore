@@ -55,5 +55,6 @@ backend/monitoring/metrics_token
 .env.*
 !.env.example
 !backend/.env.pilot.example
+!backend/.env.pilot-ip.example
 !backend/.env.production.example
 backend/storage/

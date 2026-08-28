@@ -6,18 +6,22 @@
 - Android Debug 编译、单元测试、APK 和 `lintDebug` 通过；本轮当前无连接的 Android 真机/模拟器，不宣称 Compose 真机验收通过。
 - 八段家庭筛查已增加独立足部近景取景、足部专用质量门和八个问题域失败闭合审批。脊柱排列、肩/骨盆、头颈/上肢、躯干旋转、动态膝、步态、坐姿、足弓任一域未完成独立人工验证时，系统只能重采或转专业复核，不对家庭自动发布风险等级。
 - 真实远程 API 仍阻塞：公网源站 `106.52.164.21` 的 Caddy 会将 HTTP 转到 HTTPS，但 `api.risingteen.com` 经腾讯/DNSPod 返回 `webblock`，TLS 握手无法完成。需甲方/云账号完成大陆域名备案与接入核验，或提供合规的非大陆测试入口。当前本机也无该服务器 SSH 凭据，不能代为修改 Caddy/证书。
-- 后端 PostgreSQL 真实集成套件仍缺独立 `TEST_DATABASE_URL`；不使用开发库或生产库代替。远程登录、权限变更、任务并发、课程续播、活动/预约并发、对象存储和推送路由因此尚未完成现网全闭环验收。
+- 后端 PostgreSQL 真实集成套件已在 GitHub Actions 的独立 PostgreSQL 16 服务和独立 `xiangshang_integration` schema 中通过；未使用开发库或生产库。该证据解决了数据库隔离门禁，但不等于广州公网环境的真实业务闭环已通过。
+- 已增加 `Caddyfile.pilot-ip` 与 Compose overlay，允许备案恢复前用公网 IP + 自动续期的短期 TLS 证书完成试点联调；仍需在腾讯云登录后部署并从外网验证 `/readyz`，正式交付入口仍须恢复 `api.risingteen.com`。
+- 已增加隔离的远程验收 fixture provisioner，包含专用家长、教师、孩子、班级、任务、报告、课程、活动、专家时段和可路由消息；该 provisioner 已在独立 CI 数据库验证，但尚未写入广州远程环境。
+- 对象存储现已兼容腾讯 COS 的 S3 SigV4 与虚拟主机寻址；真实 COS bucket、最小权限 CAM 子账号和备份 bucket 仍需在腾讯云账号内创建后注入，不能把占位凭据描述为已接通。
+- 推送前置已增加账号自管的 APNs/FCM device installation 接口、令牌 AES-256-GCM 加密、撤销/失效清理和通知网关 targets 合同；生产 Compose 现会真实传入短信、微信、通知网关与推送密钥配置。真实 APNs Key、Firebase 项目和网关凭据仍属外部账号配置，未配置前仅站内消息可验收。
 
-## 2026-08-27 最新状态（优先于下方历史记录）
+## 2026-08-27 历史状态（仅供追溯）
 
 - iOS 模拟器 XCTest 100/100；UI Test 共 9 项，8 通过、0 失败、1 项因未提供专用远程账号跳过。
 - Android Debug 单测 116/116，`assembleDebug` 和 `lintDebug` 通过；API 34 与 API 35 AVD Compose UI 均为 6/6 通过。这不代表 Android 真机矩阵已通过。
 - 后端 `npm run check`、64/64 单元/契约测试、4/4 独立 PostgreSQL 集成和 OpenAPI lint 通过；PostgreSQL 16 备份/恢复演练验证 39 个 migration 与种子数据。225 项跨端模型不变量、24 个大文件预算和 local preflight 通过。
 - 候选提交 `105f0a5` 的平台 CI run `33064133368` 已全绿：后端 PostgreSQL 集成、生产容器、源码完整性、Windows 场地端、iOS 与 Android 六个作业全部通过；Release 中央服务契约 run `33064133327` 也已通过。Android 托管 API 34 和本地 API 35 均 6/6 通过，但仍需 Android 15 真机门禁。
-- 远程闭环仍缺专用家长/教师账号、测试孩子和写入 fixture；广州源站当前把 HTTP 请求重定向至 DNSPod `webblock`，HTTPS 不能正常响应，需先完成或确认大陆域名备案/云侧接入并恢复网关。模型仍为 `pending-human-validation`。
+- 当日远程闭环仍缺专用家长/教师账号、测试孩子和写入 fixture；这些 fixture 已于 2026-08-28 完成代码化与隔离 CI 验证，但广州环境写入仍等待公网入口恢复。模型继续为 `pending-human-validation`。
 - 详细可审计证据见 [LOCAL_RELEASE_EVIDENCE_2026-08-27.md](LOCAL_RELEASE_EVIDENCE_2026-08-27.md)。
 
-## 2026-08-27 候选基线复核
+## 2026-08-27 候选基线复核（历史记录）
 
 - 大文件已按可独立评审的边界继续拆分：后端权威账号范围抽到 `authClaims.js`、文件上传与访问路由抽到 `routes/files.js`，`server.js` 从 3053 行降到 2907 行；iOS 角色入口、家庭账户、班级圈/课程和家庭消息已拆为独立文件；Android 实时姿态 UI 与分析器已分离为 425/477 行。18 个重点文件都加入行数预算门禁，后续不能重新合并或无界增长。
 - iOS 模拟器 Debug 构建通过；Android Debug 单元测试、`assembleDebug` 与 `lintDebug` 通过；后端 `npm run check`、OpenAPI lint 和 63/63 单元/契约测试通过；前端契约、迁移序列、本地发布预检和大文件边界门禁通过。本轮最终 XCTest 数量以本次任务结尾的测试结果为准。

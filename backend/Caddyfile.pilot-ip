@@ -1,0 +1,34 @@
+{
+	email {$ACME_EMAIL}
+}
+
+# Mainland-domain filing can temporarily block a newly deployed API domain.
+# This pilot-only gateway requests Let's Encrypt's short-lived IP certificate
+# so an explicitly configured public IPv4 address can still be tested over TLS.
+# Keep Caddy's data volume: the certificate is only valid for about six days and
+# therefore depends on uninterrupted automatic renewal.
+{$PUBLIC_HOST} {
+	tls {
+		issuer acme {
+			profile shortlived
+		}
+	}
+
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=604800"
+		Permissions-Policy "camera=(self), microphone=(), geolocation=(), payment=(), usb=()"
+		-Server
+	}
+
+	reverse_proxy api:8080 {
+		health_uri /readyz
+		health_interval 10s
+		transport http {
+			dial_timeout 5s
+			response_header_timeout 30s
+			keepalive 5s
+		}
+	}
+}

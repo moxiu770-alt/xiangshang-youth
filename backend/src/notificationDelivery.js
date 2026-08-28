@@ -1,5 +1,6 @@
 import { pool, query } from './db.js';
 import { config } from './config.js';
+import { decryptPushToken } from './pushTokens.js';
 
 const providerError = (code, message) => Object.assign(new Error(message), { code });
 
@@ -14,6 +15,19 @@ function assertProviderEndpoint() {
 
 async function dispatchToProvider(delivery) {
   const endpoint = assertProviderEndpoint();
+  let targets = [];
+  if (delivery.channel === 'push') {
+    const result = await query(`SELECT id,platform,provider,environment,token_ciphertext AS "tokenCiphertext"
+      FROM device_installations WHERE user_id=$1 AND status='active' ORDER BY last_registered_at DESC`, [delivery.receiverUserId]);
+    targets = result.rows.map((row) => ({
+      installationId: row.id,
+      platform: row.platform,
+      provider: row.provider,
+      environment: row.environment,
+      token: decryptPushToken(row.tokenCiphertext, config.pushTokenEncryptionKey)
+    }));
+    if (!targets.length) throw providerError('PUSH_DEVICE_NOT_REGISTERED', '接收账号没有有效推送设备');
+  }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), config.notificationWebhookTimeoutMs);
   try {
@@ -28,9 +42,18 @@ async function dispatchToProvider(delivery) {
         deliveryId: delivery.deliveryId, campaignId: delivery.campaignId,
         channel: delivery.channel, receiverUserId: delivery.receiverUserId,
         title: delivery.title, content: delivery.content,
-        businessRoute: 'classNotice', businessId: delivery.campaignId
+        businessRoute: 'classNotice', businessId: delivery.campaignId,
+        ...(targets.length ? { targets } : {})
       })
     });
+    const providerResult = await response.json().catch(() => ({}));
+    const invalidDeviceIds = Array.isArray(providerResult?.invalidDeviceIds)
+      ? [...new Set(providerResult.invalidDeviceIds.map(String))].filter((id) => targets.some((target) => target.installationId === id))
+      : [];
+    if (invalidDeviceIds.length) {
+      await query(`UPDATE device_installations SET status='invalid',invalidated_at=now(),updated_at=now()
+        WHERE user_id=$1 AND id=ANY($2::text[])`, [delivery.receiverUserId, invalidDeviceIds]);
+    }
     if (!response.ok) throw providerError('DELIVERY_PROVIDER_REJECTED', `通知服务商返回 HTTP ${response.status}`);
   } catch (error) {
     if (error?.name === 'AbortError') throw providerError('DELIVERY_PROVIDER_TIMEOUT', '通知服务商请求超时');

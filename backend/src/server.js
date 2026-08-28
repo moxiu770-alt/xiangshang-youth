@@ -36,6 +36,7 @@ import { handleCourseRoutes } from './routes/courses.js';
 import { handleNotificationRoutes } from './routes/notifications.js';
 import { handlePrivacyRoutes } from './routes/privacy.js';
 import { handleMessageRoutes } from './routes/messages.js';
+import { handleDeviceInstallationRoutes } from './routes/deviceInstallations.js';
 import { handleSupportRoutes } from './routes/support.js';
 import { handleProductEventRoutes } from './routes/productEvents.js';
 import { handleContentOperationRoutes } from './routes/contentOperations.js';
@@ -2796,6 +2797,8 @@ async function handle(req, res) {
       return okIdempotently(res, user, idempotency, await refreshReport(user, req, parts[2]));
     }
     await handleMessageRoutes({ req, res, user, parts, hasRole, query, fail, ok });
+    if (res.writableEnded) return;
+    await handleDeviceInstallationRoutes({ req, res, user, parts, query, body, fail, ok, created, audit });
     if (res.writableEnded) return;
     return fail(res, 404, 'NOT_FOUND', '接口不存在');
   } catch (error) {

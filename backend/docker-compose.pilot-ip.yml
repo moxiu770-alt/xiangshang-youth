@@ -1,0 +1,9 @@
+# Overlay for a temporary HTTPS pilot endpoint addressed by public IP.
+# Usage:
+#   docker compose -f docker-compose.pilot.yml -f docker-compose.pilot-ip.yml up -d
+services:
+  gateway:
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL}
+    volumes:
+      - ./Caddyfile.pilot-ip:/etc/caddy/Caddyfile:ro

@@ -470,6 +470,9 @@ test('class notification drafts expose remote lifecycle and scoped delivery', ()
   assert.match(notificationRoutes, /notification\.deliver/, 'notification delivery must use the durable job outbox');
   assert.match(notificationDelivery, /idempotency-key/, 'provider delivery must be idempotent');
   assert.match(notificationDelivery, /channel !== 'in_app'/, 'in-app delivery must not depend on an external provider');
+  assert.match(notificationDelivery, /FROM device_installations WHERE user_id=\$1 AND status='active'/, 'push delivery must resolve encrypted devices from the authenticated installation registry');
+  assert.match(notificationDelivery, /decryptPushToken/, 'push tokens must be decrypted only inside the trusted delivery boundary');
+  assert.match(notificationDelivery, /invalidDeviceIds/, 'provider-invalid tokens must be retired instead of retried forever');
   assert.match(notificationDelivery, /WHERE NOT EXISTS/, 'worker retries must not duplicate inbox messages');
   assert.doesNotMatch(notificationRoutes, /channel !== 'in_app'\) return fail\(res, 503/, 'configured external channels must not be rejected unconditionally');
 });

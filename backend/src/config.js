@@ -24,6 +24,7 @@ export const config = {
   notificationWebhookUrl: process.env.NOTIFICATION_WEBHOOK_URL || '',
   notificationWebhookAuthorization: process.env.NOTIFICATION_WEBHOOK_AUTHORIZATION || '',
   notificationWebhookTimeoutMs: Math.min(30_000, Math.max(1_000, Number(process.env.NOTIFICATION_WEBHOOK_TIMEOUT_MS || 10_000) || 10_000)),
+  pushTokenEncryptionKey: process.env.PUSH_TOKEN_ENCRYPTION_KEY || (isProduction ? '' : 'local-development-push-token-encryption-key'),
   wechatAppId: process.env.WECHAT_APP_ID || '',
   wechatAppSecret: process.env.WECHAT_APP_SECRET || '',
   wechatRedirectUri: process.env.WECHAT_REDIRECT_URI || '',
@@ -87,6 +88,7 @@ export const serverRuntimeConfigErrors = () => {
   if (config.mfaEncryptionKey.length < 32) errors.push('至少 32 位 MFA_ENCRYPTION_KEY');
   if (config.verificationCodePepper.length < 32) errors.push('至少 32 位 VERIFICATION_CODE_PEPPER');
   if (config.auditLogSigningKey.length < 32) errors.push('至少 32 位 AUDIT_LOG_SIGNING_KEY');
+  if (config.pushTokenEncryptionKey.length < 32) errors.push('至少 32 位 PUSH_TOKEN_ENCRYPTION_KEY');
   if (!config.fieldDeviceSignedRequestsRequired) errors.push('FIELD_DEVICE_SIGNED_REQUESTS_REQUIRED=true');
   if (config.fieldDeviceSigningEncryptionKey.length < 32) errors.push('至少 32 位 FIELD_DEVICE_SIGNING_ENCRYPTION_KEY');
   const wechatConfig = [config.wechatAppId, config.wechatAppSecret, config.wechatRedirectUri];

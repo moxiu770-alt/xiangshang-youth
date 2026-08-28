@@ -729,6 +729,27 @@ CREATE INDEX IF NOT EXISTS idx_scores_student_task ON assessment_scores(student_
 CREATE INDEX IF NOT EXISTS idx_reports_student_status ON diagnosis_reports(student_id, status);
 CREATE INDEX IF NOT EXISTS idx_reports_student_published_time ON diagnosis_reports(student_id, generated_at DESC) WHERE status='published';
 CREATE INDEX IF NOT EXISTS idx_messages_receiver_read ON messages(receiver_user_id, is_read, created_at DESC);
+CREATE TABLE IF NOT EXISTS device_installations (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  platform TEXT NOT NULL CHECK (platform IN ('ios', 'android')),
+  provider TEXT NOT NULL CHECK (provider IN ('apns', 'fcm')),
+  environment TEXT NOT NULL CHECK (environment IN ('sandbox', 'production')),
+  device_instance_hash TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  token_ciphertext TEXT NOT NULL,
+  token_last_four TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'invalid', 'revoked')),
+  app_version TEXT,
+  locale TEXT,
+  last_registered_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  invalidated_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK ((platform='ios' AND provider='apns') OR (platform='android' AND provider='fcm'))
+);
+CREATE INDEX IF NOT EXISTS idx_device_installations_user_active ON device_installations(user_id, last_registered_at DESC) WHERE status='active';
+CREATE INDEX IF NOT EXISTS idx_device_installations_device_active ON device_installations(user_id, platform, device_instance_hash) WHERE status='active';
 CREATE INDEX IF NOT EXISTS idx_audit_school_time ON audit_logs(school_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_resource_time ON audit_logs(resource_type, resource_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_files_owner_status ON files(owner_id, status, created_at DESC);

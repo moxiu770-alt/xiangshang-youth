@@ -2280,6 +2280,57 @@ paths:
         - { in: path, name: messageId, required: true, schema: { type: string } }
         - { $ref: '#/components/parameters/IdempotencyKey' }
       responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/notification-devices:
+    get:
+      summary: 查询当前账号的有效推送设备
+      operationId: listNotificationDevices
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: 有效设备列表；永不返回原始推送令牌
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/Envelope' }
+                  - type: object
+                    properties:
+                      data: { type: array, items: { $ref: '#/components/schemas/DeviceInstallation' } }
+        '401': { $ref: '#/components/responses/AuthError' }
+    post:
+      summary: 注册或更新当前账号的 APNs/FCM 设备
+      operationId: registerNotificationDevice
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeviceInstallationRequest' }
+      responses:
+        '201':
+          description: 设备已注册
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/Envelope' }
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/DeviceInstallation' }
+        '400': { $ref: '#/components/responses/Conflict' }
+  /v1/notification-devices/{installationId}:
+    delete:
+      summary: 撤销当前账号的一台推送设备
+      operationId: revokeNotificationDevice
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: installationId, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /v1/admin/test-stations:
     get:
       operationId: getAdminTestStations
@@ -2842,6 +2893,31 @@ components:
             authorizedClassIds: { type: array, items: { type: string } }
             capabilities: { type: array, items: { type: string } }
             mobileEntryAllowed: { type: boolean }
+    DeviceInstallationRequest:
+      type: object
+      required: [platform, provider, environment, deviceInstanceId, pushToken]
+      properties:
+        platform: { type: string, enum: [ios, android] }
+        provider: { type: string, enum: [apns, fcm] }
+        environment: { type: string, enum: [sandbox, production] }
+        deviceInstanceId: { type: string, minLength: 12, maxLength: 256, description: App 安装实例随机标识；服务端仅保存哈希 }
+        pushToken: { type: string, minLength: 20, maxLength: 4096, writeOnly: true }
+        appVersion: { type: string, maxLength: 64 }
+        locale: { type: string, maxLength: 32 }
+    DeviceInstallation:
+      type: object
+      required: [installationId, platform, provider, environment, status, tokenLastFour, lastRegisteredAt, createdAt]
+      properties:
+        installationId: { type: string }
+        platform: { type: string, enum: [ios, android] }
+        provider: { type: string, enum: [apns, fcm] }
+        environment: { type: string, enum: [sandbox, production] }
+        status: { type: string, enum: [active, invalid, revoked] }
+        appVersion: { type: [string, 'null'] }
+        locale: { type: [string, 'null'] }
+        tokenLastFour: { type: string, minLength: 4, maxLength: 4, description: 仅用于用户识别设备；不是可投递令牌 }
+        lastRegisteredAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
     AssessmentStandardCreateRequest:
       type: object
       required: [standardVersion, effectiveDate]

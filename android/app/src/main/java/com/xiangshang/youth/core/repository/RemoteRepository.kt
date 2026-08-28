@@ -175,6 +175,15 @@ class RemoteRepository(
         val key = "body-assessment-$studentId-${record.measuredAt}-${record.postureReport?.algorithm ?: BodyAssessmentRecord.ruleVersion}".sha256()
         val response = studentApi.submitBodyAssessment(studentId, BodyAssessmentRequest(record.heightCm, record.weightKg, record.postureReport?.overallLevel?.name?.lowercase() ?: "pending", record.postureReport?.algorithm ?: BodyAssessmentRecord.ruleVersion, consentVersion, record, snapshots), key).data
             ?: throw ApiError.InvalidResponse
+        return canonicalBodyAssessmentReport(response, record)
+    }
+
+    override suspend fun loadLatestBodyAssessment(studentId: String, record: BodyAssessmentRecord): PostureAssessmentReport? {
+        val response = studentApi.latestBodyAssessment(studentId).requireData()
+        return canonicalBodyAssessmentReport(response, record)
+    }
+
+    private fun canonicalBodyAssessmentReport(response: com.xiangshang.youth.core.service.RemoteBodyAssessmentResult, record: BodyAssessmentRecord): PostureAssessmentReport? {
         if (response.bmiAlgorithmVersion != BodyAssessmentRecord.bmiAlgorithmVersion) {
             throw ApiError.ModelContract("服务端返回了未支持的 BMI 算法版本：${response.bmiAlgorithmVersion ?: "missing"}")
         }
@@ -195,8 +204,48 @@ class RemoteRepository(
             throw ApiError.ModelContract("服务端返回了未支持的姿态规则版本：${summary.rulesSourceVersion}")
         }
         val local = record.postureReport ?: return null
-        val level = runCatching { BodyAttentionLevel.valueOf(summary.overallLevel.replaceFirstChar { it.uppercase() }) }.getOrDefault(local.overallLevel)
-        return local.copy(algorithm = summary.algorithm, overallLevel = level, reasons = summary.reasons, disclaimer = summary.disclaimer, riskScore = summary.riskScore, qualityScore = summary.qualityScore, calibrationVersion = summary.calibrationVersion, rulesSourceVersion = summary.rulesSourceVersion)
+        val validationStatus = if (summary.validationStatus == "human-validated") {
+            com.xiangshang.youth.core.model.AlgorithmValidationStatus.HumanValidated
+        } else {
+            com.xiangshang.youth.core.model.AlgorithmValidationStatus.PendingHumanValidation
+        }
+        val candidateLevel = runCatching { BodyAttentionLevel.valueOf(summary.overallLevel.replaceFirstChar { it.uppercase() }) }.getOrDefault(local.overallLevel)
+        val screeningDecision = response.screeningDecision?.let { decision ->
+            val route = com.xiangshang.youth.core.model.BodyScreeningRoute.entries.firstOrNull { it.apiValue == decision.route }
+                ?: throw ApiError.ModelContract("服务端返回了未支持的身体筛查分流：${decision.route}")
+            val reviewDecision = decision.reviewDecision?.let { value ->
+                com.xiangshang.youth.core.model.BodyScreeningReviewDecision.entries.firstOrNull { it.apiValue == value }
+                    ?: throw ApiError.ModelContract("服务端返回了未支持的身体筛查复核结论：$value")
+            }
+            val outcomeLevel = decision.outcomeLevel?.let { value ->
+                com.xiangshang.youth.core.model.BodyScreeningOutcomeLevel.entries.firstOrNull { it.apiValue == value }
+                    ?: throw ApiError.ModelContract("服务端返回了未支持的身体筛查结论：$value")
+            }
+            com.xiangshang.youth.core.model.BodyScreeningDecision(decision.sessionId, decision.decisionId, route, decision.reasonCodes, decision.qualityScore, decision.reviewRequired, decision.decisionPolicyVersion, decision.version, decision.decidedAt, decision.reviewStatus, reviewDecision, decision.reviewComment, decision.requestedRecaptureTasks, decision.reviewVersion, decision.reviewedAt, outcomeLevel)
+        }
+        return local.copy(
+            algorithm = summary.algorithm,
+            overallLevel = if (validationStatus.allowsClassification) candidateLevel else BodyAttentionLevel.Pending,
+            reasons = if (validationStatus.allowsClassification) summary.reasons else listOf(com.xiangshang.youth.core.model.AlgorithmReleaseGate.pendingPostureNotice) + summary.reasons.filterNot { it == com.xiangshang.youth.core.model.AlgorithmReleaseGate.pendingPostureNotice },
+            disclaimer = summary.disclaimer,
+            riskScore = if (validationStatus.allowsClassification) summary.riskScore else 0,
+            qualityScore = summary.qualityScore,
+            calibrationVersion = summary.calibrationVersion,
+            rulesSourceVersion = summary.rulesSourceVersion,
+            validationStatus = validationStatus,
+            screeningDecision = screeningDecision
+        )
+    }
+    override suspend fun loadBodyScreeningReviews(schoolId: String, limit: Int): List<BodyScreeningReviewItem> =
+        studentApi.bodyScreeningReviews(schoolId, limit.coerceIn(1, 100)).requireData()
+
+    override suspend fun decideBodyScreeningReview(reviewId: String, decision: BodyScreeningReviewDecision, expectedVersion: Int, comment: String?, requestedRecaptureTasks: List<BodyCaptureTask>): BodyScreeningReviewAck {
+        val key = "body-screening-review-$reviewId-$expectedVersion-${decision.apiValue}".sha256()
+        return studentApi.decideBodyScreeningReview(
+            reviewId,
+            com.xiangshang.youth.core.service.BodyScreeningReviewDecisionRequest(decision.apiValue, expectedVersion, comment, requestedRecaptureTasks.map { it.apiCode }),
+            key
+        ).requireData()
     }
     override suspend fun submitActivity(value: com.xiangshang.youth.core.service.ActivityRegistration): com.xiangshang.youth.core.service.ActivityRegistrationAck =
         workflowApi.registerActivity(value.activityId, ActivityRegistrationRequest(value.contactName, value.phone, value.childId), "activity-register-${value.id.sha256()}").data ?: throw ApiError.InvalidResponse

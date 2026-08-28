@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "向上少年儿童身体筛查金标准样本",
+  "type": "object",
+  "required": ["schemaVersion", "studyId", "subjectCode", "consentRecordId", "ageMonths", "sexAtMeasurement", "heightCm", "weightKg", "taskCode", "sourceReference", "artifactSha256", "capture", "expertLabels", "professionalAction", "instrumentMeasurements"],
+  "properties": {
+    "schemaVersion": { "const": "UY-BODY-GOLD-STANDARD-1.0" },
+    "studyId": { "type": "string", "minLength": 1 },
+    "subjectCode": { "type": "string", "pattern": "^[A-Z0-9_-]{6,64}$" },
+    "consentRecordId": { "type": "string", "minLength": 1 },
+    "ageMonths": { "type": "integer", "minimum": 72, "maximum": 216 },
+    "sexAtMeasurement": { "enum": ["female", "male"] },
+    "heightCm": { "type": "number", "minimum": 90, "maximum": 220 },
+    "weightKg": { "type": "number", "minimum": 15, "maximum": 180 },
+    "taskCode": { "enum": ["standingFront", "standingBack", "standingSide", "forwardBend", "dynamicKneeControl", "gaitVideo", "seatedPosture", "footArch"] },
+    "sourceReference": { "type": "string", "minLength": 1 },
+    "artifactSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "capture": {
+      "type": "object",
+      "required": ["protocolVersion", "deviceModel", "osVersion", "cameraFacing", "measurementMode", "deviceCapabilityTier", "distanceMeters", "lightingLuxBucket", "operatorRole", "capturedAt"],
+      "properties": {
+        "protocolVersion": { "const": "UY-HOME-WHOLE-BODY-8-V1-2026-08-28" },
+        "deviceModel": { "type": "string", "minLength": 1 },
+        "osVersion": { "type": "string", "minLength": 1 },
+        "cameraFacing": { "const": "rear-1x" },
+        "measurementMode": { "enum": ["rgb-pose-2d", "depth-assisted-3d"] },
+        "deviceCapabilityTier": { "enum": ["standard-2d", "enhanced-depth"] },
+        "depthAvailable": { "type": "boolean" },
+        "distanceMeters": { "type": "number", "minimum": 0.8, "maximum": 4 },
+        "lightingLuxBucket": { "enum": ["low", "normal", "bright"] },
+        "operatorRole": { "enum": ["guardian", "physical_education_teacher", "posture_assessor", "expert_team"] },
+        "capturedAt": { "type": "string", "format": "date-time" },
+        "repeatIndex": { "type": "integer", "minimum": 1, "maximum": 10 }
+      },
+      "additionalProperties": false
+    },
+    "expertLabels": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["problemCode", "severity", "side", "annotatorProtocolVersion", "expertConfidence"],
+        "properties": {
+          "problemCode": { "enum": ["trunk_rotation_scoliosis_risk", "shoulder_asymmetry", "pelvic_obliquity", "forward_head", "rounded_shoulders_kyphosis", "knee_valgus_varus", "foot_arch_gait", "bmi_growth"] },
+          "severity": { "enum": ["none", "mild", "moderate", "severe"] },
+          "side": { "enum": ["none", "left", "right", "bilateral", "uncertain"] },
+          "region": { "type": "string", "maxLength": 80 },
+          "annotatorProtocolVersion": { "type": "string", "minLength": 1 },
+          "expertConfidence": { "type": "number", "minimum": 0, "maximum": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "professionalAction": { "enum": ["no_obvious_abnormality", "training_observation", "school_retest", "professional_evaluation"] },
+    "instrumentMeasurements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["measurementCode", "value", "unit", "method", "deviceModel", "operatorCode", "measuredAt", "repeatIndex"],
+        "properties": {
+          "measurementCode": { "enum": ["atr_thoracic", "atr_lumbar", "shoulder_height_difference", "pelvic_obliquity", "craniovertebral_angle", "thoracic_kyphosis", "left_knee_frontal_angle", "right_knee_frontal_angle", "arch_height_index_left", "arch_height_index_right", "navicular_drop_left", "navicular_drop_right", "gait_asymmetry", "cobb_angle_clinically_available"] },
+          "value": { "type": "number" },
+          "unit": { "enum": ["degree", "millimeter", "ratio", "percent"] },
+          "method": { "enum": ["scoliometer", "digital_inclinometer", "standardized_photogrammetry", "three_dimensional_motion_capture", "plantar_or_arch_measurement", "clinical_radiograph_existing_record"] },
+          "deviceModel": { "type": "string", "minLength": 1 },
+          "operatorCode": { "type": "string", "minLength": 1 },
+          "measuredAt": { "type": "string", "format": "date-time" },
+          "repeatIndex": { "type": "integer", "minimum": 1, "maximum": 10 }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

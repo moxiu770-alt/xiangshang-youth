@@ -4,7 +4,7 @@ enum class AssessmentRiskLevel(val label: String) { Low("正常关注"), Attenti
 
 /** Central scoring policy for the seven school movement items. */
 object AssessmentScoreRules {
-    const val modelRegistryVersion = "UY-MODELS-1.0"
+    const val modelRegistryVersion = "UY-MODELS-1.1"
     const val algorithmVersion = "UY-IMCA-SCORE-1.3"
     const val calibrationVersion = "UY-CAL-BASELINE-1.0"
     const val itemCount = 7

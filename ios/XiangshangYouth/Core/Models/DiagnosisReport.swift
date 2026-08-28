@@ -17,7 +17,7 @@ enum AssessmentRiskLevel: String, Codable {
 /// from the field device are still authoritative, but the app clamps and
 /// explains malformed or incomplete data consistently on both platforms.
 enum AssessmentScoreRules {
-    static let modelRegistryVersion = "UY-MODELS-1.0"
+    static let modelRegistryVersion = "UY-MODELS-1.1"
     static let algorithmVersion = "UY-IMCA-SCORE-1.3"
     static let calibrationVersion = "UY-CAL-BASELINE-1.0"
     static let itemCount = TestItem.allCases.count

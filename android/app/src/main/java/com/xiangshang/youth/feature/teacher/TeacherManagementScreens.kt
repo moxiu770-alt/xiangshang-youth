@@ -430,11 +430,23 @@ fun TeacherTaskDetailScreen(state: AppUiState, nav: NavHostController, taskId: S
 }
 
 @Composable
-fun ReviewListScreen(state: AppUiState, nav: NavHostController, submitDecision: (String, com.xiangshang.youth.core.model.TaskStatus, String) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit, submitStatus: (String, com.xiangshang.youth.core.model.TaskStatus, String?, String?) -> Unit = { studentId, status, note, _ -> submitDecision(studentId, status, note.orEmpty()) }) = AppScaffold("预警中心", onBack = { nav.popBackStack() }) {
+fun ReviewListScreen(state: AppUiState, nav: NavHostController, submitDecision: (String, com.xiangshang.youth.core.model.TaskStatus, String) -> Unit, saveDraft: (String, String) -> Unit, clearDraft: (String) -> Unit, loadBodyReviews: () -> Unit = {}, submitBodyReview: (com.xiangshang.youth.core.model.BodyScreeningReviewItem, com.xiangshang.youth.core.model.BodyScreeningReviewDecision, String, Set<com.xiangshang.youth.core.model.BodyCaptureTask>) -> Unit = { _, _, _, _ -> }, submitStatus: (String, com.xiangshang.youth.core.model.TaskStatus, String?, String?) -> Unit = { studentId, status, note, _ -> submitDecision(studentId, status, note.orEmpty()) }) = AppScaffold("预警中心", onBack = { nav.popBackStack() }) {
     var selectedStudent by remember { mutableStateOf<com.xiangshang.youth.core.model.Student?>(null) }
+    var selectedBodyReview by remember { mutableStateOf<com.xiangshang.youth.core.model.BodyScreeningReviewItem?>(null) }
+    var reviewMode by rememberSaveable { mutableIntStateOf(0) }
     val dashboardError = state.error
     if (dashboardError != null && state.data == null) { ErrorState(dashboardError, retry = LocalDashboardRetry.current, dismiss = LocalDashboardClearError.current); return@AppScaffold }
     if (state.loading || state.data == null) { LoadingState(); return@AppScaffold }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FilterChip(selected = reviewMode == 0, onClick = { reviewMode = 0 }, label = { Text("学校体测") }, modifier = Modifier.weight(1f))
+        FilterChip(selected = reviewMode == 1, onClick = { reviewMode = 1 }, label = { Text("家庭身体观察") }, modifier = Modifier.weight(1f))
+    }
+    LaunchedEffect(reviewMode) { if (reviewMode == 1) loadBodyReviews() }
+    if (reviewMode == 1) {
+        BodyScreeningReviewQueue(state, onOpen = { selectedBodyReview = it }, retry = loadBodyReviews)
+        selectedBodyReview?.let { item -> BodyScreeningReviewDialog(item, state.workflowStates["body-screening-review:${item.reviewId}"] ?: WorkflowCommandState(), submitBodyReview) { selectedBodyReview = null } }
+        return@AppScaffold
+    }
     val data = state.data
     val reviewTaskId = data.tasks.firstOrNull()?.id
     val managedClassIds = state.managedTeacherClasses.map { it.id }.toSet()
@@ -466,6 +478,112 @@ fun ReviewListScreen(state: AppUiState, nav: NavHostController, submitDecision: 
             dismiss = { selectedStudent = null }
         )
     }
+}
+
+@Composable
+private fun BodyScreeningReviewQueue(state: AppUiState, onOpen: (com.xiangshang.youth.core.model.BodyScreeningReviewItem) -> Unit, retry: () -> Unit) {
+    when {
+        !state.teacherHasCapability("REVIEW_RESULT") -> ErrorState("当前账号没有身体观察复核权限。")
+        state.bodyScreeningReviewsLoading && state.bodyScreeningReviews.isEmpty() -> LoadingState()
+        state.bodyScreeningReviewsError != null && state.bodyScreeningReviews.isEmpty() -> ErrorState(state.bodyScreeningReviewsError, retry = retry)
+        state.bodyScreeningReviews.isEmpty() -> EmptyState("暂无身体观察待复核记录。算法不确定、质量边界或风险候选记录将在这里显示。")
+        else -> {
+            Text("待处理 ${state.bodyScreeningReviews.size} 条 · 仅展示结构化证据，不包含原始照片或视频", color = Color.Gray, fontSize = 13.sp, modifier = Modifier.padding(vertical = 9.dp))
+            state.bodyScreeningReviews.forEach { item ->
+                Surface(
+                    modifier = Modifier.fillMaxWidth().semantics { role = Role.Button; contentDescription = "${item.studentDisplayName}身体观察待复核，质量分${item.qualityScore ?: "未知"}" }.clickable { onOpen(item) },
+                    color = Color.White,
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(item.studentDisplayName, color = Navy, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                            Text("质量 ${item.qualityScore ?: "--"}", color = if ((item.qualityScore ?: 0) >= 70) Green else Color(0xFFFF8A24), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray)
+                        }
+                        Text("${item.attempts.size} 项结构化证据 · ${item.reasonCodes.joinToString("、") { bodyReviewReason(it) }}", color = Color.Gray, fontSize = 13.sp)
+                        Text("${item.protocolVersion ?: "协议版本待同步"} · v${item.version}", color = Color.Gray, fontSize = 12.sp)
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun BodyScreeningReviewDialog(
+    item: com.xiangshang.youth.core.model.BodyScreeningReviewItem,
+    command: WorkflowCommandState,
+    submit: (com.xiangshang.youth.core.model.BodyScreeningReviewItem, com.xiangshang.youth.core.model.BodyScreeningReviewDecision, String, Set<com.xiangshang.youth.core.model.BodyCaptureTask>) -> Unit,
+    dismiss: () -> Unit
+) {
+    var decision by rememberSaveable(item.reviewId) { mutableStateOf(com.xiangshang.youth.core.model.BodyScreeningReviewDecision.ContinueObservation) }
+    var comment by rememberSaveable(item.reviewId) { mutableStateOf("") }
+    // BodyCaptureTask is not Bundle-saveable. Keeping the selection scoped to
+    // the currently visible dialog avoids a process-restoration crash while
+    // the durable review itself remains server-owned.
+    var tasks by remember(item.reviewId) { mutableStateOf(setOf<com.xiangshang.youth.core.model.BodyCaptureTask>()) }
+    LaunchedEffect(command.status) { if (command.status == WorkflowCommandStatus.Succeeded) dismiss() }
+    AlertDialog(
+        onDismissRequest = { if (!command.isSubmitting) dismiss() },
+        title = { Text("身体观察复核") },
+        text = {
+            Column(Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("${item.studentDisplayName} · 总质量 ${item.qualityScore ?: "未提供"}", color = Navy, fontWeight = FontWeight.Bold)
+                item.attempts.forEach { attempt ->
+                    Surface(color = Canvas, shape = RoundedCornerShape(12.dp)) {
+                        Column(Modifier.padding(11.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(bodyCaptureTitle(attempt.captureTask), color = Navy, fontWeight = FontWeight.Bold)
+                            Text("置信度 ${(attempt.confidence * 100).toInt()}% · ${attempt.sampleCount} 个有效样本 · ${attempt.attemptCount} 次采集", color = Color.Gray, fontSize = 13.sp)
+                            attempt.qualityScore?.let { LinearProgressIndicator(progress = { it / 100f }, modifier = Modifier.fillMaxWidth(), color = if (it >= 70) Green else Color(0xFFFF8A24)) }
+                            attempt.evidenceMetrics.forEach { metric ->
+                                Column(
+                                    Modifier.fillMaxWidth().semantics(mergeDescendants = true) { contentDescription = "${metric.label}，${metric.displayedValue}，来源${metric.sourceTitle}" },
+                                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text(metric.label, color = Navy, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                                        Text(metric.displayedValue, color = Navy, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                    }
+                                    Text(metric.sourceTitle, color = Color.Gray, fontSize = 12.sp)
+                                }
+                            }
+                            if (attempt.evidenceMetrics.isEmpty()) Text("本动作暂无可展示的白名单指标，仅可依据采集质量决定是否重采。", color = Color.Gray, fontSize = 12.sp)
+                        }
+                    }
+                }
+                Text("“相对投影值”和“摄像头估计”不是物理厘米、ATR 或 Cobb 角。不提供原始照片或视频；复核结论仅用于健康管理与后续行动，不构成医疗诊断。", color = Color.Gray, fontSize = 12.sp)
+                Text("处理方式", color = Navy, fontWeight = FontWeight.Bold)
+                com.xiangshang.youth.core.model.BodyScreeningReviewDecision.entries.forEach { option ->
+                    FilterChip(selected = decision == option, onClick = { decision = option }, label = { Text(option.label) }, modifier = Modifier.fillMaxWidth())
+                }
+                OutlinedTextField(value = comment, onValueChange = { comment = it }, label = { Text("复核依据和后续处理说明") }, minLines = 3, modifier = Modifier.fillMaxWidth())
+                if (decision == com.xiangshang.youth.core.model.BodyScreeningReviewDecision.Recapture) {
+                    Text("选择需要重新采集的动作", color = Navy, fontWeight = FontWeight.Bold)
+                    com.xiangshang.youth.core.model.BodyCaptureTask.entries.forEach { task ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = task in tasks, onCheckedChange = { checked -> tasks = if (checked) tasks + task else tasks - task })
+                            Text(task.title, color = Navy)
+                        }
+                    }
+                }
+                if (command.status == WorkflowCommandStatus.Failed) Text(command.message ?: "提交失败，请重试", color = Color.Red, fontSize = 13.sp)
+            }
+        },
+        confirmButton = { TextButton(onClick = { submit(item, decision, comment, tasks) }, enabled = !command.isSubmitting) { if (command.isSubmitting) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Text("确认提交") } },
+        dismissButton = { TextButton(onClick = dismiss, enabled = !command.isSubmitting) { Text("取消") } }
+    )
+}
+
+private fun bodyCaptureTitle(code: String): String = com.xiangshang.youth.core.model.BodyCaptureTask.entries.firstOrNull { it.apiCode == code }?.title ?: code
+private fun bodyReviewReason(code: String): String = when (code) {
+    "MODEL_PENDING_HUMAN_VALIDATION" -> "模型待人工验证"
+    "RISK_CANDIDATE" -> "存在关注指标"
+    "HIGH_UNCERTAINTY" -> "算法不确定性较高"
+    "LOW_CONFIDENCE" -> "关键点置信度不足"
+    "REPEATABILITY_FAILED" -> "两次采集一致性不足"
+    else -> code.replace('_', ' ')
 }
 
 @Composable

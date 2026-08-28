@@ -212,6 +212,20 @@ final class FollowAlongPoseAnalyzer {
                     self.publish(FollowAlongPoseFeedback(visible: false, active: false, message: message, confidence: confidence, repCount: self.reps, qualityScore: 0, captureState: confidence > 0.1 ? .occluded : .outOfFrame))
                     return
                 }
+                let framing = self.framingSpans(points)
+                guard BodyCaptureQualityGate.hasComfortableFollowAlongFraming(bodySpan: framing.body, torsoSpan: framing.torso) else {
+                    self.resetSignal()
+                    self.publish(FollowAlongPoseFeedback(
+                        visible: false,
+                        active: false,
+                        message: "人物离镜头太近，请后退两步，保持头顶、双手和双脚都留有空间",
+                        confidence: confidence,
+                        repCount: self.reps,
+                        qualityScore: 0,
+                        captureState: .outOfFrame
+                    ), force: true)
+                    return
+                }
                 self.lowConfidenceStreak = 0
                 self.confidenceHistory.append(confidence)
                 if self.confidenceHistory.count > self.profile.confidenceWindowFrames { self.confidenceHistory.removeFirst(self.confidenceHistory.count - self.profile.confidenceWindowFrames) }
@@ -281,7 +295,7 @@ final class FollowAlongPoseAnalyzer {
                     }
                     self.reps += 1
                     self.lastRepAt = now
-                    self.publish(FollowAlongPoseFeedback(visible: true, active: true, message: "动作完成 \(self.reps) 次 · 连击 \(self.comboCount)", confidence: confidence, repCount: self.reps, qualityScore: quality, activeSeconds: self.activeSeconds(at: now), stage: .returnPhase, captureState: .ready, side: self.dominantSide(points), rangePercent: Int(min(max(amplitude / max(dynamicRange, 0.001), 0), 1) * 100), tempoScore: self.lastTempoScore, comboCount: self.comboCount), force: true)
+                    self.publish(FollowAlongPoseFeedback(visible: true, active: true, message: "辅助计数 \(self.reps) 次 · 连击 \(self.comboCount)（待人工验证）", confidence: confidence, repCount: self.reps, qualityScore: quality, activeSeconds: self.activeSeconds(at: now), stage: .returnPhase, captureState: .ready, side: self.dominantSide(points), rangePercent: Int(min(max(amplitude / max(dynamicRange, 0.001), 0), 1) * 100), tempoScore: self.lastTempoScore, comboCount: self.comboCount), force: true)
                 }
                 let text = self.correctionHint(points) ?? (active ? "动作进行中，保持动作到底再回位" : "请按示范幅度完成标准动作")
                 self.publish(FollowAlongPoseFeedback(visible: true, active: active, message: text, confidence: confidence, repCount: self.reps, qualityScore: quality, activeSeconds: self.activeSeconds(at: now), stage: self.stateReady ? (active ? .exertion : .setup) : .returnPhase, captureState: .ready, side: self.dominantSide(points), rangePercent: Int(min(max(amplitude / max(dynamicRange, 0.001), 0), 1) * 100), tempoScore: self.lastTempoScore, comboCount: self.comboCount))
@@ -314,6 +328,30 @@ final class FollowAlongPoseAnalyzer {
         default: break
         }
         return nil
+    }
+
+    /// Estimate camera distance without using face size. Torso span catches an
+    /// upper-body close-up, while nose-to-ankle span also works for horizontal
+    /// exercises such as planks and sit-ups.
+    private func framingSpans(_ points: [VNHumanBodyPoseObservation.JointName: VNRecognizedPoint]) -> (body: Double?, torso: Double?) {
+        func reliable(_ name: VNHumanBodyPoseObservation.JointName) -> CGPoint? {
+            guard let point = points[name], point.confidence >= profile.minLandmarkConfidence * 0.75 else { return nil }
+            return point.location
+        }
+        let shoulders = [reliable(.leftShoulder), reliable(.rightShoulder)].compactMap { $0 }
+        let hips = [reliable(.leftHip), reliable(.rightHip)].compactMap { $0 }
+        let torso: Double? = shoulders.isEmpty || hips.isEmpty ? nil : {
+            let shoulder = CGPoint(x: shoulders.map(\.x).reduce(0, +) / CGFloat(shoulders.count), y: shoulders.map(\.y).reduce(0, +) / CGFloat(shoulders.count))
+            let hip = CGPoint(x: hips.map(\.x).reduce(0, +) / CGFloat(hips.count), y: hips.map(\.y).reduce(0, +) / CGFloat(hips.count))
+            return hypot(Double(shoulder.x - hip.x), Double(shoulder.y - hip.y))
+        }()
+        let ankles = [reliable(.leftAnkle), reliable(.rightAnkle)].compactMap { $0 }
+        let body: Double? = reliable(.nose).flatMap { nose in
+            guard !ankles.isEmpty else { return nil }
+            let ankle = CGPoint(x: ankles.map(\.x).reduce(0, +) / CGFloat(ankles.count), y: ankles.map(\.y).reduce(0, +) / CGFloat(ankles.count))
+            return hypot(Double(nose.x - ankle.x), Double(nose.y - ankle.y))
+        }
+        return (body, torso)
     }
 
     private func resetSignal() {

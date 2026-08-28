@@ -51,19 +51,13 @@ import com.xiangshang.youth.core.model.BodyCaptureQualityGate
 import com.xiangshang.youth.core.model.BodyCaptureTask
 import com.xiangshang.youth.core.model.PostureMetricCalculator
 import com.xiangshang.youth.core.model.PostureMetricSnapshot
+import com.xiangshang.youth.core.model.SpineScreeningStandard
 import java.util.ArrayDeque
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
-
-data class CaptureAnalysis(
-    val accepted: Boolean,
-    val message: String,
-    val observationHint: String? = null,
-    val postureSnapshot: PostureMetricSnapshot? = null
-)
 
 /** Full-screen camera guidance. Frames stay in memory and are never recorded. */
 @Composable
@@ -141,6 +135,8 @@ private fun LiveCaptureContent(
     var speakerEnabled by remember(task, voiceGuidanceEnabled) { mutableStateOf(voiceGuidanceEnabled) }
     var captureProgress by remember { mutableFloatStateOf(0f) }
     var captureArmed by remember { mutableStateOf(false) }
+    var bodyAlignment by remember { mutableStateOf(CaptureBodyAlignment()) }
+    val deviceAlignment by rememberCaptureDeviceAlignment()
     // The analyzer runs on a worker thread, so it reads this atomic mirror
     // instead of reading Compose snapshot state off main thread.
     val captureArmedRef = remember { AtomicBoolean(false) }
@@ -149,6 +145,14 @@ private fun LiveCaptureContent(
     var cameraReady by remember { mutableStateOf(false) }
     var lastPromptSpokenAt by remember { mutableLongStateOf(0L) }
     var cameraError by remember { mutableStateOf<String?>(null) }
+    // Front camera remains available for parent guidance only. A formal
+    // record must be made by the rear 1× camera according to the protocol.
+    val calibrationReady = !front && cameraReady && deviceAlignment.isLevel && bodyAlignment.isReady
+    val capturePhaseIndex = when {
+        !captureArmed || captureProgress < .25f -> 0
+        captureProgress < .85f -> 1
+        else -> 2
+    }
 
     val mainExecutor = remember(context) { ContextCompat.getMainExecutor(context) }
     val coach = rememberVoiceCoach(context)
@@ -160,7 +164,8 @@ private fun LiveCaptureContent(
 
     LaunchedEffect(task, speakerEnabled) {
         if (speakerEnabled) {
-            coach.say("开始${task.title}。${task.guide}。请让孩子全身入镜。")
+            val number = SpineScreeningStandard.homeCameraItems.firstOrNull { it.task == task }?.number ?: 1
+            coach.say("开始第${number}项，${task.title}。${task.guide}。${SpineScreeningStandard.mainCameraPlacement}。")
         }
     }
 
@@ -177,6 +182,20 @@ private fun LiveCaptureContent(
         captureArmedRef.set(false)
         captureProgress = 0f
         cameraReady = false
+        bodyAlignment = CaptureBodyAlignment()
+    }
+
+    LaunchedEffect(deviceAlignment) {
+        if (!deviceAlignment.available || deviceAlignment.isLevel) return@LaunchedEffect
+        if (captureArmed) {
+            captureArmed = false
+            captureArmedRef.set(false)
+            captureProgress = 0f
+            prompt = "手机角度发生变化，记录已暂停。请重新调平手机并完成人体对齐。"
+            if (speakerEnabled) coach.say("手机角度发生变化，记录已暂停，请重新调平手机。")
+        } else {
+            prompt = "请先调平手机：左右不超过 2 度，前后不超过 5 度。"
+        }
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -214,6 +233,7 @@ private fun LiveCaptureContent(
                 { text -> mainExecutor.execute { if (cameraEpoch.get() == epoch) prompt = text } },
                 { value -> mainExecutor.execute { if (cameraEpoch.get() == epoch) captureProgress = value } },
                 { ready -> mainExecutor.execute { if (cameraEpoch.get() == epoch) cameraReady = ready } },
+                { alignment -> mainExecutor.execute { if (cameraEpoch.get() == epoch) bodyAlignment = alignment } },
                 { message -> mainExecutor.execute { if (cameraEpoch.get() == epoch) cameraError = message } },
                 { result -> mainExecutor.execute { if (cameraEpoch.get() == epoch) onComplete(result) } },
                 analysisExecutor,
@@ -242,14 +262,16 @@ private fun LiveCaptureContent(
         AndroidView(
             factory = { viewContext ->
                 PreviewView(viewContext).apply {
-                    scaleType = PreviewView.ScaleType.FILL_CENTER
+                    // Preserve the complete camera frame instead of cropping it
+                    // into a visually enlarged close-up.
+                    scaleType = PreviewView.ScaleType.FIT_CENTER
                     previewView = this
                 }
             },
             modifier = Modifier.fillMaxSize()
         )
 
-        CaptureGuideFrame(task)
+        CaptureHumanCalibrationGuide(task, bodyAlignment, deviceAlignment, captureArmed)
 
         Column(
             modifier = Modifier
@@ -275,6 +297,7 @@ private fun LiveCaptureContent(
                         captureArmedRef.set(false)
                         captureProgress = 0f
                         cameraReady = false
+                        bodyAlignment = CaptureBodyAlignment()
                         front = !front
                     }
                 }
@@ -285,6 +308,22 @@ private fun LiveCaptureContent(
                     Text(task.title, color = Color.White, style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(8.dp))
                     Text(task.guide, color = Color.White, fontSize = 14.sp)
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        when (task) {
+                            BodyCaptureTask.GaitVideo -> "后置主摄固定机位 · 3 米直线自然往返 1 次"
+                            BodyCaptureTask.FootArch -> SpineScreeningStandard.footCameraPlacement
+                            else -> "后置 1× 主摄 · ${SpineScreeningStandard.mainCameraPlacement}"
+                        },
+                        color = Color.White.copy(alpha = .76f),
+                        fontSize = 12.sp
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    if (captureArmed) {
+                        CapturePhaseRow(task, capturePhaseIndex)
+                    } else {
+                        CaptureCalibrationStatusRow(cameraReady, deviceAlignment.isLevel, bodyAlignment.isReady)
+                    }
                     Spacer(Modifier.height(8.dp))
                     Text(prompt, color = Color(0xFFFFD54F), fontSize = 12.sp)
                     Spacer(Modifier.height(10.dp))
@@ -302,20 +341,41 @@ private fun LiveCaptureContent(
                     )
                     Spacer(Modifier.height(9.dp))
                     if (captureArmed) {
-                        Text("正在记录，请保持当前姿势", color = Color(0xFFFFD54F), fontSize = 12.sp)
+                        Text(
+                            if (task == BodyCaptureTask.ForwardBend) "正在识别前屈，请完成动作后保持" else "正在记录，请保持当前姿势",
+                            color = Color(0xFFFFD54F),
+                            fontSize = 12.sp
+                        )
                     } else {
                         Button(
                             onClick = {
+                                if (!calibrationReady) return@Button
                                 captureProgress = 0f
                                 captureArmed = true
                                 captureArmedRef.set(true)
-                                if (speakerEnabled) coach.say("开始记录，请保持当前姿势。")
+                                if (speakerEnabled) coach.say(
+                                    if (task == BodyCaptureTask.ForwardBend) {
+                                        "开始记录。双脚并拢，膝关节完全伸直，双手合十自然下垂，缓慢向前弯腰至躯干接近水平，头部自然放松，不要屈膝或做弓步。"
+                                    } else {
+                                        "开始记录，请保持当前姿势。"
+                                    }
+                                )
                             },
-                            enabled = cameraReady,
+                            enabled = calibrationReady,
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD54F), contentColor = Color.Black)
                         ) {
-                            Text("开始记录")
+                            Text(
+                                when {
+                                    calibrationReady -> "引导质量门已通过，开始记录"
+                                    !cameraReady -> "正在连接相机"
+                                    front -> "正式记录请切回后置主摄"
+                                    !deviceAlignment.isLevel -> "请将左右调至 2°、前后调至 5°内"
+                                    !bodyAlignment.bodyDetected -> "请进入人型框"
+                                    !bodyAlignment.distanceReady -> "请调整拍摄距离"
+                                    else -> "请对齐头肩髋膝脚"
+                                }
+                            )
                         }
                     }
                     Text("App 内实时记录，不保存照片或视频", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
@@ -357,69 +417,38 @@ private fun LiveCaptureContent(
 }
 
 @Composable
-private fun CaptureGuideFrame(task: BodyCaptureTask) = BoxWithConstraints(
-    Modifier.fillMaxSize(),
-    contentAlignment = Alignment.Center
-) {
-    // A 260 × 410 frame works on reference phones, but may overlap controls on compact/landscape devices.
-    val width = minOf(260.dp, maxWidth * 0.74f)
-    val nominalHeight = if (task == BodyCaptureTask.Seated) 270.dp else 410.dp
-    val height = minOf(nominalHeight, maxHeight * 0.52f)
-
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Surface(color = Color.Black.copy(alpha = 0.42f), shape = RoundedCornerShape(18.dp)) {
-            Text(
-                if (task == BodyCaptureTask.GaitVideo) "从框内自然走过，完成 3 步"
-                else if (task == BodyCaptureTask.ForwardBend) "请从侧后方拍摄，缓慢前屈后停住"
-                else "请将孩子完整置于引导框内",
-                color = Color.White,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
-            )
-        }
-        Box(
-            Modifier.width(width).height(height).border(2.dp, Color.White.copy(alpha = 0.9f), RoundedCornerShape(30.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                if (task == BodyCaptureTask.Seated) "肩部与髋部入镜"
-                else if (task == BodyCaptureTask.ForwardBend) "侧后方入镜，躯干前倾后停住"
-                else "头、肩、髋与双脚入镜",
-                color = Color.White.copy(alpha = 0.84f),
-                fontSize = 12.sp
-            )
-        }
-    }
-}
-
-@Composable
 private fun CircleIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, description: String, click: () -> Unit) =
     IconButton(onClick = click, modifier = Modifier.background(Color.Black.copy(alpha = 0.42f), CircleShape)) {
         Icon(icon, description, tint = Color.White)
     }
 
-@ExperimentalGetImage
-private class VoiceCoach(context: Context) : TextToSpeech.OnInitListener {
-    private var ready = false
-    private val engine = TextToSpeech(context, this)
-    override fun onInit(status: Int) {
-        ready = status == TextToSpeech.SUCCESS
-        if (ready) engine.language = Locale.CHINA
+@Composable
+private fun CapturePhaseRow(task: BodyCaptureTask, phaseIndex: Int) {
+    val labels = when (task) {
+        BodyCaptureTask.ForwardBend -> listOf("起始位", "前屈位", "完成")
+        BodyCaptureTask.DynamicKneeControl -> listOf("站稳", "下蹲", "回位")
+        BodyCaptureTask.StandingSide -> listOf("左侧", "右侧", "完成")
+        BodyCaptureTask.FootArch -> listOf("左足", "右足", "完成")
+        else -> listOf("站稳", "保持", "完成")
     }
-
-    fun say(message: String) {
-        if (ready) engine.speak(message, TextToSpeech.QUEUE_FLUSH, null, "body-coach")
-    }
-
-    fun stop() {
-        engine.stop()
-    }
-
-    fun close() {
-        engine.stop()
-        engine.shutdown()
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        labels.forEachIndexed { index, label ->
+            Surface(
+                color = Color.White.copy(alpha = if (index == phaseIndex) .12f else .05f),
+                shape = RoundedCornerShape(50),
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = when {
+                        index < phaseIndex -> "✓ $label"
+                        index == phaseIndex -> "● $label"
+                        else -> "○ $label"
+                    },
+                    color = if (index <= phaseIndex) Color(0xFFFFD54F) else Color.White.copy(alpha = .52f),
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp)
+                )
+            }
+        }
     }
 }
-
-@Composable
-private fun rememberVoiceCoach(context: Context) = remember { VoiceCoach(context.applicationContext) }

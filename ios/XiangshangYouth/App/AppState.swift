@@ -20,6 +20,9 @@ import SwiftUI
     /// paged dashboard student directory so a task member is never hidden by
     /// the dashboard page currently loaded.
     @Published var taskRosterRecords: [String: [TaskStudentStatusRecord]] = [:]
+    @Published var bodyScreeningReviews: [BodyScreeningReviewItem] = []
+    @Published var bodyScreeningReviewsLoading = false
+    @Published var bodyScreeningReviewsError: String?
     @Published var remoteActivities: [RemoteActivity] = []
     @Published var activitiesLoading = false
     @Published var activitiesError: String?
@@ -173,7 +176,7 @@ import SwiftUI
             values.healthConsents[studentID] = HealthConsentRecord(consentID: UUID().uuidString, guardianUserID: profile.id, childID: studentID, privacyPolicyVersion: privacyVersion, cameraConsentVersion: cameraVersion, algorithmNoticeVersion: algorithmVersion, agreedAt: .now, revokedAt: nil, deviceInfo: UIDevice.current.model, dataRetentionNoticeAccepted: true)
         }
     }
-    func switchAccount() { ApiClient.shared.clearSession(); featureStore.reset(); localFeatures = featureStore.state; FrontendTelemetry.configure(enabled: false); profile = nil; selectedRole = nil; selectedChild = nil; data = nil; error = nil; reportLoading = false; reportError = nil; workflowStates.removeAll(); refreshedReports.removeAll(); taskRosterRecords.removeAll() }
+    func switchAccount() { ApiClient.shared.clearSession(); featureStore.reset(); localFeatures = featureStore.state; FrontendTelemetry.configure(enabled: false); profile = nil; selectedRole = nil; selectedChild = nil; data = nil; error = nil; reportLoading = false; reportError = nil; workflowStates.removeAll(); refreshedReports.removeAll(); taskRosterRecords.removeAll(); bodyScreeningReviews.removeAll(); bodyScreeningReviewsError = nil }
     private var refreshedReports: [String: DiagnosisReport] = [:]
     func report(for student: Student) -> DiagnosisReport { refreshedReports[student.id] ?? repository.report(for: student) }
     /// Remote dashboards must never paint a bundled demonstration result before

@@ -1,21 +1,38 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { BMI_RULE_VERSION, HEIGHT_RULE_VERSION, bmiAgeBucketMonths, bmiAttention, combineBodyLevel, finiteScalar, heightDevelopment, normalizeGender, scoreBodyAssessment } from '../src/bodyScoring.js';
+import { BMI_RULE_VERSION, HEIGHT_RULE_VERSION, bmiAgeBucketMonths, bmiAttention, combineBodyLevel, finiteScalar, heightDevelopment, normalizeGender, publicationSafeBodyReport, scoreBodyAssessment } from '../src/bodyScoring.js';
 
-const cleanSnapshots = ['standingBack', 'forwardBend', 'seatedPosture', 'gaitVideo'].map((captureTask) => ({
-  captureTask,
-  sampleCount: 18,
-  confidence: 0.82,
-  metrics: {
-    shoulderHeightDifferenceCm: 0.2,
-    pelvicHeightDifferenceCm: 0.2,
-    spinalMidlineDeviationCm: 0.2,
-    thoracicRoundingDegrees: 10,
-    forwardHeadAngleDegrees: 5,
+const cleanMetricsByTask = {
+  standingFront: { shoulderHeightDifferenceCm: 0.2, pelvicHeightDifferenceCm: 0.2 },
+  standingBack: { shoulderHeightDifferenceCm: 0.2, pelvicHeightDifferenceCm: 0.2 },
+  standingSide: { thoracicRoundingDegrees: 10, forwardHeadAngleDegrees: 5 },
+  forwardBend: { spinalMidlineDeviationCm: 0.2, cameraProxyAtrDegrees: 2 },
+  dynamicKneeControl: {
+    leftKneeValgusProxyDegrees: 8,
+    rightKneeValgusProxyDegrees: 8,
+    kneeTrackingAsymmetryRatio: 0.04,
+    squatDepthRatio: 0.4,
+    movementRepetitionCount: 3
+  },
+  gaitVideo: {
     gaitShoulderSwingDifferenceCm: 0.2,
     gaitPelvicSwingDifferenceCm: 0.2,
     gaitTrunkSwayCm: 0.2
+  },
+  seatedPosture: { spinalMidlineDeviationCm: 0.2, thoracicRoundingDegrees: 10 },
+  footArch: {
+    footArchVisibilityScore: 0.85,
+    leftArchProxyIndex: 0.3,
+    rightArchProxyIndex: 0.3,
+    heelAlignmentProxyDegrees: 2
   }
+};
+
+const cleanSnapshots = Object.entries(cleanMetricsByTask).map(([captureTask, metrics]) => ({
+  captureTask,
+  sampleCount: 18,
+  confidence: 0.82,
+  metrics
 }));
 
 test('BMI model normalizes supported gender encodings and uses published half-year buckets', () => {
@@ -57,12 +74,40 @@ test('body model combines BMI and posture without allowing unavailable data to l
   assert.equal(report.overallLevel, 'red');
   assert.equal(report.heightReport.ruleVersion, HEIGHT_RULE_VERSION);
   assert.equal(report.heightAlgorithmVersion, 'UY-IMCA-HEIGHT-1.0');
-  assert.equal(report.modelRegistryVersion, 'UY-MODELS-1.0');
+  assert.equal(report.modelRegistryVersion, 'UY-MODELS-1.1');
   assert.equal(report.heightReport.level, 'middle');
 
   const malformedMeasurements = scoreBodyAssessment({ heightCm: 40, weightKg: 120, ageMonths: 108, gender: '男', snapshots: cleanSnapshots });
   assert.equal(malformedMeasurements.bmi, 0);
   assert.equal(malformedMeasurements.bmiLevel, 'unavailable');
+});
+
+test('public body report never exposes an unvalidated posture classification', () => {
+  const candidate = scoreBodyAssessment({ heightCm: 135, weightKg: 32, ageMonths: 108, gender: '男', snapshots: cleanSnapshots });
+  assert.equal(candidate.postureReport.validationStatus, 'pending-human-validation');
+  const report = publicationSafeBodyReport(candidate);
+  assert.equal(report.postureReport.overallLevel, 'pending');
+  assert.equal(report.postureReport.riskScore, 0);
+  assert.equal(report.postureReport.classificationPublished, false);
+  assert.equal(report.overallLevel, report.bmiLevel);
+  assert.match(report.postureReport.disclaimer, /未完成人工标注验证/);
+});
+
+test('global validation text cannot bypass an unpublished posture domain', () => {
+  const report = publicationSafeBodyReport({
+    bmiLevel: 'green',
+    overallLevel: 'red',
+    postureReport: {
+      validationStatus: 'human-validated',
+      classificationPublished: false,
+      overallLevel: 'red',
+      riskScore: 90,
+      reasons: ['candidate']
+    }
+  });
+  assert.equal(report.overallLevel, 'green');
+  assert.equal(report.postureReport.overallLevel, 'pending');
+  assert.equal(report.postureReport.riskScore, 0);
 });
 
 test('height model matches the native age/sex bands and fails closed outside scope', () => {

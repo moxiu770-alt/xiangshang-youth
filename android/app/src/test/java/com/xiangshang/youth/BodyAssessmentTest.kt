@@ -11,14 +11,29 @@ import com.xiangshang.youth.core.model.TestItem
 import com.xiangshang.youth.core.model.PostureAssessmentReport
 import com.xiangshang.youth.core.model.PostureMetricSnapshot
 import com.xiangshang.youth.core.model.PostureMetricCalculator
+import com.xiangshang.youth.core.model.PostureCaptureRepeatability
+import com.xiangshang.youth.core.model.CaptureCalibrationEvidence
+import com.xiangshang.youth.core.model.CaptureCalibrationMode
 import com.xiangshang.youth.core.model.PostureScreeningRules
 import com.xiangshang.youth.core.model.AssessmentScoreRules
 import com.xiangshang.youth.core.model.GrowthInsight
 import com.xiangshang.youth.core.model.GrowthReportPeriod
 import com.xiangshang.youth.core.model.bodyAssessmentAgeMonths
 import com.xiangshang.youth.core.model.ageMonthsFromBirthDate
+import com.xiangshang.youth.core.model.gaitProgress
+import com.xiangshang.youth.core.model.adamsForwardBendCompletionScore
+import com.xiangshang.youth.core.model.hasAdamsLowerBodyPosition
+import com.xiangshang.youth.core.model.hasReliableLandmarks
+import com.xiangshang.youth.core.model.jointAngle
+import com.xiangshang.youth.core.model.range
+import com.xiangshang.youth.core.model.repeatability
+import com.xiangshang.youth.core.model.robustRange
+import com.xiangshang.youth.core.model.staticProgress
 import com.xiangshang.youth.core.service.LocalFeatureState
 import com.xiangshang.youth.core.service.LocalFeatureStore
+import com.xiangshang.youth.feature.parent.CaptureBodyAlignment
+import com.xiangshang.youth.feature.parent.CaptureCalibrationRules
+import com.xiangshang.youth.core.model.SpineScreeningStandard
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -29,6 +44,96 @@ import java.util.Locale
 import java.util.TimeZone
 
 class BodyAssessmentTest {
+    @Test
+    fun footCloseUpUsesLowerLegScaleInsteadOfFullBodyScale() {
+        assertEquals(BodyCaptureQualityGate.BodyScaleState.TooFar, BodyCaptureQualityGate.footScaleState(.18))
+        assertEquals(BodyCaptureQualityGate.BodyScaleState.Ready, BodyCaptureQualityGate.footScaleState(.45))
+        assertEquals(BodyCaptureQualityGate.BodyScaleState.TooClose, BodyCaptureQualityGate.footScaleState(.82))
+        assertEquals(BodyCaptureQualityGate.BodyScaleState.Invalid, BodyCaptureQualityGate.footScaleState(Double.NaN))
+    }
+
+    @Test
+    fun markerPnpEvidenceRequiresApprovedProfileId() {
+        val evidence = CaptureCalibrationEvidence(
+            mode = CaptureCalibrationMode.MarkerPnp, boardDetected = true, boardId = "uy-charuco-v1",
+            intrinsicsId = "pixel-rear1x-v1", lensId = "rear-1x", resolution = "1920x1080",
+            reprojectionErrorPx = 1.2, profileId = "pixel-rear1x-v1"
+        )
+        assertTrue(evidence.hasMarkerPnPEvidence)
+        assertEquals(false, evidence.copy(profileId = null).hasMarkerPnPEvidence)
+    }
+
+    @Test
+    fun postureCaptureRequiresTwoConsistentIndependentTakes() {
+        fun snapshot(id: String, shoulder: Double, headTilt: Double) = PostureMetricSnapshot(
+            id = id,
+            task = BodyCaptureTask.ForwardBend,
+            sampleCount = 24,
+            confidence = .86,
+            shoulderHeightDifferenceCm = shoulder,
+            pelvicHeightDifferenceCm = .2,
+            headTiltDegrees = headTilt,
+            spinalMidlineDeviationCm = .3,
+            thoracicRoundingDegrees = 12.0,
+            forwardHeadAngleDegrees = 6.0
+        )
+        val first = snapshot("first", .30, 1.0)
+        val second = snapshot("second", .85, 3.5)
+        val stable = PostureCaptureRepeatability.verify(first, second)
+        assertTrue(stable.passed)
+        assertTrue(stable.comparedMetricCount >= 3)
+        val merged = PostureCaptureRepeatability.merged(first, second, stable)
+        assertEquals(.575, merged.shoulderHeightDifferenceCm ?: 0.0, .0001)
+        assertEquals(48, merged.sampleCount)
+        assertEquals("passed", merged.repeatabilityStatus)
+
+        val unstable = PostureCaptureRepeatability.verify(snapshot("first", .30, 1.0), snapshot("third", 1.25, 4.5))
+        assertEquals(false, unstable.passed)
+        assertTrue(unstable.maximumDifference > .8)
+    }
+
+    @Test
+    fun captureCalibrationRequiresLevelPhoneAndEveryBodyAnchor() {
+        val level = CaptureCalibrationRules.deviceAlignment(0.0, 9.81, 0.0)
+        assertTrue(level.available)
+        assertTrue(level.isLevel)
+        assertEquals(false, CaptureCalibrationRules.deviceAlignment(1.8, 9.6, 0.0).isLevel)
+        assertEquals(false, CaptureCalibrationRules.deviceAlignment(0.0, 9.5, 2.4).isLevel)
+        assertEquals(false, CaptureCalibrationRules.deviceAlignment(Double.NaN, 9.81, 0.0).available)
+
+        val ready = CaptureBodyAlignment(
+            bodyDetected = true,
+            distanceState = BodyCaptureQualityGate.BodyScaleState.Ready,
+            centered = true,
+            headReady = true,
+            shouldersReady = true,
+            hipsReady = true,
+            kneesReady = true,
+            feetReady = true
+        )
+        assertTrue(ready.isReady)
+        assertEquals(false, ready.copy(feetReady = false).isReady)
+        assertEquals(false, ready.copy(distanceState = BodyCaptureQualityGate.BodyScaleState.TooClose).isReady)
+        assertEquals(listOf(1, 2, 3, 4, 5), SpineScreeningStandard.items.map { it.number })
+        assertEquals(8, SpineScreeningStandard.homeCameraItems.size)
+        assertEquals(
+            listOf(BodyCaptureTask.StandingFront, BodyCaptureTask.StandingBack, BodyCaptureTask.StandingSide, BodyCaptureTask.ForwardBend, BodyCaptureTask.DynamicKneeControl, BodyCaptureTask.GaitVideo, BodyCaptureTask.Seated, BodyCaptureTask.FootArch),
+            SpineScreeningStandard.homeCameraItems.map { it.task }
+        )
+        assertEquals("亚当斯前屈试验", SpineScreeningStandard.items[1].title)
+        assertTrue(SpineScreeningStandard.items[1].instruction.contains("膝关节完全伸直"))
+        assertTrue(SpineScreeningStandard.items[1].instruction.contains("不屈膝、不弓步"))
+        assertTrue(BodyCaptureQualityGate.hasAdamsLowerBodyPosition(listOf(172.0, 169.0), .045, .20, true))
+        assertEquals(false, BodyCaptureQualityGate.hasAdamsLowerBodyPosition(listOf(142.0, 171.0), .045, .20, true))
+        assertEquals(false, BodyCaptureQualityGate.hasAdamsLowerBodyPosition(listOf(172.0, 171.0), .18, .20, true))
+        assertEquals(false, BodyCaptureQualityGate.hasAdamsLowerBodyPosition(listOf(172.0, 171.0), .09, .20, true))
+        assertEquals(SpineScreeningStandard.AtrBand.Green, SpineScreeningStandard.atrBand(4.9))
+        assertEquals(SpineScreeningStandard.AtrBand.Yellow, SpineScreeningStandard.atrBand(5.0))
+        assertEquals(SpineScreeningStandard.AtrBand.Yellow, SpineScreeningStandard.atrBand(6.9))
+        assertEquals(SpineScreeningStandard.AtrBand.Red, SpineScreeningStandard.atrBand(7.0))
+        assertEquals(1.8, SpineScreeningStandard.maximumOcciputWallDistance(1.4, 1.8))
+        assertEquals(null, SpineScreeningStandard.maximumOcciputWallDistance(1.4, null))
+    }
 
     @Test
     fun validMetricsAdvanceToEnvironmentCheckInNineStepFlow() {
@@ -69,7 +174,7 @@ class BodyAssessmentTest {
 
     @Test
     fun captureTaskApiCodesMatchTheCrossPlatformContract() {
-        assertEquals(listOf("standingBack", "forwardBend", "seatedPosture", "gaitVideo"), BodyCaptureTask.values().map { it.apiCode })
+        assertEquals(listOf("standingFront", "standingBack", "standingSide", "forwardBend", "dynamicKneeControl", "seatedPosture", "gaitVideo", "footArch"), BodyCaptureTask.values().map { it.apiCode })
     }
 
     @Test
@@ -88,9 +193,22 @@ class BodyAssessmentTest {
             axisDy = dy
         )
         assertEquals(0.0, corrected, 0.000001)
-        assertEquals(false, BodyCaptureQualityGate.forwardBendReady(1500, 12, .01, Double.POSITIVE_INFINITY, 120))
-        assertEquals(false, BodyCaptureQualityGate.forwardBendReady(1500, 12, .01, -.2, null))
-        assertEquals(false, BodyCaptureQualityGate.forwardBendReady(1500, 12, .01, 10.1, null))
+        assertEquals(false, BodyCaptureQualityGate.forwardBendReady(2500, 20, .01, Double.POSITIVE_INFINITY, 120))
+        assertEquals(false, BodyCaptureQualityGate.forwardBendReady(2500, 20, .01, -.2, null))
+        assertEquals(false, BodyCaptureQualityGate.forwardBendReady(2500, 20, .01, 10.1, null))
+    }
+
+    @Test
+    fun postureSamplingRejectsOutliersAndEvaluatesTenRunRepeatability() {
+        assertEquals(10.0, PostureMetricCalculator.robustMedian(listOf(10.0, 10.1, 9.9, 10.0, 60.0))!!, .001)
+        assertEquals(.07, PostureMetricCalculator.robustRange(listOf(.10, .11, .12, .13, .14, .15, .16, .17, .18, 5.0))!!, .001)
+        assertEquals(true, PostureMetricCalculator.isStableSeries(List(18) { .20 }, 18, .55))
+        assertEquals(false, PostureMetricCalculator.isStableSeries(List(17) { .20 }, 18, .55))
+
+        val stableRuns = listOf(1.00, 1.04, .98, 1.02, 1.01, .99, 1.05, .97, 1.03, 1.00)
+        assertEquals(true, PostureMetricCalculator.repeatability(stableRuns, maximumRange = .20, maximumStandardDeviation = .08).passed)
+        assertEquals(false, PostureMetricCalculator.repeatability(stableRuns.take(9), maximumRange = .20, maximumStandardDeviation = .08).passed)
+        assertEquals(false, PostureMetricCalculator.repeatability(listOf(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.8), maximumRange = .20, maximumStandardDeviation = .08).passed)
     }
 
     @Test
@@ -110,10 +228,13 @@ class BodyAssessmentTest {
         val report = PostureAssessmentReport.make(sampleMap, "2026-08-11", 120)
         assertEquals(BodyAttentionLevel.Pending, report.overallLevel)
         assertTrue(report.reasons.isNotEmpty())
-        assertTrue(report.reasons.first().contains("记录不足"))
+        assertTrue(report.reasons.first().contains("人工标注验证"))
+        assertEquals(com.xiangshang.youth.core.model.AlgorithmValidationStatus.PendingHumanValidation, report.validationStatus)
+        assertEquals(false, report.canPublishClassification)
+        assertEquals(0, report.riskScore)
         assertEquals(PostureAssessmentReport.calibrationVersion, report.calibrationVersion)
         assertEquals(PostureScreeningRules.rulesSourceVersion, report.rulesSourceVersion)
-        assertEquals("UY-MODELS-1.0", AssessmentScoreRules.modelRegistryVersion)
+        assertEquals("UY-MODELS-1.1", AssessmentScoreRules.modelRegistryVersion)
         assertEquals("UY-IMCA-SCORE-1.3", AssessmentScoreRules.algorithmVersion)
         assertEquals("UY-IMCA-BMI-1.2", BodyAssessmentRecord.bmiAlgorithmVersion)
         assertEquals("UY-IMCA-HEIGHT-1.0", BodyAssessmentRecord.heightAlgorithmVersion)
@@ -194,6 +315,22 @@ class BodyAssessmentTest {
         assertEquals(draft, local.bodyAssessmentDrafts["s01"])
         assertEquals(2, local.bodyAssessmentDrafts["s01"]?.captures?.size)
         assertEquals("站姿提示", local.bodyAssessmentDrafts["s01"]?.captureObservationHints?.get(BodyCaptureTask.StandingBack.name))
+    }
+
+    @Test
+    fun supervisedSpineDraftRestoresEveryManualStandardField() {
+        val restored = LocalFeatureStore.decodeBodyAssessmentDrafts(
+            """{"s01":{"stage":5,"height":133.5,"weight":31.2,"captures":["StandingBack"],"standingShoulder":0.4,"standingPelvis":0.3,"standingHeadTilt":2.5,"adamsObservedResult":"equivocal","adamsProminenceSide":"右","gaitObservedAbnormal":true,"gaitObservationNote":"右侧骨盆摆动不对称","seatedMidline":0.6,"seatedShoulder":0.4,"seatedThoracicKyphosisObserved":false,"thoracicAtr":5.2,"lumbarAtr":3.4,"thoracicAtrSide":"右","lumbarAtrSide":"左","atrRetestEnabled":true,"thoracicAtrRepeat":5.4,"lumbarAtrRepeat":3.2,"seatedForwardBendAtr":2.0,"occiputWallDistanceFirst":1.4,"occiputWallDistanceSecond":1.6,"occiputWallDistance":1.6}}"""
+        )["s01"]!!
+
+        assertEquals("equivocal", restored.adamsObservedResult)
+        assertEquals("右", restored.adamsProminenceSide)
+        assertEquals(5.4, restored.thoracicAtrRepeatDegrees!!, .001)
+        assertEquals(1.6, restored.occiputWallDistanceCm!!, .001)
+        assertEquals("右侧骨盆摆动不对称", restored.gaitObservationNote)
+        assertEquals(true, SpineScreeningStandard.isApplicable(72))
+        assertEquals(true, SpineScreeningStandard.isApplicable(155))
+        assertEquals(false, SpineScreeningStandard.isApplicable(156))
     }
 
     @Test
@@ -337,25 +474,38 @@ class BodyAssessmentTest {
 
     @Test
     fun visualCaptureGateRequiresStablePoseAndRealGaitMovement() {
-        assertEquals(false, BodyCaptureQualityGate.staticReady(1500, 12, .01))
-        assertEquals(false, BodyCaptureQualityGate.staticReady(1500, 12, .03))
-        assertEquals(true, BodyCaptureQualityGate.staticReady(1700, 14, .02))
-        assertEquals(false, BodyCaptureQualityGate.staticReady(1700, 14, .02, .02))
-        assertEquals(true, BodyCaptureQualityGate.staticReady(1700, 14, .02, .005))
-        assertEquals(true, BodyCaptureQualityGate.gaitReady(2600, .04))
-        assertEquals(true, BodyCaptureQualityGate.gaitReady(2600, .04, 7))
-        assertEquals(false, BodyCaptureQualityGate.gaitReady(2600, .02))
-        assertEquals(false, BodyCaptureQualityGate.forwardBendReady(1700, 14, .01, .10))
-        assertEquals(true, BodyCaptureQualityGate.forwardBendReady(1700, 14, .01, .45))
+        assertEquals(false, BodyCaptureQualityGate.staticReady(2400, 20, .01))
+        assertEquals(false, BodyCaptureQualityGate.staticReady(2500, 20, .04))
+        assertEquals(true, BodyCaptureQualityGate.staticReady(2500, 20, .02))
+        assertEquals(false, BodyCaptureQualityGate.staticReady(2500, 20, .02, .02))
+        assertEquals(true, BodyCaptureQualityGate.staticReady(2500, 20, .02, .005))
+        assertEquals(true, BodyCaptureQualityGate.gaitReady(6400, .04))
+        assertEquals(true, BodyCaptureQualityGate.gaitReady(6400, .04, 7))
+        assertEquals(false, BodyCaptureQualityGate.gaitReady(6400, .02))
+        assertEquals(false, BodyCaptureQualityGate.forwardBendReady(2500, 20, .01, .10))
+        assertEquals(true, BodyCaptureQualityGate.forwardBendReady(2500, 20, .01, .45))
         assertEquals(false, BodyCaptureQualityGate.hasUsableBodyScale(.30, false))
         assertEquals(true, BodyCaptureQualityGate.hasUsableBodyScale(.50, false))
+        assertEquals(false, BodyCaptureQualityGate.hasUsableBodyScale(.82, false))
+        assertEquals(BodyCaptureQualityGate.BodyScaleState.TooFar, BodyCaptureQualityGate.bodyScaleState(.30, false))
+        assertEquals(BodyCaptureQualityGate.BodyScaleState.Ready, BodyCaptureQualityGate.bodyScaleState(.50, false))
+        assertEquals(BodyCaptureQualityGate.BodyScaleState.TooClose, BodyCaptureQualityGate.bodyScaleState(.82, false))
         assertEquals(false, BodyCaptureQualityGate.hasUsableBodyScale(.12, true))
+        assertEquals(false, BodyCaptureQualityGate.hasUsableBodyScale(.48, true))
+        assertEquals(true, BodyCaptureQualityGate.hasComfortableFollowAlongFraming(.70, .30))
+        assertEquals(false, BodyCaptureQualityGate.hasComfortableFollowAlongFraming(.82, .30))
+        assertEquals(false, BodyCaptureQualityGate.hasComfortableFollowAlongFraming(.70, .40))
         assertEquals(true, BodyCaptureQualityGate.hasUsableSeatedGeometry(.65, .85, .20))
         assertEquals(false, BodyCaptureQualityGate.hasUsableSeatedGeometry(.85, .65, .20))
         assertEquals(true, BodyCaptureQualityGate.hasReliableLandmarks(listOf(.72f, .62f, .58f, .60f)))
         assertEquals(false, BodyCaptureQualityGate.hasReliableLandmarks(listOf(.96f, .96f, .33f, .34f)))
         assertEquals(false, BodyCaptureQualityGate.hasReliableLandmarks(listOf(.9f, .9f, .2f, .9f)))
         assertEquals(false, BodyCaptureQualityGate.hasReliableLandmarks(listOf(.9f, Float.POSITIVE_INFINITY, .9f, .9f)))
+        assertEquals(true, BodyCaptureQualityGate.hasReliableForwardBendLandmarks(listOf(.82f, .76f, .74f, .78f, .73f), listOf(.72f, .10f), 120))
+        assertEquals(false, BodyCaptureQualityGate.hasReliableForwardBendLandmarks(listOf(.82f, .76f, .74f, .78f, .73f), listOf(.12f, .10f), 120))
+        assertEquals(.90, BodyCaptureQualityGate.adamsForwardBendCompletionScore(40.0, 52.0, 60.0, 52.0, 50.0) ?: 0.0, .001)
+        assertEquals(0.0, BodyCaptureQualityGate.adamsForwardBendCompletionScore(40.0, 70.0, 60.0, 70.0, 50.0) ?: -1.0, .001)
+        assertEquals(null, BodyCaptureQualityGate.adamsForwardBendCompletionScore(Double.POSITIVE_INFINITY, 52.0, 60.0, 52.0, 50.0))
         assertEquals(false, BodyCaptureQualityGate.hasUsableBodyScale(Double.POSITIVE_INFINITY, false))
         assertEquals(.96f, BodyCaptureQualityGate.staticProgress(10_000), .001f)
     }
@@ -368,17 +518,17 @@ class BodyAssessmentTest {
         assertEquals(true, profile6.staticHoldMilliseconds > profile12.staticHoldMilliseconds)
         assertEquals(true, profile6.staticMaximumDisplacementRatio > profile12.staticMaximumDisplacementRatio)
 
-        assertEquals(true, BodyCaptureQualityGate.staticReady(1800, 12, .028, 80))
-        assertEquals(false, BodyCaptureQualityGate.staticReady(1600, 12, .028, 130))
-        assertEquals(false, BodyCaptureQualityGate.staticReady(1700, 12, .028, 130))
+        assertEquals(true, BodyCaptureQualityGate.staticReady(2600, 20, .028, 80))
+        assertEquals(false, BodyCaptureQualityGate.staticReady(2500, 20, .028, 80))
+        assertEquals(true, BodyCaptureQualityGate.staticReady(2500, 20, .028, 130))
 
-        assertEquals(false, BodyCaptureQualityGate.gaitReady(2550, .034, 6, 80))
-        assertEquals(true, BodyCaptureQualityGate.gaitReady(2550, .037, 7, 80))
-        assertEquals(false, BodyCaptureQualityGate.gaitReady(2550, .034, 7, 130))
-        assertEquals(true, BodyCaptureQualityGate.gaitReady(2550, .039, 7, 130))
+        assertEquals(false, BodyCaptureQualityGate.gaitReady(6400, .034, 6, 80))
+        assertEquals(true, BodyCaptureQualityGate.gaitReady(6600, .037, 7, 80))
+        assertEquals(false, BodyCaptureQualityGate.gaitReady(6400, .034, 7, 130))
+        assertEquals(true, BodyCaptureQualityGate.gaitReady(6400, .039, 7, 130))
 
         assertEquals(false, BodyCaptureQualityGate.forwardBendReady(1200, 12, .02, .2, 80))
-        assertEquals(true, BodyCaptureQualityGate.forwardBendReady(1700, 14, .02, .36, 130))
+        assertEquals(true, BodyCaptureQualityGate.forwardBendReady(2500, 20, .02, .36, 130))
         assertEquals(null, PostureMetricCalculator.centimeters(Double.POSITIVE_INFINITY, .4, 140.0))
         assertEquals(null, PostureMetricCalculator.centimeters(.02, Double.NaN, 140.0))
     }
@@ -391,7 +541,7 @@ class BodyAssessmentTest {
         assertEquals(false, BodyCaptureQualityGate.setProfileOverridesFromJson(broken))
         val profile = BodyCaptureQualityGate.profileForAge(100)
         assertEquals("9-11岁", profile.tag)
-        assertEquals(1700L, profile.staticHoldMilliseconds)
+        assertEquals(2500L, profile.staticHoldMilliseconds)
         val extreme = """
             {"ageProfiles":[{"tag":"异常","minAgeMonths":72,"maxAgeMonths":96,"staticHoldMilliseconds":-1,"minimumMeanLandmarkConfidence":9}]}
         """.trimIndent()
@@ -422,7 +572,12 @@ class BodyAssessmentTest {
             cameraProxyRibProminenceCm = .2
         )
         val greenSnapshots = BodyCaptureTask.values().associateWith { snapshot(it) }
-        val greenReport = PostureAssessmentReport.make(greenSnapshots, "2026-08-11")
+        val greenReport = PostureAssessmentReport.makeValidatedFixture(greenSnapshots, "2026-08-11")
+        assertEquals(BodyAttentionLevel.Pending, PostureAssessmentReport.makeValidatedFixture(greenSnapshots, "2026-08-11", 156).overallLevel)
+        val productReport = PostureAssessmentReport.make(greenSnapshots, "2026-08-11")
+        assertEquals(BodyAttentionLevel.Pending, productReport.overallLevel)
+        assertEquals(0, productReport.riskScore)
+        assertEquals(false, productReport.canPublishClassification)
         val green = BodyAssessmentRecord(150.0, 30.0, "2026-08-11", BodyCaptureTask.values().toSet(), true, true, "2026-08-11", postureReport = greenReport)
         assertEquals(BodyAttentionLevel.Green, greenReport.overallLevel)
         assertEquals(BodyAttentionLevel.Green, green.level(108, "男"))
@@ -430,31 +585,39 @@ class BodyAssessmentTest {
         val redSnapshots = greenSnapshots.toMutableMap().apply {
             this[BodyCaptureTask.StandingBack] = snapshot(BodyCaptureTask.StandingBack, shoulder = 2.0)
         }
-        assertEquals(BodyAttentionLevel.Yellow, PostureAssessmentReport.make(redSnapshots, "2026-08-11").overallLevel)
+        assertEquals(BodyAttentionLevel.Yellow, PostureAssessmentReport.makeValidatedFixture(redSnapshots, "2026-08-11").overallLevel)
         val multiSignalSnapshots = redSnapshots.toMutableMap().apply {
             this[BodyCaptureTask.ForwardBend] = snapshot(BodyCaptureTask.ForwardBend, atr = 2.0, shoulder = .2).copy(cameraProxyRibProminenceCm = 1.3)
             this[BodyCaptureTask.GaitVideo] = snapshot(BodyCaptureTask.GaitVideo, atr = 2.0, shoulder = .2).copy(gaitTrunkSwayCm = 1.4)
         }
-        assertEquals(BodyAttentionLevel.Red, PostureAssessmentReport.make(multiSignalSnapshots, "2026-08-11").overallLevel)
+        assertEquals(BodyAttentionLevel.Red, PostureAssessmentReport.makeValidatedFixture(multiSignalSnapshots, "2026-08-11").overallLevel)
         val proxyOnlySnapshots = greenSnapshots.toMutableMap().apply {
             this[BodyCaptureTask.ForwardBend] = snapshot(BodyCaptureTask.ForwardBend, atr = 30.0)
         }
-        assertEquals(BodyAttentionLevel.Green, PostureAssessmentReport.make(proxyOnlySnapshots, "2026-08-11").overallLevel)
+        assertEquals(BodyAttentionLevel.Green, PostureAssessmentReport.makeValidatedFixture(proxyOnlySnapshots, "2026-08-11").overallLevel)
         val instrumentAtrSnapshots = greenSnapshots.toMutableMap().apply {
             this[BodyCaptureTask.ForwardBend] = snapshot(BodyCaptureTask.ForwardBend, atr = 2.0).copy(cameraProxyRibProminenceCm = null, instrumentAtrDegrees = 7.0)
         }
-        assertEquals(BodyAttentionLevel.Red, PostureAssessmentReport.make(instrumentAtrSnapshots, "2026-08-11").overallLevel)
+        assertEquals(BodyAttentionLevel.Red, PostureAssessmentReport.makeValidatedFixture(instrumentAtrSnapshots, "2026-08-11").overallLevel)
+        val functionalReview = greenSnapshots.toMutableMap().apply {
+            this[BodyCaptureTask.ForwardBend] = snapshot(BodyCaptureTask.ForwardBend, atr = 2.0).copy(cameraProxyRibProminenceCm = null, thoracicAtrDegrees = 5.5, seatedForwardBendAtrDegrees = 1.5)
+        }
+        assertEquals(BodyAttentionLevel.Yellow, PostureAssessmentReport.makeValidatedFixture(functionalReview, "2026-08-11").overallLevel)
+        val fixedReview = functionalReview.toMutableMap().apply {
+            this[BodyCaptureTask.ForwardBend] = this[BodyCaptureTask.ForwardBend]!!.copy(seatedForwardBendAtrDegrees = 5.0)
+        }
+        assertEquals(BodyAttentionLevel.Red, PostureAssessmentReport.makeValidatedFixture(fixedReview, "2026-08-11").overallLevel)
         val malformed = greenSnapshots.toMutableMap().apply {
             this[BodyCaptureTask.StandingBack] = snapshot(BodyCaptureTask.StandingBack, shoulder = Double.NaN)
         }
-        val malformedReport = PostureAssessmentReport.make(malformed, "2026-08-11")
+        val malformedReport = PostureAssessmentReport.makeValidatedFixture(malformed, "2026-08-11")
         assertEquals(BodyAttentionLevel.Pending, malformedReport.overallLevel)
         assertTrue(malformedReport.reasons.any { it.contains("异常测量值") })
         assertTrue(!malformedReport.reasons.joinToString(" ").lowercase().contains("nan"))
-        val incomplete = PostureAssessmentReport.make(greenSnapshots - BodyCaptureTask.Seated, "2026-08-11")
+        val incomplete = PostureAssessmentReport.makeValidatedFixture(greenSnapshots - BodyCaptureTask.Seated, "2026-08-11")
         assertEquals(BodyAttentionLevel.Pending, incomplete.overallLevel)
         val lowQuality = greenSnapshots.toMutableMap().apply { this[BodyCaptureTask.Seated] = snapshot(BodyCaptureTask.Seated).copy(sampleCount = 3, confidence = .9) }
-        assertEquals(BodyAttentionLevel.Pending, PostureAssessmentReport.make(lowQuality, "2026-08-11").overallLevel)
+        assertEquals(BodyAttentionLevel.Pending, PostureAssessmentReport.makeValidatedFixture(lowQuality, "2026-08-11").overallLevel)
     }
 
     @Test
@@ -468,19 +631,19 @@ class BodyAssessmentTest {
             cameraProxyRibProminenceCm = .2
         )
         val headTilt = BodyCaptureTask.values().associateWith(::snapshot)
-        assertEquals(BodyAttentionLevel.Yellow, PostureAssessmentReport.make(headTilt, "2026-08-11").overallLevel)
+        assertEquals(BodyAttentionLevel.Yellow, PostureAssessmentReport.makeValidatedFixture(headTilt, "2026-08-11").overallLevel)
 
         val thoracic = headTilt.toMutableMap().apply {
             this[BodyCaptureTask.StandingBack] = snapshot(BodyCaptureTask.StandingBack).copy(headTiltDegrees = 1.0)
             this[BodyCaptureTask.ForwardBend] = snapshot(BodyCaptureTask.ForwardBend).copy(thoracicAtrDegrees = 7.0)
         }
-        assertEquals(BodyAttentionLevel.Red, PostureAssessmentReport.make(thoracic, "2026-08-11").overallLevel)
+        assertEquals(BodyAttentionLevel.Red, PostureAssessmentReport.makeValidatedFixture(thoracic, "2026-08-11").overallLevel)
 
         val lumbar = headTilt.toMutableMap().apply {
             this[BodyCaptureTask.StandingBack] = snapshot(BodyCaptureTask.StandingBack).copy(headTiltDegrees = 1.0)
             this[BodyCaptureTask.ForwardBend] = snapshot(BodyCaptureTask.ForwardBend).copy(lumbarAtrDegrees = 5.0)
         }
-        assertEquals(BodyAttentionLevel.Yellow, PostureAssessmentReport.make(lumbar, "2026-08-11").overallLevel)
+        assertEquals(BodyAttentionLevel.Yellow, PostureAssessmentReport.makeValidatedFixture(lumbar, "2026-08-11").overallLevel)
     }
 
     @Test
@@ -491,14 +654,18 @@ class BodyAssessmentTest {
             gaitShoulderSwingDifferenceCm = gait
         )
         val mismatched = BodyCaptureTask.values().associateWith { sparse(it, shoulder = .2) }
-        assertEquals(BodyAttentionLevel.Pending, PostureAssessmentReport.make(mismatched, "2026-08-11").overallLevel)
+        assertEquals(BodyAttentionLevel.Pending, PostureAssessmentReport.makeValidatedFixture(mismatched, "2026-08-11").overallLevel)
         val taskSpecific = mapOf(
+            BodyCaptureTask.StandingFront to sparse(BodyCaptureTask.StandingFront, shoulder = .2),
             BodyCaptureTask.StandingBack to sparse(BodyCaptureTask.StandingBack, shoulder = .2),
+            BodyCaptureTask.StandingSide to sparse(BodyCaptureTask.StandingSide).copy(forwardHeadAngleDegrees = 2.0),
             BodyCaptureTask.ForwardBend to sparse(BodyCaptureTask.ForwardBend, trunk = .2),
+            BodyCaptureTask.DynamicKneeControl to sparse(BodyCaptureTask.DynamicKneeControl).copy(movementRepetitionCount = 3.0),
             BodyCaptureTask.Seated to sparse(BodyCaptureTask.Seated, trunk = .2),
-            BodyCaptureTask.GaitVideo to sparse(BodyCaptureTask.GaitVideo, gait = .2)
+            BodyCaptureTask.GaitVideo to sparse(BodyCaptureTask.GaitVideo, gait = .2),
+            BodyCaptureTask.FootArch to sparse(BodyCaptureTask.FootArch).copy(footArchVisibilityScore = .8)
         )
-        assertEquals(BodyAttentionLevel.Green, PostureAssessmentReport.make(taskSpecific, "2026-08-11").overallLevel)
+        assertEquals(BodyAttentionLevel.Green, PostureAssessmentReport.makeValidatedFixture(taskSpecific, "2026-08-11").overallLevel)
     }
 
     @Test
@@ -515,7 +682,7 @@ class BodyAssessmentTest {
         )
         val snapshots = BodyCaptureTask.values().associateWith { snapshot(it, .82) }.toMutableMap()
         snapshots[BodyCaptureTask.StandingBack] = snapshot(BodyCaptureTask.StandingBack, Double.POSITIVE_INFINITY)
-        assertEquals(BodyAttentionLevel.Pending, PostureAssessmentReport.make(snapshots, "2026-08-11").overallLevel)
+        assertEquals(BodyAttentionLevel.Pending, PostureAssessmentReport.makeValidatedFixture(snapshots, "2026-08-11").overallLevel)
         assertEquals(.2, PostureMetricCalculator.range(listOf(.2, .4, .3))!!, 0.000001)
         assertEquals(null, PostureMetricCalculator.range(listOf(Double.NaN, Double.POSITIVE_INFINITY)))
     }
@@ -574,8 +741,8 @@ class BodyAssessmentTest {
             BodyCaptureTask.ForwardBend to snapshot(BodyCaptureTask.ForwardBend, shoulder = 1.15, atr = 5.0),
             BodyCaptureTask.GaitVideo to snapshot(BodyCaptureTask.GaitVideo, shoulder = 1.15)
         )
-        val childReport = PostureAssessmentReport.make(raw, "2026-08-11", 80)
-        val juniorReport = PostureAssessmentReport.make(raw, "2026-08-11", 120)
+        val childReport = PostureAssessmentReport.makeValidatedFixture(raw, "2026-08-11", 80)
+        val juniorReport = PostureAssessmentReport.makeValidatedFixture(raw, "2026-08-11", 120)
         assertEquals(false, childReport.overallLevel == BodyAttentionLevel.Red)
         assertEquals(false, juniorReport.overallLevel == BodyAttentionLevel.Red)
         assertEquals(true, childReport.riskScore <= juniorReport.riskScore)
@@ -602,7 +769,7 @@ class BodyAssessmentTest {
             BodyCaptureTask.ForwardBend to weakSnapshot.copy(task = BodyCaptureTask.ForwardBend, id = BodyCaptureTask.ForwardBend.name, cameraProxyAtrDegrees = 3.8, cameraProxyRibProminenceCm = 0.95),
             BodyCaptureTask.GaitVideo to weakSnapshot.copy(task = BodyCaptureTask.GaitVideo, id = BodyCaptureTask.GaitVideo.name, shoulderHeightDifferenceCm = 0.0, pelvicHeightDifferenceCm = 0.0, gaitShoulderSwingDifferenceCm = 0.55, gaitPelvicSwingDifferenceCm = 0.45, gaitTrunkSwayCm = 0.45)
         )
-        val report = PostureAssessmentReport.make(lowEvidence, "2026-08-11", 120)
+        val report = PostureAssessmentReport.makeValidatedFixture(lowEvidence, "2026-08-11", 120)
         assertEquals(BodyAttentionLevel.Pending, report.overallLevel)
     }
 

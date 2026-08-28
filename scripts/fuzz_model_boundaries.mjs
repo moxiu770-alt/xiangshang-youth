@@ -38,7 +38,7 @@ const cleanMetrics = () => ({
   gaitTrunkSwayCm: between(-2, 2)
 });
 const snapshots = (complete = true) => {
-  const tasks = ['standingBack', 'forwardBend', 'seatedPosture', 'gaitVideo'];
+  const tasks = ['standingFront', 'standingBack', 'standingSide', 'forwardBend', 'dynamicKneeControl', 'gaitVideo', 'seatedPosture', 'footArch'];
   return tasks.slice(0, complete ? 4 : Math.floor(between(0, 4))).map((captureTask) => ({
     captureTask,
     sampleCount: Math.floor(between(0, 30)),
@@ -151,7 +151,7 @@ for (const ageMonths of [72, 108, 156, 192]) {
   for (let shoulder = 0; shoulder <= 4; shoulder += 0.05) {
     const report = scoreBodyAssessment({
       heightCm: 140, weightKg: 35, ageMonths, gender: '男',
-      snapshots: ['standingBack', 'forwardBend', 'seatedPosture', 'gaitVideo'].map((captureTask) => ({
+      snapshots: ['standingFront', 'standingBack', 'standingSide', 'forwardBend', 'dynamicKneeControl', 'gaitVideo', 'seatedPosture', 'footArch'].map((captureTask) => ({
         captureTask, sampleCount: 18, confidence: 0.90,
         metrics: {
           shoulderHeightDifferenceCm: captureTask === 'standingBack' ? shoulder : 0.2,

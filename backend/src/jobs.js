@@ -47,12 +47,12 @@ export async function enqueueJob(jobType, payload = {}, availableAt = new Date()
 async function exportStudent(requestId, payload) {
   await query(`UPDATE privacy_requests SET status='processing' WHERE id=$1 AND status IN ('pending','processing')`, [requestId]);
   const [student, assessments, consents, reports, tasks, scores] = await Promise.all([
-    query(`SELECT st.id,st.school_id AS "schoolId",st.name,st.gender,st.birth_date AS "birthDate",st.region,st.is_poverty_area AS "isPovertyArea",g.name AS grade,c.name AS "className"
+    query(`SELECT st.id,st.school_id AS "schoolId",st.name,st.gender,st.birth_date::text AS "birthDate",st.region,st.is_poverty_area AS "isPovertyArea",g.name AS grade,c.name AS "className"
       FROM students st JOIN grades g ON g.id=st.grade_id JOIN classes c ON c.id=st.class_id WHERE st.id=$1`, [payload.studentId]),
     query(`SELECT id,height_cm AS "heightCm",weight_kg AS "weightKg",bmi,overall_level AS "overallLevel",algorithm_version AS "algorithmVersion",consent_version AS "consentVersion",measured_at AS "measuredAt",data_json AS data FROM body_assessments WHERE student_id=$1 ORDER BY measured_at DESC`, [payload.studentId]),
     query(`SELECT id,consent_version AS "consentVersion",purpose,granted_at AS "grantedAt",revoked_at AS "revokedAt",expires_at AS "expiresAt" FROM data_consents WHERE student_id=$1 ORDER BY created_at DESC`, [payload.studentId]),
     query(`SELECT id,task_id AS "taskId",risk_level AS "riskLevel",total_score AS "totalScore",rule_version AS "ruleVersion",status,current_version AS "currentVersion",generated_at AS "generatedAt",published_at AS "publishedAt" FROM diagnosis_reports WHERE student_id=$1 ORDER BY generated_at DESC`, [payload.studentId]),
-    query(`SELECT ts.id,ts.task_id AS "taskId",ts.status,ts.note,ts.check_in_at AS "checkInAt",ts.completed_at AS "completedAt",t.title,t.test_date AS "testDate",t.rule_version AS "ruleVersion" FROM task_students ts JOIN assessment_tasks t ON t.id=ts.task_id WHERE ts.student_id=$1 ORDER BY t.test_date DESC`, [payload.studentId]),
+    query(`SELECT ts.id,ts.task_id AS "taskId",ts.status,ts.note,ts.check_in_at AS "checkInAt",ts.completed_at AS "completedAt",t.title,t.test_date::text AS "testDate",t.rule_version AS "ruleVersion" FROM task_students ts JOIN assessment_tasks t ON t.id=ts.task_id WHERE ts.student_id=$1 ORDER BY t.test_date DESC`, [payload.studentId]),
     query(`SELECT id,task_id AS "taskId",item_code AS "itemCode",score,confidence,note,source,review_status AS "reviewStatus",manual_reviewed AS "manualReviewed",algorithm_version AS "algorithmVersion",created_at AS "createdAt" FROM assessment_scores WHERE student_id=$1 ORDER BY created_at DESC`, [payload.studentId])
   ]);
   if (!student.rows[0]) throw Object.assign(new Error('学生不存在'), { code: 'STUDENT_NOT_FOUND' });

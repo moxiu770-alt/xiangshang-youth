@@ -30,6 +30,15 @@ interface StudentApi {
     @POST("v1/students/{studentId}/body-assessments")
     suspend fun submitBodyAssessment(@Path("studentId") studentId: String, @Body request: BodyAssessmentRequest, @Header("Idempotency-Key") idempotencyKey: String? = null): ApiEnvelope<RemoteBodyAssessmentResult>
 
+    @GET("v1/students/{studentId}/body-assessments/latest")
+    suspend fun latestBodyAssessment(@Path("studentId") studentId: String): ApiEnvelope<RemoteBodyAssessmentResult>
+
+    @GET("v1/body-screening/reviews")
+    suspend fun bodyScreeningReviews(@Query("schoolId") schoolId: String, @Query("limit") limit: Int = 30): ApiEnvelope<List<com.xiangshang.youth.core.model.BodyScreeningReviewItem>>
+
+    @POST("v1/body-screening/reviews/{reviewId}/decision")
+    suspend fun decideBodyScreeningReview(@Path("reviewId") reviewId: String, @Body request: BodyScreeningReviewDecisionRequest, @Header("Idempotency-Key") idempotencyKey: String): ApiEnvelope<com.xiangshang.youth.core.model.BodyScreeningReviewAck>
+
     @POST("v1/students/{studentId}/privacy-requests")
     suspend fun submitPrivacyRequest(@Path("studentId") studentId: String, @Body request: PrivacyRequestBody): ApiEnvelope<PrivacyRequestReceipt>
 }
@@ -40,11 +49,31 @@ data class PrivacyRequestBody(val requestType: String)
 data class PrivacyRequestReceipt(val id: String, val requestType: String, val status: String, val createdAt: String, val jobId: String? = null)
 data class BodySnapshotRequest(val captureTask: String, val sampleCount: Int, val confidence: Double, val metrics: PostureMetricSnapshot)
 data class BodyAssessmentRequest(val heightCm: Double, val weightKg: Double, val overallLevel: String, val algorithmVersion: String, val consentVersion: String, val data: BodyAssessmentRecord, val snapshots: List<BodySnapshotRequest>)
+data class BodyScreeningReviewDecisionRequest(val decision: String, val expectedVersion: Int, val comment: String? = null, val requestedRecaptureTasks: List<String> = emptyList())
 data class RemoteBodyAssessmentResult(
     val postureReport: RemotePostureSummary? = null,
     val bmiAlgorithmVersion: String? = null,
     val heightAlgorithmVersion: String? = null,
-    val modelRegistryVersion: String? = null
+    val modelRegistryVersion: String? = null,
+    val screeningDecision: RemoteBodyScreeningDecision? = null
+)
+data class RemoteBodyScreeningDecision(
+    val sessionId: String? = null,
+    val decisionId: String? = null,
+    val route: String,
+    val outcomeLevel: String? = null,
+    val reasonCodes: List<String> = emptyList(),
+    val qualityScore: Int? = null,
+    val reviewRequired: Boolean = false,
+    val decisionPolicyVersion: String,
+    val version: Int? = null,
+    val decidedAt: String? = null,
+    val reviewStatus: String? = null,
+    val reviewDecision: String? = null,
+    val reviewComment: String? = null,
+    val requestedRecaptureTasks: List<String>? = null,
+    val reviewVersion: Int? = null,
+    val reviewedAt: String? = null
 )
 data class RemotePostureSummary(
     val algorithm: String,
@@ -54,5 +83,6 @@ data class RemotePostureSummary(
     val riskScore: Int = 0,
     val qualityScore: Int = 0,
     val calibrationVersion: String? = null,
-    val rulesSourceVersion: String? = null
+    val rulesSourceVersion: String? = null,
+    val validationStatus: String? = null
 )

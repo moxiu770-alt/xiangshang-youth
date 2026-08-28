@@ -54,6 +54,9 @@ interface YouthRepository {
     suspend fun grantHealthConsent(consent: HealthConsentRecord) = grantHealthConsent(consent.childId, consent.privacyPolicyVersion)
     suspend fun revokeHealthConsent(studentId: String, version: String) { mockOnly { Unit } }
     suspend fun submitBodyAssessment(studentId: String, record: BodyAssessmentRecord, consentVersion: String): PostureAssessmentReport? = mockOnly { null }
+    suspend fun loadLatestBodyAssessment(studentId: String, record: BodyAssessmentRecord): PostureAssessmentReport? = mockOnly { record.postureReport }
+    suspend fun loadBodyScreeningReviews(schoolId: String, limit: Int = 30): List<BodyScreeningReviewItem> = mockOnly { emptyList() }
+    suspend fun decideBodyScreeningReview(reviewId: String, decision: BodyScreeningReviewDecision, expectedVersion: Int, comment: String?, requestedRecaptureTasks: List<BodyCaptureTask>): BodyScreeningReviewAck { throw ApiError.NotConfigured }
     suspend fun loadHealthObservations(studentId: String): List<com.xiangshang.youth.core.service.FamilyHealthRecord> = mockOnly { emptyList() }
     suspend fun submitHealthObservation(studentId: String, category: String, record: com.xiangshang.youth.core.service.FamilyHealthRecord): com.xiangshang.youth.core.service.FamilyHealthRecord = mockOnly { record }
     suspend fun loadHealthCheckins(studentId: String, from: String? = null, to: String? = null): List<com.xiangshang.youth.core.service.HealthCheckInRecord> = mockOnly { emptyList() }

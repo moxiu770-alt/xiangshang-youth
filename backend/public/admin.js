@@ -112,6 +112,7 @@ const dateText = (value) =>
 const percent = (n) => `${Math.round(Number(n) || 0)}%`;
 const statusClass = (value) => {
   const s = String(value || "");
+  if (s === "未完成" || s === "已关闭") return "review";
   if (s.includes("完成") || s === "published") return "done";
   if (s.includes("复核") || s.includes("关注") || s === "attention")
     return "review";
@@ -142,7 +143,7 @@ function applyProfile(profile) {
   $("sideName").textContent = profile.name || "工作台用户";
   $("sideRole").textContent = profile.role || "学校管理员";
 }
-function calculatePending() {
+function calculatePendingBreakdown() {
   const pendingStudents = (state.dashboard?.students || []).filter((s) =>
     String(s.taskStatus).includes("复核"),
   ).length;
@@ -151,7 +152,10 @@ function calculatePending() {
       ["high", "attention", "unavailable"].includes(r.riskLevel) &&
       r.status !== "published",
   ).length;
-  return pendingStudents + pendingReports;
+  return { pendingStudents, pendingReports, total: pendingStudents + pendingReports };
+}
+function calculatePending() {
+  return calculatePendingBreakdown().total;
 }
 function renderOverview() {
   const d = state.dashboard || {};
@@ -167,7 +171,8 @@ function renderOverview() {
     0,
   );
   const completion = total ? Math.round((completed / total) * 100) : 0;
-  const pending = calculatePending();
+  const pendingBreakdown = calculatePendingBreakdown();
+  const pending = pendingBreakdown.total;
   $("schoolTitle").textContent = school.name || "学校数据总览";
   $("schoolDescription").textContent =
     `${school.campus || "本校区"} · 已接入 ${studentTotal} 名学生、${(d.classes || []).length} 个班级，测评数据持续同步中。`;
@@ -177,10 +182,13 @@ function renderOverview() {
   $("metricStudents").textContent = studentTotal;
   $("metricTasks").textContent = tasks.length;
   $("metricClasses").textContent = (d.classes || []).length;
-  $("metricReports").textContent = pending;
+  $("metricReports").textContent = pendingBreakdown.pendingReports;
   $("taskCount").textContent = tasks.length;
-  $("updatedAt").textContent =
-    `最后同步：${new Date().toLocaleString("zh-CN", { hour12: false })}`;
+  const updateText = `最后同步：${new Date().toLocaleString("zh-CN", { hour12: false })}`;
+  $("updatedAt").dataset.latestUpdate = updateText;
+  if (!$("overviewSection").dataset.workspace || $("overviewSection").dataset.workspace === "overview") {
+    $("updatedAt").textContent = updateText;
+  }
   renderGradeChart();
   renderRisk();
   renderTasks();
@@ -213,7 +221,7 @@ function renderRisk() {
     : [0, 0, 0, 100];
   const end = values.reduce((a, n) => a + n, 0);
   $("riskDistribution").innerHTML =
-    `<div class="donut" style="background:conic-gradient(var(--green) 0 ${values[0]}%,#fbbf24 ${values[0]}% ${values[0] + values[1]}%,var(--red) ${values[0] + values[1]}% ${values[0] + values[1] + values[2]}%,#d8e2ef ${values[0] + values[1] + values[2]}% ${end}%)"><div class="donut-label"><strong>${total}</strong><span>份报告</span></div></div><div class="legend"><div class="legend-item"><span><i class="legend-dot" style="background:var(--green)"></i>低风险</span><b>${counts.low}</b></div><div class="legend-item"><span><i class="legend-dot" style="background:#fbbf24"></i>需要关注</span><b>${counts.attention}</b></div><div class="legend-item"><span><i class="legend-dot" style="background:var(--red)"></i>高风险</span><b>${counts.high}</b></div><div class="legend-item"><span><i class="legend-dot" style="background:#d8e2ef"></i>待生成</span><b>${counts.unavailable}</b></div></div>`;
+    `<div class="donut" style="background:conic-gradient(var(--green) 0 ${values[0]}%,#fbbf24 ${values[0]}% ${values[0] + values[1]}%,var(--red) ${values[0] + values[1]}% ${values[0] + values[1] + values[2]}%,#d8e2ef ${values[0] + values[1] + values[2]}% ${end}%)"><div class="donut-label"><strong>${total}</strong><span>份报告</span></div></div><div class="legend"><div class="legend-item"><span><i class="legend-dot" style="background:var(--green)"></i>低风险</span><b>${counts.low}</b></div><div class="legend-item"><span><i class="legend-dot" style="background:#fbbf24"></i>需要关注</span><b>${counts.attention}</b></div><div class="legend-item"><span><i class="legend-dot" style="background:var(--red)"></i>高风险</span><b>${counts.high}</b></div><div class="legend-item"><span><i class="legend-dot" style="background:#d8e2ef"></i>数据不足</span><b>${counts.unavailable}</b></div></div>`;
 }
 function renderTasks() {
   const tasks = state.dashboard?.tasks || [];
@@ -547,13 +555,13 @@ showLogin();
   reportPanel.className = "panel report-panel";
   reportPanel.id = "reportsSection";
   reportPanel.innerHTML =
-    '<div class="panel-head"><div><h3>报告中心</h3><p>集中处理诊断报告的风险等级与发布状态</p></div><select id="reportFilter" class="report-filter" aria-label="报告风险筛选"><option value="all">全部风险</option><option value="low">低风险</option><option value="attention">需要关注</option><option value="high">高风险</option><option value="unavailable">待生成</option></select></div><div class="table-panel"><div class="table-scroll"><table class="data-table"><thead><tr><th>学生</th><th>班级</th><th>综合得分</th><th>风险等级</th><th>发布状态</th><th>生成时间</th><th>操作</th></tr></thead><tbody id="reportTable"></tbody></table></div></div>';
+    '<div class="panel-head"><div><h3>报告中心</h3><p>集中处理诊断报告的风险等级与发布状态</p></div><select id="reportFilter" class="report-filter" aria-label="报告风险筛选"><option value="all">全部风险</option><option value="low">低风险</option><option value="attention">需要关注</option><option value="high">高风险</option><option value="unavailable">数据不足</option></select></div><div class="table-panel"><div class="table-scroll"><table class="data-table"><thead><tr><th>学生</th><th>班级</th><th>综合得分</th><th>风险等级</th><th>发布状态</th><th>生成时间</th><th>操作</th></tr></thead><tbody id="reportTable"></tbody></table></div></div>';
   if (settingsAnchor) settingsAnchor.before(reportPanel);
   const reportRiskLabel = {
     low: "低风险",
     attention: "需要关注",
     high: "高风险",
-    unavailable: "待生成",
+    unavailable: "数据不足",
   };
   function renderTrendPanel() {
     const chart = document.getElementById("trendChart");

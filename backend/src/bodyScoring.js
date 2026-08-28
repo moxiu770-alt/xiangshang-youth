@@ -133,3 +133,30 @@ export function scoreBodyAssessment({ heightCm, weightKg, ageMonths, gender, sna
     postureReport
   };
 }
+
+/**
+ * Remove unvalidated posture classifications before a report is persisted or
+ * returned by an API. The raw candidate score remains available only to the
+ * offline evaluation pipeline; families must never receive a red/yellow/green
+ * posture conclusion until the registry is explicitly human-validated.
+ */
+export function publicationSafeBodyReport(report) {
+  if (!report || typeof report !== 'object') return report;
+  const postureReport = report.postureReport;
+  if (!postureReport || postureReport.classificationPublished === true) return report;
+  const notice = '手机姿态算法尚未完成人工标注验证；当前仅显示采集记录与质量，不发布姿态风险等级。';
+  return {
+    ...report,
+    // BMI is a separate deterministic standards calculation. Do not let an
+    // unpublished posture candidate silently elevate the combined level.
+    overallLevel: report.bmiLevel,
+    postureReport: {
+      ...postureReport,
+      classificationPublished: false,
+      overallLevel: 'pending',
+      riskScore: 0,
+      reasons: [notice, ...(Array.isArray(postureReport.reasons) ? postureReport.reasons : [])],
+      disclaimer: notice
+    }
+  };
+}

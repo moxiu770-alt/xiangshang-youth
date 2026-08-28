@@ -2,15 +2,13 @@ package com.xiangshang.youth.core.model
 
 import org.json.JSONObject
 
-enum class BodyCaptureTask(val title: String, val guide: String, val apiCode: String) {
-    StandingBack("自然站姿", "背对镜头自然站立，双脚与肩同宽", "standingBack"),
-    ForwardBend("前屈观察", "建议从侧后方拍摄；成人陪同下缓慢前屈，不适立即停止", "forwardBend"),
-    Seated("坐姿观察", "坐在无靠背椅上，双手自然放在膝盖", "seatedPosture"),
-    GaitVideo("步态视频", "沿直线自然行走 3–5 秒，从后方拍摄", "gaitVideo")
-}
 /** Capture usability rules only. They never create a medical conclusion. */
 object BodyCaptureQualityGate {
-    const val canonicalAssetVersion = "android-v1-search-calibrated-2026-09-15"
+    enum class BodyScaleState { Invalid, TooFar, Ready, TooClose }
+
+    const val canonicalAssetVersion = "android-v3-adams-repeatability-2026-08-27"
+    const val footMinimumFrameCoverageRatio = .28
+    const val footMaximumFrameCoverageRatio = .72
     data class PostureCaptureProfile(
         val tag: String,
         val staticHoldMilliseconds: Long,
@@ -47,20 +45,20 @@ object BodyCaptureQualityGate {
             96,
             PostureCaptureProfile(
                 tag = "6-8岁",
-                staticHoldMilliseconds = 1800L,
-                staticMinimumFrames = 12,
+                staticHoldMilliseconds = 2600L,
+                staticMinimumFrames = 20,
                 staticMaximumDisplacementRatio = .032,
                 staticDisplacementJitterRatio = .0088,
-                gaitMinimumMilliseconds = 2550L,
+                gaitMinimumMilliseconds = 6500L,
                 gaitMinimumDisplacementRatio = .0365,
-                stabilityWindowFrames = 11,
+                stabilityWindowFrames = 15,
                 gaitMovementWindowFrames = 7,
-                minimumRawSamplesForCompletion = 6,
+                minimumRawSamplesForCompletion = 18,
                 fullBodyMinimumFrameCoverageRatio = .38,
                 seatedMinimumFrameCoverageRatio = .145,
                 minimumIndividualLandmarkConfidence = .47f,
                 minimumMeanLandmarkConfidence = .515f,
-                forwardBendMinimumTorsoTiltRatio = .34
+                forwardBendMinimumTorsoTiltRatio = .27
             )
         ),
         AgeLimitedProfile(
@@ -68,20 +66,20 @@ object BodyCaptureQualityGate {
             132,
             PostureCaptureProfile(
                 tag = "9-11岁",
-                staticHoldMilliseconds = 1700L,
-                staticMinimumFrames = 13,
+                staticHoldMilliseconds = 2500L,
+                staticMinimumFrames = 20,
                 staticMaximumDisplacementRatio = .031,
                 staticDisplacementJitterRatio = .0078,
-                gaitMinimumMilliseconds = 2500L,
+                gaitMinimumMilliseconds = 6300L,
                 gaitMinimumDisplacementRatio = .0355,
-                stabilityWindowFrames = 10,
+                stabilityWindowFrames = 15,
                 gaitMovementWindowFrames = 7,
-                minimumRawSamplesForCompletion = 6,
+                minimumRawSamplesForCompletion = 18,
                 fullBodyMinimumFrameCoverageRatio = .40,
                 seatedMinimumFrameCoverageRatio = .155,
                 minimumIndividualLandmarkConfidence = .50f,
                 minimumMeanLandmarkConfidence = .54f,
-                forwardBendMinimumTorsoTiltRatio = .35
+                forwardBendMinimumTorsoTiltRatio = .28
             )
         ),
         AgeLimitedProfile(
@@ -89,20 +87,20 @@ object BodyCaptureQualityGate {
             180,
             PostureCaptureProfile(
                 tag = "12-15岁",
-                staticHoldMilliseconds = 1650L,
-                staticMinimumFrames = 14,
+                staticHoldMilliseconds = 2400L,
+                staticMinimumFrames = 20,
                 staticMaximumDisplacementRatio = .03,
                 staticDisplacementJitterRatio = .0072,
-                gaitMinimumMilliseconds = 2450L,
+                gaitMinimumMilliseconds = 6100L,
                 gaitMinimumDisplacementRatio = .0368,
-                stabilityWindowFrames = 10,
+                stabilityWindowFrames = 14,
                 gaitMovementWindowFrames = 6,
-                minimumRawSamplesForCompletion = 6,
+                minimumRawSamplesForCompletion = 18,
                 fullBodyMinimumFrameCoverageRatio = .42,
                 seatedMinimumFrameCoverageRatio = .16,
                 minimumIndividualLandmarkConfidence = .52f,
                 minimumMeanLandmarkConfidence = .56f,
-                forwardBendMinimumTorsoTiltRatio = .35
+                forwardBendMinimumTorsoTiltRatio = .28
             )
         ),
         AgeLimitedProfile(
@@ -110,20 +108,20 @@ object BodyCaptureQualityGate {
             216,
             PostureCaptureProfile(
                 tag = "16-18岁",
-                staticHoldMilliseconds = 1600L,
-                staticMinimumFrames = 14,
+                staticHoldMilliseconds = 2400L,
+                staticMinimumFrames = 20,
                 staticMaximumDisplacementRatio = .029,
                 staticDisplacementJitterRatio = .0068,
-                gaitMinimumMilliseconds = 2400L,
+                gaitMinimumMilliseconds = 6000L,
                 gaitMinimumDisplacementRatio = .038,
-                stabilityWindowFrames = 10,
+                stabilityWindowFrames = 14,
                 gaitMovementWindowFrames = 6,
-                minimumRawSamplesForCompletion = 6,
+                minimumRawSamplesForCompletion = 18,
                 fullBodyMinimumFrameCoverageRatio = .43,
                 seatedMinimumFrameCoverageRatio = .16,
                 minimumIndividualLandmarkConfidence = .53f,
                 minimumMeanLandmarkConfidence = .57f,
-                forwardBendMinimumTorsoTiltRatio = .35
+                forwardBendMinimumTorsoTiltRatio = .28
             )
         )
     )
@@ -215,31 +213,39 @@ object BodyCaptureQualityGate {
     }
 
     // Backward-compatible legacy constants used by UI labels and existing tests.
-    const val staticHoldMilliseconds = 1600L
-    const val staticMinimumFrames = 14
+    const val staticHoldMilliseconds = 2500L
+    const val staticMinimumFrames = 20
     /** 单次单帧位移上限（相对身高归一化后）。 */
     const val staticMaximumDisplacementRatio = .029
     /** 动作完成抖动门限：当短窗内抖动上升超过该值则重置。 */
     const val staticDisplacementJitterRatio = .0072
-    const val gaitMinimumMilliseconds = 2450L
+    const val gaitMinimumMilliseconds = 6300L
     /** 步态必须有持续位移，不是一次抖动。 */
     const val gaitMinimumDisplacementRatio = .0368
     /** 过滤单次抖动的滑窗长度。 */
-    const val stabilityWindowFrames = 10
+    const val stabilityWindowFrames = 15
     /** 步态需要连续几帧维持移动迹象。 */
     const val gaitMovementWindowFrames = 6
     /** 快速拒绝噪声前最少可用原始样本。 */
-    const val minimumRawSamplesForCompletion = 6
+    const val minimumRawSamplesForCompletion = 18
     /** Pose confidence alone is insufficient when the child is too far away. */
     const val fullBodyMinimumFrameCoverageRatio = .42
     const val seatedMinimumFrameCoverageRatio = .16
+    /** Upper framing bounds keep capture in a long shot and reduce perspective
+     * distortion around shoulders and hips. */
+    const val fullBodyMaximumFrameCoverageRatio = .70
+    const val seatedMaximumFrameCoverageRatio = .36
+    const val followAlongMaximumBodySpanRatio = .78
+    const val followAlongMaximumTorsoSpanRatio = .34
     /** Requires every key joint to be reliable, not merely one detected frame.
      * This is a framing-quality gate and must not be interpreted as a body or
      * medical score. */
     const val minimumIndividualLandmarkConfidence = .50f
     const val minimumMeanLandmarkConfidence = .56f
     /** Visual completion only, never a flexibility/medical score. */
-    const val forwardBendMinimumTorsoTiltRatio = .35
+    const val forwardBendMinimumTorsoTiltRatio = .28
+    /** Manual requirement: knees fully extended, with landmark jitter tolerance. */
+    const val adamsMinimumKneeExtensionDegrees = 165.0
 
     fun profileForAge(ageMonths: Int?): PostureCaptureProfile = when {
         ageMonths == null -> fallbackProfile(108)
@@ -283,11 +289,39 @@ object BodyCaptureQualityGate {
     fun forwardBendReady(elapsedMs: Long, stableFrames: Int, displacementRatio: Double, torsoTiltRatio: Double): Boolean = forwardBendReady(elapsedMs, stableFrames, displacementRatio, torsoTiltRatio, null)
 
     fun hasUsableBodyScale(verticalCoverageRatio: Double, seated: Boolean, ageMonths: Int?): Boolean {
+        return bodyScaleState(verticalCoverageRatio, seated, ageMonths) == BodyScaleState.Ready
+    }
+
+    fun bodyScaleState(verticalCoverageRatio: Double, seated: Boolean, ageMonths: Int?): BodyScaleState {
+        if (!verticalCoverageRatio.isFinite() || verticalCoverageRatio !in 0.0..1.0) return BodyScaleState.Invalid
         val profile = profileForAge(ageMonths)
-        return verticalCoverageRatio.isFinite() && verticalCoverageRatio in 0.0..1.0 && verticalCoverageRatio >= if (seated) profile.seatedMinimumFrameCoverageRatio else profile.fullBodyMinimumFrameCoverageRatio
+        val minimum = if (seated) profile.seatedMinimumFrameCoverageRatio else profile.fullBodyMinimumFrameCoverageRatio
+        val maximum = if (seated) seatedMaximumFrameCoverageRatio else fullBodyMaximumFrameCoverageRatio
+        return when {
+            verticalCoverageRatio < minimum -> BodyScaleState.TooFar
+            verticalCoverageRatio > maximum -> BodyScaleState.TooClose
+            else -> BodyScaleState.Ready
+        }
+    }
+
+    fun bodyScaleState(verticalCoverageRatio: Double, seated: Boolean): BodyScaleState = bodyScaleState(verticalCoverageRatio, seated, null)
+
+    fun footScaleState(lowerLegCoverageRatio: Double): BodyScaleState = when {
+        !lowerLegCoverageRatio.isFinite() || lowerLegCoverageRatio !in 0.0..1.0 -> BodyScaleState.Invalid
+        lowerLegCoverageRatio < footMinimumFrameCoverageRatio -> BodyScaleState.TooFar
+        lowerLegCoverageRatio > footMaximumFrameCoverageRatio -> BodyScaleState.TooClose
+        else -> BodyScaleState.Ready
     }
 
     fun hasUsableBodyScale(verticalCoverageRatio: Double, seated: Boolean): Boolean = hasUsableBodyScale(verticalCoverageRatio, seated, null)
+
+    fun hasComfortableFollowAlongFraming(bodySpanRatio: Double?, torsoSpanRatio: Double?): Boolean {
+        val validBody = bodySpanRatio?.let { it.isFinite() && it in 0.0..1.5 } ?: true
+        val validTorso = torsoSpanRatio?.let { it.isFinite() && it in 0.0..1.5 } ?: true
+        if (!validBody || !validTorso) return false
+        return (bodySpanRatio ?: 0.0) <= followAlongMaximumBodySpanRatio &&
+            (torsoSpanRatio ?: 0.0) <= followAlongMaximumTorsoSpanRatio
+    }
 
     /** Camera image coordinates grow downward; shoulders must remain above hips. */
     fun hasUsableSeatedGeometry(shoulderCenterY: Double, hipCenterY: Double, verticalCoverageRatio: Double, ageMonths: Int?): Boolean {
@@ -302,19 +336,15 @@ object BodyCaptureQualityGate {
         return confidences.isNotEmpty() && confidences.all { it.isFinite() && it in 0f..1f && it >= profile.minimumIndividualLandmarkConfidence } && confidences.average() >= profile.minimumMeanLandmarkConfidence.toDouble()
     }
 
-    fun hasReliableLandmarks(confidences: List<Float>): Boolean = hasReliableLandmarks(confidences, null)
-
-    fun staticProgress(elapsedMs: Long, ageMonths: Int?): Float {
+    /** Feet are together in the Adams position, so one ankle can visually
+     * overlap the other. Keep the torso strict while accepting one reliable
+     * ankle for the capture-completion gate. */
+    fun hasReliableForwardBendLandmarks(core: List<Float>, ankles: List<Float>, ageMonths: Int?): Boolean {
         val profile = profileForAge(ageMonths)
-        return (elapsedMs.toFloat() / profile.staticHoldMilliseconds).coerceIn(0f, .96f)
+        val individualFloor = maxOf(.35f, profile.minimumIndividualLandmarkConfidence - .08f)
+        val meanFloor = maxOf(.42f, profile.minimumMeanLandmarkConfidence - .05f)
+        return core.isNotEmpty() && core.all { it.isFinite() && it in 0f..1f && it >= individualFloor } &&
+            core.average() >= meanFloor.toDouble() && ankles.any { it.isFinite() && it in 0f..1f && it >= profile.minimumIndividualLandmarkConfidence }
     }
 
-    fun staticProgress(elapsedMs: Long): Float = staticProgress(elapsedMs, null)
-
-    fun gaitProgress(elapsedMs: Long, hasMoved: Boolean, ageMonths: Int?): Float {
-        val profile = profileForAge(ageMonths)
-        return if (hasMoved) (.2f + elapsedMs.toFloat() / profile.gaitMinimumMilliseconds * .8f).coerceAtMost(.96f) else .12f
-    }
-
-    fun gaitProgress(elapsedMs: Long, hasMoved: Boolean): Float = gaitProgress(elapsedMs, hasMoved, null)
 }

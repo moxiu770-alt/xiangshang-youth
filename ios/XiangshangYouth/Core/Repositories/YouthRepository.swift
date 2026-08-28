@@ -16,6 +16,9 @@ protocol YouthRepository {
     func grantHealthConsent(_ consent: HealthConsentRecord) async throws
     func revokeHealthConsent(studentID: String, version: String) async throws
     func submitBodyAssessment(studentID: String, record: BodyAssessmentRecord, consentVersion: String) async throws -> PostureAssessmentReport?
+    func loadLatestBodyAssessment(studentID: String, record: BodyAssessmentRecord) async throws -> PostureAssessmentReport?
+    func loadBodyScreeningReviews(schoolID: String, limit: Int) async throws -> [BodyScreeningReviewItem]
+    func decideBodyScreeningReview(reviewID: String, decision: BodyScreeningReviewDecision, expectedVersion: Int, comment: String?, requestedRecaptureTasks: [BodyAssessmentRecord.CaptureTask]) async throws -> BodyScreeningReviewAck
     func loadHealthObservations(studentID: String) async throws -> [FamilyHealthRecord]
     func submitHealthObservation(studentID: String, category: String, record: FamilyHealthRecord) async throws -> FamilyHealthRecord
     func loadHealthCheckins(studentID: String, from: String?, to: String?) async throws -> [HealthCheckInRecord]
@@ -95,6 +98,9 @@ extension YouthRepository {
     func grantHealthConsent(_ consent: HealthConsentRecord) async throws { try await grantHealthConsent(studentID: consent.childID, version: consent.privacyPolicyVersion) }
     func revokeHealthConsent(studentID: String, version: String) async throws { try requireMockDefault() }
     func submitBodyAssessment(studentID: String, record: BodyAssessmentRecord, consentVersion: String) async throws -> PostureAssessmentReport? { try requireMockDefault(); return nil }
+    func loadLatestBodyAssessment(studentID: String, record: BodyAssessmentRecord) async throws -> PostureAssessmentReport? { try requireMockDefault(); return record.postureReport }
+    func loadBodyScreeningReviews(schoolID: String, limit: Int = 30) async throws -> [BodyScreeningReviewItem] { try requireMockDefault(); return [] }
+    func decideBodyScreeningReview(reviewID: String, decision: BodyScreeningReviewDecision, expectedVersion: Int, comment: String?, requestedRecaptureTasks: [BodyAssessmentRecord.CaptureTask]) async throws -> BodyScreeningReviewAck { throw ApiError.notConfigured }
     func loadHealthObservations(studentID: String) async throws -> [FamilyHealthRecord] { try requireMockDefault(); return [] }
     func loadFollowAlongSessions(childID: String, from: String?, to: String?) async throws -> [TrainingSessionRecord] { try requireMockDefault(); return [] }
     func submitFollowAlongSession(_ record: FollowAlongSessionRecord) async throws -> TrainingSessionRecord? { try requireMockDefault(); return nil }

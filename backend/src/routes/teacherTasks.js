@@ -11,6 +11,44 @@ export async function handleTeacherTaskRoutes(context) {
     movementScoreRules: MOVEMENT_SCORE_RULES, normalizeScoreRows,
     normalizeScore, normalizeConfidence, normalizeReviewStatus
   } = context;
+  const operationalTaskOrder = (alias = '') => {
+    const prefix = alias ? `${alias}.` : '';
+    return `CASE WHEN ${prefix}test_date=current_date THEN 0 WHEN ${prefix}test_date<current_date THEN 1 ELSE 2 END,
+      CASE WHEN ${prefix}test_date<=current_date THEN ${prefix}test_date END DESC,
+      CASE WHEN ${prefix}test_date>current_date THEN ${prefix}test_date END ASC`;
+  };
+  const validTaskCompletionPredicate = (taskStudentAlias = 'ts', taskAlias = 't') => {
+    const safeItems = `CASE WHEN jsonb_typeof(${taskAlias}.items)='array' THEN ${taskAlias}.items ELSE '[]'::jsonb END`;
+    return `(${taskStudentAlias}.status='已完成'
+      AND jsonb_array_length(${safeItems})>0
+      AND (SELECT COUNT(DISTINCT completion_score.item_code) FROM assessment_scores completion_score
+        WHERE completion_score.task_id=${taskStudentAlias}.task_id AND completion_score.student_id=${taskStudentAlias}.student_id
+          AND completion_score.review_status='passed'
+          AND completion_score.item_code IN (SELECT jsonb_array_elements_text(${safeItems})))=jsonb_array_length(${safeItems}))`;
+  };
+  const runQuery = (executor, sql, params) => typeof executor === 'function' ? executor(sql, params) : executor.query(sql, params);
+  const taskCompletionState = async (executor, taskId, studentId, taskItems = null) => {
+    let expected = Array.isArray(taskItems) ? taskItems.map((item) => String(item || '').trim()).filter(Boolean) : null;
+    if (expected === null) {
+      const task = await runQuery(executor, 'SELECT items FROM assessment_tasks WHERE id=$1', [taskId]);
+      expected = task.rows[0]?.items;
+    }
+    if (!Array.isArray(expected) || expected.length < 1 || expected.length > MOVEMENT_ITEM_CODES.length || new Set(expected).size !== expected.length || expected.some((item) => !MOVEMENT_ITEM_CODES.includes(item))) {
+      throw Object.assign(new Error('任务项目配置不完整，不能确认学生已完成'), { status: 409, code: 'TASK_ITEMS_INVALID' });
+    }
+    const scores = await runQuery(executor, `SELECT item_code AS item,review_status AS "reviewStatus" FROM assessment_scores
+      WHERE task_id=$1 AND student_id=$2 AND item_code=ANY($3::text[])`, [taskId, studentId, expected]);
+    const present = new Set(scores.rows.map((item) => item.item));
+    const missingItems = expected.filter((item) => !present.has(item));
+    const pendingReviewItems = scores.rows.filter((item) => item.reviewStatus === 'pendingReview').map((item) => item.item);
+    return { requiredItemCount: expected.length, measuredItemCount: present.size, missingItems, pendingReviewItems, canComplete: missingItems.length === 0 && pendingReviewItems.length === 0 };
+  };
+  const requireTaskCompletion = async (executor, taskId, studentId, taskItems = null) => {
+    const state = await taskCompletionState(executor, taskId, studentId, taskItems);
+    if (state.missingItems.length) throw Object.assign(new Error(`成绩尚未完整，缺少：${state.missingItems.join('、')}`), { status: 409, code: 'TASK_COMPLETION_SCORES_INCOMPLETE', data: state });
+    if (state.pendingReviewItems.length) throw Object.assign(new Error(`以下成绩仍待复核：${state.pendingReviewItems.join('、')}`), { status: 409, code: 'TASK_COMPLETION_REVIEW_PENDING', data: state });
+    return state;
+  };
 
 if (req.method === 'GET' && url.pathname === '/v1/teacher/analytics/overview') {
   if (!teacherOnly(user) || !await userHasCapability(user, 'VIEW_CLASS_DASHBOARD')) return fail(res, 403, 'CAPABILITY_DENIED', '当前账号无查看班级看板权限');
@@ -24,7 +62,7 @@ if (req.method === 'GET' && url.pathname === '/v1/teacher/analytics/overview') {
   const standardVersion = queryValue(url, 'standardVersion');
   if (standardVersion && standardVersion !== task.rows[0].rule_version) return fail(res, 409, 'STANDARD_VERSION_MISMATCH', '评分标准已更新，请刷新看板');
   const summary = await query(`SELECT COUNT(ts.id)::int AS "totalCount",
-    COUNT(ts.id) FILTER(WHERE ts.status='已完成')::int AS "completedCount",
+    COUNT(ts.id) FILTER(WHERE ${validTaskCompletionPredicate('ts', 'completion_task')})::int AS "completedCount",
     COUNT(ts.id) FILTER(WHERE ts.status='未签到')::int AS "notCheckedInCount",
     COUNT(ts.id) FILTER(WHERE ts.status='已签到')::int AS "checkedInCount",
     COUNT(ts.id) FILTER(WHERE ts.status='候测')::int AS "waitingCount",
@@ -32,6 +70,7 @@ if (req.method === 'GET' && url.pathname === '/v1/teacher/analytics/overview') {
     COUNT(ts.id) FILTER(WHERE ts.status='待复核')::int AS "reviewCount",
     COUNT(ts.id) FILTER(WHERE ts.status='待补测')::int AS "retestCount",
     COUNT(ts.id) FILTER(WHERE ts.status='缺席')::int AS "absentCount",
+    COUNT(ts.id) FILTER(WHERE ts.status='未完成')::int AS "incompleteCount",
     COUNT(DISTINCT ts.student_id) FILTER(WHERE ts.status IN ('待复核','待补测') OR EXISTS (
       SELECT 1 FROM assessment_scores risk_score WHERE risk_score.task_id=ts.task_id AND risk_score.student_id=ts.student_id
         AND (risk_score.score < 3 OR risk_score.review_status='pendingReview')
@@ -39,7 +78,7 @@ if (req.method === 'GET' && url.pathname === '/v1/teacher/analytics/overview') {
     COUNT(DISTINCT ts.student_id) FILTER(WHERE EXISTS (
       SELECT 1 FROM assessment_scores low_score WHERE low_score.task_id=ts.task_id AND low_score.student_id=ts.student_id AND low_score.score < 3
     ))::int AS "lowScoreCount"
-    FROM task_students ts JOIN students st ON st.id=ts.student_id WHERE ts.task_id=$1 AND st.class_id=$2`, [taskId, classId]);
+    FROM task_students ts JOIN assessment_tasks completion_task ON completion_task.id=ts.task_id JOIN students st ON st.id=ts.student_id WHERE ts.task_id=$1 AND st.class_id=$2`, [taskId, classId]);
   // Cross join the canonical seven-item catalogue with this class's task
   // roster. This deliberately returns zero-measurement rows instead of
   // removing an item that has not started yet; clients can distinguish
@@ -172,10 +211,16 @@ if (req.method === 'GET' && parts[0] === 'v1' && parts[1] === 'schools' && parts
   const offsetIndex = parentScope ? 6 : 5;
   const visibleTaskAlias = parentScope ? 'visible_ts' : 'ts';
   const visibleTaskId = `${visibleTaskAlias}.id`;
-  const result = await query(`SELECT t.id,t.title,t.test_date AS date,t.location,COALESCE(g.name,'全校') AS "gradeName",COALESCE(c.name,'全校') AS "className",t.items,t.rule_version AS "ruleVersion",t.status,
-    CASE WHEN t.class_id IS NULL THEN ARRAY[]::text[] ELSE ARRAY[t.class_id] END AS "classIds",COALESCE(ARRAY_AGG(DISTINCT ${visibleTaskAlias}.student_id) FILTER(WHERE ${visibleTaskAlias}.student_id IS NOT NULL), ARRAY[]::text[]) AS "studentIds",COUNT(DISTINCT ${visibleTaskId})::int AS "totalCount",COUNT(DISTINCT ${visibleTaskId}) FILTER(WHERE ${visibleTaskAlias}.status='已完成')::int AS "completedCount" FROM assessment_tasks t LEFT JOIN grades g ON g.id=t.grade_id LEFT JOIN classes c ON c.id=t.class_id LEFT JOIN task_students ts ON ts.task_id=t.id${scopeJoin}
-    WHERE t.school_id=$1 AND ($2::text IS NULL OR t.grade_id=$2) AND ($3::text IS NULL OR t.class_id=$3) GROUP BY t.id,g.name,c.name,t.class_id${parentGroup} ORDER BY t.test_date DESC LIMIT $${limitIndex} OFFSET $${offsetIndex}`, taskParams);
-  return ok(res, listResult(url, result.rows.map((row) => ({ ...row, items: row.items || [], status: row.completedCount === row.totalCount && row.totalCount > 0 ? '已完成' : row.status === 'published' ? '未签到' : row.status === 'closed' ? '已完成' : row.status })), count.rows[0].total));
+  const result = await query(`SELECT t.id,t.title,t.test_date::text AS date,t.location,COALESCE(g.name,'全校') AS "gradeName",COALESCE(c.name,'全校') AS "className",t.items,t.rule_version AS "ruleVersion",t.protocol_snapshot_json AS "protocolSnapshot",t.status,
+    CASE WHEN t.class_id IS NULL THEN ARRAY[]::text[] ELSE ARRAY[t.class_id] END AS "classIds",COALESCE(ARRAY_AGG(DISTINCT ${visibleTaskAlias}.student_id) FILTER(WHERE ${visibleTaskAlias}.student_id IS NOT NULL), ARRAY[]::text[]) AS "studentIds",COUNT(DISTINCT ${visibleTaskId})::int AS "totalCount",COUNT(DISTINCT ${visibleTaskId}) FILTER(WHERE ${validTaskCompletionPredicate(visibleTaskAlias, 't')})::int AS "completedCount" FROM assessment_tasks t LEFT JOIN grades g ON g.id=t.grade_id LEFT JOIN classes c ON c.id=t.class_id LEFT JOIN task_students ts ON ts.task_id=t.id${scopeJoin}
+    WHERE t.school_id=$1 AND ($2::text IS NULL OR t.grade_id=$2) AND ($3::text IS NULL OR t.class_id=$3) GROUP BY t.id,g.name,c.name,t.class_id${parentGroup} ORDER BY ${operationalTaskOrder('t')},t.created_at DESC LIMIT $${limitIndex} OFFSET $${offsetIndex}`, taskParams);
+  return ok(res, listResult(url, result.rows.map((row) => {
+    const progressStatus = row.completedCount === row.totalCount && row.totalCount > 0
+      ? '已完成'
+      : row.status === 'published' ? '未签到'
+        : row.status === 'closed' ? '已关闭' : row.status;
+    return { ...row, items: row.items || [], lifecycleStatus: row.status, progressStatus, status: progressStatus };
+  }), count.rows[0].total));
 }
 if (req.method === 'GET' && parts[0] === 'v1' && parts[1] === 'tasks' && parts[2] && parts[3] === 'students' && parts.length === 4) {
   const taskResult = await query('SELECT id,school_id FROM assessment_tasks WHERE id=$1', [parts[2]]);
@@ -200,8 +245,13 @@ if (req.method === 'GET' && parts[0] === 'v1' && parts[1] === 'tasks' && parts[2
   if (keyword) { params.push(`%${keyword}%`); scope += ` AND (st.name ILIKE $${params.length} OR c.name ILIKE $${params.length})`; }
   const limitIndex = params.length + 1;
   const offsetIndex = params.length + 2;
-  const result = await query(`SELECT ts.id,ts.task_id AS "taskId",ts.student_id AS "studentId",ts.status,ts.version,st.name AS "studentName",st.gender AS "studentGender",st.grade_id AS "gradeId",g.name AS "gradeName",st.class_id AS "classId",c.name AS "className"
-    FROM task_students ts JOIN students st ON st.id=ts.student_id JOIN classes c ON c.id=st.class_id LEFT JOIN grades g ON g.id=st.grade_id
+  const result = await query(`SELECT ts.id,ts.task_id AS "taskId",ts.student_id AS "studentId",ts.status,ts.version,st.name AS "studentName",st.gender AS "studentGender",st.grade_id AS "gradeId",g.name AS "gradeName",st.class_id AS "classId",c.name AS "className",
+      jsonb_array_length(t.items)::int AS "requiredItemCount",completion.measured_count AS "measuredItemCount",completion.pending_review_count AS "pendingReviewCount",
+      (jsonb_array_length(t.items)>0 AND completion.measured_count=jsonb_array_length(t.items) AND completion.pending_review_count=0) AS "completionReady"
+    FROM task_students ts JOIN assessment_tasks t ON t.id=ts.task_id JOIN students st ON st.id=ts.student_id JOIN classes c ON c.id=st.class_id LEFT JOIN grades g ON g.id=st.grade_id
+    LEFT JOIN LATERAL (SELECT COUNT(DISTINCT score.item_code) FILTER(WHERE score.item_code IN (SELECT jsonb_array_elements_text(t.items)))::int AS measured_count,
+      COUNT(*) FILTER(WHERE score.item_code IN (SELECT jsonb_array_elements_text(t.items)) AND score.review_status='pendingReview')::int AS pending_review_count
+      FROM assessment_scores score WHERE score.task_id=ts.task_id AND score.student_id=ts.student_id) completion ON TRUE
     WHERE ts.task_id=$1${scope} ORDER BY c.name,st.name LIMIT $${limitIndex} OFFSET $${offsetIndex}`, [...params, page.pageSize, page.offset]);
   if (!page.paged) return ok(res, result.rows);
   const count = await query(`SELECT COUNT(*)::int AS total FROM task_students ts JOIN students st ON st.id=ts.student_id JOIN classes c ON c.id=st.class_id WHERE ts.task_id=$1${scope}`, params);
@@ -210,12 +260,13 @@ if (req.method === 'GET' && parts[0] === 'v1' && parts[1] === 'tasks' && parts[2
 if (req.method === 'PATCH' && parts[0] === 'v1' && parts[1] === 'tasks' && parts[3] === 'students' && parts[5] === 'status') {
   if (!hasRole(user, 'teacher', 'principal', 'admin')) return fail(res, 403, 'NO_PERMISSION', '无权修改测评状态');
   const input = await body(req);
-  const result = await query(`SELECT ts.*,t.school_id,st.class_id FROM task_students ts JOIN assessment_tasks t ON t.id=ts.task_id JOIN students st ON st.id=ts.student_id WHERE ts.task_id=$1 AND ts.student_id=$2`, [parts[2], parts[4]]);
+  const result = await query(`SELECT ts.*,t.school_id,t.items,st.class_id FROM task_students ts JOIN assessment_tasks t ON t.id=ts.task_id JOIN students st ON st.id=ts.student_id WHERE ts.task_id=$1 AND ts.student_id=$2`, [parts[2], parts[4]]);
   const row = result.rows[0];
   if (!row || !schoolAllowed(user, row.school_id)) return fail(res, 404, 'TASK_STUDENT_NOT_FOUND', '任务学生不存在');
   if (hasRole(user, 'teacher') && !hasRole(user, 'principal', 'admin') && !teacherClassIds(user, row.school_id).includes(row.class_id)) return fail(res, 403, 'NO_PERMISSION', '无权修改该班级测评状态');
   if (teacherOnly(user) && !await userHasCapability(user, 'UPDATE_TEST_STATUS', row.school_id, row.class_id)) return fail(res, 403, 'CAPABILITY_DENIED', '当前账号无更新测评状态权限');
   if (!taskStatusAllowed(row.status, input.status)) return fail(res, 409, 'TASK_STATUS_INVALID', `不能从${row.status}变更为${input.status}`);
+  if (input.status === '已完成') await requireTaskCompletion(query, parts[2], parts[4], row.items);
   const expectedVersion = input.expectedVersion == null ? null : Number(input.expectedVersion);
   if (expectedVersion != null && (!Number.isInteger(expectedVersion) || expectedVersion < 1)) return fail(res, 400, 'VERSION_INVALID', '版本号不合法');
   const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ taskId: parts[2], studentId: parts[4], ...input }));
@@ -242,7 +293,7 @@ if (req.method === 'POST' && (url.pathname === '/v1/admin/tasks/batch-status' ||
   try {
     await client.query('BEGIN');
     for (const item of input.updates) {
-      const rowResult = await client.query(`SELECT ts.*,t.school_id,st.class_id FROM task_students ts
+      const rowResult = await client.query(`SELECT ts.*,t.school_id,t.items,st.class_id FROM task_students ts
         JOIN assessment_tasks t ON t.id=ts.task_id JOIN students st ON st.id=ts.student_id
         WHERE ts.task_id=$1 AND ts.student_id=$2 FOR UPDATE`, [item.taskId, item.studentId]);
       const row = rowResult.rows[0];
@@ -250,6 +301,7 @@ if (req.method === 'POST' && (url.pathname === '/v1/admin/tasks/batch-status' ||
       if (hasRole(user, 'teacher') && !hasRole(user, 'principal', 'admin') && !teacherClassIds(user, row.school_id).includes(row.class_id)) throw Object.assign(new Error('无权修改该班级测评状态'), { status: 403, code: 'NO_PERMISSION' });
       if (teacherOnly(user) && !await userHasCapability(user, 'UPDATE_TEST_STATUS', row.school_id, row.class_id)) throw Object.assign(new Error('当前账号无更新测评状态权限'), { status: 403, code: 'CAPABILITY_DENIED' });
       if (!taskStatusAllowed(row.status, item.status)) throw Object.assign(new Error(`不能从${row.status}变更为${item.status}`), { status: 409, code: 'TASK_STATUS_INVALID' });
+      if (item.status === '已完成') await requireTaskCompletion(client, item.taskId, item.studentId, row.items);
       const expectedVersion = item.expectedVersion == null ? null : Number(item.expectedVersion);
       const updated = await client.query(`UPDATE task_students SET status=$1,note=$2,version=version+1,
         check_in_at=CASE WHEN $1='已签到' THEN COALESCE(check_in_at,now()) ELSE check_in_at END,
@@ -290,9 +342,11 @@ if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'tasks' && parts[
   if (!Array.isArray(input.scores) || input.scores.length === 0) return fail(res, 400, 'SCORES_REQUIRED', '至少需要提交一项成绩');
   if (input.scores.length > MOVEMENT_SCORE_RULES.itemCount) return fail(res, 400, 'SCORES_TOO_MANY', `最多提交${MOVEMENT_SCORE_RULES.itemCount}项成绩`);
   const itemCodes = new Set();
+  const taskItems = Array.isArray(taskStudent.items) ? taskStudent.items : [];
   for (const item of input.scores) {
     if (!MOVEMENT_ITEM_CODES.includes(String(item?.item || '').trim())) throw Object.assign(new Error('体测项目不合法'), { status: 400, code: 'SCORE_ITEM_INVALID' });
     const itemCode = String(item.item).trim();
+    if (!taskItems.includes(itemCode)) throw Object.assign(new Error(`“${itemCode}”不在当前任务项目范围内`), { status: 409, code: 'SCORE_ITEM_OUTSIDE_TASK' });
     if (itemCodes.has(itemCode)) throw Object.assign(new Error('同一请求不能重复提交体测项目'), { status: 400, code: 'SCORE_ITEM_DUPLICATE' });
     itemCodes.add(itemCode);
   }
@@ -315,9 +369,15 @@ if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'tasks' && parts[
         RETURNING id,item_code AS item,score,note,confidence,review_status AS "reviewStatus"`, [parts[2], parts[4], item.item, score, confidence, item.note || '', item.source || 'teacher', reviewStatus, user.id]);
       saved.push({ ...result.rows[0], score: Number(result.rows[0].score), confidence: Number(result.rows[0].confidence) });
     }
-    if (input.markCompleted === true) await client.query(`UPDATE task_students SET status='已完成',completed_at=COALESCE(completed_at,now()),version=version+1 WHERE task_id=$1 AND student_id=$2`, [parts[2], parts[4]]);
+    if (input.markCompleted === true) {
+      if (!taskStatusAllowed(taskStudent.status, '已完成')) throw Object.assign(new Error(`不能从${taskStudent.status}直接确认已完成`), { status: 409, code: 'TASK_STATUS_INVALID' });
+      await requireTaskCompletion(client, parts[2], parts[4], taskItems);
+      await client.query(`UPDATE task_students SET status='已完成',completed_at=COALESCE(completed_at,now()),version=version+1 WHERE task_id=$1 AND student_id=$2`, [parts[2], parts[4]]);
+    }
     await client.query('COMMIT');
     await audit(user, req, 'scores.upsert', 'task_student', `${parts[2]}:${parts[4]}`, null, saved, taskStudent.school_id);
+    // Preserve the established array response used by the mobile clients. The
+    // roster endpoint exposes completion readiness after this write.
     return createdIdempotently(res, user, idempotency, saved);
   } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
 }

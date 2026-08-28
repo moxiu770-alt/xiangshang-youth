@@ -26,6 +26,20 @@ public sealed class FieldApiClient(HttpClient http, DeviceCredentials credential
         return request;
     }
 
+    private HttpRequestMessage RequestBytes(HttpMethod method, string path, byte[] payload, string contentType)
+    {
+        var request = new HttpRequestMessage(method, path);
+        var signed = FieldDeviceRequestSigner.Sign(credentials, method.Method, path, DateTimeOffset.UtcNow, RandomNumberGenerator.GetBytes(16), payload);
+        request.Headers.Add("X-Device-Id", credentials.DeviceId);
+        request.Headers.Add("X-Device-Timestamp", signed.Timestamp);
+        request.Headers.Add("X-Device-Nonce", signed.Nonce);
+        request.Headers.Add("X-Device-Body-Hash", signed.BodyHash);
+        request.Headers.Add("X-Device-Signature", signed.Signature);
+        request.Content = new ByteArrayContent(payload);
+        request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+        return request;
+    }
+
     public async Task<FieldBootstrap> GetBootstrapAsync(string? taskId, CancellationToken cancellationToken)
     {
         var suffix = string.IsNullOrWhiteSpace(taskId) ? string.Empty : $"?taskId={Uri.EscapeDataString(taskId)}";
@@ -36,6 +50,19 @@ public sealed class FieldApiClient(HttpClient http, DeviceCredentials credential
     public async Task HeartbeatAsync(object health, string softwareVersion, CancellationToken cancellationToken)
     {
         using var response = await http.SendAsync(Request(HttpMethod.Post, "/v1/field/heartbeat", new { health, softwareVersion }), cancellationToken);
+        _ = await ReadDataAsync<JsonElement>(response, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<DeviceCommand>> GetCommandsAsync(CancellationToken cancellationToken)
+    {
+        using var response = await http.SendAsync(Request(HttpMethod.Get, "/v1/field/commands"), cancellationToken);
+        var result = await ReadDataAsync<DeviceCommandsResponse>(response, cancellationToken);
+        return result.Commands;
+    }
+
+    public async Task AcknowledgeCommandAsync(string commandId, bool failed, CancellationToken cancellationToken)
+    {
+        using var response = await http.SendAsync(Request(HttpMethod.Post, $"/v1/field/commands/{Uri.EscapeDataString(commandId)}/ack", new { failed }), cancellationToken);
         _ = await ReadDataAsync<JsonElement>(response, cancellationToken);
     }
 
@@ -56,18 +83,61 @@ public sealed class FieldApiClient(HttpClient http, DeviceCredentials credential
         return new SyncResult(batch.ClientBatchId, raw.GetProperty("accepted").GetInt32(), raw.TryGetProperty("idempotent", out var idempotent) && idempotent.GetBoolean(), raw);
     }
 
+    public async Task<IReadOnlyList<FieldSyncConflictResolution>> GetConflictResolutionsAsync(CancellationToken cancellationToken)
+    {
+        using var response = await http.SendAsync(Request(HttpMethod.Get, "/v1/field/sync/conflict-resolutions"), cancellationToken);
+        return await ReadDataAsync<IReadOnlyList<FieldSyncConflictResolution>>(response, cancellationToken);
+    }
+
+    public async Task<UploadedFieldEvidence> UploadEvidenceAsync(PendingFieldEvidence evidence, CancellationToken cancellationToken)
+    {
+        if (!File.Exists(evidence.LocalPath)) throw new FileNotFoundException("本地证据文件不存在，不能提交成绩。", evidence.LocalPath);
+        var file = new FileInfo(evidence.LocalPath);
+        if (file.Length > 20 * 1024 * 1024) throw new InvalidDataException("单个证据文件不能超过 20MB。");
+        if (file.Length > int.MaxValue) throw new InvalidDataException("证据文件过大。");
+
+        var payload = await File.ReadAllBytesAsync(evidence.LocalPath, cancellationToken);
+        var localChecksum = Convert.ToHexString(SHA256.HashData(payload)).ToLowerInvariant();
+        if (!string.IsNullOrWhiteSpace(evidence.ChecksumSha256) && !string.Equals(evidence.ChecksumSha256, localChecksum, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException("证据文件校验值与采集设备声明不一致，已停止上传。");
+        }
+
+        using var presignResponse = await http.SendAsync(Request(HttpMethod.Post, "/v1/field/files/presign", new
+        {
+            evidence.FileName,
+            evidence.ContentType,
+            fileSize = payload.Length
+        }), cancellationToken);
+        var presign = await ReadDataAsync<FilePresignResponse>(presignResponse, cancellationToken);
+        if (!presign.UploadUrl.StartsWith("/v1/field/files/", StringComparison.Ordinal)) throw new InvalidDataException("服务端返回了无效的证据上传地址。");
+
+        using var uploadResponse = await http.SendAsync(RequestBytes(HttpMethod.Put, presign.UploadUrl, payload, evidence.ContentType), cancellationToken);
+        var uploaded = await ReadDataAsync<FileUploadResponse>(uploadResponse, cancellationToken);
+        if (!string.Equals(uploaded.Id, presign.Id, StringComparison.Ordinal) || !string.Equals(uploaded.ChecksumSha256, localChecksum, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException("服务端证据校验结果与本地文件不一致。");
+        }
+        return new UploadedFieldEvidence(uploaded.Id, uploaded.ChecksumSha256);
+    }
+
     private static async Task<T> ReadDataAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken) where T : notnull
     {
         var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<T>>(Json, cancellationToken);
         if (!response.IsSuccessStatusCode || envelope is null || envelope.Data is null)
         {
             var message = envelope?.Message ?? $"HTTP {(int)response.StatusCode}";
-            throw new FieldApiException(response.StatusCode, envelope?.Code ?? "FIELD_API_ERROR", message);
+            JsonElement? errorData = null;
+            if (envelope is not null && envelope.Data is JsonElement data) errorData = data.Clone();
+            throw new FieldApiException(response.StatusCode, envelope?.Code ?? "FIELD_API_ERROR", message, errorData);
         }
         return envelope.Data;
     }
 
     private sealed record ApiEnvelope<T>(string Code, string Message, T Data) where T : notnull;
+    private sealed record DeviceCommandsResponse(IReadOnlyList<DeviceCommand> Commands);
+    private sealed record FilePresignResponse(string Id, string UploadUrl);
+    private sealed record FileUploadResponse(string Id, string ChecksumSha256);
 }
 
 public sealed record FieldDeviceRequestSignature(string Timestamp, string Nonce, string BodyHash, string Signature);
@@ -90,8 +160,9 @@ public static class FieldDeviceRequestSigner
     }
 }
 
-public sealed class FieldApiException(System.Net.HttpStatusCode statusCode, string code, string message) : Exception(message)
+public sealed class FieldApiException(System.Net.HttpStatusCode statusCode, string code, string message, JsonElement? data = null) : Exception(message)
 {
     public System.Net.HttpStatusCode StatusCode { get; } = statusCode;
     public string Code { get; } = code;
+    public JsonElement? ErrorData { get; } = data;
 }

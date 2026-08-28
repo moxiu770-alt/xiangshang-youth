@@ -7,6 +7,7 @@ import com.xiangshang.youth.core.model.TaskStatus
 import com.xiangshang.youth.core.model.TestTask
 import com.xiangshang.youth.core.model.UserProfile
 import com.xiangshang.youth.core.model.UserRole
+import com.xiangshang.youth.core.model.BodyScreeningReviewItem
 import com.xiangshang.youth.core.repository.DashboardData
 import com.xiangshang.youth.core.service.ActivityRegistrationAck
 import com.xiangshang.youth.core.service.ExpertAppointmentAck
@@ -105,7 +106,10 @@ data class AppUiState(
     /** Debug-only routing signal used by the school-provisioned UI fixture. */
     val uiTestSchoolProvisionedTeacher: Boolean = false,
     /** Authoritative task roster rows, independent from the paged dashboard directory. */
-    val taskRosterRecords: Map<String, List<TaskStudentStatusRecord>> = emptyMap()
+    val taskRosterRecords: Map<String, List<TaskStudentStatusRecord>> = emptyMap(),
+    val bodyScreeningReviews: List<BodyScreeningReviewItem> = emptyList(),
+    val bodyScreeningReviewsLoading: Boolean = false,
+    val bodyScreeningReviewsError: String? = null
 ) {
     fun taskRosterStudents(taskId: String, fallbackTask: TestTask? = null): List<Student> {
         val rows = taskRosterRecords[taskId].orEmpty()

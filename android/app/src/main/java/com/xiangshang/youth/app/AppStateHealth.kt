@@ -89,6 +89,31 @@ fun AppViewModel.saveBodyAssessment(student: Student, record: BodyAssessmentReco
     }
 }
 
+fun AppViewModel.refreshLatestBodyAssessment(student: Student) {
+    if (!repository.supportsRemoteAcknowledgement) return
+    val record = _state.value.local.bodyAssessments[student.id] ?: return
+    val key = "body-assessment-refresh-${student.id}"
+    setWorkflow(key, WorkflowCommandState(WorkflowCommandStatus.Submitting))
+    viewModelScope.launch {
+        runCatching { repository.loadLatestBodyAssessment(student.id, record) }
+            .onSuccess { report ->
+                if (_state.value.selectedChild?.id != student.id) return@onSuccess
+                if (report != null) mutate { local ->
+                    val current = local.bodyAssessments[student.id] ?: return@mutate local
+                    val canonical = current.copy(postureReport = report)
+                    val history = local.bodyAssessmentHistory[student.id].orEmpty().toMutableList()
+                    if (history.isNotEmpty()) history[history.lastIndex] = canonical
+                    local.copy(bodyAssessments = local.bodyAssessments + (student.id to canonical), bodyAssessmentHistory = local.bodyAssessmentHistory + (student.id to history))
+                }
+                setWorkflow(key, if (report == null) WorkflowCommandState(WorkflowCommandStatus.Failed, "学校服务尚未返回身体观察结果。") else WorkflowCommandState(WorkflowCommandStatus.Succeeded, "复核状态已更新"))
+            }
+            .onFailure { error ->
+                setWorkflow(key, WorkflowCommandState(WorkflowCommandStatus.Failed, error.localizedMessage ?: "复核状态更新失败"))
+                if (error is ApiError.Unauthorized) handleDashboardFailure(error)
+            }
+    }
+}
+
 fun AppViewModel.saveBodyAssessmentDraft(student: Student, draft: BodyAssessmentDraft) = mutate { local -> local.copy(bodyAssessmentDrafts = local.bodyAssessmentDrafts + (student.id to draft)) }
 fun AppViewModel.toggleBodyPlanDay(student: Student, key: String) = mutate { local ->
     val record = local.bodyAssessments[student.id] ?: return@mutate local
@@ -97,8 +122,8 @@ fun AppViewModel.toggleBodyPlanDay(student: Student, key: String) = mutate { loc
 
 fun AppViewModel.saveFollowAlongSession(record: FollowAlongSessionRecord) {
     mutate { local ->
-        val key = "follow-along-${record.childId}"; val day = record.completedAt.take(10); val body = if (record.cameraVerified) local.bodyAssessments[record.childId]?.copy(planDays = local.bodyAssessments[record.childId]?.planDays.orEmpty() + day) else null
-        local.copy(followAlongSessions = (local.followAlongSessions + record).takeLast(90), followAlongSyncStates = local.followAlongSyncStates + (record.id to if (repository.supportsRemoteAcknowledgement) LocalSubmissionStatus.PendingSync else LocalSubmissionStatus.Submitted), courseProgress = if (record.cameraVerified) local.courseProgress + (key to maxOf(local.courseProgress[key] ?: 0f, record.completionRatio).coerceIn(0f, 1f)) else local.courseProgress, checkedInDates = if (record.cameraVerified) local.checkedInDates + day else local.checkedInDates, bodyAssessments = if (body != null) local.bodyAssessments + (record.childId to body) else local.bodyAssessments)
+        val key = "follow-along-${record.childId}"; val day = record.completedAt.take(10); val parentConfirmed = record.mode == "parentConfirmedAssistedTraining" && record.completionRatio >= 1f; val acceptedCompletion = record.cameraVerified || parentConfirmed; val body = if (acceptedCompletion) local.bodyAssessments[record.childId]?.copy(planDays = local.bodyAssessments[record.childId]?.planDays.orEmpty() + day) else null
+        local.copy(followAlongSessions = (local.followAlongSessions + record).takeLast(90), followAlongSyncStates = local.followAlongSyncStates + (record.id to if (repository.supportsRemoteAcknowledgement) LocalSubmissionStatus.PendingSync else LocalSubmissionStatus.Submitted), courseProgress = if (acceptedCompletion) local.courseProgress + (key to maxOf(local.courseProgress[key] ?: 0f, record.completionRatio).coerceIn(0f, 1f)) else local.courseProgress, checkedInDates = if (acceptedCompletion) local.checkedInDates + day else local.checkedInDates, bodyAssessments = if (body != null) local.bodyAssessments + (record.childId to body) else local.bodyAssessments)
     }
     if (repository.supportsRemoteAcknowledgement && !_state.value.isOffline) syncFollowAlongSession(record)
 }

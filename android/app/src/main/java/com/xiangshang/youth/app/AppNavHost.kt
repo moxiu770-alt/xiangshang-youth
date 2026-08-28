@@ -302,14 +302,14 @@ private fun NavHostController.replaceRoot(destination: String) {
                 focusedTaskId = entry.arguments?.getString("taskId")
             )
         }
-        composable(Destinations.BodyAssessment) { BodyAssessmentScreen(state, nav, viewModel::saveBodyAssessment, viewModel::saveBodyAssessmentDraft, viewModel::toggleBodyPlanDay, viewModel::saveFollowAlongSession, updateVoiceGuidance = { viewModel.updateSettings(voiceGuidanceEnabled = it) }, recordHealthConsent = viewModel::recordHealthConsent) }
+        composable(Destinations.BodyAssessment) { BodyAssessmentScreen(state, nav, viewModel::saveBodyAssessment, viewModel::saveBodyAssessmentDraft, viewModel::toggleBodyPlanDay, viewModel::saveFollowAlongSession, updateVoiceGuidance = { viewModel.updateSettings(voiceGuidanceEnabled = it) }, recordHealthConsent = viewModel::recordHealthConsent, refreshLatest = viewModel::refreshLatestBodyAssessment) }
         composable("${Destinations.Assessment}/{category}") { entry ->
             // Legacy local routes may still contain /assessment/fitness. The
             // product's only body-test surface is the BMI + live camera flow;
             // never let those routes reveal the retired text-only form.
             val category = entry.arguments?.getString("category") ?: "fitness"
             if (category == "fitness") {
-                BodyAssessmentScreen(state, nav, viewModel::saveBodyAssessment, viewModel::saveBodyAssessmentDraft, viewModel::toggleBodyPlanDay, viewModel::saveFollowAlongSession, updateVoiceGuidance = { viewModel.updateSettings(voiceGuidanceEnabled = it) }, recordHealthConsent = viewModel::recordHealthConsent)
+                BodyAssessmentScreen(state, nav, viewModel::saveBodyAssessment, viewModel::saveBodyAssessmentDraft, viewModel::toggleBodyPlanDay, viewModel::saveFollowAlongSession, updateVoiceGuidance = { viewModel.updateSettings(voiceGuidanceEnabled = it) }, recordHealthConsent = viewModel::recordHealthConsent, refreshLatest = viewModel::refreshLatestBodyAssessment)
             } else {
                 AssessmentFlowScreen(state, nav, category, viewModel::completeAssessment, viewModel::saveDraft, viewModel::clearDraft, viewModel::loadFamilyHealthObservations)
             }
@@ -357,8 +357,8 @@ private fun NavHostController.replaceRoot(destination: String) {
                 )
             }
         }
-        composable(Destinations.Messages) { ParentMessagesScreen(state, nav, viewModel::markMessageRead, viewModel::markAllMessagesRead, viewModel::openRecommendedCourse, viewModel::openActivityTarget, viewModel::openExpertAppointmentTarget) }
-        composable(Destinations.Notifications) { NotificationsScreen(state, nav, viewModel::markMessageRead, viewModel::markAllMessagesRead, viewModel::openRecommendedCourse, viewModel::openActivityTarget, viewModel::openExpertAppointmentTarget, viewModel::loadClassNoticeDetail, viewModel::acknowledgeClassNotice) }
+        composable(Destinations.Messages) { ParentMessagesScreen(state, nav, viewModel::markMessageRead, viewModel::markAllMessagesRead, viewModel::openRecommendedCourse, viewModel::openActivityTarget, viewModel::openExpertAppointmentTarget, selectChildTarget = { id -> state.data?.students?.firstOrNull { it.id == id }?.let(viewModel::chooseChild) }) }
+        composable(Destinations.Notifications) { NotificationsScreen(state, nav, viewModel::markMessageRead, viewModel::markAllMessagesRead, viewModel::openRecommendedCourse, viewModel::openActivityTarget, viewModel::openExpertAppointmentTarget, selectChildTarget = { id -> state.data?.students?.firstOrNull { it.id == id }?.let(viewModel::chooseChild) }, loadClassNoticeDetail = viewModel::loadClassNoticeDetail, acknowledgeClassNotice = viewModel::acknowledgeClassNotice) }
         composable(Destinations.Health) { HealthProfileScreen(state, nav, { type, minutes, intensity, feeling, completed, note -> viewModel.checkInToday(type, minutes, intensity, feeling, completed, note) }, viewModel::visibleReport) }
         composable(Destinations.Report) {
             val child = state.selectedChild
@@ -482,7 +482,7 @@ private fun NavHostController.replaceRoot(destination: String) {
             LaunchedEffect(taskId) { taskId?.let(viewModel::loadTaskStudents) }
             TeacherTaskDetailScreen(state, nav, taskId) { studentId, status, note -> viewModel.submitTaskStatusCommand(studentId, status, note, taskId) }
         }
-        composable(Destinations.Review) { ReviewListScreen(state, nav, viewModel::submitReviewDecision, viewModel::saveDraft, viewModel::clearDraft) { studentId, status, note, taskId -> viewModel.submitTaskStatusCommand(studentId, status, note, taskId) } }
+        composable(Destinations.Review) { ReviewListScreen(state, nav, viewModel::submitReviewDecision, viewModel::saveDraft, viewModel::clearDraft, viewModel::loadBodyScreeningReviews, viewModel::submitBodyScreeningReview) { studentId, status, note, taskId -> viewModel.submitTaskStatusCommand(studentId, status, note, taskId) } }
         composable(Destinations.BackendDashboard) {
             BackendDashboardNoticeScreen(
                 onLogout = { viewModel.logout(); nav.replaceRoot(Destinations.Login) }

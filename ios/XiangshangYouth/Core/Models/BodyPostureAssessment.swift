@@ -5,30 +5,99 @@ enum AdamsScreeningResult: String, Codable, CaseIterable {
 
     var label: String {
         switch self {
-        case .negative: "阴性（未见明显不对称）"
-        case .equivocal: "可疑阳性（建议复测）"
-        case .positive: "阳性代理信号（建议专科复核）"
+        case .negative: "阴性（双侧等高）"
+        case .equivocal: "可疑阳性（隆起＜1 cm）"
+        case .positive: "阳性（隆起≥1 cm）"
         }
     }
 }
 
-/// One aggregated, on-device pose observation. Values are derived from
-/// normalized Vision landmarks and the parent's measured height; raw frames
-/// are never retained. The names deliberately say "camera proxy" where a
-/// 2-D phone camera cannot replace a Scoliometer or standing X-ray.
+/// Evidence of how a posture capture was aligned. This is deliberately
+/// metadata only: no image, video, frame, or raw landmark is persisted.
+/// `.guided` is the current mobile capability; `.markerPnP` is reserved for
+/// the future physical calibration-board detector and must never be inferred.
+enum CaptureCalibrationMode: String, Codable, Equatable {
+    case guided
+    case markerPnP = "marker-pnp"
+}
+
+struct CaptureCalibrationEvidence: Codable, Equatable {
+    var mode: CaptureCalibrationMode
+    var boardDetected: Bool
+    var boardID: String?
+    var intrinsicsID: String?
+    var lensID: String?
+    var resolution: String?
+    var reprojectionErrorPx: Double?
+    /// Server-approved phone/lens/resolution profile. A native detector must
+    /// populate this before it can make a Marker-PnP claim.
+    var profileID: String? = nil
+
+    static let guided = CaptureCalibrationEvidence(
+        mode: .guided,
+        boardDetected: false,
+        boardID: nil,
+        intrinsicsID: nil,
+        lensID: nil,
+        resolution: nil,
+        reprojectionErrorPx: nil,
+        profileID: nil
+    )
+
+    // Keep the wire contract lower camel case on both native clients. Swift's
+    // synthesized keys would emit boardID/intrinsicsID and fail server-side
+    // marker-profile validation.
+    enum CodingKeys: String, CodingKey {
+        case mode, boardDetected, resolution, reprojectionErrorPx
+        case boardID = "boardId"
+        case intrinsicsID = "intrinsicsId"
+        case lensID = "lensId"
+        case profileID = "profileId"
+    }
+
+    /// This only means camera geometry can be audited. It is not a medical
+    /// validation or a promise that the health algorithm is publishable.
+    var hasMarkerPnPEvidence: Bool {
+        mode == .markerPnP && boardDetected && !(boardID?.isEmpty ?? true)
+            && !(intrinsicsID?.isEmpty ?? true) && !(lensID?.isEmpty ?? true)
+            && !(resolution?.isEmpty ?? true) && !(profileID?.isEmpty ?? true)
+            && (reprojectionErrorPx ?? .infinity) <= 2
+    }
+}
+
 struct PostureMetricSnapshot: Codable, Equatable, Identifiable {
     let id: String
     let task: BodyAssessmentRecord.CaptureTask
     let sampleCount: Int
     let confidence: Double
-    let shoulderHeightDifferenceCm: Double?
-    let pelvicHeightDifferenceCm: Double?
-    let headTiltDegrees: Double?
-    let spinalMidlineDeviationCm: Double?
-    let thoracicRoundingDegrees: Double?
+    var shoulderHeightDifferenceCm: Double?
+    var pelvicHeightDifferenceCm: Double?
+    var headTiltDegrees: Double?
+    var spinalMidlineDeviationCm: Double?
+    var thoracicRoundingDegrees: Double?
     let forwardHeadAngleDegrees: Double?
     let cameraProxyAtrDegrees: Double?
     let cameraProxyRibProminenceCm: Double?
+    var shoulderProtractionProxyDegrees: Double? = nil
+    var pelvicTiltProxyDegrees: Double? = nil
+    var kneeAlignmentProxyRatio: Double? = nil
+    var lowerLimbAxisAsymmetryDegrees: Double? = nil
+    var leftKneeValgusProxyDegrees: Double? = nil
+    var rightKneeValgusProxyDegrees: Double? = nil
+    var kneeTrackingAsymmetryRatio: Double? = nil
+    var squatDepthRatio: Double? = nil
+    var movementRepetitionCount: Double? = nil
+    /// Quality-only until the dedicated paediatric foot model passes the
+    /// independent validation gate. Nil arch indices must never be filled by
+    /// a generic body-pose heuristic.
+    var footArchVisibilityScore: Double? = nil
+    var leftArchProxyIndex: Double? = nil
+    var rightArchProxyIndex: Double? = nil
+    var heelAlignmentProxyDegrees: Double? = nil
+    /// Supervised visual record from the trained examiner. These fields are
+    /// kept separate from camera proxies and follow the manual's symbols.
+    var adamsObservedResult: String? = nil
+    var adamsProminenceSide: String? = nil
     /// Optional validated instrument/depth measurement. The current phone
     /// RGB flow never fills this field; when a calibrated field device or
     /// backend supplies it, the framework's ATR thresholds become active.
@@ -37,11 +106,38 @@ struct PostureMetricSnapshot: Codable, Equatable, Identifiable {
     /// segment reading drives the 5°/7° screening gates.
     var thoracicAtrDegrees: Double? = nil
     var lumbarAtrDegrees: Double? = nil
+    var thoracicAtrSide: String? = nil
+    var lumbarAtrSide: String? = nil
+    var thoracicAtrFirstDegrees: Double? = nil
+    var thoracicAtrSecondDegrees: Double? = nil
+    var lumbarAtrFirstDegrees: Double? = nil
+    var lumbarAtrSecondDegrees: Double? = nil
+    var seatedForwardBendAtrDegrees: Double? = nil
     /// Optional occiput-to-wall distance from a supervised measurement.
     var occiputWallDistanceCm: Double? = nil
     let gaitShoulderSwingDifferenceCm: Double?
     let gaitPelvicSwingDifferenceCm: Double?
     let gaitTrunkSwayCm: Double?
+    var gaitObservedAbnormal: Bool? = nil
+    var gaitObservationNote: String? = nil
+    var seatedThoracicKyphosisObserved: Bool? = nil
+    /// Provenance for the camera quality gate. It records the protocol and
+    /// checks actually used; it deliberately does not pretend an ArUco board
+    /// was detected before a native marker detector is integrated.
+    var captureProtocolVersion: String? = nil
+    var cameraFacing: String? = nil
+    /// Describes the evidence actually used by this run. Current household
+    /// capture remains RGB 2D even when the phone happens to contain LiDAR.
+    var measurementMode: String? = nil
+    var deviceCapabilityTier: String? = nil
+    var depthAvailable: Bool? = nil
+    var segmentPhaseCount: Int? = nil
+    var qualityChecks: [String]? = nil
+    var captureCalibration: CaptureCalibrationEvidence? = nil
+    /// 1 means a usable first take is stored and a fresh re-entry is needed.
+    var captureAttemptCount: Int? = nil
+    var repeatabilityStatus: String? = nil
+    var repeatabilityMaximumDifference: Double? = nil
 
     // Keep a stable, explicit initializer for persisted records and capture
     // adapters. Swift's synthesized memberwise initializer moves defaulted
@@ -60,13 +156,49 @@ struct PostureMetricSnapshot: Codable, Equatable, Identifiable {
         forwardHeadAngleDegrees: Double?,
         cameraProxyAtrDegrees: Double?,
         cameraProxyRibProminenceCm: Double?,
+        shoulderProtractionProxyDegrees: Double? = nil,
+        pelvicTiltProxyDegrees: Double? = nil,
+        kneeAlignmentProxyRatio: Double? = nil,
+        lowerLimbAxisAsymmetryDegrees: Double? = nil,
+        leftKneeValgusProxyDegrees: Double? = nil,
+        rightKneeValgusProxyDegrees: Double? = nil,
+        kneeTrackingAsymmetryRatio: Double? = nil,
+        squatDepthRatio: Double? = nil,
+        movementRepetitionCount: Double? = nil,
+        footArchVisibilityScore: Double? = nil,
+        leftArchProxyIndex: Double? = nil,
+        rightArchProxyIndex: Double? = nil,
+        heelAlignmentProxyDegrees: Double? = nil,
+        adamsObservedResult: String? = nil,
+        adamsProminenceSide: String? = nil,
         instrumentAtrDegrees: Double? = nil,
         thoracicAtrDegrees: Double? = nil,
         lumbarAtrDegrees: Double? = nil,
+        thoracicAtrSide: String? = nil,
+        lumbarAtrSide: String? = nil,
+        thoracicAtrFirstDegrees: Double? = nil,
+        thoracicAtrSecondDegrees: Double? = nil,
+        lumbarAtrFirstDegrees: Double? = nil,
+        lumbarAtrSecondDegrees: Double? = nil,
+        seatedForwardBendAtrDegrees: Double? = nil,
         occiputWallDistanceCm: Double? = nil,
         gaitShoulderSwingDifferenceCm: Double?,
         gaitPelvicSwingDifferenceCm: Double?,
-        gaitTrunkSwayCm: Double?
+        gaitTrunkSwayCm: Double?,
+        gaitObservedAbnormal: Bool? = nil,
+        gaitObservationNote: String? = nil,
+        seatedThoracicKyphosisObserved: Bool? = nil,
+        captureProtocolVersion: String? = nil,
+        cameraFacing: String? = nil,
+        measurementMode: String? = nil,
+        deviceCapabilityTier: String? = nil,
+        depthAvailable: Bool? = nil,
+        segmentPhaseCount: Int? = nil,
+        qualityChecks: [String]? = nil,
+        captureCalibration: CaptureCalibrationEvidence? = nil,
+        captureAttemptCount: Int? = nil,
+        repeatabilityStatus: String? = nil,
+        repeatabilityMaximumDifference: Double? = nil
     ) {
         self.id = id
         self.task = task
@@ -80,16 +212,53 @@ struct PostureMetricSnapshot: Codable, Equatable, Identifiable {
         self.forwardHeadAngleDegrees = forwardHeadAngleDegrees
         self.cameraProxyAtrDegrees = cameraProxyAtrDegrees
         self.cameraProxyRibProminenceCm = cameraProxyRibProminenceCm
+        self.shoulderProtractionProxyDegrees = shoulderProtractionProxyDegrees
+        self.pelvicTiltProxyDegrees = pelvicTiltProxyDegrees
+        self.kneeAlignmentProxyRatio = kneeAlignmentProxyRatio
+        self.lowerLimbAxisAsymmetryDegrees = lowerLimbAxisAsymmetryDegrees
+        self.leftKneeValgusProxyDegrees = leftKneeValgusProxyDegrees
+        self.rightKneeValgusProxyDegrees = rightKneeValgusProxyDegrees
+        self.kneeTrackingAsymmetryRatio = kneeTrackingAsymmetryRatio
+        self.squatDepthRatio = squatDepthRatio
+        self.movementRepetitionCount = movementRepetitionCount
+        self.footArchVisibilityScore = footArchVisibilityScore
+        self.leftArchProxyIndex = leftArchProxyIndex
+        self.rightArchProxyIndex = rightArchProxyIndex
+        self.heelAlignmentProxyDegrees = heelAlignmentProxyDegrees
+        self.adamsObservedResult = adamsObservedResult
+        self.adamsProminenceSide = adamsProminenceSide
         self.instrumentAtrDegrees = instrumentAtrDegrees
         self.thoracicAtrDegrees = thoracicAtrDegrees
         self.lumbarAtrDegrees = lumbarAtrDegrees
+        self.thoracicAtrSide = thoracicAtrSide
+        self.lumbarAtrSide = lumbarAtrSide
+        self.thoracicAtrFirstDegrees = thoracicAtrFirstDegrees
+        self.thoracicAtrSecondDegrees = thoracicAtrSecondDegrees
+        self.lumbarAtrFirstDegrees = lumbarAtrFirstDegrees
+        self.lumbarAtrSecondDegrees = lumbarAtrSecondDegrees
+        self.seatedForwardBendAtrDegrees = seatedForwardBendAtrDegrees
         self.occiputWallDistanceCm = occiputWallDistanceCm
         self.gaitShoulderSwingDifferenceCm = gaitShoulderSwingDifferenceCm
         self.gaitPelvicSwingDifferenceCm = gaitPelvicSwingDifferenceCm
         self.gaitTrunkSwayCm = gaitTrunkSwayCm
+        self.gaitObservedAbnormal = gaitObservedAbnormal
+        self.gaitObservationNote = gaitObservationNote
+        self.seatedThoracicKyphosisObserved = seatedThoracicKyphosisObserved
+        self.captureProtocolVersion = captureProtocolVersion
+        self.cameraFacing = cameraFacing
+        self.measurementMode = measurementMode
+        self.deviceCapabilityTier = deviceCapabilityTier
+        self.depthAvailable = depthAvailable
+        self.segmentPhaseCount = segmentPhaseCount
+        self.qualityChecks = qualityChecks
+        self.captureCalibration = captureCalibration
+        self.captureAttemptCount = captureAttemptCount
+        self.repeatabilityStatus = repeatabilityStatus
+        self.repeatabilityMaximumDifference = repeatabilityMaximumDifference
     }
 
     var adamsResult: AdamsScreeningResult? {
+        if let adamsObservedResult, let result = AdamsScreeningResult(rawValue: adamsObservedResult) { return result }
         guard let prominence = cameraProxyRibProminenceCm, prominence.isFinite, prominence >= 0 else { return nil }
         if prominence >= PostureScreeningRules.ribProminencePositiveCentimeters { return .positive }
         if prominence >= PostureScreeningRules.ribProminenceEquivocalCentimeters { return .equivocal }
@@ -97,8 +266,9 @@ struct PostureMetricSnapshot: Codable, Equatable, Identifiable {
     }
 }
 
-/// Product screening thresholds for the on-device posture proxy. These are
-/// referral guardrails, not diagnostic scoliosis cut-offs.
+/// Engineering candidate thresholds retained for offline comparison only.
+/// They are not published product or clinical cut-offs until the exact model
+/// version passes the independent human-validation release gate.
 enum PostureScreeningRules {
     static let rulesSourceVersion = "UY-IMCA-SCOLIOSIS-FRAMEWORK-V1-2026-07-20"
     // Profile weights are kept in the human-readable policy values below;
@@ -167,215 +337,8 @@ enum PostureScreeningRules {
     }
 }
 
-/// Report-level rules from UY-IMCA V1 (研发参考版), derived from the supplied
-/// 7.20 framework. This is a screening report: red means referral advice, not
-/// a scoliosis diagnosis. A clinician and imaging remain the diagnostic path.
-struct PostureAssessmentReport: Codable, Equatable {
-    static let algorithmVersion = "UY-IMCA-CV-1.3"
-    /// Version of the threshold/calibration manifest used with the algorithm.
-    /// Keep this alongside every persisted/remote report so results can be
-    /// audited and safely re-scored after a calibration rollout.
-    static let calibrationVersion = "UY-CAL-BASELINE-1.0"
-    let generatedAt: Date
-    let algorithm: String
-    let snapshots: [BodyAssessmentRecord.CaptureTask: PostureMetricSnapshot]
-    let overallLevel: BodyAssessmentRecord.AttentionLevel
-    let reasons: [String]
-    let disclaimer: String
-    /// Exposed for the same dashboard contract as Android. These are
-    /// explainable screening/quality scores, never a medical diagnosis.
-    let riskScore: Int
-    let qualityScore: Int
-    let calibrationVersion: String
-    let rulesSourceVersion: String
-
-    private enum CodingKeys: String, CodingKey {
-        case generatedAt, algorithm, snapshots, overallLevel, reasons, disclaimer, riskScore, qualityScore, calibrationVersion, rulesSourceVersion
-    }
-
-    init(generatedAt: Date, algorithm: String, snapshots: [BodyAssessmentRecord.CaptureTask: PostureMetricSnapshot], overallLevel: BodyAssessmentRecord.AttentionLevel, reasons: [String], disclaimer: String, riskScore: Int = 0, qualityScore: Int = 0, calibrationVersion: String = PostureAssessmentReport.calibrationVersion, rulesSourceVersion: String = PostureScreeningRules.rulesSourceVersion) {
-        self.generatedAt = generatedAt
-        self.algorithm = algorithm
-        self.snapshots = snapshots
-        self.overallLevel = overallLevel
-        self.reasons = reasons
-        self.disclaimer = disclaimer
-        self.riskScore = min(100, max(0, riskScore))
-        self.qualityScore = min(100, max(0, qualityScore))
-        self.calibrationVersion = calibrationVersion
-        self.rulesSourceVersion = rulesSourceVersion
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        generatedAt = try container.decode(Date.self, forKey: .generatedAt)
-        algorithm = try container.decode(String.self, forKey: .algorithm)
-        snapshots = try container.decode([BodyAssessmentRecord.CaptureTask: PostureMetricSnapshot].self, forKey: .snapshots)
-        overallLevel = try container.decode(BodyAssessmentRecord.AttentionLevel.self, forKey: .overallLevel)
-        reasons = try container.decode([String].self, forKey: .reasons)
-        disclaimer = try container.decode(String.self, forKey: .disclaimer)
-        riskScore = min(100, max(0, try container.decodeIfPresent(Int.self, forKey: .riskScore) ?? 0))
-        qualityScore = min(100, max(0, try container.decodeIfPresent(Int.self, forKey: .qualityScore) ?? 0))
-        calibrationVersion = try container.decodeIfPresent(String.self, forKey: .calibrationVersion) ?? PostureAssessmentReport.calibrationVersion
-        rulesSourceVersion = try container.decodeIfPresent(String.self, forKey: .rulesSourceVersion) ?? PostureScreeningRules.rulesSourceVersion
-    }
-
-    /// A report is complete only when every task has enough reliable frames;
-    /// a persisted placeholder snapshot must not make the UI look finished.
-    var isComplete: Bool {
-        BodyAssessmentRecord.CaptureTask.allCases.allSatisfy { task in
-            guard let snapshot = snapshots[task] else { return false }
-            let numeric: [Double?]
-            switch snapshot.task {
-            case .standingBack:
-                numeric = [snapshot.shoulderHeightDifferenceCm, snapshot.pelvicHeightDifferenceCm, snapshot.headTiltDegrees]
-            case .forwardBend:
-                numeric = [snapshot.spinalMidlineDeviationCm, snapshot.thoracicRoundingDegrees, snapshot.forwardHeadAngleDegrees, snapshot.cameraProxyAtrDegrees, snapshot.cameraProxyRibProminenceCm, snapshot.instrumentAtrDegrees, snapshot.thoracicAtrDegrees, snapshot.lumbarAtrDegrees]
-            case .seatedPosture:
-                numeric = [snapshot.shoulderHeightDifferenceCm, snapshot.spinalMidlineDeviationCm, snapshot.thoracicRoundingDegrees, snapshot.forwardHeadAngleDegrees, snapshot.occiputWallDistanceCm]
-            case .gaitVideo:
-                numeric = [snapshot.gaitShoulderSwingDifferenceCm, snapshot.gaitPelvicSwingDifferenceCm, snapshot.gaitTrunkSwayCm]
-            }
-            let hasEvidence = numeric.contains { $0?.isFinite == true } || snapshot.adamsResult != nil
-            return hasEvidence && snapshot.sampleCount >= PostureScreeningRules.minimumSamples && snapshot.confidence.isFinite && snapshot.confidence >= PostureScreeningRules.minimumConfidence && snapshot.confidence <= 1
-        }
-    }
-
-    static func make(snapshots: [BodyAssessmentRecord.CaptureTask: PostureMetricSnapshot], generatedAt: Date = .now, ageMonths: Int? = nil) -> PostureAssessmentReport {
-        let profile = PostureScreeningRules.profile(ageMonths: ageMonths)
-        let standing = snapshots[.standingBack]
-        let forward = snapshots[.forwardBend]
-        let seated = snapshots[.seatedPosture]
-        let gait = snapshots[.gaitVideo]
-        func valid(_ value: Double?, max: Double) -> Bool {
-            guard let value else { return true }
-            return value.isFinite && abs(value) <= max
-        }
-        func validMetrics(_ snapshot: PostureMetricSnapshot?) -> Bool {
-            guard let snapshot else { return true }
-            return valid(snapshot.shoulderHeightDifferenceCm, max: 20) &&
-                valid(snapshot.pelvicHeightDifferenceCm, max: 20) &&
-                valid(snapshot.headTiltDegrees, max: 180) &&
-                valid(snapshot.spinalMidlineDeviationCm, max: 20) &&
-                valid(snapshot.thoracicRoundingDegrees, max: 180) &&
-                valid(snapshot.forwardHeadAngleDegrees, max: 180) &&
-                valid(snapshot.cameraProxyAtrDegrees, max: 180) &&
-                valid(snapshot.cameraProxyRibProminenceCm, max: 20) &&
-                valid(snapshot.instrumentAtrDegrees, max: 180) &&
-                valid(snapshot.thoracicAtrDegrees, max: 180) &&
-                valid(snapshot.lumbarAtrDegrees, max: 180) &&
-                valid(snapshot.occiputWallDistanceCm, max: 50) &&
-                valid(snapshot.gaitShoulderSwingDifferenceCm, max: 20) &&
-                valid(snapshot.gaitPelvicSwingDifferenceCm, max: 20) &&
-                valid(snapshot.gaitTrunkSwayCm, max: 20)
-        }
-        func hasMetricEvidence(_ snapshot: PostureMetricSnapshot?) -> Bool {
-            guard let snapshot else { return false }
-            let numeric: [Double?]
-            switch snapshot.task {
-            case .standingBack:
-                numeric = [snapshot.shoulderHeightDifferenceCm, snapshot.pelvicHeightDifferenceCm, snapshot.headTiltDegrees]
-            case .forwardBend:
-                numeric = [snapshot.spinalMidlineDeviationCm, snapshot.thoracicRoundingDegrees, snapshot.forwardHeadAngleDegrees, snapshot.cameraProxyAtrDegrees, snapshot.cameraProxyRibProminenceCm, snapshot.instrumentAtrDegrees, snapshot.thoracicAtrDegrees, snapshot.lumbarAtrDegrees]
-            case .seatedPosture:
-                numeric = [snapshot.shoulderHeightDifferenceCm, snapshot.spinalMidlineDeviationCm, snapshot.thoracicRoundingDegrees, snapshot.forwardHeadAngleDegrees, snapshot.occiputWallDistanceCm]
-            case .gaitVideo:
-                numeric = [snapshot.gaitShoulderSwingDifferenceCm, snapshot.gaitPelvicSwingDifferenceCm, snapshot.gaitTrunkSwayCm]
-            }
-            return numeric.contains { $0?.isFinite == true } || snapshot.adamsResult != nil
-        }
-        let metricsValid = [standing, forward, seated, gait].allSatisfy(validMetrics)
-        // Reports can be restored from older/local payloads. Treat non-finite
-        // or negative geometry as missing instead of allowing NaN to bypass a
-        // threshold or leak into a family-facing reason string.
-        func magnitude(_ value: Double?) -> Double {
-            guard let value, value.isFinite else { return 0 }
-            return abs(value)
-        }
-        let shoulder = max(magnitude(standing?.shoulderHeightDifferenceCm), magnitude(seated?.shoulderHeightDifferenceCm))
-        let pelvis = magnitude(standing?.pelvicHeightDifferenceCm)
-        let shoulderRed = shoulder > profile.shoulderReferral
-        let pelvisRed = pelvis > profile.pelvisReferral
-        let shoulderYellow = shoulder > profile.shoulderAttention
-        let pelvisYellow = pelvis > profile.pelvisAttention
-        // Use the age-specific profile when a numeric rib-prominence proxy is
-        // present. The snapshot convenience property keeps legacy/static
-        // thresholds for display, but report scoring must match the server.
-        let adams: AdamsScreeningResult? = {
-            guard let value = forward?.cameraProxyRibProminenceCm, value.isFinite else { return forward?.adamsResult }
-            let prominence = abs(value)
-            if prominence >= profile.ribProminencePositiveCentimeters { return .positive }
-            if prominence >= profile.ribProminenceEquivocalCentimeters { return .equivocal }
-            return .negative
-        }()
-        let instrumentATR = [forward?.instrumentAtrDegrees, forward?.thoracicAtrDegrees, forward?.lumbarAtrDegrees]
-            .compactMap { $0.flatMap { $0.isFinite ? max(0, $0) : nil } }
-            .max() ?? 0
-        let atrRed = instrumentATR >= profile.proxyAtrReferral
-        let atrYellow = instrumentATR >= profile.proxyAtrAttention
-        let occiputWallAbnormal = seated?.occiputWallDistanceCm.flatMap { $0.isFinite ? max(0, $0) : nil }.map { $0 > 2.0 } ?? false
-        let gaitAbnormal = max(magnitude(gait?.gaitShoulderSwingDifferenceCm), max(magnitude(gait?.gaitPelvicSwingDifferenceCm), magnitude(gait?.gaitTrunkSwayCm))) >= profile.gaitAttention
-        let seatedMidline = magnitude(seated?.spinalMidlineDeviationCm)
-        let seatedRounding = magnitude(seated?.thoracicRoundingDegrees)
-        let seatedForwardHead = magnitude(seated?.forwardHeadAngleDegrees)
-        let headTilt = magnitude(standing?.headTiltDegrees)
-        let headTiltYellow = headTilt > PostureScreeningRules.headTiltAttentionDegrees
-        let seatedAbnormal = seatedMidline > profile.seatedMidlineAttention || seatedRounding >= profile.seatedRoundingAttention || seatedForwardHead >= profile.forwardHeadReferral
-        let seatedAbnormalYellow = seatedMidline > profile.seatedMidlineAttention || seatedRounding >= profile.seatedRoundingAttention || seatedForwardHead >= profile.forwardHeadAttention
-        let complete = BodyAssessmentRecord.CaptureTask.allCases.allSatisfy { task in
-            guard let snapshot = snapshots[task] else { return false }
-            return hasMetricEvidence(snapshot) && snapshot.sampleCount >= PostureScreeningRules.minimumSamples && snapshot.confidence.isFinite && snapshot.confidence >= PostureScreeningRules.minimumConfidence && snapshot.confidence <= 1
-        }
-        func clamp01(_ value: Double) -> Double { min(1, max(0, value)) }
-        func norm(_ value: Double, _ attention: Double, _ referral: Double) -> Double {
-            guard value.isFinite, attention.isFinite, referral.isFinite, referral > attention else { return 0 }
-            if value <= attention { return 0 }
-            if value >= referral { return 1 }
-            return clamp01((value - attention) / (referral - attention))
-        }
-        func evidence(_ snapshot: PostureMetricSnapshot?) -> Double {
-            guard let snapshot,
-                  snapshot.sampleCount >= PostureScreeningRules.minimumSamples,
-                  snapshot.confidence.isFinite,
-                  snapshot.confidence >= PostureScreeningRules.minimumConfidence,
-                  snapshot.confidence <= 1 else { return 0 }
-            let sampleFactor = min(1, max(0, Double(snapshot.sampleCount - PostureScreeningRules.minimumSamples) / Double(PostureScreeningRules.minimumSamples)))
-            let confidenceFactor = min(1, max(0, (snapshot.confidence - PostureScreeningRules.minimumConfidence) / 0.44))
-            return 0.55 * confidenceFactor + 0.45 * sampleFactor
-        }
-        let quality = [standing, forward, seated, gait].map(evidence).reduce(0, +) / 4
-        let adamsValue: Double = adams == .positive ? 1 : (adams == .equivocal ? 0.48 : 0)
-        let weightedScoreRaw = (
-            norm(shoulder, profile.shoulderAttention, profile.shoulderReferral) * profile.weightedShoulder +
-            norm(pelvis, profile.pelvisAttention, profile.pelvisReferral) * profile.weightedPelvis +
-            norm(seatedMidline, profile.seatedMidlineAttention, profile.seatedMidlineAttention + 1.2) * profile.weightedSpinalMidline +
-            norm(seatedRounding, profile.seatedRoundingAttention, profile.seatedRoundingAttention + 14) * profile.weightedThoracicRounding +
-            norm(seatedForwardHead, profile.forwardHeadAttention, profile.forwardHeadReferral) * profile.weightedForwardHead +
-            adamsValue * profile.weightedAdams +
-            norm(max(magnitude(gait?.gaitShoulderSwingDifferenceCm), max(magnitude(gait?.gaitPelvicSwingDifferenceCm), magnitude(gait?.gaitTrunkSwayCm))), profile.gaitAttention, profile.gaitAttention + 1.1) * profile.weightedGait
-        ) / PostureScreeningRules.scoringWeightTotal
-        let evidenceAdjustedScore = weightedScoreRaw * (0.55 + 0.45 * clamp01(quality))
-        let level: BodyAssessmentRecord.AttentionLevel
-        if !complete || !metricsValid { level = .pending }
-        else if atrRed || (adams == .positive && (gaitAbnormal || seatedAbnormal)) || evidenceAdjustedScore >= profile.redScore / 100 { level = .red }
-        else if atrYellow || occiputWallAbnormal || shoulderRed || pelvisRed || adams == .positive || gaitAbnormal || seatedAbnormal || headTiltYellow || evidenceAdjustedScore >= profile.yellowScore / 100 { level = .yellow }
-        else if shoulderYellow || pelvisYellow || adams == .equivocal || seatedAbnormalYellow { level = .yellow }
-        else { level = .green }
-
-        var reasons: [String] = []
-        if let value = standing?.shoulderHeightDifferenceCm, value.isFinite { reasons.append(String(format: "站姿双肩高度差 %.1f cm", abs(value))) }
-        if let value = standing?.pelvicHeightDifferenceCm, value.isFinite { reasons.append(String(format: "站姿骨盆高度差 %.1f cm", abs(value))) }
-        if let value = forward?.cameraProxyAtrDegrees, value.isFinite { reasons.append(String(format: "前屈姿态代偿角 %.1f°（用于观察提示）", abs(value))) }
-        if let value = [forward?.instrumentAtrDegrees, forward?.thoracicAtrDegrees, forward?.lumbarAtrDegrees].compactMap({ $0.flatMap { $0.isFinite ? max(0, $0) : nil } }).max() { reasons.append(String(format: "校准设备/深度 ATR 最大值 %.1f°（设备筛查证据）", value)) }
-        if let value = standing?.headTiltDegrees, value.isFinite { reasons.append(String(format: "头部侧倾角 %.1f°", abs(value))) }
-        if !metricsValid { reasons.append("检测到异常测量值，请重新拍摄并保持设备稳定。") }
-        if let adams { reasons.append("前屈背部不对称：\(adams.label)") }
-        if let value = seated?.spinalMidlineDeviationCm, value.isFinite { reasons.append(String(format: "坐姿躯干中线偏移 %.1f cm", abs(value))) }
-        if let value = seated?.thoracicRoundingDegrees, value.isFinite { reasons.append(String(format: "坐姿胸椎圆背观察角度 %.1f°", abs(value))) }
-        if let value = seated?.forwardHeadAngleDegrees, value.isFinite { reasons.append(String(format: "坐姿头前伸观察角度 %.1f°", abs(value))) }
-        if let value = gait?.gaitTrunkSwayCm, value.isFinite { reasons.append(String(format: "步态躯干侧向摆动 %.1f cm", abs(value))) }
-        if let value = seated?.occiputWallDistanceCm, value.isFinite, value >= 0 { reasons.append(String(format: "枕墙距 %.1f cm", value)) }
-        if reasons.isEmpty { reasons.append(complete ? "记录不足，暂未形成完整指标。" : "请完成 4 项拍摄记录，并保持每项画面稳定、全身入镜。") }
-        return PostureAssessmentReport(generatedAt: generatedAt, algorithm: algorithmVersion, snapshots: snapshots, overallLevel: level, reasons: reasons, disclaimer: "本报告用于家庭健康观察与风险提示。二维相机不输出肋峰/ATR或Cobb角度，结果不替代脊柱侧弯筛查、体检或影像检查。出现持续疼痛或异常体征请及时就医。", riskScore: min(100, max(0, Int((evidenceAdjustedScore * 100).rounded(.down)))), qualityScore: min(100, max(0, Int((quality * 100).rounded(.down)))))
-    }
-}
+/// Candidate posture rules used for validation. The supplied 7.20 framework
+/// defines the capture procedure and professional screening path; it does not
+/// validate every phone-camera proxy threshold below. Product classification
+/// therefore remains fail-closed until an independent labelled evaluation is
+/// approved for this exact algorithm/calibration version.

@@ -1,11 +1,13 @@
 {
-  "approvalVersion": "UY-MODEL-APPROVAL-1.0",
+  "approvalVersion": "UY-MODEL-APPROVAL-1.1",
   "approvalId": "REPLACE-WITH-APPROVAL-ID",
   "status": "pending-human-validation",
   "datasetId": "REPLACE-WITH-SECURE-DATASET-ID",
   "corpusSha256": "REPLACE-WITH-64-HEX-SHA256",
   "evaluationReportSha256": "REPLACE-WITH-64-HEX-SHA256",
-  "modelRegistryVersion": "UY-MODELS-1.0",
+  "repeatabilityCorpusSha256": "REPLACE-WITH-64-HEX-SHA256",
+  "repeatabilityReportSha256": "REPLACE-WITH-64-HEX-SHA256",
+  "modelRegistryVersion": "UY-MODELS-1.1",
   "modelVersions": {
     "movement": "REPLACE-WITH-FROZEN-VERSION",
     "posture": "REPLACE-WITH-FROZEN-VERSION",
@@ -13,6 +15,21 @@
     "height": "REPLACE-WITH-FROZEN-VERSION",
     "followAlong": "REPLACE-WITH-FROZEN-VERSION",
     "growth": "REPLACE-WITH-FROZEN-VERSION"
+  },
+  "postureDomainValidation": {
+    "spinal_alignment": { "status": "pending-human-validation", "datasetId": "REPLACE", "sampleCount": 0, "evaluationReportSha256": "REPLACE-WITH-64-HEX-SHA256", "evaluatedAt": "REPLACE-WITH-ISO-8601" },
+    "shoulder_pelvis": { "status": "pending-human-validation", "datasetId": "REPLACE", "sampleCount": 0, "evaluationReportSha256": "REPLACE-WITH-64-HEX-SHA256", "evaluatedAt": "REPLACE-WITH-ISO-8601" },
+    "head_upper_posture": { "status": "pending-human-validation", "datasetId": "REPLACE", "sampleCount": 0, "evaluationReportSha256": "REPLACE-WITH-64-HEX-SHA256", "evaluatedAt": "REPLACE-WITH-ISO-8601" },
+    "trunk_rotation": { "status": "pending-human-validation", "datasetId": "REPLACE", "sampleCount": 0, "evaluationReportSha256": "REPLACE-WITH-64-HEX-SHA256", "evaluatedAt": "REPLACE-WITH-ISO-8601" },
+    "dynamic_knee": { "status": "pending-human-validation", "datasetId": "REPLACE", "sampleCount": 0, "evaluationReportSha256": "REPLACE-WITH-64-HEX-SHA256", "evaluatedAt": "REPLACE-WITH-ISO-8601" },
+    "gait": { "status": "pending-human-validation", "datasetId": "REPLACE", "sampleCount": 0, "evaluationReportSha256": "REPLACE-WITH-64-HEX-SHA256", "evaluatedAt": "REPLACE-WITH-ISO-8601" },
+    "seated_posture": { "status": "pending-human-validation", "datasetId": "REPLACE", "sampleCount": 0, "evaluationReportSha256": "REPLACE-WITH-64-HEX-SHA256", "evaluatedAt": "REPLACE-WITH-ISO-8601" },
+    "foot_arch": { "status": "pending-human-validation", "datasetId": "REPLACE", "sampleCount": 0, "evaluationReportSha256": "REPLACE-WITH-64-HEX-SHA256", "evaluatedAt": "REPLACE-WITH-ISO-8601" }
+  },
+  "validationProtocol": {
+    "doubleScreenedFraction": 0,
+    "cohensKappa": 0,
+    "ageThresholdCohorts": []
   },
   "evaluatedAt": "REPLACE-WITH-ISO-8601",
   "approvers": []

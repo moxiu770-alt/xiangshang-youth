@@ -19,6 +19,7 @@ import com.google.mlkit.vision.pose.PoseDetection
 import com.google.mlkit.vision.pose.PoseLandmark
 import com.google.mlkit.vision.pose.PoseDetector
 import com.google.mlkit.vision.pose.accurate.AccuratePoseDetectorOptions
+import com.xiangshang.youth.core.model.BodyCaptureQualityGate
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.math.abs
@@ -64,6 +65,8 @@ class FollowAlongPoseAnalyzer(context: Context) {
     private var lastPublishedAt = 0L
     private var profile: FollowAlongAgeProfile = ChildFollowAlongTuning.profileForAge(null)
     private var ageBand: ChildFollowAlongTuning.FollowAgeBand = ChildFollowAlongTuning.FollowAgeBand.AGE_UNKNOWN
+    private var frameWidth = 1f
+    private var frameHeight = 1f
 
     fun update(category: String, ageMonths: Int?, callback: (FollowAlongPoseFeedback) -> Unit) {
         val targetProfile = ChildFollowAlongTuning.profileForAge(ageMonths)
@@ -87,6 +90,9 @@ class FollowAlongPoseAnalyzer(context: Context) {
             return
         }
         val input = InputImage.fromMediaImage(mediaImage, image.imageInfo.rotationDegrees)
+        val rotated = image.imageInfo.rotationDegrees % 180 != 0
+        frameWidth = (if (rotated) mediaImage.height else mediaImage.width).toFloat().coerceAtLeast(1f)
+        frameHeight = (if (rotated) mediaImage.width else mediaImage.height).toFloat().coerceAtLeast(1f)
         val poseTask = detector.process(input)
         val faceTask = faceDetector.process(input)
         Tasks.whenAllSuccess<Any>(poseTask, faceTask)
@@ -123,6 +129,24 @@ class FollowAlongPoseAnalyzer(context: Context) {
                 "请让头、肩、髋和双脚完整入镜，站稳后开始确认动作"
             }
             publish(FollowAlongPoseFeedback(false, false, message, confidence, reps, 0, 0, captureState = if (confidence > 0.1f) FollowAlongCaptureState.Occluded else FollowAlongCaptureState.OutOfFrame))
+            return
+        }
+        val (bodySpan, torsoSpan) = framingSpans(pose)
+        if (!BodyCaptureQualityGate.hasComfortableFollowAlongFraming(bodySpan, torsoSpan)) {
+            resetSignal()
+            publish(
+                FollowAlongPoseFeedback(
+                    false,
+                    false,
+                    "人物离镜头太近，请后退两步，保持头顶、双手和双脚都留有空间",
+                    confidence,
+                    reps,
+                    0,
+                    0,
+                    captureState = FollowAlongCaptureState.OutOfFrame
+                ),
+                true
+            )
             return
         }
         lowConfidenceStreak = 0
@@ -222,7 +246,7 @@ class FollowAlongPoseAnalyzer(context: Context) {
             }
             lastRepAt = now
             reps += 1
-            publish(FollowAlongPoseFeedback(true, true, "动作完成 ${reps} 次 · 连击 $comboCount", confidence, reps, activeSeconds(now), quality, FollowAlongStage.Return, FollowAlongCaptureState.Ready, dominantSide(pose), (amplitude / dynamicRange.coerceAtLeast(.001f) * 100f).roundToInt().coerceIn(0, 100), lastTempoScore, comboCount), true)
+            publish(FollowAlongPoseFeedback(true, true, "辅助计数 ${reps} 次 · 连击 $comboCount（待人工验证）", confidence, reps, activeSeconds(now), quality, FollowAlongStage.Return, FollowAlongCaptureState.Ready, dominantSide(pose), (amplitude / dynamicRange.coerceAtLeast(.001f) * 100f).roundToInt().coerceIn(0, 100), lastTempoScore, comboCount), true)
         }
         publish(
                 FollowAlongPoseFeedback(
@@ -269,6 +293,27 @@ class FollowAlongPoseAnalyzer(context: Context) {
             }
             else -> null
         }
+    }
+
+    /** Distance gate shared with iOS: reject close upper-body crops without
+     * depending on face size, which varies too much between children. */
+    private fun framingSpans(pose: Pose): Pair<Double?, Double?> {
+        fun point(id: Int) = pose.getPoseLandmark(id)
+            ?.takeIf { it.inFrameLikelihood >= profile.minLandmarkConfidence * .75f }
+            ?.position
+        fun midpoint(a: android.graphics.PointF?, b: android.graphics.PointF?): android.graphics.PointF? = when {
+            a != null && b != null -> android.graphics.PointF((a.x + b.x) / 2f, (a.y + b.y) / 2f)
+            a != null -> a
+            else -> b
+        }
+        fun normalizedDistance(a: android.graphics.PointF?, b: android.graphics.PointF?): Double? {
+            if (a == null || b == null) return null
+            return hypot(((a.x - b.x) / frameWidth).toDouble(), ((a.y - b.y) / frameHeight).toDouble())
+        }
+        val shoulder = midpoint(point(PoseLandmark.LEFT_SHOULDER), point(PoseLandmark.RIGHT_SHOULDER))
+        val hip = midpoint(point(PoseLandmark.LEFT_HIP), point(PoseLandmark.RIGHT_HIP))
+        val ankle = midpoint(point(PoseLandmark.LEFT_ANKLE), point(PoseLandmark.RIGHT_ANKLE))
+        return normalizedDistance(point(PoseLandmark.NOSE), ankle) to normalizedDistance(shoulder, hip)
     }
 
     private fun guidanceText(
@@ -573,7 +618,10 @@ fun bindFollowAlongCamera(context: Context, lifecycleOwner: androidx.lifecycle.L
             .build()
             .also { it.setAnalyzer(analyzer.executor) { image -> analyzer.analyze(image) } }
         val selector = if (front) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
-        runCatching { provider.bindToLifecycle(lifecycleOwner, selector, preview, analysis) }
+        runCatching {
+            val camera = provider.bindToLifecycle(lifecycleOwner, selector, preview, analysis)
+            camera.cameraControl.setZoomRatio(1f)
+        }
     }, ContextCompat.getMainExecutor(context))
 }
 

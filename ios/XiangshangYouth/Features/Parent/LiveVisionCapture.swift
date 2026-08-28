@@ -15,6 +15,7 @@ struct LiveVisionCaptureSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var appState: AppState
+    @StateObject private var deviceAlignmentMonitor = CaptureDeviceAlignmentMonitor()
     @State private var usesFrontCamera = false
     @State private var guidance = "正在启动相机…"
     @State private var speaksGuidance = true
@@ -24,18 +25,23 @@ struct LiveVisionCaptureSheet: View {
     @State private var cameraReady = false
     @State private var cameraError: String?
     @State private var captureArmed = false
+    @State private var bodyAlignment: CaptureBodyAlignment = .waiting
+    private var calibrationReady: Bool {
+        !usesFrontCamera && cameraReady && deviceAlignmentMonitor.alignment.isLevel && bodyAlignment.isReady
+    }
     private var taskIndex: Int {
-        (BodyAssessmentRecord.CaptureTask.allCases.firstIndex(of: task) ?? 0) + 1
+        SpineScreeningStandard.homeCameraItems.first(where: { $0.method == .camera(task) })?.number ?? 1
     }
     private var phaseIndex: Int {
         if !captureArmed { return 0 }
-        if captureProgress < 0.65 { return 1 }
+        if captureProgress < 0.25 { return 0 }
+        if captureProgress < 0.85 { return 1 }
         return 2
     }
 
     var body: some View {
         ZStack {
-            LiveVisionPreview(task: task, measuredHeightCm: measuredHeightCm, ageMonths: ageMonths, usesFrontCamera: usesFrontCamera, speaksGuidance: speaksGuidance, captureArmed: $captureArmed, cameraReady: $cameraReady, guidance: $guidance, captureProgress: $captureProgress, failed: { message in
+            LiveVisionPreview(task: task, measuredHeightCm: measuredHeightCm, ageMonths: ageMonths, usesFrontCamera: usesFrontCamera, speaksGuidance: speaksGuidance, captureArmed: $captureArmed, cameraReady: $cameraReady, guidance: $guidance, captureProgress: $captureProgress, bodyAlignment: $bodyAlignment, failed: { message in
                 cameraError = message
             }, interrupted: {
                 captureArmed = false
@@ -49,7 +55,7 @@ struct LiveVisionCaptureSheet: View {
             LinearGradient(colors: [.black.opacity(0.52), .clear, .black.opacity(0.60)], startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea().allowsHitTesting(false)
 
-            LiveBodyGuideOverlay(task: task)
+            CaptureHumanCalibrationGuide(task: task, alignment: bodyAlignment, device: deviceAlignmentMonitor.alignment, recording: captureArmed)
                 .allowsHitTesting(false)
 
             VStack(spacing: 16) {
@@ -64,7 +70,7 @@ struct LiveVisionCaptureSheet: View {
                     .accessibilityLabel("关闭姿态记录")
                     Spacer()
                     VStack(spacing: 2) {
-                        Text("动作 \(taskIndex) / \(BodyAssessmentRecord.CaptureTask.allCases.count)")
+                        Text("家庭采集 \(taskIndex) / \(SpineScreeningStandard.homeCameraItems.count)")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(.white.opacity(0.72))
                         Text(task.title)
@@ -82,6 +88,7 @@ struct LiveVisionCaptureSheet: View {
                         captureArmed = false
                         captureProgress = 0
                         cameraReady = false
+                        bodyAlignment = .waiting
                         usesFrontCamera.toggle()
                     } label: {
                         Image(systemName: "camera.rotate.fill").font(.headline).frame(width: 48, height: 48)
@@ -97,10 +104,23 @@ struct LiveVisionCaptureSheet: View {
                         .font(.system(size: 15, weight: .semibold))
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
-                    HStack(spacing: 6) {
-                        capturePhase("站位", index: 0)
-                        capturePhase("保持", index: 1)
-                        capturePhase("完成", index: 2)
+                    Label(capturePlacementText, systemImage: "iphone.gen3.radiowaves.left.and.right")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.76))
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if captureArmed {
+                        HStack(spacing: 6) {
+                            ForEach(Array(capturePhaseLabels.enumerated()), id: \.offset) { index, label in
+                                capturePhase(label, index: index)
+                            }
+                        }
+                    } else {
+                        CaptureCalibrationStatusRow(
+                            cameraReady: cameraReady,
+                            deviceReady: deviceAlignmentMonitor.alignment.isLevel,
+                            bodyReady: bodyAlignment.isReady
+                        )
                     }
                     HStack(alignment: .top, spacing: 9) {
                         Image(systemName: guidanceIcon)
@@ -137,19 +157,24 @@ struct LiveVisionCaptureSheet: View {
                         .frame(maxWidth: .infinity, minHeight: 50)
                     } else {
                         Button {
+                            guard calibrationReady else { return }
                             captureProgress = 0
                             captureArmed = true
-                            if speaksGuidance { VoiceCoach.shared.say("开始记录，请保持当前姿势。") }
+                            if speaksGuidance {
+                                VoiceCoach.shared.say(task == .forwardBend
+                                    ? "开始记录。双脚并拢，膝关节完全伸直，双手合十自然下垂，缓慢向前弯腰至躯干接近水平，头部自然放松，不要屈膝或做弓步。"
+                                    : "开始记录。\(task.instruction)")
+                            }
                         } label: {
-                            Label("开始记录", systemImage: "record.circle.fill")
+                            Label(calibrationReady ? "引导质量门已通过，开始记录" : calibrationBlockingText, systemImage: calibrationReady ? "record.circle.fill" : "viewfinder")
                                 .font(.system(size: 16, weight: .bold))
                                 .frame(maxWidth: .infinity, minHeight: 50)
                         }
                         .buttonStyle(.borderedProminent)
                         .buttonBorderShape(.roundedRectangle(radius: 13))
                         .tint(.yellow).foregroundStyle(.black)
-                        .disabled(!cameraReady)
-                        .accessibilityHint("确认孩子已按当前动作站好后开始记录")
+                        .disabled(!calibrationReady)
+                        .accessibilityHint("相机、手机角度和人体关键点三项全部通过后才能开始")
                     }
                 }
                 .foregroundStyle(.white)
@@ -186,7 +211,7 @@ struct LiveVisionCaptureSheet: View {
         }
         .onAppear {
             speaksGuidance = appState.localFeatures.settings.voiceGuidanceEnabled
-            if speaksGuidance { VoiceCoach.shared.say("开始\(task.title)。\(task.instruction)。请让孩子全身入镜。") }
+        if speaksGuidance { VoiceCoach.shared.say("开始第\(taskIndex)项，\(task.title)。\(task.instruction)。\(SpineScreeningStandard.mainCameraPlacement)。") }
         }
         .onChange(of: speaksGuidance) { _, enabled in if !enabled { VoiceCoach.shared.stop() } }
         // A capture must never span an app interruption. Returning from a
@@ -202,7 +227,33 @@ struct LiveVisionCaptureSheet: View {
             cameraReady = false
             VoiceCoach.shared.stop()
         }
-        .onDisappear { VoiceCoach.shared.stop() }
+        .onChange(of: deviceAlignmentMonitor.alignment) { _, alignment in
+            guard alignment.isAvailable else { return }
+            if !alignment.isLevel {
+                if captureArmed {
+                    captureArmed = false
+                    captureProgress = 0
+                    guidance = "手机角度发生变化，记录已暂停。请重新调平手机并完成人体对齐。"
+                    if speaksGuidance { VoiceCoach.shared.say("手机角度发生变化，记录已暂停，请重新调平手机。") }
+                } else {
+                    guidance = "请先调平手机：左右不超过 2 度，前后不超过 5 度。"
+                }
+            }
+        }
+        .onAppear { deviceAlignmentMonitor.start() }
+        .onDisappear {
+            deviceAlignmentMonitor.stop()
+            VoiceCoach.shared.stop()
+        }
+    }
+
+    private var calibrationBlockingText: String {
+        if !cameraReady { return "正在连接相机" }
+        if usesFrontCamera { return "正式记录请切回后置主摄" }
+        if !deviceAlignmentMonitor.alignment.isLevel { return "请将左右调至 2°、前后调至 5°内" }
+        if !bodyAlignment.bodyDetected { return "请进入人型框" }
+        if !bodyAlignment.distanceReady { return "请调整拍摄距离" }
+        return "请对齐头肩髋膝脚"
     }
 
     private var guidanceIcon: String {
@@ -212,6 +263,24 @@ struct LiveVisionCaptureSheet: View {
         if guidance.contains("距离") || guidance.contains("入镜") { return "viewfinder" }
         if guidance.contains("遮挡") { return "eye.slash.fill" }
         return captureArmed ? "waveform.path.ecg" : "figure.stand"
+    }
+
+    private var capturePlacementText: String {
+        switch task {
+        case .gaitVideo: "后置主摄固定机位 · 3 米直线自然往返 1 次"
+        case .footArch: SpineScreeningStandard.footCameraPlacement
+        default: "后置 1× 主摄 · \(SpineScreeningStandard.mainCameraPlacement)"
+        }
+    }
+
+    private var capturePhaseLabels: [String] {
+        switch task {
+        case .forwardBend: ["起始位", "前屈位", "完成"]
+        case .dynamicKneeControl: ["站稳", "下蹲", "回位"]
+        case .standingSide: ["左侧", "右侧", "完成"]
+        case .footArch: ["左足", "右足", "完成"]
+        default: ["站稳", "保持", "完成"]
+        }
     }
 
     private func capturePhase(_ title: String, index: Int) -> some View {
@@ -227,54 +296,6 @@ struct LiveVisionCaptureSheet: View {
     }
 }
 
-/// A deliberately neutral framing guide: it verifies framing quality without
-/// implying that a body outline is a diagnosis or a score.
-private struct LiveBodyGuideOverlay: View {
-    let task: BodyAssessmentRecord.CaptureTask
-
-    var body: some View {
-        GeometryReader { proxy in
-            // Keep the guide clear of the bottom guidance panel on short
-            // phones and landscape. The original fixed-height target could
-            // leave no visible space for the start button on compact screens.
-            let aspectRatio = task == .seatedPosture ? 0.88 : 1.48
-            let preferredWidth = min(proxy.size.width * 0.74, 330)
-            let height = min(preferredWidth * aspectRatio, max(160, proxy.size.height * 0.43))
-            let width = min(preferredWidth, height / aspectRatio)
-            VStack(spacing: 10) {
-                Text(task == .gaitVideo ? "从框内自然走过，完成 3 步" : "请将孩子完整置于引导框内")
-                    .font(.caption.weight(.semibold))
-                    .padding(.horizontal, 12).padding(.vertical, 7)
-                    .background(.black.opacity(0.42), in: Capsule())
-                ZStack {
-                    RoundedRectangle(cornerRadius: 30)
-                        .stroke(.white.opacity(0.92), style: StrokeStyle(lineWidth: 2, dash: [9, 7]))
-                    VStack(spacing: 10) {
-                        Image(systemName: task == .gaitVideo ? "arrow.left.and.right" : task == .forwardBend ? "figure.flexibility" : "figure.stand")
-                            .font(.system(size: 46, weight: .light))
-                        Text(frameInstruction)
-                            .font(.caption.weight(.medium))
-                    }
-                    .foregroundStyle(.white.opacity(0.82))
-                }
-                .frame(width: width, height: height)
-            }
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .offset(y: -38)
-        }
-        .ignoresSafeArea()
-    }
-
-    private var frameInstruction: String {
-        switch task {
-        case .seatedPosture: "肩部与髋部入镜"
-        case .forwardBend: "侧后方入镜，躯干前倾后停住"
-        case .gaitVideo, .standingBack: "头、肩、髋与双脚入镜"
-        }
-    }
-}
-
 private struct LiveVisionPreview: UIViewControllerRepresentable {
     let task: BodyAssessmentRecord.CaptureTask
     let measuredHeightCm: Double
@@ -285,6 +306,7 @@ private struct LiveVisionPreview: UIViewControllerRepresentable {
     @Binding var cameraReady: Bool
     @Binding var guidance: String
     @Binding var captureProgress: Double
+    @Binding var bodyAlignment: CaptureBodyAlignment
     let failed: (String) -> Void
     let interrupted: () -> Void
     let completed: (CaptureReview) -> Void
@@ -299,6 +321,9 @@ private struct LiveVisionPreview: UIViewControllerRepresentable {
         }
         controller.onCameraReady = { value in
             DispatchQueue.main.async { cameraReady = value }
+        }
+        controller.onBodyAlignment = { value in
+            DispatchQueue.main.async { bodyAlignment = value }
         }
         controller.onFailure = { message in DispatchQueue.main.async { failed(message) } }
         controller.onInterrupted = { DispatchQueue.main.async { interrupted() } }
@@ -335,17 +360,24 @@ private final class LiveVisionCaptureController: UIViewController, AVCaptureVide
     private var metricSamples: [PoseMetricSample] = []
     private var displacementWindow: [Double] = []
     private var gaitMotionWindow: [Bool] = []
+    private var dynamicRepetitionCount = 0
+    private var dynamicWasDown = false
+    private var segmentPhaseIndex = 0
+    private var completedPhaseSamples: [PoseMetricSample] = []
 
     var onGuidance: ((String) -> Void)?
     var onProgress: ((Double) -> Void)?
     var onCameraReady: ((Bool) -> Void)?
+    var onBodyAlignment: ((CaptureBodyAlignment) -> Void)?
     var onFailure: ((String) -> Void)?
     var onInterrupted: (() -> Void)?
     var onCompleted: ((CaptureReview) -> Void)?
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        previewLayer.videoGravity = .resizeAspectFill
+        // Show the complete sensor frame. Aspect-fill cropped the top/bottom
+        // and made a correctly positioned child look like a close-up.
+        previewLayer.videoGravity = .resizeAspect
         previewLayer.frame = view.bounds
         view.layer.addSublayer(previewLayer)
         observeSystemCaptureInterruptions()
@@ -357,8 +389,9 @@ private final class LiveVisionCaptureController: UIViewController, AVCaptureVide
         // A dismissed sheet must never leave an armed capture or an enabled
         // button behind while AVCapture winds down on its own serial queue.
         captureArmed = false
-        resetStability()
+        resetStability(clearCompletedPhases: true)
         onCameraReady?(false)
+        onBodyAlignment?(.waiting)
         sessionQueue.async { self.session.stopRunning() }
     }
     deinit { lifecycleObservers.forEach(NotificationCenter.default.removeObserver) }
@@ -379,7 +412,7 @@ private final class LiveVisionCaptureController: UIViewController, AVCaptureVide
     private func pauseForSystemInterruption(_ message: String) {
         guard !didFinish else { return }
         captureArmed = false
-        resetStability()
+        resetStability(clearCompletedPhases: true)
         onCameraReady?(false)
         VoiceCoach.shared.stop()
         onInterrupted?()
@@ -405,13 +438,14 @@ private final class LiveVisionCaptureController: UIViewController, AVCaptureVide
         self.speaksGuidance = speaksGuidance
         if self.captureArmed != captureArmed {
             self.captureArmed = captureArmed
-            resetStability()
+            resetStability(clearCompletedPhases: true)
         }
         let position: AVCaptureDevice.Position = usesFrontCamera ? .front : .back
         guard currentPosition != position else { return }
         currentPosition = position
-        resetStability()
+        resetStability(clearCompletedPhases: true)
         onCameraReady?(false)
+        onBodyAlignment?(.waiting)
         sessionQueue.async { self.configureSession(position: position) }
     }
 
@@ -467,6 +501,14 @@ private final class LiveVisionCaptureController: UIViewController, AVCaptureVide
               let input = try? AVCaptureDeviceInput(device: device), session.canAddInput(input) else {
             fail("当前设备无法打开所选摄像头，请切换前后摄像头后重试。"); return
         }
+        // Never inherit a digital zoom factor from another capture session.
+        // The calibrated posture flow deliberately uses the undistorted 1×
+        // wide camera and asks the child to move back instead of zooming out
+        // with an ultra-wide lens.
+        if let _ = try? device.lockForConfiguration() {
+            device.videoZoomFactor = min(max(1, device.minAvailableVideoZoomFactor), device.maxAvailableVideoZoomFactor)
+            device.unlockForConfiguration()
+        }
         session.addInput(input)
         if session.outputs.isEmpty {
             let output = AVCaptureVideoDataOutput()
@@ -493,12 +535,46 @@ private final class LiveVisionCaptureController: UIViewController, AVCaptureVide
             let framePosition = (connection.inputPorts.first?.input as? AVCaptureDeviceInput)?.device.position
             let orientation: CGImagePropertyOrientation = framePosition == .front ? .leftMirrored : .right
             try VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: orientation).perform([poseRequest])
-            guard let pose = poseRequest.results?.first else { updateGuidance("暂未看清全身，请退后一步并确保全身入镜。"); resetStability(); return }
+            guard let pose = poseRequest.results?.first else {
+                onBodyAlignment?(.waiting)
+                updateGuidance("暂未看清全身，请退后一步并确保全身入镜。"); resetStability(); return
+            }
             let points = try pose.recognizedPoints(.all)
-            let required: [VNHumanBodyPoseObservation.JointName] = task == .seatedPosture ? [.nose, .leftEar, .rightEar, .leftShoulder, .rightShoulder, .leftHip, .rightHip] : [.nose, .leftShoulder, .rightShoulder, .leftHip, .rightHip, .leftAnkle, .rightAnkle]
+            if task == .footArch {
+                processFootCloseUp(points)
+                return
+            }
+            let required: [VNHumanBodyPoseObservation.JointName]
+            switch task {
+            case .seatedPosture:
+                required = [.nose, .leftEar, .rightEar, .leftShoulder, .rightShoulder, .leftHip, .rightHip]
+            case .standingFront, .standingBack:
+                // Head tilt is reported from this task, so both ears must be
+                // genuinely observed instead of silently turning a missing
+                // landmark into a repeatable but false zero.
+                required = [.nose, .leftEar, .rightEar, .leftShoulder, .rightShoulder, .leftHip, .rightHip, .leftKnee, .rightKnee, .leftAnkle, .rightAnkle]
+            default:
+                required = [.nose, .leftShoulder, .rightShoulder, .leftHip, .rightHip, .leftKnee, .rightKnee, .leftAnkle, .rightAnkle]
+            }
             let confidences = required.map { points[$0]?.confidence ?? 0 }
-            guard BodyCaptureQualityGate.hasReliableLandmarks(confidences, ageMonths: ageMonths) else {
-                updateGuidance(task == .seatedPosture ? "请让肩部和髋部清晰入镜，保持光线充足。" : "请让头、肩、髋和双脚完整入镜，保持光线充足。"); resetStability(); return
+            let forwardBendCoreConfidences = [VNHumanBodyPoseObservation.JointName.nose, .leftShoulder, .rightShoulder, .leftHip, .rightHip, .leftKnee, .rightKnee].map { points[$0]?.confidence ?? 0 }
+            let forwardBendAnkleConfidences = [VNHumanBodyPoseObservation.JointName.leftAnkle, .rightAnkle].map { points[$0]?.confidence ?? 0 }
+            let hasReliablePose: Bool
+            if task == .forwardBend {
+                hasReliablePose = captureArmed
+                    ? BodyCaptureQualityGate.hasReliableForwardBendLandmarks(core: forwardBendCoreConfidences, ankles: forwardBendAnkleConfidences, ageMonths: ageMonths)
+                    : BodyCaptureQualityGate.hasReliableLandmarks(confidences, ageMonths: ageMonths)
+            } else {
+                hasReliablePose = BodyCaptureQualityGate.hasReliableLandmarks(confidences, ageMonths: ageMonths)
+            }
+            guard hasReliablePose else {
+                onBodyAlignment?(.waiting)
+                let prompt = task == .seatedPosture
+                    ? "请让肩部和髋部清晰入镜，保持光线充足。"
+                    : task == .forwardBend
+                        ? "请背对镜头，让头、双肩、双髋、双膝和双脚清晰入镜。"
+                        : "请让头、肩、髋和双脚完整入镜，保持光线充足。"
+                updateGuidance(prompt); resetStability(); return
             }
             // Vision observations are value snapshots, but the dictionary can
             // still omit a joint while a frame is being invalidated during a
@@ -509,23 +585,86 @@ private final class LiveVisionCaptureController: UIViewController, AVCaptureVide
                   let leftHip = points[.leftHip],
                   let rightHip = points[.rightHip],
                   let nose = points[.nose],
-                  task == .seatedPosture || (points[.leftAnkle] != nil && points[.rightAnkle] != nil) else {
+                  task == .seatedPosture || (points[.leftKnee] != nil && points[.rightKnee] != nil),
+                  task == .seatedPosture || task == .forwardBend || (points[.leftAnkle] != nil && points[.rightAnkle] != nil) else {
                 updateGuidance("暂未看清关键点，请保持光线充足并重新取景。"); resetStability(); return
             }
+            let leftKnee = points[.leftKnee]
+            let rightKnee = points[.rightKnee]
             let leftAnkle = points[.leftAnkle]
             let rightAnkle = points[.rightAnkle]
             let verticalCoverage: Double
+            var alignmentAnkleLocations: [CGPoint] = []
             if task == .seatedPosture {
                 verticalCoverage = abs((leftShoulder.location.y + rightShoulder.location.y) / 2 - (leftHip.location.y + rightHip.location.y) / 2)
             } else {
-                guard let leftAnkle, let rightAnkle else {
-                    updateGuidance("暂未看清双脚，请退后一步并确保全身入镜。"); resetStability(); return
+                let ankleConfidenceFloor = BodyCaptureQualityGate.profile(ageMonths: ageMonths).minimumIndividualLandmarkConfidence
+                let visibleAnkleLocations = [leftAnkle, rightAnkle].compactMap { ankle -> CGPoint? in
+                    guard let ankle, ankle.confidence >= ankleConfidenceFloor else { return nil }
+                    return ankle.location
                 }
-                verticalCoverage = abs((nose.location.y - (leftAnkle.location.y + rightAnkle.location.y) / 2))
+                let requiredVisibleAnkles = task == .forwardBend && captureArmed ? 1 : 2
+                guard visibleAnkleLocations.count >= requiredVisibleAnkles else {
+                    onBodyAlignment?(.waiting)
+                    updateGuidance(task == .forwardBend ? "请让双脚完整入镜并保持并拢。" : "暂未看清双脚，请退后一步并确保全身入镜。"); resetStability(); return
+                }
+                alignmentAnkleLocations = visibleAnkleLocations
+                let ankleY = visibleAnkleLocations.map(\.y).reduce(0, +) / CGFloat(visibleAnkleLocations.count)
+                verticalCoverage = abs(nose.location.y - ankleY)
             }
-            guard BodyCaptureQualityGate.hasUsableBodyScale(verticalCoverage: verticalCoverage, seated: task == .seatedPosture, ageMonths: ageMonths) else {
+            let scaleState = BodyCaptureQualityGate.bodyScaleState(verticalCoverage: verticalCoverage, seated: task == .seatedPosture, ageMonths: ageMonths)
+            let shoulderCenterX = (leftShoulder.location.x + rightShoulder.location.x) / 2
+            let hipCenterX = (leftHip.location.x + rightHip.location.x) / 2
+            let bodyCenterX = (shoulderCenterX + hipCenterX) / 2
+            let ankleCenterX = alignmentAnkleLocations.isEmpty ? bodyCenterX : alignmentAnkleLocations.map(\.x).reduce(0, +) / CGFloat(alignmentAnkleLocations.count)
+            let kneeConfidenceFloor = BodyCaptureQualityGate.profile(ageMonths: ageMonths).minimumIndividualLandmarkConfidence
+            let kneesVisible = (leftKnee?.confidence ?? 0) >= kneeConfidenceFloor && (rightKnee?.confidence ?? 0) >= kneeConfidenceFloor
+            let kneeAngles: [Double] = [
+                (leftHip, leftKnee, leftAnkle),
+                (rightHip, rightKnee, rightAnkle)
+            ].compactMap { hip, knee, ankle in
+                guard let knee, let ankle, knee.confidence >= kneeConfidenceFloor, ankle.confidence >= kneeConfidenceFloor else { return nil }
+                return BodyCaptureQualityGate.jointAngle(first: hip.location, joint: knee.location, third: ankle.location)
+            }
+            let shoulderWidth = abs(leftShoulder.location.x - rightShoulder.location.x)
+            let ankleGap = (leftAnkle?.confidence ?? 0) >= kneeConfidenceFloor && (rightAnkle?.confidence ?? 0) >= kneeConfidenceFloor
+                ? abs((leftAnkle?.location.x ?? 0) - (rightAnkle?.location.x ?? 0))
+                : nil
+            let adamsLowerBodyReady = task != .forwardBend || BodyCaptureQualityGate.hasAdamsLowerBodyPosition(
+                kneeAngles: kneeAngles,
+                ankleGap: ankleGap.map(Double.init),
+                shoulderWidth: Double(shoulderWidth),
+                requiresBothFeet: !captureArmed
+            )
+            let alignment = CaptureBodyAlignment(
+                bodyDetected: true,
+                distanceState: scaleState,
+                centered: (0.39...0.61).contains(bodyCenterX),
+                headReady: (0.27...0.73).contains(nose.location.x) && (0.08...0.94).contains(nose.location.y),
+                shouldersReady: (0.31...0.69).contains(shoulderCenterX),
+                hipsReady: (0.33...0.67).contains(hipCenterX),
+                kneesReady: task == .seatedPosture || (kneesVisible && adamsLowerBodyReady),
+                feetReady: task == .seatedPosture || ((0.27...0.73).contains(ankleCenterX) && !alignmentAnkleLocations.isEmpty && adamsLowerBodyReady)
+            )
+            onBodyAlignment?(alignment)
+            switch scaleState {
+            case .ready:
+                break
+            case .tooClose:
                 resetStability()
-                updateGuidance(task == .seatedPosture ? "请把手机靠近一些，让上半身占满引导框的大部分区域。" : "请让孩子靠近一些，让身体在引导框内更清晰。")
+                updateGuidance(task == .seatedPosture
+                    ? "镜头太近，请把手机向后移，让肩部到髋部约占画面三分之一。"
+                    : "人物离镜头太近，请后退两步，让全身约占画面一半到三分之二。")
+                return
+            case .tooFar:
+                resetStability()
+                updateGuidance(task == .seatedPosture
+                    ? "距离稍远，请向前半步，仍保持头部、肩部和髋部完整入镜。"
+                    : "距离稍远，请向前半步，保持头顶和双脚完整入镜。")
+                return
+            case .invalid:
+                resetStability()
+                updateGuidance("暂时无法判断取景距离，请保持手机竖直并重新站位。")
                 return
             }
             if task == .seatedPosture {
@@ -535,6 +674,10 @@ private final class LiveVisionCaptureController: UIViewController, AVCaptureVide
                     resetStability(); updateGuidance("请坐直、双脚落地，让肩部保持在髋部上方；不要斜靠椅背。")
                     return
                 }
+            }
+            if task == .forwardBend, !adamsLowerBodyReady {
+                resetStability()
+                updateGuidance("请保持双脚并拢、膝关节完全伸直；不要屈膝或做弓步。"); return
             }
             guard captureArmed else {
                 resetStability()
@@ -554,13 +697,20 @@ private final class LiveVisionCaptureController: UIViewController, AVCaptureVide
             let correctedHip1 = (x: PostureMetricCalculator.rollCorrectedX(rightHipX, rightHipY, axisDx: rollAxisDx, axisDy: rollAxisDy), y: PostureMetricCalculator.rollCorrectedY(rightHipX, rightHipY, axisDx: rollAxisDx, axisDy: rollAxisDy))
             let correctedShoulder0 = (x: PostureMetricCalculator.rollCorrectedX(leftShoulderX, leftShoulderY, axisDx: rollAxisDx, axisDy: rollAxisDy), y: PostureMetricCalculator.rollCorrectedY(leftShoulderX, leftShoulderY, axisDx: rollAxisDx, axisDy: rollAxisDy))
             let correctedShoulder1 = (x: PostureMetricCalculator.rollCorrectedX(rightShoulderX, rightShoulderY, axisDx: rollAxisDx, axisDy: rollAxisDy), y: PostureMetricCalculator.rollCorrectedY(rightShoulderX, rightShoulderY, axisDx: rollAxisDx, axisDy: rollAxisDy))
-            let hipCenterX = (correctedHip0.x + correctedHip1.x) / 2
+            let correctedHipCenterX = (correctedHip0.x + correctedHip1.x) / 2
             let hipCenterY = (correctedHip0.y + correctedHip1.y) / 2
-            let shoulderCenterX = (correctedShoulder0.x + correctedShoulder1.x) / 2
+            let correctedShoulderCenterX = (correctedShoulder0.x + correctedShoulder1.x) / 2
             let shoulderCenterY = (correctedShoulder0.y + correctedShoulder1.y) / 2
-            let hipCenter = CGPoint(x: CGFloat(hipCenterX), y: CGFloat(hipCenterY))
-            let shoulderCenter = CGPoint(x: CGFloat(shoulderCenterX), y: CGFloat(shoulderCenterY))
-            let torsoTilt = abs(shoulderCenterX - hipCenterX) / max(abs(shoulderCenterY - hipCenterY), 0.001)
+            let hipCenter = CGPoint(x: CGFloat(correctedHipCenterX), y: CGFloat(hipCenterY))
+            let shoulderCenter = CGPoint(x: CGFloat(correctedShoulderCenterX), y: CGFloat(shoulderCenterY))
+            let rawHipCenterY = (leftHipY + rightHipY) / 2
+            let forwardBendCompletionScore = BodyCaptureQualityGate.adamsForwardBendCompletionScore(
+                leftShoulderX: leftShoulderX,
+                leftShoulderY: leftShoulderY,
+                rightShoulderX: rightShoulderX,
+                rightShoulderY: rightShoulderY,
+                hipCenterY: rawHipCenterY
+            ) ?? 0
             if firstHipLocation == nil { firstHipLocation = hipCenter }
             let start = firstHipLocation ?? hipCenter
             let displacement = hypot(hipCenter.x - start.x, hipCenter.y - start.y)
@@ -580,18 +730,42 @@ private final class LiveVisionCaptureController: UIViewController, AVCaptureVide
                 let rightEarX = Double(rightEar.location.x), rightEarY = Double(rightEar.location.y)
                 let earCenterX = (PostureMetricCalculator.rollCorrectedX(leftEarX, leftEarY, axisDx: rollAxisDx, axisDy: rollAxisDy) + PostureMetricCalculator.rollCorrectedX(rightEarX, rightEarY, axisDx: rollAxisDx, axisDy: rollAxisDy)) / 2
                 let earCenterY = (PostureMetricCalculator.rollCorrectedY(leftEarX, leftEarY, axisDx: rollAxisDx, axisDy: rollAxisDy) + PostureMetricCalculator.rollCorrectedY(rightEarX, rightEarY, axisDx: rollAxisDx, axisDy: rollAxisDy)) / 2
-                return PostureMetricCalculator.degrees(atan2(abs(earCenterX - shoulderCenterX), max(abs(earCenterY - shoulderCenterY), 0.001)))
+                return PostureMetricCalculator.degrees(atan2(abs(earCenterX - correctedShoulderCenterX), max(abs(earCenterY - shoulderCenterY), 0.001)))
             } }
-            let trunkOffset = abs(shoulderCenterX - hipCenterX)
+            let trunkOffset = abs(correctedShoulderCenterX - correctedHipCenterX)
             let shoulderGapCm = PostureMetricCalculator.centimeters(shoulderGap, bodyHeightNormalized: bodyHeightNormalized, measuredHeightCm: measuredHeightCm)
             let pelvicGapCm = PostureMetricCalculator.centimeters(pelvicGap, bodyHeightNormalized: bodyHeightNormalized, measuredHeightCm: measuredHeightCm)
             let trunkOffsetCm = PostureMetricCalculator.centimeters(trunkOffset, bodyHeightNormalized: bodyHeightNormalized, measuredHeightCm: measuredHeightCm)
+            let hipWidth = max(abs(leftHipX - rightHipX), 0.001)
+            let kneeGap = leftKnee.flatMap { left in rightKnee.map { abs(Double(left.location.x - $0.location.x)) } }
+            let ankleGapValue = leftAnkle.flatMap { left in rightAnkle.map { abs(Double(left.location.x - $0.location.x)) } }
+            let kneeAlignmentProxy = kneeGap.flatMap { knees in ankleGapValue.map { (knees - $0) / hipWidth } }
+            let leftKneeValgus: Double? = {
+                guard let knee = leftKnee, let ankle = leftAnkle,
+                      let angle = BodyCaptureQualityGate.jointAngle(first: leftHip.location, joint: knee.location, third: ankle.location) else { return nil }
+                return 180 - angle
+            }()
+            let rightKneeValgus: Double? = {
+                guard let knee = rightKnee, let ankle = rightAnkle,
+                      let angle = BodyCaptureQualityGate.jointAngle(first: rightHip.location, joint: knee.location, third: ankle.location) else { return nil }
+                return 180 - angle
+            }()
+            let lowerLimbAxisAsymmetry = leftKneeValgus.flatMap { left in rightKneeValgus.map { abs(left - $0) } }
+            let kneeCenterY = leftKnee.flatMap { left in rightKnee.map { Double((left.location.y + $0.location.y) / 2) } }
+            let squatDepthRatio = kneeCenterY.map { abs(rawHipCenterY - $0) / max(bodyHeightNormalized, 0.001) }
+            let heelAlignmentProxy = leftKnee.flatMap { left in leftAnkle.flatMap { leftFoot in
+                rightKnee.flatMap { right in rightAnkle.map { rightFoot in
+                    let leftAngle = PostureMetricCalculator.degrees(atan2(abs(Double(left.location.x - leftFoot.location.x)), max(abs(Double(left.location.y - leftFoot.location.y)), 0.001))) ?? 0
+                    let rightAngle = PostureMetricCalculator.degrees(atan2(abs(Double(right.location.x - rightFoot.location.x)), max(abs(Double(right.location.y - rightFoot.location.y)), 0.001))) ?? 0
+                    return (leftAngle + rightAngle) / 2
+                } }
+            } }
             // A single RGB/2D camera cannot measure rib prominence or ATR.
             // The previous midpoint-distance formula was mathematically zero
             // by construction, so retaining it would create a false medical
             // signal. Leave these fields unavailable until a validated depth/
             // 3D or scoliometer-backed pipeline is integrated.
-            metricSamples.append(PoseMetricSample(confidence: Double(confidences.reduce(0, +) / Float(confidences.count)), bodyHeightNormalized: bodyHeightNormalized, shoulderHeightDifferenceCm: shoulderGapCm ?? 0, pelvicHeightDifferenceCm: pelvicGapCm ?? 0, headTiltDegrees: headTilt ?? 0, spinalMidlineDeviationCm: trunkOffsetCm ?? 0, thoracicRoundingDegrees: PostureMetricCalculator.degrees(atan2(abs(shoulderCenter.x - hipCenter.x), max(abs(shoulderCenter.y - hipCenter.y), 0.001))) ?? 0, forwardHeadAngleDegrees: forwardHeadAngle ?? 0))
+            metricSamples.append(PoseMetricSample(confidence: Double(confidences.reduce(0, +) / Float(confidences.count)), bodyHeightNormalized: bodyHeightNormalized, shoulderHeightDifferenceCm: shoulderGapCm ?? 0, pelvicHeightDifferenceCm: pelvicGapCm ?? 0, headTiltDegrees: headTilt ?? 0, spinalMidlineDeviationCm: trunkOffsetCm ?? 0, thoracicRoundingDegrees: PostureMetricCalculator.degrees(atan2(abs(shoulderCenter.x - hipCenter.x), max(abs(shoulderCenter.y - hipCenter.y), 0.001))) ?? 0, forwardHeadAngleDegrees: forwardHeadAngle ?? 0, forwardBendCompletionScore: forwardBendCompletionScore, kneeAlignmentProxyRatio: kneeAlignmentProxy ?? 0, lowerLimbAxisAsymmetryDegrees: lowerLimbAxisAsymmetry ?? 0, leftKneeValgusProxyDegrees: leftKneeValgus ?? 0, rightKneeValgusProxyDegrees: rightKneeValgus ?? 0, squatDepthRatio: squatDepthRatio ?? 0, footArchVisibilityScore: task == .footArch ? Double([leftAnkle?.confidence, rightAnkle?.confidence].compactMap { $0 }.reduce(0, +) / 2) : 0, heelAlignmentProxyDegrees: heelAlignmentProxy ?? 0))
             let gap = max(shoulderGap, pelvicGap)
             let captureProfile = BodyCaptureQualityGate.profile(ageMonths: ageMonths)
             displacementWindow.append(displacement)
@@ -602,7 +776,8 @@ private final class LiveVisionCaptureController: UIViewController, AVCaptureVide
                 gaitMotionWindow.append(displacement >= captureProfile.gaitMinimumDisplacement)
                 if gaitMotionWindow.count > captureProfile.gaitMovementWindowFrames { gaitMotionWindow.removeFirst() }
             }
-            if task != .gaitVideo, windowDisplacement >= captureProfile.staticMaximumDisplacement || windowJitter > captureProfile.staticDisplacementJitter {
+            if task != .gaitVideo, task != .dynamicKneeControl,
+               windowDisplacement >= captureProfile.staticMaximumDisplacement || windowJitter > captureProfile.staticDisplacementJitter {
                 resetStability()
                 firstHipLocation = hipCenter
                 updateGuidance("请保持自然不动，画面稳定后开始计时。")
@@ -611,30 +786,177 @@ private final class LiveVisionCaptureController: UIViewController, AVCaptureVide
             stableFrames += 1
             if stableSince == nil { stableSince = .now }
             let elapsed = Date.now.timeIntervalSince(stableSince ?? .now)
-            if task == .gaitVideo {
+            if task == .dynamicKneeControl {
+                let kneeFlexion = [leftKneeValgus, rightKneeValgus].compactMap { $0 }.reduce(0, +) / Double(max([leftKneeValgus, rightKneeValgus].compactMap { $0 }.count, 1))
+                if kneeFlexion >= 30 {
+                    dynamicWasDown = true
+                    updateGuidance("已识别下蹲位，请保持双膝朝向脚尖并自然站起。")
+                } else if dynamicWasDown, kneeFlexion <= 18 {
+                    dynamicWasDown = false
+                    dynamicRepetitionCount += 1
+                    updateGuidance(dynamicRepetitionCount >= 3 ? "三次动作已完成，请保持站立。" : "已完成 \(dynamicRepetitionCount) 次，请继续下一次下蹲。")
+                } else {
+                    updateGuidance(dynamicRepetitionCount == 0 ? "请正对镜头，缓慢下蹲后回到站立，共完成三次。" : "已完成 \(dynamicRepetitionCount) 次，请继续完成下蹲和回位。")
+                }
+                publishProgress(min(0.98, (Double(dynamicRepetitionCount) + (dynamicWasDown ? 0.5 : 0)) / 3.0))
+                guard dynamicRepetitionCount >= 3 else { return }
+            } else if task == .gaitVideo {
                 let movedFrames = gaitMotionWindow.filter { $0 }.count
                 let moved = movedFrames >= captureProfile.gaitMovementWindowFrames / 2
                 updateGuidance(moved ? "动作已进入判定口径，请继续自然走完三步。" : "请固定手机，沿直线自然走三步。")
-                onProgress?(BodyCaptureQualityGate.gaitProgress(elapsed: elapsed, hasMoved: moved, ageMonths: ageMonths))
+                publishProgress(BodyCaptureQualityGate.gaitProgress(elapsed: elapsed, hasMoved: moved, ageMonths: ageMonths))
                 guard BodyCaptureQualityGate.isGaitCaptureReady(elapsed: elapsed, displacement: displacement, movedFrames: movedFrames, rawSamples: metricSamples.count, ageMonths: ageMonths) else { return }
             } else {
                 let remaining = max(0, Int(ceil(captureProfile.staticHoldSeconds - elapsed)))
-                if task == .forwardBend, torsoTilt < captureProfile.forwardBendMinimumTorsoTilt {
+                if task == .forwardBend, forwardBendCompletionScore < captureProfile.forwardBendMinimumTorsoTilt {
                     resetStability()
                     firstHipLocation = hipCenter
-                    updateGuidance("请从侧后方拍摄，缓慢前屈到舒适位置后停住；感到不适请立即停止。")
+                    updateGuidance("请背对镜头，双脚并拢、膝盖完全伸直、双手合十下垂，继续缓慢前屈至躯干接近水平。")
                     return
                 }
-                updateGuidance(remaining > 0 ? "画面稳定，请保持自然姿势 \(remaining) 秒。" : "记录完成，请保持不动。")
-                onProgress?(BodyCaptureQualityGate.staticProgress(elapsed: elapsed, ageMonths: ageMonths))
+                updateGuidance(task == .forwardBend
+                    ? (remaining > 0 ? "前屈动作已识别，请保持 \(remaining) 秒。" : "前屈记录完成，请保持不动。")
+                    : (remaining > 0 ? "画面稳定，请保持自然姿势 \(remaining) 秒。" : "记录完成，请保持不动。"))
+                publishProgress(BodyCaptureQualityGate.staticProgress(elapsed: elapsed, ageMonths: ageMonths))
                 let ready = task == .forwardBend
-                    ? BodyCaptureQualityGate.isForwardBendCaptureReady(elapsed: elapsed, stableFrames: stableFrames, displacement: windowDisplacement, jitter: windowJitter, torsoTilt: torsoTilt, ageMonths: ageMonths)
+                    ? BodyCaptureQualityGate.isForwardBendCaptureReady(elapsed: elapsed, stableFrames: stableFrames, displacement: windowDisplacement, jitter: windowJitter, torsoTilt: forwardBendCompletionScore, ageMonths: ageMonths)
                     : BodyCaptureQualityGate.isStaticCaptureReady(elapsed: elapsed, stableFrames: stableFrames, displacement: windowDisplacement, jitter: windowJitter, ageMonths: ageMonths)
                 guard ready else { return }
             }
+                guard metricSamples.count >= captureProfile.minimumRawSamplesForCompletion else {
+                    updateGuidance("请继续保持，正在采集更多稳定样本。")
+                    return
+                }
+                if task != .gaitVideo, task != .dynamicKneeControl,
+                   !staticMetricSeriesAreStable(minimumSamples: captureProfile.minimumRawSamplesForCompletion) {
+                    resetStability()
+                    firstHipLocation = hipCenter
+                    updateGuidance("本次关键点波动较大，请固定手机并重新保持动作。")
+                    return
+                }
+                if requiresBilateralPhases, segmentPhaseIndex == 0 {
+                    completedPhaseSamples = metricSamples
+                    segmentPhaseIndex = 1
+                    resetStability(clearCompletedPhases: false)
+                    updateGuidance(task == .standingSide
+                        ? "左侧记录完成。请让孩子转身，以右侧对准镜头，重新进入人型框后保持自然站立。"
+                        : "左足记录完成。请按引导调整站位，让右足完整进入近景框。")
+                    return
+                }
+                if requiresBilateralPhases, !completedPhaseSamples.isEmpty {
+                    metricSamples = completedPhaseSamples + metricSamples
+                }
                 let hint = gap >= 0.07 ? "观察到左右高度差异，已写入姿态报告；如有持续不适建议结合体检。" : nil
                 finish(CaptureReview(accepted: true, message: "已完成姿态记录，可查看本次家庭观察指标。", observationHint: hint, postureSnapshot: makeSnapshot()))
-        } catch { resetStability(); updateGuidance("正在重试判定，请保持全身入镜。") }
+        } catch { resetStability(); updateGuidance(task == .footArch ? "正在重新确认足部近景，请保持膝部以下完整入镜。" : "正在重试判定，请保持全身入镜。") }
+    }
+
+    private func processFootCloseUp(_ points: [VNHumanBodyPoseObservation.JointName: VNRecognizedPoint]) {
+        let jointNames: [VNHumanBodyPoseObservation.JointName] = [.leftKnee, .rightKnee, .leftAnkle, .rightAnkle]
+        let confidences = jointNames.map { points[$0]?.confidence ?? 0 }
+        guard BodyCaptureQualityGate.hasReliableLandmarks(confidences, ageMonths: ageMonths),
+              let leftKnee = points[.leftKnee], let rightKnee = points[.rightKnee],
+              let leftAnkle = points[.leftAnkle], let rightAnkle = points[.rightAnkle] else {
+            onBodyAlignment?(.waiting)
+            resetStability()
+            updateGuidance("请只拍摄膝部以下，让双膝、双踝和双脚完整进入近景框。")
+            return
+        }
+
+        let kneeCenter = CGPoint(x: (leftKnee.location.x + rightKnee.location.x) / 2, y: (leftKnee.location.y + rightKnee.location.y) / 2)
+        let ankleCenter = CGPoint(x: (leftAnkle.location.x + rightAnkle.location.x) / 2, y: (leftAnkle.location.y + rightAnkle.location.y) / 2)
+        let lowerLegCoverage = abs(kneeCenter.y - ankleCenter.y)
+        let scaleState = BodyCaptureQualityGate.footScaleState(lowerLegCoverage: lowerLegCoverage)
+        let lowerBodyCenterX = (kneeCenter.x + ankleCenter.x) / 2
+        let centered = (0.34...0.66).contains(lowerBodyCenterX)
+        let jointsReady = centered && scaleState == .ready
+        onBodyAlignment?(CaptureBodyAlignment(
+            bodyDetected: true,
+            distanceState: scaleState,
+            centered: centered,
+            headReady: true,
+            shouldersReady: true,
+            hipsReady: true,
+            kneesReady: jointsReady,
+            feetReady: jointsReady
+        ))
+
+        switch scaleState {
+        case .tooFar:
+            resetStability(); updateGuidance("足部画面太小，请把手机移近半步，保持膝部以下完整入镜。")
+            return
+        case .tooClose:
+            resetStability(); updateGuidance("足部画面过近，请把手机后移半步，让双膝到双脚都在近景框内。")
+            return
+        case .invalid:
+            resetStability(); updateGuidance("暂时无法判断足部取景距离，请保持手机竖直并重新对准双脚。")
+            return
+        case .ready:
+            break
+        }
+        guard centered else {
+            resetStability(); updateGuidance("请将双膝和双脚整体移到近景框中央。")
+            return
+        }
+        guard captureArmed else {
+            resetStability(); updateGuidance("足部近景已就绪，请确认赤足站稳后点击开始记录。")
+            return
+        }
+
+        let lowerLegCenter = CGPoint(x: lowerBodyCenterX, y: (kneeCenter.y + ankleCenter.y) / 2)
+        if firstHipLocation == nil { firstHipLocation = lowerLegCenter }
+        let start = firstHipLocation ?? lowerLegCenter
+        let displacement = hypot(lowerLegCenter.x - start.x, lowerLegCenter.y - start.y)
+        let leftHeelLine = PostureMetricCalculator.degrees(atan2(abs(Double(leftKnee.location.x - leftAnkle.location.x)), max(abs(Double(leftKnee.location.y - leftAnkle.location.y)), 0.001))) ?? 0
+        let rightHeelLine = PostureMetricCalculator.degrees(atan2(abs(Double(rightKnee.location.x - rightAnkle.location.x)), max(abs(Double(rightKnee.location.y - rightAnkle.location.y)), 0.001))) ?? 0
+        metricSamples.append(PoseMetricSample(
+            confidence: Double(confidences.reduce(0, +) / Float(confidences.count)),
+            bodyHeightNormalized: lowerLegCoverage,
+            shoulderHeightDifferenceCm: 0,
+            pelvicHeightDifferenceCm: 0,
+            headTiltDegrees: 0,
+            spinalMidlineDeviationCm: 0,
+            thoracicRoundingDegrees: 0,
+            forwardHeadAngleDegrees: 0,
+            forwardBendCompletionScore: 0,
+            kneeAlignmentProxyRatio: 0,
+            lowerLimbAxisAsymmetryDegrees: abs(leftHeelLine - rightHeelLine),
+            leftKneeValgusProxyDegrees: 0,
+            rightKneeValgusProxyDegrees: 0,
+            squatDepthRatio: 0,
+            footArchVisibilityScore: Double(confidences.reduce(0, +) / Float(confidences.count)),
+            heelAlignmentProxyDegrees: (leftHeelLine + rightHeelLine) / 2
+        ))
+
+        let captureProfile = BodyCaptureQualityGate.profile(ageMonths: ageMonths)
+        displacementWindow.append(displacement)
+        if displacementWindow.count > captureProfile.stabilityWindowFrames { displacementWindow.removeFirst() }
+        let windowDisplacement = PostureMetricCalculator.median(displacementWindow) ?? displacement
+        let windowJitter = medianAbsoluteDeviation(displacementWindow)
+        if windowDisplacement >= captureProfile.staticMaximumDisplacement || windowJitter > captureProfile.staticDisplacementJitter {
+            resetStability()
+            firstHipLocation = lowerLegCenter
+            updateGuidance("请让孩子双脚平行站稳，并固定手机等待画面稳定。")
+            return
+        }
+        stableFrames += 1
+        if stableSince == nil { stableSince = .now }
+        let elapsed = Date.now.timeIntervalSince(stableSince ?? .now)
+        let remaining = max(0, Int(ceil(captureProfile.staticHoldSeconds - elapsed)))
+        updateGuidance(remaining > 0 ? "足部近景稳定，请保持 (remaining) 秒。" : "本侧足部记录完成，请保持不动。")
+        publishProgress(BodyCaptureQualityGate.staticProgress(elapsed: elapsed, ageMonths: ageMonths))
+        guard BodyCaptureQualityGate.isStaticCaptureReady(elapsed: elapsed, stableFrames: stableFrames, displacement: windowDisplacement, jitter: windowJitter, ageMonths: ageMonths),
+              metricSamples.count >= captureProfile.minimumRawSamplesForCompletion else { return }
+
+        if segmentPhaseIndex == 0 {
+            completedPhaseSamples = metricSamples
+            segmentPhaseIndex = 1
+            resetStability(clearCompletedPhases: false)
+            updateGuidance("左足近景完成。请调整站位，让右足内侧和足跟对准近景框后再次记录。")
+            return
+        }
+        if !completedPhaseSamples.isEmpty { metricSamples = completedPhaseSamples + metricSamples }
+        finish(CaptureReview(accepted: true, message: "双侧足部近景记录完成。", observationHint: "当前仅形成足部画面质量和足跟投影记录，不输出足弓诊断。", postureSnapshot: makeSnapshot()))
     }
 
     private func updateGuidance(_ text: String) {
@@ -662,19 +984,66 @@ private final class LiveVisionCaptureController: UIViewController, AVCaptureVide
         onCameraReady?(false)
         onFailure?(message)
     }
-    private func resetStability() { stableFrames = 0; stableSince = nil; firstHipLocation = nil; metricSamples.removeAll(keepingCapacity: true); displacementWindow.removeAll(keepingCapacity: true); gaitMotionWindow.removeAll(keepingCapacity: true); onProgress?(0) }
+    private var requiresBilateralPhases: Bool { task == .standingSide || task == .footArch }
+
+    private func publishProgress(_ rawValue: Double) {
+        let clamped = min(max(rawValue, 0), 1)
+        onProgress?(requiresBilateralPhases ? (Double(segmentPhaseIndex) + clamped) / 2 : clamped)
+    }
+
+    private func resetStability(clearCompletedPhases: Bool = false) {
+        stableFrames = 0
+        stableSince = nil
+        firstHipLocation = nil
+        metricSamples.removeAll(keepingCapacity: true)
+        displacementWindow.removeAll(keepingCapacity: true)
+        gaitMotionWindow.removeAll(keepingCapacity: true)
+        dynamicRepetitionCount = 0
+        dynamicWasDown = false
+        if clearCompletedPhases {
+            segmentPhaseIndex = 0
+            completedPhaseSamples.removeAll(keepingCapacity: true)
+        }
+        publishProgress(0)
+    }
 
     private func medianAbsoluteDeviation(_ values: [Double]) -> Double {
         guard values.count >= 2, let center = PostureMetricCalculator.median(values) else { return 0 }
         return PostureMetricCalculator.median(values.map { abs($0 - center) }) ?? 0
     }
 
+    private func staticMetricSeriesAreStable(minimumSamples: Int) -> Bool {
+        let stableCm: (KeyPath<PoseMetricSample, Double>) -> Bool = { keyPath in
+            PostureMetricCalculator.isStableSeries(self.metricSamples.map { $0[keyPath: keyPath] }, minimumSamples: minimumSamples, maximumMedianAbsoluteDeviation: 0.55)
+        }
+        guard stableCm(\.shoulderHeightDifferenceCm),
+              stableCm(\.pelvicHeightDifferenceCm),
+              stableCm(\.spinalMidlineDeviationCm) else { return false }
+        switch task {
+        case .standingFront, .standingBack:
+            return PostureMetricCalculator.isStableSeries(metricSamples.map(\.headTiltDegrees), minimumSamples: minimumSamples, maximumMedianAbsoluteDeviation: 2.5)
+        case .standingSide, .seatedPosture:
+            return PostureMetricCalculator.isStableSeries(metricSamples.map(\.thoracicRoundingDegrees), minimumSamples: minimumSamples, maximumMedianAbsoluteDeviation: 3.5)
+                && PostureMetricCalculator.isStableSeries(metricSamples.map(\.forwardHeadAngleDegrees), minimumSamples: minimumSamples, maximumMedianAbsoluteDeviation: 3.5)
+        case .forwardBend:
+            return PostureMetricCalculator.isStableSeries(metricSamples.map(\.forwardBendCompletionScore), minimumSamples: minimumSamples, maximumMedianAbsoluteDeviation: 0.05)
+        case .dynamicKneeControl:
+            return PostureMetricCalculator.isStableSeries(metricSamples.map(\.kneeAlignmentProxyRatio), minimumSamples: minimumSamples, maximumMedianAbsoluteDeviation: 0.08)
+        case .gaitVideo, .footArch:
+            return true
+        }
+    }
+
     private func makeSnapshot() -> PostureMetricSnapshot {
-        let median: (KeyPath<PoseMetricSample, Double>) -> Double? = { keyPath in PostureMetricCalculator.median(self.metricSamples.map { $0[keyPath: keyPath] }) }
-        let gaitShoulder = PostureMetricCalculator.range(metricSamples.map { $0.shoulderHeightDifferenceCm })
-        let gaitPelvic = PostureMetricCalculator.range(metricSamples.map { $0.pelvicHeightDifferenceCm })
-        let gaitSway = PostureMetricCalculator.range(metricSamples.map { $0.spinalMidlineDeviationCm })
-        return PostureMetricSnapshot(id: "\(task.rawValue)-\(Int(Date().timeIntervalSince1970))", task: task, sampleCount: metricSamples.count, confidence: metricSamples.map(\.confidence).reduce(0, +) / Double(max(metricSamples.count, 1)), shoulderHeightDifferenceCm: median(\.shoulderHeightDifferenceCm), pelvicHeightDifferenceCm: median(\.pelvicHeightDifferenceCm), headTiltDegrees: median(\.headTiltDegrees), spinalMidlineDeviationCm: median(\.spinalMidlineDeviationCm), thoracicRoundingDegrees: median(\.thoracicRoundingDegrees), forwardHeadAngleDegrees: median(\.forwardHeadAngleDegrees), cameraProxyAtrDegrees: nil, cameraProxyRibProminenceCm: nil, gaitShoulderSwingDifferenceCm: task == .gaitVideo ? gaitShoulder : nil, gaitPelvicSwingDifferenceCm: task == .gaitVideo ? gaitPelvic : nil, gaitTrunkSwayCm: task == .gaitVideo ? gaitSway : nil)
+        let median: (KeyPath<PoseMetricSample, Double>) -> Double? = { keyPath in PostureMetricCalculator.robustMedian(self.metricSamples.map { $0[keyPath: keyPath] }) }
+        let gaitShoulder = PostureMetricCalculator.robustRange(metricSamples.map { $0.shoulderHeightDifferenceCm })
+        let gaitPelvic = PostureMetricCalculator.robustRange(metricSamples.map { $0.pelvicHeightDifferenceCm })
+        let gaitSway = PostureMetricCalculator.robustRange(metricSamples.map { $0.spinalMidlineDeviationCm })
+        let framingChecks = task == .footArch
+            ? ["device-level", "foot-close-up", "lower-limb-landmarks", "single-person", "landmark-confidence", "multi-frame-robust"]
+            : ["device-level", "full-body", "single-person", "landmark-confidence", "multi-frame-robust"]
+        let checks = framingChecks + (task == .dynamicKneeControl ? ["three-repetition-cycle"] : [])
+        return PostureMetricSnapshot(id: "\(task.rawValue)-\(Int(Date().timeIntervalSince1970))", task: task, sampleCount: metricSamples.count, confidence: PostureMetricCalculator.robustMedian(metricSamples.map(\.confidence)) ?? 0, shoulderHeightDifferenceCm: median(\.shoulderHeightDifferenceCm), pelvicHeightDifferenceCm: median(\.pelvicHeightDifferenceCm), headTiltDegrees: median(\.headTiltDegrees), spinalMidlineDeviationCm: median(\.spinalMidlineDeviationCm), thoracicRoundingDegrees: median(\.thoracicRoundingDegrees), forwardHeadAngleDegrees: median(\.forwardHeadAngleDegrees), cameraProxyAtrDegrees: nil, cameraProxyRibProminenceCm: nil, shoulderProtractionProxyDegrees: task == .standingSide ? median(\.forwardHeadAngleDegrees) : nil, pelvicTiltProxyDegrees: task == .standingSide ? median(\.thoracicRoundingDegrees) : nil, kneeAlignmentProxyRatio: task == .standingFront ? median(\.kneeAlignmentProxyRatio) : nil, lowerLimbAxisAsymmetryDegrees: task == .standingFront ? median(\.lowerLimbAxisAsymmetryDegrees) : nil, leftKneeValgusProxyDegrees: task == .dynamicKneeControl ? median(\.leftKneeValgusProxyDegrees) : nil, rightKneeValgusProxyDegrees: task == .dynamicKneeControl ? median(\.rightKneeValgusProxyDegrees) : nil, kneeTrackingAsymmetryRatio: task == .dynamicKneeControl ? median(\.kneeAlignmentProxyRatio).map(abs) : nil, squatDepthRatio: task == .dynamicKneeControl ? median(\.squatDepthRatio) : nil, movementRepetitionCount: task == .dynamicKneeControl ? Double(dynamicRepetitionCount) : nil, footArchVisibilityScore: task == .footArch ? median(\.footArchVisibilityScore) : nil, leftArchProxyIndex: nil, rightArchProxyIndex: nil, heelAlignmentProxyDegrees: task == .footArch ? median(\.heelAlignmentProxyDegrees) : nil, gaitShoulderSwingDifferenceCm: task == .gaitVideo ? gaitShoulder : nil, gaitPelvicSwingDifferenceCm: task == .gaitVideo ? gaitPelvic : nil, gaitTrunkSwayCm: task == .gaitVideo ? gaitSway : nil, captureProtocolVersion: "UY-CAPTURE-GUIDED-3.0", cameraFacing: currentPosition == .back ? "rear-1x" : "front-preview", measurementMode: "rgb-pose-2d", deviceCapabilityTier: "standard-2d", depthAvailable: false, segmentPhaseCount: requiresBilateralPhases ? 2 : 1, qualityChecks: checks, captureCalibration: .guided, captureAttemptCount: 1, repeatabilityStatus: "awaiting-second-take")
     }
 }
 
@@ -687,6 +1056,14 @@ private struct PoseMetricSample {
     let spinalMidlineDeviationCm: Double
     let thoracicRoundingDegrees: Double
     let forwardHeadAngleDegrees: Double
+    let forwardBendCompletionScore: Double
+    let kneeAlignmentProxyRatio: Double
+    let lowerLimbAxisAsymmetryDegrees: Double
+    let leftKneeValgusProxyDegrees: Double
+    let rightKneeValgusProxyDegrees: Double
+    let squatDepthRatio: Double
+    let footArchVisibilityScore: Double
+    let heelAlignmentProxyDegrees: Double
 }
 
 private final class VoiceCoach {

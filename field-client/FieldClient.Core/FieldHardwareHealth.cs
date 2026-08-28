@@ -20,7 +20,10 @@ public sealed record FieldCalibrationHealth(bool Passed, string? Version, string
 
 public static class FieldHardwareHealthFactory
 {
-    public static FieldHardwareHealth ManualFallback()
+    public static FieldHardwareHealth ApplyLocalEmergencyStop(FieldHardwareHealth health, bool localEmergencyStop) =>
+        health with { EmergencyStop = health.EmergencyStop || localEmergencyStop };
+
+    public static FieldHardwareHealth ManualFallback(string? reason = null)
     {
         var freeMb = 0L;
         try
@@ -33,7 +36,7 @@ public static class FieldHardwareHealthFactory
 
         return new FieldHardwareHealth(
             "field-health/v1",
-            new FieldSelfTest(false, DateTimeOffset.UtcNow, "未加载经认证的视觉采集适配器"),
+            new FieldSelfTest(false, DateTimeOffset.UtcNow, reason ?? "未加载经认证的视觉采集适配器"),
             new FieldCaptureHealth(false, "manual-fallback", 0, 0, false, null),
             new FieldStorageHealth(freeMb),
             new FieldCalibrationHealth(false, null, null, null));

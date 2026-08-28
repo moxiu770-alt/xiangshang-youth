@@ -117,6 +117,9 @@ def main() -> int:
     android_body = read_all(
         "android/app/src/main/java/com/xiangshang/youth/feature/parent/LivePostureCapture.kt",
         "android/app/src/main/java/com/xiangshang/youth/feature/parent/LivePostureAnalyzer.kt",
+        "android/app/src/main/java/com/xiangshang/youth/feature/parent/LivePostureAnalyzerEngine.kt",
+        "android/app/src/main/java/com/xiangshang/youth/feature/parent/FootCloseUpProcessor.kt",
+        "android/app/src/main/java/com/xiangshang/youth/feature/parent/PostureSnapshotFactory.kt",
     )
     android_body_screen = read("android/app/src/main/java/com/xiangshang/youth/feature/parent/BodyAssessmentScreen.kt")
     android_follow_along = read("android/app/src/main/java/com/xiangshang/youth/feature/parent/FollowAlongTraining.kt")

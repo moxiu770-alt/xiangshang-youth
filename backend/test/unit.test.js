@@ -8,12 +8,32 @@ import { scorePostureSnapshots } from '../src/postureScoring.js';
 import { scoreGrowth } from '../src/growthScoring.js';
 import { createStorage } from '../src/storage.js';
 import { MODEL_CALIBRATION, MODEL_CALIBRATION_STATUS, MODEL_CALIBRATION_VERSION } from '../src/modelCalibration.js';
-import { MODEL_REGISTRY, MODEL_REGISTRY_VERSION, modelManifest } from '../src/modelRegistry.js';
+import { MODEL_REGISTRY, MODEL_REGISTRY_VERSION, modelManifest, postureClassificationIsPublished } from '../src/modelRegistry.js';
 import { clientIp } from '../src/request.js';
 import { archiveBackup, backupArchivePrefix } from '../src/backupArchive.js';
 import { postgresCliEnv, postgresDatabaseName } from '../src/postgresCli.js';
 import { normalizePath } from '../src/observability.js';
 import { assessmentStandardSnapshot, resolveAssessmentStandard } from '../src/assessmentStandards.js';
+import { fieldReadiness } from '../src/fieldReadiness.js';
+import { summarizeFieldOperations } from '../src/fieldOperationsSummary.js';
+import { normalizeFieldTaskItems, normalizeStationItemCode, scoreScopeDifference, stationTaskCompatibility } from '../src/fieldTaskScope.js';
+import { dateOnlyText } from '../src/dateOnly.js';
+import { BASELINE_ASSESSMENT_PROTOCOL_ITEMS, baselineAssessmentProtocolSnapshot, protocolSnapshotFromTask } from '../src/assessmentProtocols.js';
+
+test('baseline field protocol preserves the fixed seven-action complete-lane order', () => {
+  const snapshot = baselineAssessmentProtocolSnapshot(MOVEMENT_ITEM_CODES);
+  assert.equal(snapshot.items.length, 7);
+  assert.deepEqual(snapshot.items.map((item) => item.code), MOVEMENT_ITEM_CODES);
+  assert.deepEqual(snapshot.items.map((item) => item.sequenceNo), [1, 2, 3, 4, 5, 6, 7]);
+  assert.ok(BASELINE_ASSESSMENT_PROTOCOL_ITEMS.every((item) => item.required));
+  assert.deepEqual(protocolSnapshotFromTask({ items: MOVEMENT_ITEM_CODES }).items.map((item) => item.name), MOVEMENT_ITEM_CODES);
+});
+
+test('date-only database values keep their calendar day across JSON boundaries', () => {
+  assert.equal(dateOnlyText('2026-08-27'), '2026-08-27');
+  assert.equal(dateOnlyText(new Date(2026, 7, 27)), '2026-08-27');
+  assert.equal(dateOnlyText('not-a-date'), null);
+});
 
 test('client IP trusts a forwarding header only behind an explicit trusted proxy', () => {
   const request = { socket: { remoteAddress: '172.18.0.5' }, headers: { 'x-forwarded-for': '203.0.113.8, 172.18.0.1' } };
@@ -79,6 +99,112 @@ test('central validation accepts bounded values and rejects unsafe input', () =>
   assert.throws(() => assertEnum('root', ['parent', 'teacher'], '角色'), { code: 'INVALID_ARGUMENT' });
 });
 
+test('field task scope prevents dispatching or completing work at the wrong project station', () => {
+  const fullTask = normalizeFieldTaskItems(MOVEMENT_ITEM_CODES);
+  assert.deepEqual(fullTask, MOVEMENT_ITEM_CODES);
+  assert.equal(stationTaskCompatibility(null, fullTask).compatible, true);
+  assert.equal(stationTaskCompatibility('连续双脚障碍跳', ['连续双脚障碍跳']).compatible, true);
+  assert.equal(stationTaskCompatibility('连续双脚障碍跳', fullTask).compatible, false);
+  assert.equal(stationTaskCompatibility('run', fullTask).mode, 'invalid_station');
+  assert.equal(normalizeStationItemCode('all'), null);
+  assert.throws(() => normalizeStationItemCode('run'), { code: 'FIELD_STATION_ITEM_INVALID' });
+  assert.throws(() => normalizeFieldTaskItems(['连续双脚障碍跳', '自定义项目']), { code: 'FIELD_TASK_ITEMS_INVALID' });
+  assert.deepEqual(scoreScopeDifference(['连续双脚障碍跳', '侧向滑步'], ['连续双脚障碍跳']), {
+    expected: ['连续双脚障碍跳', '侧向滑步'], missing: ['侧向滑步'], unexpected: []
+  });
+});
+
+test('field readiness exposes an actionable checklist without weakening the formal gate', () => {
+  const blocked = fieldReadiness({ device_type: 'edge_host', control_state: 'running', station_id: 'station-1', health_json: {} }, { id: 'station-1', status: 'offline' }, null);
+  assert.equal(blocked.ready, false);
+  assert.ok(blocked.blockers.includes('尚未下发有效标定配置'));
+  assert.equal(blocked.checks.find((item) => item.key === 'station_online').status, 'blocked');
+  assert.match(blocked.checks.find((item) => item.key === 'station_online').remediation, /Windows 场地端/);
+  assert.match(blocked.checks.find((item) => item.key === 'capture_adapter').remediation, /采集设备.*DLL/);
+  assert.equal(blocked.checks.find((item) => item.key === 'calibration_check').status, 'pending');
+
+  const checksum = 'a'.repeat(64);
+  const healthyDevice = {
+    device_type: 'edge_host', control_state: 'running', station_id: 'station-1', status: 'online', last_heartbeat_at: '2026-08-28T00:00:30Z',
+    health_json: {
+      schemaVersion: 'field-health/v1',
+      selfTest: { passed: true, completedAt: '2026-08-28T00:00:00Z' },
+      capture: { adapterReady: true, adapterName: 'certified/1.0', depthCameraCount: 2, rgbCameraCount: 1, gpuReady: true, frameSyncOffsetMs: 10 },
+      storage: { freeMb: 10_240 },
+      calibration: { passed: true, version: 'CAL-1', checksumSha256: checksum, errorCm: 2 },
+      emergencyStop: false
+    }
+  };
+  const ready = fieldReadiness(healthyDevice, { id: 'station-1', status: 'online' }, { version: 'CAL-1', checksumSha256: checksum }, { now: new Date('2026-08-28T00:01:00Z') });
+  assert.equal(ready.ready, true);
+  assert.deepEqual(ready.blockers, []);
+  assert.ok(ready.checks.length >= 10);
+  assert.ok(ready.checks.every((item) => item.status === 'passed'));
+
+  const stale = fieldReadiness(healthyDevice, { id: 'station-1', status: 'online' }, { version: 'CAL-1', checksumSha256: checksum }, { now: new Date('2026-08-28T00:03:00Z') });
+  assert.equal(stale.ready, false);
+  assert.equal(stale.checks.find((item) => item.key === 'device_online').status, 'blocked');
+  assert.match(stale.checks.find((item) => item.key === 'device_online').detail, /90 秒/);
+  const deploymentThreshold = fieldReadiness(healthyDevice, { id: 'station-1', status: 'online' }, { version: 'CAL-1', checksumSha256: checksum }, { now: new Date('2026-08-28T00:01:01Z'), heartbeatMaxAgeSeconds: 30 });
+  assert.equal(deploymentThreshold.ready, false);
+  assert.match(deploymentThreshold.checks.find((item) => item.key === 'device_online').detail, /30 秒/);
+  const malformedHeartbeat = fieldReadiness({ ...healthyDevice, last_heartbeat_at: 'not-a-date' }, { id: 'station-1', status: 'online' }, { version: 'CAL-1', checksumSha256: checksum }, { now: new Date('2026-08-28T00:01:00Z') });
+  assert.equal(malformedHeartbeat.checks.find((item) => item.key === 'device_online').status, 'blocked');
+
+  const mismatch = fieldReadiness(healthyDevice, { id: 'station-1', status: 'online' }, { version: 'CAL-2', checksumSha256: 'b'.repeat(64) }, { now: new Date('2026-08-28T00:01:00Z') });
+  assert.equal(mismatch.ready, false);
+  assert.equal(mismatch.checks.find((item) => item.key === 'calibration_version').status, 'blocked');
+  assert.equal(mismatch.checks.find((item) => item.key === 'calibration_checksum').status, 'blocked');
+});
+
+test('field operations summary exposes the real task queue device runway on the admin home page', () => {
+  const now = new Date('2026-08-28T00:01:00Z');
+  const checksum = 'a'.repeat(64);
+  const device = {
+    id: 'device-1', name: 'A 区采集主机', deviceCode: 'EDGE-A-01', stationName: 'A 区测试点', signedRequestReady: true,
+    status: 'online', controlState: 'running', stationId: 'station-1', stationStatus: 'online', deviceType: 'edge_host', lastHeartbeatAt: '2026-08-28T00:00:30Z',
+    activeCalibrationVersion: 'CAL-1', activeCalibrationChecksumSha256: checksum,
+    health: {
+      schemaVersion: 'field-health/v1', selfTest: { passed: true, completedAt: '2026-08-28T00:00:00Z' },
+      capture: { adapterReady: true, adapterName: 'certified/1.0', depthCameraCount: 2, rgbCameraCount: 1, gpuReady: true, frameSyncOffsetMs: 10 },
+      storage: { freeMb: 10_240 }, calibration: { passed: true, version: 'CAL-1', checksumSha256: checksum, errorCm: 2 }, emergencyStop: false
+    }
+  };
+  const queue = { publishedTaskCount: 3, selectedTaskId: 'task-1', selectedTaskTitle: '秋季体测', selectedTaskDate: '2026-08-28', activeQueueCount: 8, waitingCount: 6, testingCount: 1, overdueCount: 0 };
+  const ready = summarizeFieldOperations({ devices: [device], queue, now });
+  assert.equal(ready.state, 'ready');
+  assert.equal(ready.onlineDevices, 1);
+  assert.equal(ready.readyDevices, 1);
+  assert.equal(ready.activeQueueCount, 8);
+  assert.equal(ready.publishedTaskCount, 3);
+  assert.equal(ready.selectedTaskId, 'task-1');
+  assert.equal(ready.selectedTaskTitle, '秋季体测');
+  assert.equal(ready.selectedTaskDate, '2026-08-28');
+  assert.match(ready.message, /秋季体测/);
+  assert.equal(ready.primaryAction.target, 'queue');
+
+  const stale = summarizeFieldOperations({ devices: [{ ...device, lastHeartbeatAt: '2026-08-27T23:55:00Z' }], queue, now });
+  assert.equal(stale.state, 'offline');
+  assert.equal(stale.onlineDevices, 0);
+  assert.equal(stale.readyDevices, 0);
+  assert.equal(stale.primaryAction.target, 'devices');
+  assert.equal(stale.focusDevice.id, 'device-1');
+
+  const noQueue = summarizeFieldOperations({ devices: [], queue: { ...queue, activeQueueCount: 0 }, now });
+  assert.equal(noQueue.state, 'no_queue');
+  assert.equal(noQueue.primaryAction.target, 'generate');
+
+  const attention = summarizeFieldOperations({ devices: [device], queue: { ...queue, overdueCount: 2 }, now });
+  assert.equal(attention.state, 'attention');
+  assert.match(attention.message, /2 名学生/);
+  assert.equal(attention.primaryAction.target, 'timing');
+
+  const neverConnected = summarizeFieldOperations({ devices: [{ ...device, status: 'offline', lastHeartbeatAt: null, name: '首次接入主机' }], queue, now });
+  assert.equal(neverConnected.neverConnectedDevices, 1);
+  assert.equal(neverConnected.focusDevice.id, 'device-1');
+  assert.match(neverConnected.message, /首次接入主机/);
+});
+
 test('model calibration manifest is versioned and cannot masquerade as validated', () => {
   assert.equal(MODEL_CALIBRATION.version, MODEL_CALIBRATION_VERSION);
   assert.equal(MODEL_CALIBRATION.status, MODEL_CALIBRATION_STATUS);
@@ -93,11 +219,14 @@ test('all model families have an immutable versioned registry entry', () => {
     assert.equal(MODEL_REGISTRY[family].calibrationVersion, MODEL_CALIBRATION_VERSION);
     assert.equal(MODEL_REGISTRY[family].status, 'pending-human-validation');
   }
+  assert.equal(Object.keys(MODEL_REGISTRY.posture.domainValidation).length, 8);
+  assert.equal(postureClassificationIsPublished(), false);
 });
 
 test('policy and storage boundaries reject unauthorized transitions and path traversal', async () => {
   assert.equal(taskStatusAllowed('未签到', '已签到'), true);
   assert.equal(taskStatusAllowed('未签到', '已完成'), false);
+  assert.equal(taskStatusAllowed('未完成', '已签到'), false);
   const storage = createStorage({ storageDriver: 'local', storageRoot: '/tmp/xiangshang-unit-storage' });
   await assert.rejects(() => storage.put('../escape.txt', Buffer.from('blocked')), { code: 'FILE_PATH_INVALID' });
 });
@@ -121,7 +250,7 @@ test('movement scoring normalizes malformed rows and never lets duplicates infla
   ]).length, 0);
 
   const complete = evaluateMovementScores(MOVEMENT_ITEM_CODES.map((item, index) => ({ item, score: index === 0 ? 2.5 : 3.5, confidence: 0.95, reviewStatus: 'passed' })));
-  assert.equal(complete.modelRegistryVersion, 'UY-MODELS-1.0');
+  assert.equal(complete.modelRegistryVersion, 'UY-MODELS-1.1');
   assert.equal(complete.isComplete, true);
   assert.equal(complete.totalScore, 23.5);
   assert.equal(complete.riskLevel, 'attention');

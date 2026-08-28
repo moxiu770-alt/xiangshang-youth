@@ -325,7 +325,7 @@ final class LaunchAndRoleFlowTests: XCTestCase {
         captureButton.tap()
         XCTAssertTrue(staticText(containing: "第 6 步 · 共 9 步").waitForExistence(timeout: 3))
 
-        let standingCapture = button(containing: "自然站姿")
+        let standingCapture = app.buttons["body-capture-standingFront"]
         XCTAssertTrue(standingCapture.waitForExistence(timeout: 3))
         standingCapture.tap()
         app.tap() // Gives XCTest a chance to handle the system camera prompt.
@@ -335,14 +335,29 @@ final class LaunchAndRoleFlowTests: XCTestCase {
         let cameraToggle = button(containing: "切换为前置摄像头")
         XCTAssertTrue(cameraToggle.exists)
         let recordButton = button(containing: "开始记录")
+        let calibrationGateButton = app.buttons.matching(NSPredicate(
+            format: "label CONTAINS %@ OR label CONTAINS %@ OR label CONTAINS %@ OR label CONTAINS %@ OR label CONTAINS %@",
+            "正在连接相机",
+            "请进入人型框",
+            "请将左右调至",
+            "请调整拍摄距离",
+            "请对齐头肩髋膝脚"
+        )).firstMatch
         let unavailable = staticText(containing: "暂时无法启动相机")
         if unavailable.waitForExistence(timeout: 4) {
             // iOS Simulator does not guarantee a capture device. The product
             // contract in that environment is an actionable failure state,
             // not a falsely enabled recording control. Physical-device camera
             // readiness is covered by the opt-in pilot device run.
-            XCTAssertFalse(recordButton.isEnabled)
+            XCTAssertFalse(recordButton.exists)
             XCTAssertTrue(button(containing: "重试").exists)
+        } else if calibrationGateButton.waitForExistence(timeout: 8) {
+            // A simulator may expose a synthetic capture device but cannot
+            // provide a real child pose. In that state the commercial safety
+            // contract is to keep the record action visibly gated until the
+            // phone and full body pass calibration.
+            XCTAssertFalse(calibrationGateButton.isEnabled)
+            XCTAssertTrue(staticText(containing: "不保存原始画面").exists)
         } else {
             let cameraReady = NSPredicate(format: "enabled == true")
             expectation(for: cameraReady, evaluatedWith: recordButton)

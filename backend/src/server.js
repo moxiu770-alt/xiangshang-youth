@@ -1,8 +1,9 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
+import { createReadStream } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { URL } from 'node:url';
+import { fileURLToPath, URL } from 'node:url';
 import { assertServerRuntimeConfig, config } from './config.js';
 import { pool, query } from './db.js';
 import { logger, metricsText, recordMetric, recordRequest } from './observability.js';
@@ -10,9 +11,12 @@ import { enqueueJob, jobWorkerStatus, startJobWorker, stopJobWorker } from './jo
 import { hasRole, parentOnly, schoolAllowed, schoolStaffAllowed, taskStatusAllowed, teacherClassIds, teacherOnly } from './policy.js';
 import { createStorage } from './storage.js';
 import { MOVEMENT_ALGORITHM_VERSION, MOVEMENT_ITEM_CODES, MOVEMENT_SCORE_RULES, evaluateMovementScores, normalizeReviewStatus, normalizeScore, normalizeTotalScore, normalizeConfidence, normalizeScoreRows } from './scoring.js';
+import { normalizeFieldTaskItems, normalizeStationItemCode, scoreScopeDifference, stationTaskCompatibility } from './fieldTaskScope.js';
+import { protocolSnapshotFromTask, protocolTaskItems, resolveAssessmentProtocol } from './assessmentProtocols.js';
 import { POSTURE_ALGORITHM_VERSION } from './postureScoring.js';
-import { finiteScalar, scoreBodyAssessment } from './bodyScoring.js';
+import { finiteScalar, publicationSafeBodyReport, scoreBodyAssessment } from './bodyScoring.js';
 import { MODEL_CALIBRATION_VERSION } from './modelCalibration.js';
+import { validateMarkerPnpProfile } from './mobileCaptureCalibration.js';
 import { MODEL_REGISTRY_VERSION } from './modelRegistry.js';
 import { ageMonthsFromBirthDate } from './age.js';
 import { assertPassword, assertPhone, requiredString } from './validation.js';
@@ -40,10 +44,21 @@ import { handleFieldDeviceRoutes } from './routes/fieldDevice.js';
 import { handleFieldAdminRoutes } from './routes/fieldAdmin.js';
 import { createAuthClaimsService } from './authClaims.js';
 import { handleFileRoutes } from './routes/files.js';
+import { fieldReadiness } from './fieldReadiness.js';
+import { summarizeFieldOperations } from './fieldOperationsSummary.js';
+import { dateOnlyText } from './dateOnly.js';
+import { BODY_SCREENING_DECISION_POLICY_VERSION, containsRawMedia, decideBodyScreening } from './bodyScreeningDecision.js';
+import { bodyScreeningEvidenceMetrics, sanitizeHouseholdBodyMetrics } from './bodyScreeningEvidence.js';
+import { abortFieldSession, appendFieldSessionEvents, completeFieldSession, configureFieldSessionService, effectiveDate, ensureFieldQueue, fieldBootstrap, fieldInputString, fieldIsoDate, fieldObject, fieldQueueStatusMap, openFieldSession, operationalTaskOrder, rebalanceFieldQueue, transitionFieldQueue, validTaskCompletionPredicate } from './fieldSessionService.js';
 
-const { port, isProduction, accessTokenTtlMinutes, refreshTokenTtlDays, maxSessionsPerUser, mfaEncryptionKey, verificationCodePepper, requireMfaForPrivileged, auditLogSigningKey, requireHealthConsent, healthRetentionDays, allowPublicRegistration, smsWebhookUrl, smsWebhookAuthorization, wechatAppId, wechatAppSecret, wechatRedirectUri, oauthStateTtlSeconds, corsOrigin, trustProxy, metricsToken, jobWorkerEnabled, jobWorkerMode, jobWorkerIntervalMs, jobWorkerShutdownTimeoutMs, fieldDeviceKeyTtlDays, fieldDeviceSigningEncryptionKey, fieldDeviceSignedRequestsRequired, fieldDeviceSignatureMaxAgeSeconds, fieldEvidenceVideoRetentionDays, fieldEvidenceDerivedRetentionDays, workerHeartbeatMaxAgeSeconds, backupEnabled, backupIntervalSeconds, backupHeartbeatMaxAgeSeconds } = config;
+const { port, isProduction, accessTokenTtlMinutes, refreshTokenTtlDays, maxSessionsPerUser, mfaEncryptionKey, verificationCodePepper, requireMfaForPrivileged, auditLogSigningKey, requireHealthConsent, healthRetentionDays, allowPublicRegistration, smsWebhookUrl, smsWebhookAuthorization, wechatAppId, wechatAppSecret, wechatRedirectUri, oauthStateTtlSeconds, corsOrigin, trustProxy, metricsToken, jobWorkerEnabled, jobWorkerMode, jobWorkerIntervalMs, jobWorkerShutdownTimeoutMs, fieldDeviceKeyTtlDays, fieldDeviceSigningEncryptionKey, fieldDeviceSignedRequestsRequired, fieldDeviceSignatureMaxAgeSeconds, fieldDeviceOfflineAfterSeconds, fieldEvidenceVideoRetentionDays, fieldEvidenceDerivedRetentionDays, workerHeartbeatMaxAgeSeconds, backupEnabled, backupIntervalSeconds, backupHeartbeatMaxAgeSeconds } = config;
 assertServerRuntimeConfig();
+const evaluateFieldReadiness = (device, station, calibration, options = {}) => fieldReadiness(device, station, calibration, { ...options, heartbeatMaxAgeSeconds: fieldDeviceOfflineAfterSeconds });
 const storage = createStorage(config);
+const fieldClientReleaseDir = path.resolve(process.env.FIELD_CLIENT_RELEASE_DIR || fileURLToPath(new URL('../storage/releases/', import.meta.url)));
+const fieldClientArchiveName = 'xiangshang-field-client-windows-x64.zip';
+const fieldClientManifestPath = path.join(fieldClientReleaseDir, 'field-client-release.json');
+const fieldClientArchivePath = path.join(fieldClientReleaseDir, fieldClientArchiveName);
 
 const jsonHeaders = {
   'Content-Type': 'application/json; charset=utf-8',
@@ -62,7 +77,7 @@ const send = (res, status, body) => {
 const ok = (res, data) => send(res, 200, { code: 'OK', message: 'success', data });
 const created = (res, data) => send(res, 201, { code: 'OK', message: 'created', data });
 const accepted = (res, data) => send(res, 202, { code: 'OK', message: 'accepted', data });
-const fail = (res, status, code, message) => send(res, status, { code, message, data: null });
+const fail = (res, status, code, message, data = null) => send(res, status, { code, message, data });
 
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const randomToken = () => crypto.randomBytes(32).toString('base64url');
@@ -182,6 +197,47 @@ const maskPhone = (value) => {
   const phone = String(value || '');
   return phone.length >= 7 ? `${phone.slice(0, 3)}****${phone.slice(-4)}` : '已隐藏';
 };
+
+async function fieldClientRelease() {
+  try {
+    const [rawManifest, archive] = await Promise.all([
+      fs.readFile(fieldClientManifestPath, 'utf8'),
+      fs.stat(fieldClientArchivePath)
+    ]);
+    const manifest = JSON.parse(rawManifest);
+    const sha = String(manifest.sha256 || '').toLowerCase();
+    const version = String(manifest.version || '').trim();
+    if (manifest.fileName !== fieldClientArchiveName || !/^\d+\.\d+\.\d+(?:[-+][a-zA-Z0-9.-]+)?$/.test(version) || !/^[a-f0-9]{64}$/.test(sha) || !archive.isFile()) {
+      throw new Error('Windows 场地端发布清单无效');
+    }
+    return {
+      available: true,
+      version,
+      platform: String(manifest.platform || 'Windows 10/11 x64'),
+      runtime: String(manifest.runtime || 'win-x64 self-contained'),
+      sizeBytes: archive.size,
+      sha256: sha,
+      generatedAt: manifest.generatedAt || archive.mtime.toISOString(),
+      unsigned: manifest.unsigned !== false,
+      downloadUrl: `/downloads/${fieldClientArchiveName}`,
+      executable: 'FieldClient.Windows.exe'
+    };
+  } catch (error) {
+    if (error.code !== 'ENOENT') logger.warn('field_client.release_unavailable', { error: error.message });
+    return {
+      available: false,
+      version: null,
+      platform: 'Windows 10/11 x64',
+      runtime: 'win-x64 self-contained',
+      sizeBytes: 0,
+      sha256: null,
+      generatedAt: null,
+      unsigned: true,
+      downloadUrl: null,
+      executable: 'FieldClient.Windows.exe'
+    };
+  }
+}
 
 const pathParts = (url) => url.pathname.split('/').filter(Boolean).map(decodeURIComponent);
 const queryValue = (url, key) => url.searchParams.get(key) || undefined;
@@ -465,38 +521,6 @@ const jobQueueMetricsText = (jobs) => {
   return `${lines.join('\n')}\n`;
 };
 
-const fieldQueueStatusMap = Object.freeze({
-  waiting: '未签到',
-  called: '已签到',
-  checked_in: '候测',
-  testing: '测试中',
-  completed: '已完成',
-  retest: '待补测',
-  absent: '缺席',
-  skipped: '缺席',
-  cancelled: '缺席',
-  paused: '候测'
-});
-
-const queueStatusTransitions = Object.freeze({
-  waiting: ['called', 'checked_in', 'absent', 'cancelled', 'paused'],
-  called: ['waiting', 'checked_in', 'absent', 'skipped', 'paused'],
-  checked_in: ['called', 'testing', 'retest', 'absent', 'paused'],
-  testing: ['completed', 'retest', 'paused', 'cancelled'],
-  completed: ['retest'],
-  retest: ['waiting', 'called', 'checked_in', 'testing', 'cancelled'],
-  absent: ['waiting', 'checked_in'],
-  skipped: ['waiting', 'checked_in'],
-  paused: ['waiting', 'called', 'checked_in', 'testing', 'retest', 'cancelled'],
-  cancelled: []
-});
-
-const fieldQueueTransitionAllowed = (from, to) => from === to || Boolean(queueStatusTransitions[from]?.includes(to));
-const fieldIsoDate = (value, fallback = new Date()) => {
-  if (!value) return fallback;
-  const parsed = new Date(value);
-  return Number.isFinite(parsed.getTime()) ? parsed : fallback;
-};
 const fieldDeviceKeyExpiresAt = (value) => {
   const now = Date.now();
   const maximum = now + fieldDeviceKeyTtlDays * 86_400_000;
@@ -642,7 +666,6 @@ async function createMfaChallenge(user, req, purpose = 'verify') {
   return { ...(purpose === 'enroll' ? { mfaEnrollmentRequired: true } : { mfaRequired: true }), challengeToken, expiresAt };
 }
 
-
 async function requireUser(req, res) {
   const user = await currentUser(req);
   if (!user) {
@@ -668,7 +691,7 @@ const studentRow = (row) => ({
     const value = Number(row.total_score);
     return Number.isFinite(value) ? normalizeTotalScore(value) : null;
   })(),
-  birthDate: row.birth_date
+  birthDate: dateOnlyText(row.birth_date)
 });
 
 async function studentForUser(user, studentId) {
@@ -802,7 +825,12 @@ async function dashboard(user, schoolId, options = {}) {
     SELECT st.*, g.name AS grade_name, c.name AS class_name,
            ts.status AS task_status, ts.task_version, dr.total_score
       FROM students st JOIN grades g ON g.id = st.grade_id JOIN classes c ON c.id = st.class_id
-    LEFT JOIN LATERAL (SELECT status,version AS task_version FROM task_students WHERE student_id = st.id ORDER BY created_at DESC LIMIT 1) ts ON true
+    LEFT JOIN LATERAL (
+      SELECT ts.status,ts.version AS task_version
+        FROM task_students ts JOIN assessment_tasks task ON task.id=ts.task_id
+       WHERE ts.student_id=st.id AND task.school_id=st.school_id AND task.status='published'
+       ORDER BY ${operationalTaskOrder('task')},task.created_at DESC LIMIT 1
+    ) ts ON true
       LEFT JOIN LATERAL (SELECT total_score FROM diagnosis_reports WHERE student_id = st.id AND status='published' ORDER BY generated_at DESC LIMIT 1) dr ON true
      WHERE st.school_id = $1 AND st.status = 'active'`;
   const studentParams = [schoolId];
@@ -828,18 +856,18 @@ async function dashboard(user, schoolId, options = {}) {
       ? query(`SELECT DISTINCT g.id,g.name,g.standard_version AS "standardVersion" FROM grades g JOIN classes c ON c.grade_id=g.id WHERE g.school_id=$1 AND c.id=ANY($2) ORDER BY g.name`, [schoolId, scopedClassIds.length ? scopedClassIds : ['__none__']])
       : query(`SELECT id, name, standard_version AS "standardVersion" FROM grades WHERE school_id=$1 ORDER BY name`, [schoolId]);
   const classesQuery = isParentScope
-    ? query(`SELECT c.id,c.name,c.grade_id AS "gradeId",COALESCE(u.name,'未分配') AS "teacherName",COUNT(st.id)::int AS "studentCount",COALESCE(ROUND(100.0*COUNT(*) FILTER(WHERE ts.status='已完成')/NULLIF(COUNT(st.id),0)),0)::int AS "completionRate"
+    ? query(`SELECT c.id,c.name,c.grade_id AS "gradeId",COALESCE(u.name,'未分配') AS "teacherName",COUNT(st.id)::int AS "studentCount",COALESCE(ROUND(100.0*COUNT(*) FILTER(WHERE COALESCE(ts."validCompletion",FALSE))/NULLIF(COUNT(st.id),0)),0)::int AS "completionRate"
         FROM classes c LEFT JOIN users u ON u.id=c.teacher_id JOIN students st ON st.class_id=c.id AND st.status='active' JOIN parent_student_bindings pb ON pb.student_id=st.id AND pb.parent_user_id=$2 AND pb.status='active'
-        LEFT JOIN LATERAL (SELECT status FROM task_students WHERE student_id=st.id ORDER BY created_at DESC LIMIT 1) ts ON true WHERE c.school_id=$1 GROUP BY c.id,u.name ORDER BY c.name`, [schoolId, user.id])
+        LEFT JOIN LATERAL (SELECT ${validTaskCompletionPredicate('ts', 'task')} AS "validCompletion" FROM task_students ts JOIN assessment_tasks task ON task.id=ts.task_id WHERE ts.student_id=st.id AND task.school_id=st.school_id AND task.status='published' ORDER BY ${operationalTaskOrder('task')},task.created_at DESC LIMIT 1) ts ON true WHERE c.school_id=$1 GROUP BY c.id,u.name ORDER BY c.name`, [schoolId, user.id])
     : isTeacherScope
-      ? query(`SELECT c.id,c.name,c.grade_id AS "gradeId",COALESCE(u.name,'未分配') AS "teacherName",COUNT(st.id)::int AS "studentCount",COALESCE(ROUND(100.0*COUNT(*) FILTER(WHERE ts.status='已完成')/NULLIF(COUNT(st.id),0)),0)::int AS "completionRate"
-          FROM classes c LEFT JOIN users u ON u.id=c.teacher_id LEFT JOIN students st ON st.class_id=c.id AND st.status='active' LEFT JOIN LATERAL (SELECT status FROM task_students WHERE student_id=st.id ORDER BY created_at DESC LIMIT 1) ts ON true WHERE c.school_id=$1 AND c.id=ANY($2) GROUP BY c.id,u.name ORDER BY c.name`, [schoolId, scopedClassIds.length ? scopedClassIds : ['__none__']])
-      : query(`SELECT c.id, c.name, c.grade_id AS "gradeId", COALESCE(u.name,'未分配') AS "teacherName",COUNT(st.id)::int AS "studentCount",COALESCE(ROUND(100.0 * COUNT(*) FILTER (WHERE ts.status='已完成') / NULLIF(COUNT(st.id),0)),0)::int AS "completionRate" FROM classes c LEFT JOIN users u ON u.id=c.teacher_id LEFT JOIN students st ON st.class_id=c.id AND st.status='active' LEFT JOIN LATERAL (SELECT status FROM task_students WHERE student_id=st.id ORDER BY created_at DESC LIMIT 1) ts ON true WHERE c.school_id=$1 GROUP BY c.id,u.name ORDER BY c.name`, [schoolId]);
+      ? query(`SELECT c.id,c.name,c.grade_id AS "gradeId",COALESCE(u.name,'未分配') AS "teacherName",COUNT(st.id)::int AS "studentCount",COALESCE(ROUND(100.0*COUNT(*) FILTER(WHERE COALESCE(ts."validCompletion",FALSE))/NULLIF(COUNT(st.id),0)),0)::int AS "completionRate"
+          FROM classes c LEFT JOIN users u ON u.id=c.teacher_id LEFT JOIN students st ON st.class_id=c.id AND st.status='active' LEFT JOIN LATERAL (SELECT ${validTaskCompletionPredicate('ts', 'task')} AS "validCompletion" FROM task_students ts JOIN assessment_tasks task ON task.id=ts.task_id WHERE ts.student_id=st.id AND task.school_id=st.school_id AND task.status='published' ORDER BY ${operationalTaskOrder('task')},task.created_at DESC LIMIT 1) ts ON true WHERE c.school_id=$1 AND c.id=ANY($2) GROUP BY c.id,u.name ORDER BY c.name`, [schoolId, scopedClassIds.length ? scopedClassIds : ['__none__']])
+      : query(`SELECT c.id, c.name, c.grade_id AS "gradeId", COALESCE(u.name,'未分配') AS "teacherName",COUNT(st.id)::int AS "studentCount",COALESCE(ROUND(100.0 * COUNT(*) FILTER (WHERE COALESCE(ts."validCompletion",FALSE)) / NULLIF(COUNT(st.id),0)),0)::int AS "completionRate" FROM classes c LEFT JOIN users u ON u.id=c.teacher_id LEFT JOIN students st ON st.class_id=c.id AND st.status='active' LEFT JOIN LATERAL (SELECT ${validTaskCompletionPredicate('ts', 'task')} AS "validCompletion" FROM task_students ts JOIN assessment_tasks task ON task.id=ts.task_id WHERE ts.student_id=st.id AND task.school_id=st.school_id AND task.status='published' ORDER BY ${operationalTaskOrder('task')},task.created_at DESC LIMIT 1) ts ON true WHERE c.school_id=$1 GROUP BY c.id,u.name ORDER BY c.name`, [schoolId]);
   const tasksQuery = isParentScope
-    ? query(`SELECT t.id,t.title,t.test_date AS date,t.location,COALESCE(g.name,'全校') AS "gradeName",COALESCE(c.name,'全校') AS "className",t.items,t.rule_version AS "ruleVersion",t.status,CASE WHEN t.class_id IS NULL THEN ARRAY[]::text[] ELSE ARRAY[t.class_id] END AS "classIds",ARRAY_AGG(DISTINCT ts.student_id) AS "studentIds",COUNT(ts.id)::int AS "totalCount",COUNT(ts.id) FILTER(WHERE ts.status='已完成')::int AS "completedCount" FROM assessment_tasks t LEFT JOIN grades g ON g.id=t.grade_id LEFT JOIN classes c ON c.id=t.class_id JOIN task_students ts ON ts.task_id=t.id JOIN parent_student_bindings pb ON pb.student_id=ts.student_id AND pb.parent_user_id=$2 AND pb.status='active' WHERE t.school_id=$1 GROUP BY t.id,g.name,c.name,t.class_id ORDER BY t.test_date DESC LIMIT 50`, [schoolId, user.id])
+    ? query(`SELECT t.id,t.title,t.test_date::text AS date,t.location,COALESCE(g.name,'全校') AS "gradeName",COALESCE(c.name,'全校') AS "className",t.items,t.rule_version AS "ruleVersion",t.protocol_snapshot_json AS "protocolSnapshot",t.status,CASE WHEN t.class_id IS NULL THEN ARRAY[]::text[] ELSE ARRAY[t.class_id] END AS "classIds",ARRAY_AGG(DISTINCT ts.student_id) AS "studentIds",COUNT(ts.id)::int AS "totalCount",COUNT(ts.id) FILTER(WHERE ${validTaskCompletionPredicate('ts', 't')})::int AS "completedCount" FROM assessment_tasks t LEFT JOIN grades g ON g.id=t.grade_id LEFT JOIN classes c ON c.id=t.class_id JOIN task_students ts ON ts.task_id=t.id JOIN parent_student_bindings pb ON pb.student_id=ts.student_id AND pb.parent_user_id=$2 AND pb.status='active' WHERE t.school_id=$1 GROUP BY t.id,g.name,c.name,t.class_id ORDER BY ${operationalTaskOrder('t')},t.created_at DESC LIMIT 50`, [schoolId, user.id])
     : isTeacherScope
-      ? query(`SELECT t.id,t.title,t.test_date AS date,t.location,COALESCE(g.name,'全校') AS "gradeName",COALESCE(c.name,'全校') AS "className",t.items,t.rule_version AS "ruleVersion",t.status,CASE WHEN t.class_id IS NULL THEN ARRAY[]::text[] ELSE ARRAY[t.class_id] END AS "classIds",ARRAY_AGG(DISTINCT ts.student_id) AS "studentIds",COUNT(ts.id)::int AS "totalCount",COUNT(ts.id) FILTER(WHERE ts.status='已完成')::int AS "completedCount" FROM assessment_tasks t LEFT JOIN grades g ON g.id=t.grade_id LEFT JOIN classes c ON c.id=t.class_id JOIN task_students ts ON ts.task_id=t.id JOIN students st ON st.id=ts.student_id AND st.class_id=ANY($2) WHERE t.school_id=$1 GROUP BY t.id,g.name,c.name,t.class_id ORDER BY t.test_date DESC LIMIT 50`, [schoolId, scopedClassIds.length ? scopedClassIds : ['__none__']])
-      : query(`SELECT t.id,t.title,t.test_date AS date,t.location,COALESCE(g.name,'全校') AS "gradeName",COALESCE(c.name,'全校') AS "className",t.items,t.rule_version AS "ruleVersion",t.status,CASE WHEN t.class_id IS NULL THEN ARRAY[]::text[] ELSE ARRAY[t.class_id] END AS "classIds",COALESCE(ARRAY_AGG(DISTINCT ts.student_id) FILTER(WHERE ts.student_id IS NOT NULL), ARRAY[]::text[]) AS "studentIds",COUNT(ts.id)::int AS "totalCount",COUNT(ts.id) FILTER(WHERE ts.status='已完成')::int AS "completedCount" FROM assessment_tasks t LEFT JOIN grades g ON g.id=t.grade_id LEFT JOIN classes c ON c.id=t.class_id LEFT JOIN task_students ts ON ts.task_id=t.id WHERE t.school_id=$1 GROUP BY t.id,g.name,c.name,t.class_id ORDER BY t.test_date DESC LIMIT 50`, [schoolId]);
+      ? query(`SELECT t.id,t.title,t.test_date::text AS date,t.location,COALESCE(g.name,'全校') AS "gradeName",COALESCE(c.name,'全校') AS "className",t.items,t.rule_version AS "ruleVersion",t.protocol_snapshot_json AS "protocolSnapshot",t.status,CASE WHEN t.class_id IS NULL THEN ARRAY[]::text[] ELSE ARRAY[t.class_id] END AS "classIds",ARRAY_AGG(DISTINCT ts.student_id) AS "studentIds",COUNT(ts.id)::int AS "totalCount",COUNT(ts.id) FILTER(WHERE ${validTaskCompletionPredicate('ts', 't')})::int AS "completedCount" FROM assessment_tasks t LEFT JOIN grades g ON g.id=t.grade_id LEFT JOIN classes c ON c.id=t.class_id JOIN task_students ts ON ts.task_id=t.id JOIN students st ON st.id=ts.student_id AND st.class_id=ANY($2) WHERE t.school_id=$1 GROUP BY t.id,g.name,c.name,t.class_id ORDER BY ${operationalTaskOrder('t')},t.created_at DESC LIMIT 50`, [schoolId, scopedClassIds.length ? scopedClassIds : ['__none__']])
+      : query(`SELECT t.id,t.title,t.test_date::text AS date,t.location,COALESCE(g.name,'全校') AS "gradeName",COALESCE(c.name,'全校') AS "className",t.items,t.rule_version AS "ruleVersion",t.protocol_snapshot_json AS "protocolSnapshot",t.status,CASE WHEN t.class_id IS NULL THEN ARRAY[]::text[] ELSE ARRAY[t.class_id] END AS "classIds",COALESCE(ARRAY_AGG(DISTINCT ts.student_id) FILTER(WHERE ts.student_id IS NOT NULL), ARRAY[]::text[]) AS "studentIds",COUNT(ts.id)::int AS "totalCount",COUNT(ts.id) FILTER(WHERE ${validTaskCompletionPredicate('ts', 't')})::int AS "completedCount" FROM assessment_tasks t LEFT JOIN grades g ON g.id=t.grade_id LEFT JOIN classes c ON c.id=t.class_id LEFT JOIN task_students ts ON ts.task_id=t.id WHERE t.school_id=$1 GROUP BY t.id,g.name,c.name,t.class_id ORDER BY ${operationalTaskOrder('t')},t.created_at DESC LIMIT 50`, [schoolId]);
   const [school, grades, classes, students, studentCount, tasks, messages, bindings] = await Promise.all([
     query(`SELECT id, name, campus, region, is_poverty_area AS "isPovertyArea" FROM schools WHERE id=$1`, [schoolId]),
     gradesQuery,
@@ -862,7 +890,13 @@ async function dashboard(user, schoolId, options = {}) {
     grades: grades.rows,
     classes: classes.rows,
     students: students.rows.map(studentRow),
-    tasks: tasks.rows.map((row) => ({ ...row, items: row.items || [], status: row.completedCount === row.totalCount && row.totalCount > 0 ? '已完成' : row.status === 'published' ? '未签到' : row.status === 'closed' ? '已完成' : row.status })),
+    tasks: tasks.rows.map((row) => {
+      const progressStatus = row.completedCount === row.totalCount && row.totalCount > 0
+        ? '已完成'
+        : row.status === 'published' ? '未签到'
+          : row.status === 'closed' ? '已关闭' : row.status;
+      return { ...row, items: row.items || [], lifecycleStatus: row.status, progressStatus, status: progressStatus };
+    }),
     parentChildren: bindings.rows.map((row) => ({ id: row.id, parentId: row.parentId, relation: row.relation, student: studentRow(row) })),
     children: bindings.rows.map((row) => ({ id: row.id, parentId: row.parentId, relation: row.relation, student: studentRow(row) })),
     messages: messages.rows,
@@ -906,7 +940,7 @@ async function refreshReport(user, req, studentId) {
 }
 
 async function taskStudentForUser(user, taskId, studentId) {
-  const result = await query(`SELECT ts.*, t.school_id, t.rule_version, st.class_id
+  const result = await query(`SELECT ts.*, t.school_id, t.rule_version, t.items, st.class_id
     FROM task_students ts JOIN assessment_tasks t ON t.id=ts.task_id JOIN students st ON st.id=ts.student_id
     WHERE ts.task_id=$1 AND ts.student_id=$2`, [taskId, studentId]);
   const row = result.rows[0];
@@ -922,428 +956,51 @@ async function taskStudentForUser(user, taskId, studentId) {
   return row;
 }
 
-const fieldInputString = (value, name, max = 160) => {
-  const result = String(value || '').trim();
-  if (!result || result.length > max) throw Object.assign(new Error(`${name}不合法`), { status: 400, code: 'FIELD_INPUT_INVALID' });
-  return result;
-};
+const guidedCaptureChecks = Object.freeze(['device-level', 'full-body', 'single-person', 'landmark-confidence', 'multi-frame-robust']);
 
-const fieldObject = (value) => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-const fieldEvidenceRetentionDaysFor = (evidenceType) => ['video', 'image'].includes(evidenceType) ? fieldEvidenceVideoRetentionDays : fieldEvidenceDerivedRetentionDays;
-
-const assessmentStandardContext = (student, task) => ({
-  schoolId: student.school_id,
-  gradeId: student.grade_id || task.grade_id || null,
-  region: student.region || '',
-  povertyArea: Boolean(student.is_poverty_area),
-  testDate: task.test_date,
-  fallbackVersion: task.rule_version
-});
-
-const effectiveDate = (value, name = '生效日期') => {
-  const date = String(value || '').trim();
-  const parsed = new Date(`${date}T00:00:00.000Z`);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(parsed.valueOf()) || parsed.toISOString().slice(0, 10) !== date) {
-    throw Object.assign(new Error(`${name}不合法`), { status: 400, code: 'FIELD_INPUT_INVALID' });
-  }
-  return date;
-};
-
-async function fieldTaskForDevice(device, taskId, client = null) {
-  const executor = client || { query };
-  const result = await executor.query(`SELECT t.* FROM assessment_tasks t
-    WHERE t.id=$1 AND t.school_id=$2`, [taskId, device.school_id]);
-  if (!result.rows[0]) throw Object.assign(new Error('测评任务不存在或不属于本设备学校'), { status: 404, code: 'FIELD_TASK_NOT_FOUND' });
-  if (result.rows[0].status !== 'published') throw Object.assign(new Error('只有已发布的测评任务可以下发到场地端'), { status: 409, code: 'FIELD_TASK_INACTIVE' });
-  return result.rows[0];
-}
-
-const fieldHealthNumber = (value) => {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-};
-
-// Formal scores are only accepted from an edge host that has explicitly
-// attested its preflight state. The source hardware remains vendor-specific,
-// but the safety contract is not: two depth cameras, one RGB camera, a GPU,
-// frame synchronisation, calibration validation and enough local evidence
-// storage must all be healthy before a session can begin.
-const fieldHardwareReadiness = (device, calibration) => {
-  const health = fieldObject(device?.health_json);
-  const selfTest = fieldObject(health.selfTest);
-  const capture = fieldObject(health.capture);
-  const calibrationCheck = fieldObject(health.calibration);
-  const storage = fieldObject(health.storage);
-  const blockers = [];
-  const storageFreeMb = fieldHealthNumber(storage.freeMb ?? health.storageFreeMb);
-  const frameSyncOffsetMs = fieldHealthNumber(capture.frameSyncOffsetMs);
-  const calibrationErrorCm = fieldHealthNumber(calibrationCheck.errorCm);
-  const depthCameraCount = fieldHealthNumber(capture.depthCameraCount);
-  const rgbCameraCount = fieldHealthNumber(capture.rgbCameraCount);
-
-  if (health.schemaVersion !== 'field-health/v1') blockers.push('未上报 field-health/v1 场地自检结果');
-  if (selfTest.passed !== true) blockers.push('边缘主机自检未通过');
-  if (device?.device_type !== 'edge_host') blockers.push('正式采集必须由已注册的边缘主机发起');
-  if (capture.adapterReady !== true || !String(capture.adapterName || '').trim()) blockers.push('视觉采集适配器未就绪');
-  if (depthCameraCount == null || depthCameraCount < 2) blockers.push('双深度摄像头未全部通过自检');
-  if (rgbCameraCount == null || rgbCameraCount < 1) blockers.push('高速 RGB 摄像头未通过自检');
-  if (capture.gpuReady !== true) blockers.push('边缘 GPU 推理环境未就绪');
-  if (frameSyncOffsetMs == null || frameSyncOffsetMs > 33.4) blockers.push('多机帧同步未达标（需不超过 33.4ms）');
-  if (storageFreeMb == null || storageFreeMb < 5_120) blockers.push('本地证据存储空间不足（至少 5GB）');
-  if (calibration) {
-    if (calibrationCheck.passed !== true) blockers.push('场地标定复核未通过');
-    if (String(calibrationCheck.version || '') !== String(calibration.version)) blockers.push('设备标定版本与中央下发版本不一致');
-    if (String(calibrationCheck.checksumSha256 || '').toLowerCase() !== String(calibration.checksumSha256 || calibration.checksum_sha256 || '').toLowerCase()) blockers.push('设备标定校验和与中央下发版本不一致');
-    if (calibrationErrorCm == null || calibrationErrorCm > 5) blockers.push('场地标定误差未达标（需不超过 5cm）');
-  }
-  if (health.emergencyStop === true) blockers.push('场地端处于紧急停止状态');
+function submittedCaptureTrace(snapshot) {
+  const metrics = snapshot?.metrics && typeof snapshot.metrics === 'object' ? snapshot.metrics : {};
+  const nested = metrics.captureMetadata && typeof metrics.captureMetadata === 'object' ? metrics.captureMetadata : {};
+  const calibration = nested.calibration && typeof nested.calibration === 'object' ? nested.calibration
+    : metrics.captureCalibration && typeof metrics.captureCalibration === 'object' ? metrics.captureCalibration : {};
+  const checks = Array.isArray(snapshot?.qualityChecks) ? snapshot.qualityChecks
+    : Array.isArray(nested.qualityChecks) ? nested.qualityChecks
+      : Array.isArray(metrics.qualityChecks) ? metrics.qualityChecks : [];
   return {
-    ready: blockers.length === 0,
-    blockers,
-    summary: {
-      schemaVersion: String(health.schemaVersion || ''),
-      selfTestPassed: selfTest.passed === true,
-      selfTestAt: selfTest.completedAt || null,
-      adapterName: String(capture.adapterName || '') || null,
-      depthCameraCount,
-      rgbCameraCount,
-      gpuReady: capture.gpuReady === true,
-      frameSyncOffsetMs,
-      storageFreeMb,
-      calibrationVersion: String(calibrationCheck.version || '') || null,
-      calibrationErrorCm,
-      emergencyStop: health.emergencyStop === true
-    }
+    protocolVersion: String(snapshot?.captureProtocolVersion || nested.captureProtocolVersion || metrics.captureProtocolVersion || '').trim(),
+    cameraFacing: String(snapshot?.cameraFacing || nested.cameraFacing || metrics.cameraFacing || '').trim(),
+    qualityChecks: checks.filter((item) => typeof item === 'string').map((item) => item.trim()).filter(Boolean),
+    calibration
   };
-};
-
-const fieldReadiness = (device, station, calibration) => {
-  const blockers = [];
-  if (!device.station_id) blockers.push('设备尚未绑定测试点');
-  if (!station) blockers.push('测试点不存在或已删除');
-  else if (station.status !== 'online') blockers.push(`测试点状态为 ${station.status}，请先检查设备心跳或维护状态`);
-  if (!calibration) blockers.push('尚未下发有效标定配置');
-  const hardware = fieldHardwareReadiness(device, calibration);
-  blockers.push(...hardware.blockers);
-  return {
-    ready: blockers.length === 0,
-    stationStatus: station?.status || null,
-    calibrationVersion: calibration?.version || null,
-    hardware: hardware.summary,
-    blockers
-  };
-};
-
-async function ensureFieldQueue(client, device, taskId) {
-  await fieldTaskForDevice(device, taskId, client);
-  await client.query(`INSERT INTO test_queue_entries(school_id,task_id,student_id,station_id,queue_order)
-    SELECT $1,$2,ts.student_id,NULL,ROW_NUMBER() OVER (ORDER BY c.name,st.name)::int
-      FROM task_students ts JOIN students st ON st.id=ts.student_id JOIN classes c ON c.id=st.class_id
-     WHERE ts.task_id=$2
-    ON CONFLICT(task_id,student_id) DO NOTHING`, [device.school_id, taskId]);
 }
 
-// Only unstarted students may move. Called, checked-in and testing students
-// retain their station so identity, evidence and operator context never split
-// across two physical points mid-flow.
-async function rebalanceFieldQueue(client, task) {
-  const stationRows = await client.query(`SELECT s.id AS "stationId",s.station_code AS "stationCode",s.queue_capacity AS "queueCapacity",s.status,
-      d.*,cal.version AS "calibrationVersion",cal.checksum_sha256 AS "calibrationChecksumSha256"
-    FROM test_stations s JOIN test_devices d ON d.station_id=s.id
-    JOIN LATERAL (SELECT version,checksum_sha256 FROM station_calibrations WHERE station_id=s.id AND status='active' ORDER BY effective_at DESC LIMIT 1) cal ON TRUE
-    WHERE s.school_id=$1 AND s.status='online' AND d.status='online' AND d.device_type='edge_host'
-    ORDER BY s.station_code,d.id`, [task.school_id]);
-  const stationsById = new Map();
-  for (const row of stationRows.rows) {
-    if (stationsById.has(row.stationId)) continue;
-    const readiness = fieldReadiness(row, { id: row.stationId, status: row.status }, { version: row.calibrationVersion, checksumSha256: row.calibrationChecksumSha256 });
-    if (readiness.ready) stationsById.set(row.stationId, { id: row.stationId, stationCode: row.stationCode, queueCapacity: Number(row.queueCapacity), load: 0 });
+function validateSubmittedCaptureTrace(snapshot) {
+  const trace = submittedCaptureTrace(snapshot);
+  // Legacy history may not have provenance. It remains readable and is
+  // explicitly labelled untraced by the scorer, but a new protocol claim is
+  // never accepted without the evidence it claims to have used.
+  if (!trace.protocolVersion) return;
+  const guided = trace.protocolVersion.startsWith('UY-CAPTURE-GUIDED-');
+  const markerPnp = trace.protocolVersion.startsWith('UY-CAPTURE-MARKER-PNP-');
+  if (!guided && !markerPnp) throw Object.assign(new Error('不支持的姿态采集协议版本'), { status: 400, code: 'CAPTURE_PROTOCOL_INVALID' });
+  if (trace.cameraFacing !== 'rear-1x') throw Object.assign(new Error('正式姿态采集必须使用后置 1× 镜头'), { status: 400, code: 'CAPTURE_CAMERA_INVALID' });
+  if (!guidedCaptureChecks.every((check) => trace.qualityChecks.includes(check))) {
+    throw Object.assign(new Error('姿态采集质量门未全部通过，请重新完成完整入镜与稳定性检查'), { status: 400, code: 'CAPTURE_QUALITY_INCOMPLETE' });
   }
-  const eligibleStations = [...stationsById.values()];
-  const eligibleIds = eligibleStations.map((station) => station.id);
-  if (eligibleIds.length) {
-    await client.query(`UPDATE test_queue_entries SET station_id=NULL,state_version=state_version+1,updated_at=now()
-      WHERE task_id=$1 AND status='waiting' AND station_id IS NOT NULL AND NOT (station_id=ANY($2::text[]))`, [task.id, eligibleIds]);
-  } else {
-    await client.query(`UPDATE test_queue_entries SET station_id=NULL,state_version=state_version+1,updated_at=now()
-      WHERE task_id=$1 AND status='waiting' AND station_id IS NOT NULL`, [task.id]);
+  if (/^UY-CAPTURE-GUIDED-(2|3)\./.test(trace.protocolVersion) && !trace.qualityChecks.includes('two-take-repeatability')) {
+    throw Object.assign(new Error('该采集协议需要两次独立记录一致性通过后才能提交'), { status: 400, code: 'CAPTURE_REPEATABILITY_INCOMPLETE' });
   }
-  const entries = await client.query(`SELECT id,station_id,status,priority,queue_order AS "queueOrder",created_at AS "createdAt"
-    FROM test_queue_entries WHERE task_id=$1 AND status IN ('waiting','called','checked_in','testing')
-    ORDER BY priority DESC,queue_order,created_at FOR UPDATE`, [task.id]);
-  for (const entry of entries.rows) {
-    const station = entry.station_id ? stationsById.get(entry.station_id) : null;
-    if (station) station.load += 1;
+  if (markerPnp) {
+    const reprojectionErrorPx = finiteScalar(trace.calibration.reprojectionErrorPx);
+    if (trace.calibration.mode !== 'marker-pnp' || trace.calibration.boardDetected !== true
+      || !String(trace.calibration.boardId || '').trim() || !String(trace.calibration.intrinsicsId || '').trim()
+      || !String(trace.calibration.lensId || '').trim() || !String(trace.calibration.resolution || '').trim()
+      || reprojectionErrorPx == null || reprojectionErrorPx > 2) {
+      throw Object.assign(new Error('标定板/PnP 证据不完整或重投影误差未达标'), { status: 400, code: 'CAPTURE_CALIBRATION_INCOMPLETE' });
+    }
+    const profileValidation = validateMarkerPnpProfile(trace.calibration);
+    if (!profileValidation.valid) throw Object.assign(new Error(profileValidation.message), { status: 400, code: profileValidation.code });
   }
-  const assignments = [];
-  for (const entry of entries.rows.filter((item) => item.status === 'waiting' && !item.station_id)) {
-    const target = eligibleStations
-      .filter((station) => station.load < station.queueCapacity)
-      .sort((left, right) => (left.load / left.queueCapacity) - (right.load / right.queueCapacity) || left.stationCode.localeCompare(right.stationCode))[0];
-    if (!target) break;
-    target.load += 1;
-    await client.query(`UPDATE test_queue_entries SET station_id=$1,queue_order=$2,state_version=state_version+1,updated_at=now() WHERE id=$3`, [target.id, target.load, entry.id]);
-    assignments.push({ queueEntryId: entry.id, stationId: target.id, stationCode: target.stationCode, queueOrder: target.load });
-  }
-  const remaining = await client.query(`SELECT COUNT(*)::int AS count FROM test_queue_entries WHERE task_id=$1 AND status='waiting' AND station_id IS NULL`, [task.id]);
-  return { eligibleStations: eligibleStations.map(({ load, ...station }) => ({ ...station, assignedCount: load })), assignments, unassignedCount: Number(remaining.rows[0]?.count || 0) };
-}
-
-async function fieldBootstrap(device, taskId) {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    let selectedTaskId = taskId ? fieldInputString(taskId, '任务 ID') : null;
-    if (!selectedTaskId) {
-      const active = await client.query(`SELECT id FROM assessment_tasks WHERE school_id=$1 AND status='published'
-        ORDER BY test_date DESC,created_at DESC LIMIT 1`, [device.school_id]);
-      selectedTaskId = active.rows[0]?.id || null;
-    }
-    let task = null;
-    let queue = [];
-    let dispatch = null;
-    if (selectedTaskId) {
-      task = await fieldTaskForDevice(device, selectedTaskId, client);
-      await ensureFieldQueue(client, device, selectedTaskId);
-      dispatch = await rebalanceFieldQueue(client, task);
-      const entries = await client.query(`SELECT q.id,q.task_id AS "taskId",q.student_id AS "studentId",q.station_id AS "stationId",q.status,
-          q.priority,q.queue_order AS "queueOrder",q.retest_count AS "retestCount",q.state_version AS "stateVersion",q.note,
-          q.last_called_at AS "lastCalledAt",q.updated_at AS "updatedAt",st.name AS "studentName",st.gender,st.birth_date AS "birthDate",
-          st.student_no AS "studentNo",st.grade_id AS "gradeId",st.region,st.is_poverty_area AS "isPovertyArea",g.name AS "gradeName",c.name AS "className",ts.status AS "taskStatus",ts.version AS "taskVersion"
-        FROM test_queue_entries q JOIN students st ON st.id=q.student_id JOIN grades g ON g.id=st.grade_id
-          JOIN classes c ON c.id=st.class_id JOIN task_students ts ON ts.task_id=q.task_id AND ts.student_id=q.student_id
-        WHERE q.task_id=$1 AND (q.station_id IS NULL OR q.station_id=$2)
-        ORDER BY q.priority DESC,q.queue_order,q.created_at`, [selectedTaskId, device.station_id || null]);
-      queue = entries.rows;
-    }
-    const [station, calibration, commands] = await Promise.all([
-      client.query(`SELECT id,station_code AS "stationCode",name,item_code AS "itemCode",queue_capacity AS "queueCapacity",status,
-          metadata_json AS metadata,last_seen_at AS "lastSeenAt",updated_at AS "updatedAt" FROM test_stations WHERE id=$1`, [device.station_id || null]),
-      client.query(`SELECT version,checksum_sha256 AS "checksumSha256",config_json AS config,effective_at AS "effectiveAt"
-        FROM station_calibrations WHERE station_id=$1 AND status='active' ORDER BY effective_at DESC LIMIT 1`, [device.station_id || null]),
-      client.query(`SELECT id,command_type AS "commandType",payload_json AS payload,created_at AS "createdAt",expires_at AS "expiresAt"
-        FROM device_commands WHERE device_id=$1 AND status IN ('pending','delivered') AND (expires_at IS NULL OR expires_at>now()) ORDER BY created_at LIMIT 50`, [device.id])
-    ]);
-    await client.query('COMMIT');
-    const standardContexts = [...new Map(queue.map((entry) => {
-      const context = assessmentStandardContext({ school_id: device.school_id, grade_id: entry.gradeId, region: entry.region, is_poverty_area: entry.isPovertyArea }, task);
-      return [`${context.gradeId || ''}|${context.region}|${context.povertyArea}`, context];
-    })).values()];
-    const standards = await Promise.all(standardContexts.map(async (context) => ({
-      ...(await resolveAssessmentStandard(client, context)),
-      appliesTo: { gradeId: context.gradeId, region: context.region, povertyArea: context.povertyArea }
-    })));
-    const readiness = fieldReadiness(device, station.rows[0] || null, calibration.rows[0] || null);
-    if (dispatch?.assignments.length) void publishFieldUpdate(device.school_id, 'queue.rebalanced', { taskId: task.id, assignments: dispatch.assignments, unassignedCount: dispatch.unassignedCount });
-    return {
-      serverTime: new Date().toISOString(),
-      device: { id: device.id, code: device.device_code, name: device.name, type: device.device_type, softwareVersion: device.software_version },
-      station: station.rows[0] || null,
-      calibration: calibration.rows[0] || null,
-      readiness,
-      task: task ? { id: task.id, title: task.title, testDate: task.test_date, location: task.location, items: task.items || [], ruleVersion: task.rule_version, status: task.status } : null,
-      queue,
-      dispatch,
-      standards,
-      commands: commands.rows
-    };
-  } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
-}
-
-async function transitionFieldQueue(device, input, actor = { type: 'device', id: null }) {
-  const queueEntryId = fieldInputString(input.queueEntryId || input.id, '队列记录 ID');
-  const nextStatus = fieldInputString(input.status, '队列状态', 32);
-  const expectedVersion = input.expectedVersion == null ? null : Number(input.expectedVersion);
-  if (!Object.hasOwn(fieldQueueStatusMap, nextStatus)) throw Object.assign(new Error('队列状态不合法'), { status: 400, code: 'FIELD_QUEUE_STATUS_INVALID' });
-  if (expectedVersion != null && (!Number.isInteger(expectedVersion) || expectedVersion < 1)) throw Object.assign(new Error('队列版本不合法'), { status: 400, code: 'FIELD_QUEUE_VERSION_INVALID' });
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const current = await client.query(`SELECT q.*,t.school_id,ts.id AS task_student_id,ts.status AS task_student_status
-      FROM test_queue_entries q JOIN assessment_tasks t ON t.id=q.task_id
-        JOIN task_students ts ON ts.task_id=q.task_id AND ts.student_id=q.student_id
-      WHERE q.id=$1 FOR UPDATE`, [queueEntryId]);
-    const row = current.rows[0];
-    if (!row || row.school_id !== device.school_id || (device.station_id && row.station_id && row.station_id !== device.station_id)) throw Object.assign(new Error('队列记录不存在或不属于本设备'), { status: 404, code: 'FIELD_QUEUE_NOT_FOUND' });
-    if (!fieldQueueTransitionAllowed(row.status, nextStatus)) throw Object.assign(new Error(`不能从 ${row.status} 变更为 ${nextStatus}`), { status: 409, code: 'FIELD_QUEUE_TRANSITION_INVALID' });
-    if (expectedVersion != null && Number(row.state_version) !== expectedVersion) throw Object.assign(new Error('队列已被其他终端更新，请重新同步'), { status: 409, code: 'FIELD_QUEUE_VERSION_CONFLICT' });
-    const happenedAt = fieldIsoDate(input.happenedAt);
-    const updated = await client.query(`UPDATE test_queue_entries SET status=$1,note=$2,state_version=state_version+1,
-      last_called_at=CASE WHEN $1='called' THEN $3 ELSE last_called_at END,
-      completed_at=CASE WHEN $1='completed' THEN COALESCE(completed_at,$3) ELSE completed_at END,updated_at=now()
-      WHERE id=$4 RETURNING id,task_id AS "taskId",student_id AS "studentId",station_id AS "stationId",status,priority,
-      queue_order AS "queueOrder",retest_count AS "retestCount",state_version AS "stateVersion",note,last_called_at AS "lastCalledAt",updated_at AS "updatedAt"`,
-    [nextStatus, String(input.note || '').slice(0, 500), happenedAt, row.id]);
-    const taskStatus = fieldQueueStatusMap[nextStatus];
-    await client.query(`UPDATE task_students SET status=$1,note=COALESCE(NULLIF($2,''),note),
-      check_in_at=CASE WHEN $1='已签到' THEN COALESCE(check_in_at,$3) ELSE check_in_at END,
-      completed_at=CASE WHEN $1='已完成' THEN COALESCE(completed_at,$3) ELSE completed_at END,version=version+1
-      WHERE id=$4`, [taskStatus, String(input.note || '').slice(0, 500), happenedAt, row.task_student_id]);
-    await client.query(`INSERT INTO queue_events(queue_entry_id,client_event_id,old_status,new_status,reason,actor_type,actor_id,station_id,happened_at)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(client_event_id) DO NOTHING`,
-    [row.id, input.clientEventId ? fieldInputString(input.clientEventId, '客户端事件 ID') : null, row.status, nextStatus, String(input.reason || input.note || '').slice(0, 500), actor.type, actor.id, device.station_id || null, happenedAt]);
-    await client.query('COMMIT');
-    void publishFieldUpdate(row.school_id, 'queue.updated', { queueEntryId: row.id, taskId: row.task_id, studentId: row.student_id, stationId: row.station_id, status: nextStatus, stateVersion: Number(updated.rows[0].stateVersion) });
-    return updated.rows[0];
-  } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
-}
-
-async function openFieldSession(device, input) {
-  const clientSessionId = fieldInputString(input.clientSessionId, '客户端会话 ID');
-  const taskId = fieldInputString(input.taskId, '任务 ID');
-  const studentId = fieldInputString(input.studentId, '学生 ID');
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query('SELECT pg_advisory_xact_lock(hashtext($1),hashtext($2))', [taskId, studentId]);
-    const existing = await client.query(`SELECT id,client_session_id AS "clientSessionId",status,attempt_no AS "attemptNo",started_at AS "startedAt",sync_version AS "syncVersion"
-      FROM test_sessions WHERE client_session_id=$1`, [clientSessionId]);
-    if (existing.rows[0]) { await client.query('COMMIT'); return existing.rows[0]; }
-    const task = await fieldTaskForDevice(device, taskId, client);
-    const [stationResult, calibrationResult] = await Promise.all([
-      client.query(`SELECT id,status FROM test_stations WHERE id=$1`, [device.station_id || null]),
-      client.query(`SELECT version,checksum_sha256 AS "checksumSha256" FROM station_calibrations WHERE station_id=$1 AND status='active' ORDER BY effective_at DESC LIMIT 1`, [device.station_id || null])
-    ]);
-    const readiness = fieldReadiness(device, stationResult.rows[0] || null, calibrationResult.rows[0] || null);
-    if (!readiness.ready) throw Object.assign(new Error(`场地端未就绪：${readiness.blockers.join('；')}`), { status: 409, code: 'FIELD_STATION_NOT_READY' });
-    const roster = await client.query(`SELECT ts.id AS task_student_id,ts.status,st.grade_id,st.region,st.is_poverty_area FROM task_students ts
-      JOIN students st ON st.id=ts.student_id WHERE ts.task_id=$1 AND ts.student_id=$2 AND st.school_id=$3 FOR UPDATE`, [taskId, studentId, device.school_id]);
-    if (!roster.rows[0]) throw Object.assign(new Error('学生不在当前测评名单内'), { status: 404, code: 'FIELD_ROSTER_NOT_FOUND' });
-    const standard = await resolveAssessmentStandard(client, assessmentStandardContext({ school_id: device.school_id, ...roster.rows[0] }, task));
-    await ensureFieldQueue(client, device, taskId);
-    await rebalanceFieldQueue(client, task);
-    const queueResult = await client.query(`SELECT * FROM test_queue_entries WHERE task_id=$1 AND student_id=$2 FOR UPDATE`, [taskId, studentId]);
-    const queue = queueResult.rows[0];
-    if (queue?.station_id && queue.station_id !== device.station_id) throw Object.assign(new Error('学生已由其他测试点接管，请在对应测试点继续'), { status: 409, code: 'FIELD_QUEUE_ASSIGNED_ELSEWHERE' });
-    const existingAttempts = await client.query('SELECT COALESCE(MAX(attempt_no),0)::int AS max_attempt FROM test_sessions WHERE task_id=$1 AND student_id=$2', [taskId, studentId]);
-    const startedAt = fieldIsoDate(input.startedAt);
-    const session = await client.query(`INSERT INTO test_sessions(client_session_id,school_id,task_id,student_id,station_id,edge_device_id,queue_entry_id,attempt_no,status,rule_version,standard_id,standard_version,standard_snapshot_json,calibration_version,algorithm_version,started_at,device_started_at,summary_json)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,'testing',$9,$10,$11,$12,$13,$14,$15,$15,$16)
-      RETURNING id,client_session_id AS "clientSessionId",task_id AS "taskId",student_id AS "studentId",station_id AS "stationId",attempt_no AS "attemptNo",status,rule_version AS "ruleVersion",standard_id AS "standardId",standard_version AS "standardVersion",calibration_version AS "calibrationVersion",algorithm_version AS "algorithmVersion",started_at AS "startedAt",sync_version AS "syncVersion"`,
-    [clientSessionId, device.school_id, taskId, studentId, device.station_id || null, device.id, queue?.id || null, Number(existingAttempts.rows[0].max_attempt) + 1, task.rule_version, standard.id, standard.standardVersion, standard, calibrationResult.rows[0]?.version || '', String(input.algorithmVersion || device.software_version || '').slice(0, 120), startedAt, fieldObject(input.summary)]);
-    if (queue) {
-      await client.query(`UPDATE test_queue_entries SET status='testing',state_version=state_version+1,updated_at=now() WHERE id=$1`, [queue.id]);
-      await client.query(`INSERT INTO queue_events(queue_entry_id,old_status,new_status,reason,actor_type,actor_id,station_id,happened_at)
-        VALUES($1,$2,'testing','场地端开始测试','device',$3,$4,$5)`, [queue.id, queue.status, device.id, device.station_id || null, startedAt]);
-    }
-    await client.query(`UPDATE task_students SET status='测试中',check_in_at=COALESCE(check_in_at,$1),version=version+1 WHERE id=$2`, [startedAt, roster.rows[0].task_student_id]);
-    await client.query('COMMIT');
-    void publishFieldUpdate(device.school_id, 'session.opened', { sessionId: session.rows[0].id, taskId, studentId, stationId: device.station_id || null, deviceId: device.id });
-    return session.rows[0];
-  } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
-}
-
-async function appendFieldSessionEvents(device, sessionId, events) {
-  if (!Array.isArray(events) || !events.length || events.length > 500) throw Object.assign(new Error('采集事件数量必须在 1 到 500 条之间'), { status: 400, code: 'FIELD_EVENTS_INVALID' });
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const sessionResult = await client.query(`SELECT id,client_session_id,school_id,edge_device_id,status FROM test_sessions WHERE (id=$1 OR client_session_id=$1) FOR UPDATE`, [sessionId]);
-    const session = sessionResult.rows[0];
-    if (!session || session.school_id !== device.school_id || session.edge_device_id !== device.id) throw Object.assign(new Error('测试会话不存在或不属于本设备'), { status: 404, code: 'FIELD_SESSION_NOT_FOUND' });
-    if (!['created', 'checked_in', 'testing'].includes(session.status)) throw Object.assign(new Error('当前会话不能继续写入采集事件'), { status: 409, code: 'FIELD_SESSION_CLOSED' });
-    const saved = [];
-    let insertedCount = 0;
-    for (const event of events) {
-      const clientEventId = fieldInputString(event?.clientEventId, '客户端事件 ID');
-      const sequenceNo = Number(event?.sequenceNo);
-      if (!Number.isInteger(sequenceNo) || sequenceNo < 0) throw Object.assign(new Error('事件序号不合法'), { status: 400, code: 'FIELD_EVENT_SEQUENCE_INVALID' });
-      const eventType = fieldInputString(event?.eventType, '事件类型', 64);
-      const happenedAt = fieldIsoDate(event?.happenedAt);
-      const payload = fieldObject(event?.payload);
-      const sameEvent = (row) => row.session_id === session.id
-        && Number(row.sequence_no) === sequenceNo
-        && row.event_type === eventType
-        && new Date(row.happened_at).getTime() === new Date(happenedAt).getTime()
-        && requestBodyHash(row.payload_json) === requestBodyHash(payload);
-      const replay = await client.query('SELECT id,session_id,sequence_no,event_type,happened_at,payload_json FROM session_action_events WHERE client_event_id=$1', [clientEventId]);
-      if (replay.rows[0]) {
-        if (!sameEvent(replay.rows[0])) {
-          recordMetric('xiangshang_field_sync_conflicts_total', { reason: 'action_replay_mismatch' });
-          logger.warn('field.action_replay_mismatch', { deviceId: device.id, sessionId: session.id, clientEventId });
-          throw Object.assign(new Error('采集事件 ID 已被用于不同内容，已拒绝覆盖原始时间线'), { status: 409, code: 'FIELD_ACTION_REPLAY_MISMATCH' });
-        }
-        saved.push({ id: replay.rows[0].id, clientEventId, sequenceNo, eventType, happenedAt });
-        continue;
-      }
-      const sequence = await client.query('SELECT client_event_id AS "clientEventId" FROM session_action_events WHERE session_id=$1 AND sequence_no=$2', [session.id, sequenceNo]);
-      if (sequence.rows[0]) throw Object.assign(new Error('采集事件序号已被其他事件占用，请重新同步会话时间线'), { status: 409, code: 'FIELD_EVENT_SEQUENCE_CONFLICT' });
-      const result = await client.query(`INSERT INTO session_action_events(session_id,client_event_id,sequence_no,event_type,happened_at,payload_json)
-        VALUES($1,$2,$3,$4,$5,$6)
-        RETURNING id,client_event_id AS "clientEventId",sequence_no AS "sequenceNo",event_type AS "eventType",happened_at AS "happenedAt"`,
-      [session.id, clientEventId, sequenceNo, eventType, happenedAt, payload]);
-      if (result.rows[0]) { saved.push(result.rows[0]); insertedCount += 1; }
-    }
-    if (insertedCount) await client.query('UPDATE test_sessions SET sync_version=sync_version+1,updated_at=now() WHERE id=$1', [session.id]);
-    await client.query('COMMIT');
-    return { id: session.id, sessionId: session.id, clientSessionId: session.client_session_id, accepted: saved.length, events: saved };
-  } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
-}
-
-async function completeFieldSession(device, sessionId, input) {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const result = await client.query(`SELECT s.*,t.school_id,ts.id AS task_student_id FROM test_sessions s
-      JOIN assessment_tasks t ON t.id=s.task_id JOIN task_students ts ON ts.task_id=s.task_id AND ts.student_id=s.student_id
-      WHERE (s.id=$1 OR s.client_session_id=$1) FOR UPDATE`, [sessionId]);
-    const session = result.rows[0];
-    if (!session || session.school_id !== device.school_id || session.edge_device_id !== device.id) throw Object.assign(new Error('测试会话不存在或不属于本设备'), { status: 404, code: 'FIELD_SESSION_NOT_FOUND' });
-    if (['completed', 'needs_review', 'retest'].includes(session.status)) { await client.query('COMMIT'); return { id: session.id, status: session.status, idempotent: true }; }
-    if (!Array.isArray(input.scores) || !input.scores.length || input.scores.length > MOVEMENT_SCORE_RULES.itemCount) throw Object.assign(new Error('必须提交 1 到 7 项成绩'), { status: 400, code: 'FIELD_SCORES_INVALID' });
-    const items = new Set();
-    const savedScores = [];
-    const evidence = Array.isArray(input.evidence) ? input.evidence : [];
-    const endedAt = fieldIsoDate(input.endedAt);
-    if (evidence.length > 30) throw Object.assign(new Error('证据文件超过上限'), { status: 400, code: 'FIELD_EVIDENCE_INVALID' });
-    for (const item of input.scores) {
-      const itemCode = fieldInputString(item?.item, '体测项目', 64);
-      const score = normalizeScore(item?.score);
-      const confidence = normalizeConfidence(item?.confidence == null ? 0 : item.confidence);
-      if (!MOVEMENT_ITEM_CODES.includes(itemCode) || score == null || confidence == null || items.has(itemCode)) throw Object.assign(new Error('成绩项目、分数或置信度不合法'), { status: 400, code: 'FIELD_SCORE_INVALID' });
-      items.add(itemCode);
-      const reviewStatus = normalizeReviewStatus(item?.reviewStatus, confidence);
-      const saved = await client.query(`INSERT INTO assessment_scores(task_id,student_id,item_code,score,confidence,note,source,review_status,manual_reviewed,created_by,session_id,algorithm_version,evidence_json)
-        VALUES($1,$2,$3,$4,$5,$6,'field',$7,FALSE,NULL,$8,$9,$10)
-        ON CONFLICT(task_id,student_id,item_code) DO UPDATE SET score=EXCLUDED.score,confidence=EXCLUDED.confidence,note=EXCLUDED.note,source='field',review_status=EXCLUDED.review_status,manual_reviewed=FALSE,created_by=NULL,session_id=EXCLUDED.session_id,algorithm_version=EXCLUDED.algorithm_version,evidence_json=EXCLUDED.evidence_json,updated_at=now()
-        RETURNING id,item_code AS item,score,confidence,review_status AS "reviewStatus"`,
-      [session.task_id, session.student_id, itemCode, score, confidence, String(item?.note || '').slice(0, 1000), reviewStatus, session.id, String(input.algorithmVersion || session.algorithm_version || '').slice(0, 120), fieldObject(item?.evidence)]);
-      savedScores.push({ ...saved.rows[0], score: Number(saved.rows[0].score), confidence: Number(saved.rows[0].confidence) });
-    }
-    for (const [ordinal, entry] of evidence.entries()) {
-      const fileId = fieldInputString(entry?.fileId, '证据文件 ID');
-      const file = await client.query(`SELECT id FROM files WHERE id=$1 AND status='uploaded' AND purpose='field_evidence' AND object_key LIKE $2`, [fileId, `field/${device.id}/%`]);
-      if (!file.rows[0]) throw Object.assign(new Error('证据文件不存在、未上传或不属于本设备'), { status: 400, code: 'FIELD_EVIDENCE_NOT_FOUND' });
-      const evidenceType = fieldInputString(entry?.evidenceType || 'other', '证据类型', 32);
-      if (!['video', 'image', 'skeleton', 'timeline', 'calibration', 'log', 'other'].includes(evidenceType)) throw Object.assign(new Error('证据类型不合法'), { status: 400, code: 'FIELD_EVIDENCE_INVALID' });
-      const retentionDays = fieldEvidenceRetentionDaysFor(evidenceType);
-      await client.query(`INSERT INTO session_evidence(session_id,file_id,evidence_type,ordinal,checksum_sha256,metadata_json,retention_until,purged_at,purge_reason)
-        VALUES($1,$2,$3,$4,$5,$6,$7::timestamptz+($8::int * interval '1 day'),NULL,NULL)
-        ON CONFLICT(file_id) DO UPDATE SET session_id=EXCLUDED.session_id,evidence_type=EXCLUDED.evidence_type,ordinal=EXCLUDED.ordinal,metadata_json=EXCLUDED.metadata_json,retention_until=EXCLUDED.retention_until,purged_at=NULL,purge_reason=NULL`,
-      [session.id, fileId, evidenceType, ordinal, entry?.checksumSha256 || null, fieldObject(entry?.metadata), endedAt, retentionDays]);
-      await client.query(`UPDATE files SET retention_until=$1::timestamptz+($2::int * interval '1 day'),expires_at=NULL WHERE id=$3`, [endedAt, retentionDays, fileId]);
-    }
-    const needsReview = savedScores.some((score) => score.reviewStatus === 'pendingReview');
-    const isRetest = input.outcome === 'retest';
-    const sessionStatus = isRetest ? 'retest' : (needsReview ? 'needs_review' : 'completed');
-    const queueStatus = isRetest ? 'retest' : 'completed';
-    await client.query(`UPDATE test_sessions SET status=$1,ended_at=$2,device_ended_at=$2,algorithm_version=$3,summary_json=$4,sync_version=sync_version+1,updated_at=now() WHERE id=$5`,
-    [sessionStatus, endedAt, String(input.algorithmVersion || session.algorithm_version || '').slice(0, 120), fieldObject(input.summary), session.id]);
-    if (session.queue_entry_id) {
-      const queue = await client.query('SELECT status FROM test_queue_entries WHERE id=$1 FOR UPDATE', [session.queue_entry_id]);
-      await client.query(`UPDATE test_queue_entries SET status=$1,retest_count=retest_count+CASE WHEN $1='retest' THEN 1 ELSE 0 END,state_version=state_version+1,
-        completed_at=CASE WHEN $1='completed' THEN COALESCE(completed_at,$2) ELSE completed_at END,updated_at=now() WHERE id=$3`, [queueStatus, endedAt, session.queue_entry_id]);
-      await client.query(`INSERT INTO queue_events(queue_entry_id,old_status,new_status,reason,actor_type,actor_id,station_id,happened_at)
-        VALUES($1,$2,$3,$4,'device',$5,$6,$7)`, [session.queue_entry_id, queue.rows[0]?.status || 'testing', queueStatus, String(input.reason || '').slice(0, 500), device.id, device.station_id || null, endedAt]);
-    }
-    const taskStatus = isRetest ? '待补测' : (needsReview ? '待复核' : '已完成');
-    await client.query(`UPDATE task_students SET status=$1,completed_at=CASE WHEN $1='已完成' THEN COALESCE(completed_at,$2) ELSE completed_at END,version=version+1 WHERE id=$3`, [taskStatus, endedAt, session.task_student_id]);
-    if (!isRetest) await client.query(`INSERT INTO job_queue(job_type,payload,available_at) VALUES('report.refresh',$1,now())`, [{ studentId: session.student_id, taskId: session.task_id, sessionId: session.id, schoolId: session.school_id }]);
-    await client.query('COMMIT');
-    await audit(null, { ...input, socket: { remoteAddress: null }, _requestId: input.requestId || crypto.randomUUID() }, 'field.session.complete', 'test_session', session.id, null, { deviceId: device.id, status: sessionStatus, scoreCount: savedScores.length }, session.school_id);
-    void publishFieldUpdate(session.school_id, 'session.completed', { sessionId: session.id, taskId: session.task_id, studentId: session.student_id, stationId: session.station_id, status: sessionStatus, scoreCount: savedScores.length });
-    return { id: session.id, status: sessionStatus, scores: savedScores, evidenceCount: evidence.length };
-  } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
 }
 
 async function bodyAssessmentForUser(user, studentId, input, req) {
@@ -1351,12 +1008,15 @@ async function bodyAssessmentForUser(user, studentId, input, req) {
   const student = await guardianStudentForUser(user, studentId);
   if (!student) throw Object.assign(new Error('学生不存在或未绑定'), { status: 404, code: 'STUDENT_NOT_FOUND' });
   const consentVersion = String(input.consentVersion || 'v1');
+  let consentRecord = null;
   if (requireHealthConsent) {
-    const consent = await query(`SELECT 1 FROM data_consents
+    const consent = await query(`SELECT id,consent_id FROM data_consents
       WHERE student_id=$1 AND parent_user_id=$2 AND purpose='body_assessment' AND consent_version=$3
         AND granted_at IS NOT NULL AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())`, [studentId, user.id, consentVersion]);
     if (!consent.rowCount) throw Object.assign(new Error('提交家庭测评前需要取得有效的数据使用同意'), { status: 403, code: 'CONSENT_REQUIRED' });
+    consentRecord = consent.rows[0];
   }
+  if (containsRawMedia(input)) throw Object.assign(new Error('家庭身体筛查仅接收结构化指标，禁止上传原始照片、视频或摄像头帧'), { status: 400, code: 'RAW_MEDIA_NOT_ALLOWED' });
   const height = finiteScalar(input.heightCm);
   const weight = finiteScalar(input.weightKg);
   // Keep the API boundary identical to both native clients' child-measurement
@@ -1365,7 +1025,7 @@ async function bodyAssessmentForUser(user, studentId, input, req) {
   if (!Number.isFinite(height) || height < 90 || height > 190 || !Number.isFinite(weight) || weight < 15 || weight > 90) {
     throw Object.assign(new Error('身高或体重不在有效范围'), { status: 400, code: 'MEASUREMENT_INVALID' });
   }
-  const allowedCaptureTasks = new Set(['standingBack', 'forwardBend', 'seatedPosture', 'gaitVideo']);
+  const allowedCaptureTasks = new Set(['standingFront', 'standingBack', 'standingSide', 'forwardBend', 'dynamicKneeControl', 'gaitVideo', 'seatedPosture', 'footArch']);
   const rawSnapshots = Array.isArray(input.snapshots) ? input.snapshots : [];
   if (rawSnapshots.length > allowedCaptureTasks.size) throw Object.assign(new Error('姿态任务数量不合法'), { status: 400, code: 'SNAPSHOTS_INVALID' });
   const snapshots = rawSnapshots.map((snapshot) => {
@@ -1375,14 +1035,17 @@ async function bodyAssessmentForUser(user, studentId, input, req) {
     if (!allowedCaptureTasks.has(captureTask) || !Number.isInteger(sampleCount) || sampleCount < 0 || sampleCount > 10000 || !Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
       throw Object.assign(new Error('姿态任务数据不合法'), { status: 400, code: 'SNAPSHOT_INVALID' });
     }
-    return { ...snapshot, captureTask, sampleCount, confidence, metrics: snapshot?.metrics && typeof snapshot.metrics === 'object' ? snapshot.metrics : {} };
+    validateSubmittedCaptureTrace(snapshot);
+    return { captureTask, sampleCount, confidence, metrics: sanitizeHouseholdBodyMetrics(snapshot?.metrics, captureTask) };
   });
   if (new Set(snapshots.map((snapshot) => snapshot.captureTask)).size !== snapshots.length) throw Object.assign(new Error('姿态任务不能重复'), { status: 400, code: 'SNAPSHOT_DUPLICATE' });
   // The client may preview a level, but it cannot choose the persisted health
   // state. Re-score the normalized evidence on the server so a forged red/green
   // value or stale native implementation cannot bypass the publication gate.
   const ageMonths = ageMonthsFromBirthDate(student.birth_date);
-  const bodyReport = scoreBodyAssessment({ heightCm: height, weightKg: weight, ageMonths, gender: student.gender, snapshots });
+  const candidateBodyReport = scoreBodyAssessment({ heightCm: height, weightKg: weight, ageMonths, gender: student.gender, snapshots });
+  const screeningDecision = decideBodyScreening({ snapshots, postureReport: candidateBodyReport.postureReport });
+  const bodyReport = publicationSafeBodyReport(candidateBodyReport);
   const { bmi, postureReport, overallLevel } = bodyReport;
   const client = await pool.connect();
   try {
@@ -1395,11 +1058,26 @@ async function bodyAssessmentForUser(user, studentId, input, req) {
       await client.query(`INSERT INTO posture_snapshots(body_assessment_id,capture_task,sample_count,confidence,metrics_json)
         VALUES($1,$2,$3,$4,$5) ON CONFLICT(body_assessment_id,capture_task) DO UPDATE SET sample_count=EXCLUDED.sample_count,confidence=EXCLUDED.confidence,metrics_json=EXCLUDED.metrics_json`, [assessment.rows[0].id, snapshot.captureTask, Number(snapshot.sampleCount || 0), Number(snapshot.confidence || 0), snapshot.metrics || {}]);
     }
+    const firstTrace = snapshots[0]?.metrics || {};
+    const sessionStatus = screeningDecision.route === 'auto_archive' ? 'auto_archived' : screeningDecision.route;
+    const screeningSession = await client.query(`INSERT INTO body_screening_sessions(student_id,guardian_user_id,consent_id,body_assessment_id,status,protocol_version,model_version,threshold_version,decision_policy_version,device_model,camera_lens,completed_at)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now()) RETURNING id,status,version,completed_at AS "completedAt"`, [studentId, user.id, consentRecord?.consent_id || null, assessment.rows[0].id, sessionStatus, String(firstTrace.captureProtocolVersion || 'unknown').slice(0, 120), POSTURE_ALGORITHM_VERSION, String(candidateBodyReport.postureReport?.rulesSourceVersion || 'unknown').slice(0, 120), BODY_SCREENING_DECISION_POLICY_VERSION, String(input.data?.deviceModel || '').slice(0, 120) || null, String(firstTrace.cameraFacing || '').slice(0, 60) || null]);
+    for (const snapshot of snapshots) {
+      const metrics = snapshot.metrics || {};
+      const attemptCount = Math.max(1, Math.min(10, Number(metrics.captureAttemptCount || 1)));
+      await client.query(`INSERT INTO body_screening_attempts(session_id,capture_task,attempt_number,attempt_count,sample_count,confidence,quality_score,quality_events_json,metrics_json,repeatability_difference)
+        VALUES($1,$2,$3,$3,$4,$5,$6,$7,$8,$9)`, [screeningSession.rows[0].id, snapshot.captureTask, attemptCount, snapshot.sampleCount, snapshot.confidence, candidateBodyReport.postureReport?.qualityScore ?? null, JSON.stringify(Array.isArray(metrics.qualityChecks) ? metrics.qualityChecks : []), metrics, Number.isFinite(Number(metrics.repeatabilityMaximumDifference)) ? Number(metrics.repeatabilityMaximumDifference) : null]);
+    }
+    const decisionRow = await client.query(`INSERT INTO body_screening_decisions(session_id,route,outcome_level,reason_codes,model_confidence,model_uncertainty,quality_score,review_required,policy_version)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id,route,outcome_level AS "outcomeLevel",reason_codes AS "reasonCodes",model_confidence AS "modelConfidence",model_uncertainty AS "modelUncertainty",quality_score AS "qualityScore",review_required AS "reviewRequired",policy_version AS "decisionPolicyVersion",version,decided_at AS "decidedAt"`, [screeningSession.rows[0].id, screeningDecision.route, screeningDecision.outcomeLevel, JSON.stringify(screeningDecision.reasonCodes), null, candidateBodyReport.postureReport?.validationStatus === 'human-validated' ? 0 : 1, candidateBodyReport.postureReport?.qualityScore ?? null, screeningDecision.reviewRequired, screeningDecision.decisionPolicyVersion]);
+    if (screeningDecision.reviewRequired) await client.query(`INSERT INTO body_screening_reviews(session_id,status) VALUES($1,'pending')`, [screeningSession.rows[0].id]);
     await client.query('COMMIT');
-    await audit(user, req, 'body_assessment.create', 'body_assessment', assessment.rows[0].id, null, { studentId, bmi, overallLevel }, student.school_id);
-    return { ...assessment.rows[0], heightCm: Number(assessment.rows[0].height_cm), weightKg: Number(assessment.rows[0].weight_kg), bmi: Number(assessment.rows[0].bmi), snapshots, ...bodyReport };
+    await audit(user, req, 'body_assessment.create', 'body_assessment', assessment.rows[0].id, null, { studentId, bmi, overallLevel, screeningRoute: screeningDecision.route }, student.school_id);
+    return { ...assessment.rows[0], heightCm: Number(assessment.rows[0].height_cm), weightKg: Number(assessment.rows[0].weight_kg), bmi: Number(assessment.rows[0].bmi), snapshots, ...bodyReport, screeningSession: screeningSession.rows[0], screeningDecision: decisionRow.rows[0] };
   } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
 }
+
+configureFieldSessionService({ publishFieldUpdate, audit });
 
 async function handle(req, res) {
   const startedAt = Date.now();
@@ -1427,13 +1105,33 @@ async function handle(req, res) {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(html);
     }
-    if (req.method === 'GET' && ['/admin.css', '/admin.js', '/admin-enhancements.js', '/content-operations.css', '/content-operations.js', '/commercial-polish.css'].includes(url.pathname)) {
+    if (req.method === 'GET' && ['/admin.css', '/admin.js', '/field-operations-policy.js', '/admin-enhancements.js', '/admin-workspaces.js', '/content-operations.css', '/content-operations.js', '/commercial-polish.css'].includes(url.pathname)) {
       const assetName = url.pathname.slice(1);
       const asset = await fs.readFile(new URL(`../public/${assetName}`, import.meta.url));
       const contentType = assetName.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/javascript; charset=utf-8';
       res.setHeader('Cache-Control', 'no-cache');
       res.writeHead(200, { 'Content-Type': contentType });
       return res.end(asset);
+    }
+    if (req.method === 'GET' && url.pathname === '/v1/public/field-client-release') return ok(res, await fieldClientRelease());
+    if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === `/downloads/${fieldClientArchiveName}`) {
+      const release = await fieldClientRelease();
+      if (!release.available) return fail(res, 404, 'FIELD_CLIENT_RELEASE_NOT_FOUND', 'Windows 场地端安装包尚未生成');
+      res.writeHead(200, {
+        'Content-Type': 'application/zip',
+        'Content-Length': String(release.sizeBytes),
+        'Content-Disposition': `attachment; filename="${fieldClientArchiveName}"`,
+        'Cache-Control': 'private, no-cache',
+        'X-Checksum-Sha256': release.sha256
+      });
+      if (req.method === 'HEAD') return res.end();
+      const stream = createReadStream(fieldClientArchivePath);
+      stream.once('error', (error) => {
+        logger.error('field_client.download_failed', { requestId: requestId(req), error: error.message });
+        res.destroy(error);
+      });
+      stream.pipe(res);
+      return;
     }
     if (req.method === 'GET' && url.pathname === '/favicon.ico') return send(res, 204, null);
     if (req.method === 'GET' && url.pathname === '/metrics') {
@@ -1695,7 +1393,7 @@ async function handle(req, res) {
       publishFieldUpdate, ok, fieldBootstrap, queryValue, safeFileName,
       allowedContentTypes, maxUploadBytes, crypto, path, created, rawBody,
       fileSignatureMatches, storage, sha256, transitionFieldQueue,
-      openFieldSession, appendFieldSessionEvents, accepted, completeFieldSession,
+      openFieldSession, appendFieldSessionEvents, accepted, completeFieldSession, abortFieldSession,
       fieldInputString, requestBodyHash, recordMetric, logger, requestId, fieldIsoDate
     });
     if (fieldDeviceResult !== false) return fieldDeviceResult;
@@ -1796,11 +1494,11 @@ async function handle(req, res) {
       req, res, user, url, parts, hasRole, fail, fieldInputString, queryValue,
       schoolAllowed, corsOrigin, fieldStreamSubscribers, writeFieldStream, query,
       ok, body, beginIdempotentRequest, requestBodyHash, fieldObject, audit,
-      createdIdempotently, fieldReadiness, randomToken, sha256,
+      createdIdempotently, fieldReadiness: evaluateFieldReadiness, randomToken, sha256,
       encryptFieldDeviceSigningSecret, fieldDeviceSigningEncryptionKey,
       fieldDeviceKeyExpiresAt, created, pool, teacherOnly, teacherClassIds,
-      pagination, normalizeScoreRows, rebalanceFieldQueue, okIdempotently,
-      publishFieldUpdate, transitionFieldQueue, fieldIsoDate
+      pagination, normalizeScoreRows, ensureFieldQueue, rebalanceFieldQueue, okIdempotently,
+      publishFieldUpdate, transitionFieldQueue, fieldIsoDate, normalizeStationItemCode, stationTaskCompatibility
     });
     if (fieldAdminResult !== false) return fieldAdminResult;
     if (req.method === 'POST' && url.pathname === '/v1/auth/password') {
@@ -1892,18 +1590,53 @@ async function handle(req, res) {
       const schoolId = queryValue(url, 'schoolId') || user.roles.find((role) => role.school_id)?.school_id || null;
       if (!schoolId || !schoolAllowed(user, schoolId)) return fail(res, 403, 'NO_PERMISSION', '无权访问该学校');
       const scopedUser = `EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id = x.user_id AND ur.school_id = $1)`;
-      const [reviews, bodyAssessments, activities, appointments, courses, support, privacy, auditToday] = await Promise.all([
-        query(`SELECT COUNT(*)::int AS count FROM assessment_scores x WHERE x.review_status='pendingReview' AND EXISTS (SELECT 1 FROM students st WHERE st.id=x.student_id AND st.school_id=$1)`, [schoolId]),
+      const fieldAttentionPredicate = `(session.status IN ('needs_review','aborted','sync_conflict') OR (session.status IN ('created','checked_in','testing') AND (session.edge_device_id IS NULL OR field_device.id IS NULL OR field_device.status<>'online' OR field_device.last_heartbeat_at IS NULL OR field_device.last_heartbeat_at<now()-interval '90 seconds' OR field_device.control_state='stopped')) OR (session.status='completed' AND NOT EXISTS (SELECT 1 FROM session_evidence evidence WHERE evidence.session_id=session.id)))`;
+      const [reviews, reports, fieldSessions, retests, completionAnomalies, syncConflicts, bodyAssessments, activities, appointments, courses, support, privacy, auditToday, fieldQueue, fieldDevices] = await Promise.all([
+        query(`SELECT COUNT(*)::int AS count FROM assessment_scores x WHERE x.review_status='pendingReview' AND x.session_id IS NULL AND EXISTS (SELECT 1 FROM students st WHERE st.id=x.student_id AND st.school_id=$1)`, [schoolId]),
+        query(`SELECT COUNT(*)::int AS count FROM diagnosis_reports report JOIN students st ON st.id=report.student_id WHERE st.school_id=$1 AND report.risk_level IN ('high','attention','unavailable') AND report.status IS DISTINCT FROM 'published'`, [schoolId]),
+        query(`SELECT COUNT(*)::int AS count FROM test_sessions session LEFT JOIN test_devices field_device ON field_device.id=session.edge_device_id WHERE session.school_id=$1 AND ${fieldAttentionPredicate}`, [schoolId]),
+        query(`SELECT COUNT(*)::int AS count FROM task_students ts JOIN assessment_tasks t ON t.id=ts.task_id WHERE t.school_id=$1 AND t.status='published' AND ts.status='待补测'`, [schoolId]),
+        query(`SELECT COUNT(*)::int AS count FROM task_students ts JOIN assessment_tasks t ON t.id=ts.task_id WHERE t.school_id=$1 AND t.status IN ('published','closed') AND ts.status='已完成' AND NOT ${validTaskCompletionPredicate('ts', 't')}`, [schoolId]),
+        query(`SELECT COUNT(*)::int AS count FROM field_sync_batches batch JOIN test_devices device ON device.id=batch.device_id WHERE device.school_id=$1 AND batch.status='failed' AND batch.resolution_status='open'`, [schoolId]),
         query(`SELECT COUNT(*)::int AS count FROM body_assessments x JOIN students st ON st.id=x.student_id WHERE st.school_id=$1 AND x.measured_at >= now()-interval '30 days'`, [schoolId]),
         query(`SELECT COUNT(*)::int AS count FROM activity_registrations x WHERE x.status='pending' AND ${scopedUser}`, [schoolId]),
         query(`SELECT COUNT(*)::int AS count FROM expert_appointments x WHERE x.status='pending' AND ${scopedUser}`, [schoolId]),
         query(`SELECT COUNT(*)::int AS count FROM course_uploads x WHERE x.status='pending' AND ${scopedUser}`, [schoolId]),
         query(`SELECT COUNT(*)::int AS count FROM support_messages x WHERE x.status IN ('open','pending') AND ${scopedUser}`, [schoolId]),
         query(`SELECT COUNT(*)::int AS count FROM privacy_requests x JOIN students st ON st.id=x.student_id WHERE x.status IN ('pending','approved','processing') AND st.school_id=$1`, [schoolId]),
-        query(`SELECT COUNT(*)::int AS count FROM audit_logs WHERE school_id=$1 AND created_at >= now()-interval '24 hours'`, [schoolId])
+        query(`SELECT COUNT(*)::int AS count FROM audit_logs WHERE school_id=$1 AND created_at >= now()-interval '24 hours'`, [schoolId]),
+        query(`WITH published_tasks AS (
+            SELECT t.id,t.title,t.test_date FROM assessment_tasks t WHERE t.school_id=$1 AND t.status='published'
+          ), selected_task AS (
+            SELECT t.id,t.title,t.test_date FROM assessment_tasks t WHERE t.school_id=$1 AND t.status='published'
+            ORDER BY ${operationalTaskOrder('t')},t.created_at DESC LIMIT 1
+          )
+          SELECT (SELECT COUNT(*)::int FROM published_tasks) AS "publishedTaskCount",
+            (SELECT id FROM selected_task) AS "selectedTaskId",
+            (SELECT title FROM selected_task) AS "selectedTaskTitle",
+            (SELECT test_date::text FROM selected_task) AS "selectedTaskDate",
+            COUNT(q.id) FILTER(WHERE q.status IN ('waiting','called','checked_in','testing','retest','paused'))::int AS "activeQueueCount",
+            COUNT(q.id) FILTER(WHERE q.status IN ('waiting','retest'))::int AS "waitingCount",
+            COUNT(q.id) FILTER(WHERE q.status='testing')::int AS "testingCount",
+            COUNT(q.id) FILTER(WHERE (q.status='called' AND q.updated_at<now()-interval '2 minutes') OR (q.status IN ('waiting','retest') AND q.updated_at<now()-interval '15 minutes'))::int AS "overdueCount"
+          FROM test_queue_entries q WHERE q.task_id=(SELECT id FROM selected_task)`, [schoolId]),
+        query(`SELECT d.id,d.device_code AS "deviceCode",d.name,d.status,d.control_state AS "controlState",d.station_id AS "stationId",d.device_type AS "deviceType",d.software_version AS "softwareVersion",d.last_heartbeat_at AS "lastHeartbeatAt",d.health_json AS health,
+          (d.signing_secret_encrypted IS NOT NULL) AS "signedRequestReady",station.name AS "stationName",station.status AS "stationStatus",cal.version AS "activeCalibrationVersion",cal.checksum_sha256 AS "activeCalibrationChecksumSha256"
+          FROM test_devices d LEFT JOIN test_stations station ON station.id=d.station_id
+          LEFT JOIN LATERAL (SELECT version,checksum_sha256 FROM station_calibrations WHERE station_id=station.id AND status='active' ORDER BY effective_at DESC LIMIT 1) cal ON TRUE
+          WHERE d.school_id=$1 AND d.device_type='edge_host' AND d.status<>'disabled' ORDER BY d.id`, [schoolId])
       ]);
       const count = (result) => Number(result.rows[0]?.count || 0);
-      return ok(res, { schoolId, updatedAt: new Date().toISOString(), pendingReviews: count(reviews), bodyAssessmentsLast30Days: count(bodyAssessments), pendingActivities: count(activities), pendingAppointments: count(appointments), pendingCourseUploads: count(courses), pendingSupportMessages: count(support), pendingPrivacyRequests: count(privacy), auditEventsLast24Hours: count(auditToday) });
+      const fieldRuntime = summarizeFieldOperations({ devices: fieldDevices.rows, queue: fieldQueue.rows[0] || {}, now: new Date(), heartbeatMaxAgeSeconds: fieldDeviceOfflineAfterSeconds });
+      return ok(res, {
+        schoolId, updatedAt: new Date().toISOString(), pendingReviews: count(reviews), pendingReports: count(reports),
+        attentionFieldSessions: count(fieldSessions), pendingRetests: count(retests),
+        completionAnomalies: count(completionAnomalies), openFieldSyncConflicts: count(syncConflicts),
+        bodyAssessmentsLast30Days: count(bodyAssessments), pendingActivities: count(activities),
+        pendingAppointments: count(appointments), pendingCourseUploads: count(courses),
+        pendingSupportMessages: count(support), pendingPrivacyRequests: count(privacy),
+        auditEventsLast24Hours: count(auditToday), fieldRuntime
+      });
     }
     if (req.method === 'GET' && url.pathname === '/v1/admin/data-retention') {
       if (!hasRole(user, 'admin')) return fail(res, 403, 'NO_PERMISSION', '只有平台管理员可以查看数据治理配置');
@@ -2178,7 +1911,7 @@ async function handle(req, res) {
       if (!schoolId && !hasRole(user, 'admin')) return fail(res, 400, 'INVALID_ARGUMENT', '请选择学校');
       const result = await query(`SELECT s.id,s.school_id AS "schoolId",s.grade_id AS "gradeId",s.region,s.poverty_area AS "povertyArea",
         s.standard_version AS "standardVersion",s.rule_config AS "ruleConfig",s.report_config AS "reportConfig",s.course_config AS "courseConfig",
-        s.effective_date AS "effectiveDate",s.status,s.created_at AS "createdAt",s.updated_at AS "updatedAt",u.name AS "createdBy"
+        s.effective_date::text AS "effectiveDate",s.status,s.created_at AS "createdAt",s.updated_at AS "updatedAt",u.name AS "createdBy"
         FROM assessment_standards s LEFT JOIN users u ON u.id=s.created_by
         WHERE ($1::text IS NULL OR s.school_id IS NULL OR s.school_id=$1) AND ($2::text IS NULL OR s.grade_id=$2)
           AND ($3::text IS NULL OR s.status=$3)
@@ -2216,7 +1949,7 @@ async function handle(req, res) {
       const result = await query(`INSERT INTO assessment_standards(school_id,grade_id,region,poverty_area,standard_version,rule_config,report_config,course_config,effective_date,status,created_by)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
         RETURNING id,school_id AS "schoolId",grade_id AS "gradeId",region,poverty_area AS "povertyArea",standard_version AS "standardVersion",
-        rule_config AS "ruleConfig",report_config AS "reportConfig",course_config AS "courseConfig",effective_date AS "effectiveDate",status,created_at AS "createdAt"`,
+        rule_config AS "ruleConfig",report_config AS "reportConfig",course_config AS "courseConfig",effective_date::text AS "effectiveDate",status,created_at AS "createdAt"`,
       [schoolId, gradeId, region, povertyArea, standardVersion, fieldObject(input.ruleConfig), fieldObject(input.reportConfig), fieldObject(input.courseConfig), standardEffectiveDate, status, user.id]);
       await audit(user, req, 'assessment_standard.create', 'assessment_standard', result.rows[0].id, null, result.rows[0], schoolId);
       return createdIdempotently(res, user, idempotency, result.rows[0]);
@@ -2236,7 +1969,7 @@ async function handle(req, res) {
       const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ id: parts[3], status: input.status }));
       if (idempotency === false) return;
       const result = await query(`UPDATE assessment_standards SET status=$1,updated_at=now() WHERE id=$2
-        RETURNING id,school_id AS "schoolId",grade_id AS "gradeId",region,poverty_area AS "povertyArea",standard_version AS "standardVersion",effective_date AS "effectiveDate",status,updated_at AS "updatedAt"`, [input.status, parts[3]]);
+        RETURNING id,school_id AS "schoolId",grade_id AS "gradeId",region,poverty_area AS "povertyArea",standard_version AS "standardVersion",effective_date::text AS "effectiveDate",status,updated_at AS "updatedAt"`, [input.status, parts[3]]);
       await audit(user, req, 'assessment_standard.status.update', 'assessment_standard', parts[3], before.rows[0], result.rows[0], before.rows[0].school_id);
       return okIdempotently(res, user, idempotency, result.rows[0]);
     }
@@ -2420,7 +2153,7 @@ async function handle(req, res) {
       const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ id: parts[3], ...input }));
       if (idempotency === false) return;
       const result = await query(`UPDATE students SET grade_id=$1,class_id=$2,period_id=COALESCE($3,period_id),student_no=$4,name=$5,gender=$6,birth_date=$7,region=$8,is_poverty_area=$9,updated_at=now() WHERE id=$10
-        RETURNING id,school_id AS "schoolId",grade_id AS "gradeId",class_id AS "classId",student_no AS "studentNo",name,gender,birth_date AS "birthDate",region,is_poverty_area AS "isPovertyArea",status`, [gradeId, classId, input.periodId || null, input.studentNo ?? current.student_no, input.name || current.name, input.gender ?? current.gender, input.birthDate ?? current.birth_date, input.region ?? current.region, input.isPovertyArea ?? current.is_poverty_area, parts[3]]);
+        RETURNING id,school_id AS "schoolId",grade_id AS "gradeId",class_id AS "classId",student_no AS "studentNo",name,gender,birth_date::text AS "birthDate",region,is_poverty_area AS "isPovertyArea",status`, [gradeId, classId, input.periodId || null, input.studentNo ?? current.student_no, input.name || current.name, input.gender ?? current.gender, input.birthDate ?? current.birth_date, input.region ?? current.region, input.isPovertyArea ?? current.is_poverty_area, parts[3]]);
       const eventType = current.grade_id !== gradeId ? 'promoted' : (current.class_id !== classId ? 'class_transfer' : 'updated');
       await query(`INSERT INTO student_lifecycle_events(student_id,event_type,from_grade_id,from_class_id,to_grade_id,to_class_id,from_status,to_status,note,operator_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [parts[3], eventType, current.grade_id, current.class_id, gradeId, classId, current.status, current.status, input.note || '后台档案维护', user.id]);
       await audit(user, req, `student.${eventType}`, 'student', parts[3], current, result.rows[0], current.school_id);
@@ -2493,7 +2226,12 @@ async function handle(req, res) {
         const classScope = await query('SELECT id,grade_id FROM classes WHERE id=$1 AND school_id=$2', [classId, current.school_id]);
         if (!classScope.rowCount || (gradeId && classScope.rows[0].grade_id !== gradeId)) return fail(res, 400, 'CLASS_SCOPE_INVALID', '班级不属于该学校或不属于所选年级');
       }
-      const result = await query(`UPDATE assessment_tasks SET title=COALESCE($1,title),test_date=COALESCE($2,test_date),location=COALESCE($3,location),grade_id=$4,class_id=$5,items=COALESCE($6,items),updated_at=now() WHERE id=$7 RETURNING id,title,test_date AS "testDate",location,grade_id AS "gradeId",class_id AS "classId",items,status`, [input.title || null, input.testDate || null, input.location === undefined ? null : input.location, gradeId, classId, Array.isArray(input.items) ? JSON.stringify(input.items) : null, parts[3]]);
+      const requestedItems = input.items === undefined ? current.items : normalizeFieldTaskItems(input.items);
+      const protocol = input.protocolId
+        ? await resolveAssessmentProtocol({ query }, { schoolId: current.school_id, protocolId: input.protocolId, testDate: input.testDate || current.test_date })
+        : input.items === undefined ? protocolSnapshotFromTask(current) : await resolveAssessmentProtocol({ query }, { schoolId: current.school_id, taskItems: requestedItems, testDate: input.testDate || current.test_date });
+      const taskItems = input.protocolId ? protocolTaskItems(protocol) : requestedItems;
+      const result = await query(`UPDATE assessment_tasks SET title=COALESCE($1,title),test_date=COALESCE($2,test_date),location=COALESCE($3,location),grade_id=$4,class_id=$5,items=$6,protocol_id=$7,protocol_version=$8,protocol_snapshot_json=$9,updated_at=now() WHERE id=$10 RETURNING id,title,test_date::text AS "testDate",location,grade_id AS "gradeId",class_id AS "classId",items,protocol_snapshot_json AS "protocolSnapshot",status`, [input.title || null, input.testDate || null, input.location === undefined ? null : input.location, gradeId, classId, JSON.stringify(taskItems), protocol.id, protocol.version, protocol, parts[3]]);
       await audit(user, req, 'task.update', 'assessment_task', parts[3], current, result.rows[0], current.school_id);
       return okIdempotently(res, user, idempotency, result.rows[0]);
     }
@@ -2506,11 +2244,102 @@ async function handle(req, res) {
       if (!current || !schoolAllowed(user, current.school_id)) return fail(res, 404, 'TASK_NOT_FOUND', '测评任务不存在或无权访问');
       if (current.status === 'closed' && input.status !== 'closed') return fail(res, 409, 'TASK_CLOSED', '已关闭任务不能重新打开');
       if (teacherOnly(user) && (!current.class_id || !teacherClassIds(user, current.school_id).includes(current.class_id))) return fail(res, 403, 'NO_PERMISSION', '教师只能管理所负责班级的任务');
-      const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ id: parts[3], status: input.status }));
+      const closing = input.status === 'closed';
+      const closeReason = closing ? String(input.reason || '').trim() : '';
+      const unfinishedAction = closing ? String(input.unfinishedAction || '').trim() : '';
+      const followUpTitle = closing ? String(input.followUpTitle || '').trim() : '';
+      const followUpDate = closing && input.followUpDate ? effectiveDate(input.followUpDate, '后续任务日期') : null;
+      if (closing && current.status !== 'closed' && (!closeReason || closeReason.length > 500)) return fail(res, 400, 'TASK_CLOSE_REASON_REQUIRED', '关闭原因必填，且不能超过 500 个字符');
+      if (closing && current.status !== 'closed' && !['close_incomplete', 'create_followup'].includes(unfinishedAction)) return fail(res, 400, 'TASK_CLOSE_ACTION_REQUIRED', '请选择未完成学生的后续处理方式');
+      if (unfinishedAction === 'create_followup' && !followUpDate) return fail(res, 400, 'TASK_CLOSE_FOLLOWUP_DATE_REQUIRED', '创建后续任务时必须填写测评日期');
+      if (followUpTitle.length > 160) return fail(res, 400, 'TASK_CLOSE_FOLLOWUP_TITLE_INVALID', '后续任务标题不能超过 160 个字符');
+      const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ id: parts[3], ...input }));
       if (idempotency === false) return;
-      const result = await query(`UPDATE assessment_tasks SET status=$1,updated_at=now() WHERE id=$2 RETURNING id,status,updated_at AS "updatedAt"`, [input.status, parts[3]]);
-      await audit(user, req, `task.status.${input.status}`, 'assessment_task', parts[3], current, result.rows[0], current.school_id);
-      return okIdempotently(res, user, idempotency, result.rows[0]);
+      if (!closing) {
+        const result = await query(`UPDATE assessment_tasks SET status=$1,updated_at=now() WHERE id=$2 RETURNING id,status,updated_at AS "updatedAt"`, [input.status, parts[3]]);
+        if (input.status === 'published') await ensureFieldQueue({ query }, { school_id: current.school_id }, parts[3]);
+        await audit(user, req, `task.status.${input.status}`, 'assessment_task', parts[3], current, result.rows[0], current.school_id);
+        return okIdempotently(res, user, idempotency, result.rows[0]);
+      }
+      if (current.status === 'closed') {
+        const summary = await query(`SELECT COUNT(*)::int AS "totalCount",COUNT(*) FILTER(WHERE ${validTaskCompletionPredicate('ts', 't')})::int AS "completedCount",
+          COUNT(*) FILTER(WHERE NOT ${validTaskCompletionPredicate('ts', 't')})::int AS "incompleteStudentCount"
+          FROM task_students ts JOIN assessment_tasks t ON t.id=ts.task_id WHERE ts.task_id=$1`, [parts[3]]);
+        return okIdempotently(res, user, idempotency, { id: parts[3], status: 'closed', alreadyClosed: true, ...summary.rows[0] });
+      }
+      const client = await pool.connect();
+      let response;
+      try {
+        await client.query('BEGIN');
+        const locked = await client.query('SELECT * FROM assessment_tasks WHERE id=$1 FOR UPDATE', [parts[3]]);
+        const lockedTask = locked.rows[0];
+        if (!lockedTask || lockedTask.status === 'closed') throw Object.assign(new Error('任务状态已变化，请刷新后重试'), { status: 409, code: 'TASK_CLOSE_STATE_CHANGED' });
+        const active = await client.query(`SELECT COUNT(DISTINCT active.student_id)::int AS count FROM (
+          SELECT student_id FROM test_sessions WHERE task_id=$1 AND status IN ('created','checked_in','testing')
+          UNION SELECT student_id FROM test_queue_entries WHERE task_id=$1 AND status='testing'
+        ) active`, [parts[3]]);
+        if (Number(active.rows[0]?.count || 0) > 0) throw Object.assign(new Error(`还有 ${active.rows[0].count} 名学生正在测试，须先完成或安全结束会话`), { status: 409, code: 'TASK_CLOSE_ACTIVE_SESSIONS' });
+        const reviews = await client.query(`SELECT COUNT(DISTINCT pending.student_id)::int AS count FROM (
+          SELECT student_id FROM test_sessions WHERE task_id=$1 AND status IN ('needs_review','sync_conflict')
+          UNION SELECT student_id FROM task_students WHERE task_id=$1 AND status='待复核'
+          UNION SELECT student_id FROM assessment_scores WHERE task_id=$1 AND review_status='pendingReview'
+        ) pending`, [parts[3]]);
+        if (Number(reviews.rows[0]?.count || 0) > 0) throw Object.assign(new Error(`还有 ${reviews.rows[0].count} 名学生存在待复核成绩或同步冲突，须先处理后再关闭`), { status: 409, code: 'TASK_CLOSE_PENDING_REVIEWS' });
+        const anomalies = await client.query(`SELECT COUNT(*)::int AS count FROM task_students ts JOIN assessment_tasks t ON t.id=ts.task_id
+          WHERE ts.task_id=$1 AND ts.status='已完成' AND NOT ${validTaskCompletionPredicate('ts', 't')}`, [parts[3]]);
+        if (Number(anomalies.rows[0]?.count || 0) > 0) throw Object.assign(new Error(`还有 ${anomalies.rows[0].count} 条完成记录缺少有效成绩，须先处理完成异常`), { status: 409, code: 'TASK_CLOSE_COMPLETION_ANOMALIES' });
+        const counts = await client.query(`SELECT COUNT(*)::int AS "totalCount",COUNT(*) FILTER(WHERE ${validTaskCompletionPredicate('ts', 't')})::int AS "completedCount",
+          COUNT(*) FILTER(WHERE NOT ${validTaskCompletionPredicate('ts', 't')})::int AS "incompleteStudentCount"
+          FROM task_students ts JOIN assessment_tasks t ON t.id=ts.task_id WHERE ts.task_id=$1`, [parts[3]]);
+        const incompleteStudentCount = Number(counts.rows[0]?.incompleteStudentCount || 0);
+        if (unfinishedAction === 'create_followup' && incompleteStudentCount === 0) throw Object.assign(new Error('当前没有未完成学生，无需创建后续任务'), { status: 409, code: 'TASK_CLOSE_FOLLOWUP_EMPTY' });
+        const closureNote = `任务关闭：${closeReason}`;
+        const cancelledQueue = await client.query(`WITH targets AS (
+            SELECT id,status AS old_status,station_id FROM test_queue_entries
+            WHERE task_id=$1 AND status IN ('waiting','called','checked_in','retest','paused') FOR UPDATE
+          ), updated AS (
+            UPDATE test_queue_entries q SET status='cancelled',note=$2,state_version=q.state_version+1,updated_at=now()
+            FROM targets target WHERE q.id=target.id RETURNING q.id,q.station_id,target.old_status
+          ) INSERT INTO queue_events(queue_entry_id,old_status,new_status,reason,actor_type,actor_id,station_id)
+            SELECT id,old_status,'cancelled',$2,$3,$4,station_id FROM updated RETURNING queue_entry_id`,
+          [parts[3], closureNote, hasRole(user, 'admin') ? 'admin' : 'teacher', user.id]);
+        const incompleteEvents = await client.query(`WITH targets AS (
+            SELECT ts.id,ts.student_id,ts.status AS old_status,ts.version AS old_version FROM task_students ts JOIN assessment_tasks t ON t.id=ts.task_id
+            WHERE ts.task_id=$1 AND NOT ${validTaskCompletionPredicate('ts', 't')} FOR UPDATE OF ts
+          ), updated AS (
+            UPDATE task_students ts SET status='未完成',note=CASE WHEN COALESCE(ts.note,'')='' THEN $2 ELSE ts.note || E'\\n' || $2 END,
+              completed_at=NULL,version=ts.version+1 FROM targets target WHERE ts.id=target.id
+            RETURNING ts.student_id,ts.version,target.old_status,target.old_version
+          ) INSERT INTO task_student_status_events(task_id,student_id,from_status,to_status,note,reason_code,operator_teacher_id,expected_version,resulting_version)
+            SELECT $1,student_id,old_status,'未完成',$2,'task_closed',$3,old_version,version FROM updated RETURNING student_id`,
+          [parts[3], closureNote, user.id]);
+        let followUpTask = null;
+        if (unfinishedAction === 'create_followup') {
+          const followUp = await client.query(`INSERT INTO assessment_tasks(school_id,title,test_date,location,grade_id,class_id,items,rule_version,protocol_id,protocol_version,protocol_snapshot_json,status,created_by)
+            VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'draft',$12)
+            RETURNING id,title,test_date::text AS "testDate",status`, [lockedTask.school_id, followUpTitle || `${lockedTask.title}（后续补测）`, followUpDate, lockedTask.location, lockedTask.grade_id, lockedTask.class_id, JSON.stringify(lockedTask.items || []), lockedTask.rule_version, lockedTask.protocol_id, lockedTask.protocol_version, lockedTask.protocol_snapshot_json, user.id]);
+          await client.query(`INSERT INTO task_students(task_id,student_id)
+            SELECT $1,student_id FROM task_students WHERE task_id=$2 AND status='未完成'`, [followUp.rows[0].id, parts[3]]);
+          followUpTask = { ...followUp.rows[0], studentCount: incompleteStudentCount };
+        }
+        const updatedTask = await client.query(`UPDATE assessment_tasks SET status='closed',updated_at=now() WHERE id=$1
+          RETURNING id,status,updated_at AS "updatedAt"`, [parts[3]]);
+        await client.query('COMMIT');
+        response = {
+          ...updatedTask.rows[0], reason: closeReason, unfinishedAction,
+          totalCount: Number(counts.rows[0]?.totalCount || 0), completedStudentCount: Number(counts.rows[0]?.completedCount || 0),
+          incompleteStudentCount: incompleteEvents.rowCount, cancelledQueueCount: cancelledQueue.rowCount,
+          followUpTask
+        };
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
+        if (error.status && error.code) return failIdempotently(req, res, error.status, error.code, error.message);
+        throw error;
+      } finally { client.release(); }
+      await audit(user, req, 'task.status.closed', 'assessment_task', parts[3], current, response, current.school_id);
+      if (response.followUpTask) await audit(user, req, 'task.followup.created', 'assessment_task', response.followUpTask.id, null, { sourceTaskId: parts[3], studentCount: response.followUpTask.studentCount }, current.school_id);
+      void publishFieldUpdate(current.school_id, 'task.closed', { taskId: parts[3], reason: closeReason, incompleteStudentCount: response.incompleteStudentCount, followUpTaskId: response.followUpTask?.id || null });
+      return okIdempotently(res, user, idempotency, response);
     }
     if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'admin' && parts[2] === 'tasks' && parts[4] === 'sync-students') {
       if (!hasRole(user, 'admin', 'principal', 'teacher')) return fail(res, 403, 'NO_PERMISSION', '无权同步测评名单');
@@ -2522,6 +2351,7 @@ async function handle(req, res) {
       const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ taskId: parts[3], action: 'sync-students' }));
       if (idempotency === false) return;
       const result = await query(`INSERT INTO task_students(task_id,student_id) SELECT $1,st.id FROM students st WHERE st.school_id=$2 AND st.status='active' AND ($3::text IS NULL OR st.grade_id=$3) AND ($4::text IS NULL OR st.class_id=$4) ON CONFLICT(task_id,student_id) DO NOTHING`, [parts[3], current.school_id, current.grade_id, current.class_id]);
+      if (current.status === 'published') await ensureFieldQueue({ query }, { school_id: current.school_id }, parts[3]);
       await query('UPDATE assessment_tasks SET updated_at=now() WHERE id=$1', [parts[3]]);
       await audit(user, req, 'task.students.sync', 'assessment_task', parts[3], null, { addedCount: result.rowCount }, current.school_id);
       return okIdempotently(res, user, idempotency, { addedCount: result.rowCount });
@@ -2535,8 +2365,8 @@ async function handle(req, res) {
       if (teacherOnly(user) && (!current.class_id || !teacherClassIds(user, current.school_id).includes(current.class_id))) return fail(res, 403, 'NO_PERMISSION', '教师只能复制所负责班级的测评任务');
       const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ sourceTaskId: parts[3], ...input }));
       if (idempotency === false) return;
-      const result = await query(`INSERT INTO assessment_tasks(school_id,title,test_date,location,grade_id,class_id,items,rule_version,status,created_by)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,'draft',$9) RETURNING id,title,status,grade_id AS "gradeId",class_id AS "classId"`, [current.school_id, input.title || `${current.title}（副本）`, input.testDate || current.test_date, input.location ?? current.location, current.grade_id, current.class_id, current.items, current.rule_version, user.id]);
+      const result = await query(`INSERT INTO assessment_tasks(school_id,title,test_date,location,grade_id,class_id,items,rule_version,protocol_id,protocol_version,protocol_snapshot_json,status,created_by)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'draft',$12) RETURNING id,title,status,grade_id AS "gradeId",class_id AS "classId"`, [current.school_id, input.title || `${current.title}（副本）`, input.testDate || current.test_date, input.location ?? current.location, current.grade_id, current.class_id, current.items, current.rule_version, current.protocol_id, current.protocol_version, current.protocol_snapshot_json, user.id]);
       await query(`INSERT INTO task_students(task_id,student_id) SELECT $1,student_id FROM task_students WHERE task_id=$2`, [result.rows[0].id, current.id]);
       await audit(user, req, 'task.clone', 'assessment_task', result.rows[0].id, null, { sourceTaskId: current.id }, current.school_id);
       return createdIdempotently(res, user, idempotency, result.rows[0]);
@@ -2545,10 +2375,10 @@ async function handle(req, res) {
       const schoolId = parts[2];
       if (!schoolStaffAllowed(user, schoolId)) return fail(res, 403, 'NO_PERMISSION', '只有学校工作人员可以查看统计');
       const scopedClasses = teacherOnly(user) ? teacherClassIds(user, schoolId) : null;
-      const result = await query(`WITH active_task AS (SELECT id FROM assessment_tasks WHERE school_id=$1 ORDER BY test_date DESC, created_at DESC LIMIT 1)
+      const result = await query(`WITH active_task AS (SELECT id,items FROM assessment_tasks WHERE school_id=$1 AND status='published' ORDER BY ${operationalTaskOrder()},created_at DESC LIMIT 1)
         SELECT g.id,g.name,g.standard_version AS "standardVersion",COUNT(st.id)::int AS "studentCount",
-        COUNT(*) FILTER(WHERE ts.status='已完成')::int AS "completedCount",
-        COALESCE(ROUND(100.0*COUNT(*) FILTER(WHERE ts.status='已完成')/NULLIF(COUNT(st.id),0)),0)::int AS "completionRate"
+        COUNT(*) FILTER(WHERE ${validTaskCompletionPredicate('ts', 'at')})::int AS "completedCount",
+        COALESCE(ROUND(100.0*COUNT(*) FILTER(WHERE ${validTaskCompletionPredicate('ts', 'at')})/NULLIF(COUNT(st.id),0)),0)::int AS "completionRate"
         FROM grades g LEFT JOIN students st ON st.grade_id=g.id AND st.status='active'
         LEFT JOIN active_task at ON true
         LEFT JOIN task_students ts ON ts.student_id=st.id AND ts.task_id=at.id
@@ -2560,9 +2390,9 @@ async function handle(req, res) {
       if (!schoolStaffAllowed(user, schoolId)) return fail(res, 403, 'NO_PERMISSION', '只有学校工作人员可以查看统计');
       const gradeId = queryValue(url, 'gradeId') || null;
       const scopedClasses = teacherOnly(user) ? teacherClassIds(user, schoolId) : null;
-      const result = await query(`WITH active_task AS (SELECT id FROM assessment_tasks WHERE school_id=$1 ORDER BY test_date DESC, created_at DESC LIMIT 1)
+      const result = await query(`WITH active_task AS (SELECT id,items FROM assessment_tasks WHERE school_id=$1 AND status='published' ORDER BY ${operationalTaskOrder()},created_at DESC LIMIT 1)
         SELECT c.id,c.name,c.grade_id AS "gradeId",COALESCE(u.name,'未分配') AS "teacherName",COUNT(st.id)::int AS "studentCount",
-        COALESCE(ROUND(100.0*COUNT(*) FILTER(WHERE ts.status='已完成')/NULLIF(COUNT(st.id),0)),0)::int AS "completionRate"
+        COALESCE(ROUND(100.0*COUNT(*) FILTER(WHERE ${validTaskCompletionPredicate('ts', 'at')})/NULLIF(COUNT(st.id),0)),0)::int AS "completionRate"
         FROM classes c LEFT JOIN users u ON u.id=c.teacher_id LEFT JOIN students st ON st.class_id=c.id AND st.status='active'
         LEFT JOIN active_task at ON true
         LEFT JOIN task_students ts ON ts.student_id=st.id AND ts.task_id=at.id
@@ -2608,13 +2438,17 @@ async function handle(req, res) {
       }
       const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash(input));
       if (idempotency === false) return;
+      const requestedItems = normalizeFieldTaskItems(input.items);
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
-        const task = await client.query(`INSERT INTO assessment_tasks(school_id,title,test_date,location,grade_id,class_id,items,rule_version,status,created_by)
-          VALUES($1,$2,$3,$4,$5,$6,$7,$8,'published',$9) RETURNING id`, [input.schoolId, input.title, input.testDate, input.location || '', input.gradeId || null, input.classId || null, JSON.stringify(input.items || []), input.ruleVersion || '运动能力标准 v1.0', user.id]);
+        const protocol = await resolveAssessmentProtocol(client, { schoolId: input.schoolId, protocolId: input.protocolId || null, taskItems: requestedItems, testDate: input.testDate });
+        const taskItems = input.protocolId ? protocolTaskItems(protocol) : requestedItems;
+        const task = await client.query(`INSERT INTO assessment_tasks(school_id,title,test_date,location,grade_id,class_id,items,rule_version,protocol_id,protocol_version,protocol_snapshot_json,status,created_by)
+          VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'published',$12) RETURNING id`, [input.schoolId, input.title, input.testDate, input.location || '', input.gradeId || null, input.classId || null, JSON.stringify(taskItems), input.ruleVersion || '运动能力标准 v1.0', protocol.id, protocol.version, protocol, user.id]);
         const students = await client.query(`SELECT id FROM students WHERE school_id=$1 AND status='active' AND ($2::text IS NULL OR grade_id=$2) AND ($3::text IS NULL OR class_id=$3)`, [input.schoolId, input.gradeId || null, input.classId || null]);
         for (const student of students.rows) await client.query(`INSERT INTO task_students(task_id,student_id) VALUES($1,$2) ON CONFLICT DO NOTHING`, [task.rows[0].id, student.id]);
+        await ensureFieldQueue(client, { school_id: input.schoolId }, task.rows[0].id);
         await client.query('COMMIT');
         await audit(user, req, 'task.create', 'assessment_task', task.rows[0].id, null, input, input.schoolId);
         return createdIdempotently(res, user, idempotency, { id: task.rows[0].id, studentCount: students.rowCount });
@@ -2639,10 +2473,51 @@ async function handle(req, res) {
       if (!schoolId || !schoolAllowed(user, schoolId)) return fail(res, 403, 'NO_PERMISSION', '无权访问该学校');
       const type = queryValue(url, 'type') || 'all';
       const items = [];
+      const safeTaskItems = `CASE WHEN jsonb_typeof(t.items)='array' THEN t.items ELSE '[]'::jsonb END`;
       if (type === 'all' || type === 'reviews') {
-        const result = await query(`SELECT s.id,s.review_status AS status,'reviews' AS type,s.item_code AS title,st.name AS "studentName",c.name AS "className",s.created_at AS "createdAt",s.confidence,t.title AS "taskTitle"
+        const result = await query(`SELECT s.id,s.review_status AS status,'reviews' AS type,s.item_code AS title,st.name AS "studentName",c.name AS "className",s.created_at AS "createdAt",s.confidence,t.title AS "taskTitle",s.session_id AS "sessionId"
           FROM assessment_scores s JOIN assessment_tasks t ON t.id=s.task_id JOIN students st ON st.id=s.student_id JOIN classes c ON c.id=st.class_id
-          WHERE s.review_status='pendingReview' AND st.school_id=$1 ORDER BY s.created_at DESC LIMIT 100`, [schoolId]);
+          WHERE s.review_status='pendingReview' AND s.session_id IS NULL AND st.school_id=$1 ORDER BY s.created_at DESC LIMIT 100`, [schoolId]);
+        items.push(...result.rows);
+      }
+      if (type === 'all' || type === 'reports') {
+        const result = await query(`SELECT report.id,report.status,'reports' AS type,report.risk_level AS "riskLevel",report.generated_at AS "createdAt",report.task_id AS "taskId",st.name AS "studentName",c.name AS "className",t.title AS "taskTitle"
+          FROM diagnosis_reports report JOIN students st ON st.id=report.student_id JOIN classes c ON c.id=st.class_id LEFT JOIN assessment_tasks t ON t.id=report.task_id
+          WHERE st.school_id=$1 AND report.risk_level IN ('high','attention','unavailable') AND report.status IS DISTINCT FROM 'published'
+          ORDER BY report.generated_at DESC LIMIT 100`, [schoolId]);
+        items.push(...result.rows);
+      }
+      if (type === 'all' || type === 'fieldSessions') {
+        const result = await query(`SELECT session.id,'fieldSessions' AS type,session.id AS "sessionId",session.status,st.name AS "studentName",st.student_no AS "studentNo",c.name AS "className",t.title AS "taskTitle",session.created_at AS "createdAt",
+          (session.status IN ('created','checked_in','testing') AND (session.edge_device_id IS NULL OR field_device.id IS NULL OR field_device.status<>'online' OR field_device.last_heartbeat_at IS NULL OR field_device.last_heartbeat_at<now()-interval '90 seconds' OR field_device.control_state='stopped')) AS "recoveryEligible",
+          (SELECT COUNT(*)::int FROM session_evidence evidence WHERE evidence.session_id=session.id AND evidence.purged_at IS NULL) AS "evidenceCount"
+          FROM test_sessions session JOIN assessment_tasks t ON t.id=session.task_id JOIN students st ON st.id=session.student_id JOIN classes c ON c.id=st.class_id LEFT JOIN test_devices field_device ON field_device.id=session.edge_device_id
+          WHERE session.school_id=$1 AND (session.status IN ('needs_review','aborted','sync_conflict') OR (session.status IN ('created','checked_in','testing') AND (session.edge_device_id IS NULL OR field_device.id IS NULL OR field_device.status<>'online' OR field_device.last_heartbeat_at IS NULL OR field_device.last_heartbeat_at<now()-interval '90 seconds' OR field_device.control_state='stopped')) OR (session.status='completed' AND NOT EXISTS (SELECT 1 FROM session_evidence evidence WHERE evidence.session_id=session.id)))
+          ORDER BY session.created_at DESC LIMIT 100`, [schoolId]);
+        items.push(...result.rows);
+      }
+      if (type === 'all' || type === 'retests') {
+        const result = await query(`SELECT ts.id,'retests' AS type,ts.status,ts.task_id AS "taskId",ts.student_id AS "studentId",st.name AS "studentName",st.student_no AS "studentNo",c.name AS "className",t.title AS "taskTitle",COALESCE(ts.completed_at,ts.created_at) AS "createdAt",
+          queue.id AS "queueEntryId",queue.status AS "queueStatus",queue.retest_count AS "retestCount",station.station_code AS "stationCode",ts.note
+          FROM task_students ts JOIN assessment_tasks t ON t.id=ts.task_id JOIN students st ON st.id=ts.student_id JOIN classes c ON c.id=st.class_id
+          LEFT JOIN test_queue_entries queue ON queue.task_id=ts.task_id AND queue.student_id=ts.student_id LEFT JOIN test_stations station ON station.id=queue.station_id
+          WHERE t.school_id=$1 AND t.status='published' AND ts.status='待补测' ORDER BY COALESCE(ts.completed_at,ts.created_at) DESC LIMIT 100`, [schoolId]);
+        items.push(...result.rows);
+      }
+      if (type === 'all' || type === 'completionAnomalies') {
+        const result = await query(`SELECT ts.id,'completionAnomalies' AS type,ts.status,ts.task_id AS "taskId",ts.student_id AS "studentId",st.name AS "studentName",st.student_no AS "studentNo",c.name AS "className",t.title AS "taskTitle",COALESCE(ts.completed_at,ts.created_at) AS "createdAt",
+          jsonb_array_length(${safeTaskItems})::int AS "requiredItemCount",
+          (SELECT COUNT(DISTINCT score.item_code)::int FROM assessment_scores score WHERE score.task_id=ts.task_id AND score.student_id=ts.student_id AND score.item_code IN (SELECT jsonb_array_elements_text(${safeTaskItems}))) AS "measuredItemCount",
+          (SELECT COUNT(*)::int FROM assessment_scores score WHERE score.task_id=ts.task_id AND score.student_id=ts.student_id AND score.review_status='pendingReview' AND score.item_code IN (SELECT jsonb_array_elements_text(${safeTaskItems}))) AS "pendingReviewCount"
+          FROM task_students ts JOIN assessment_tasks t ON t.id=ts.task_id JOIN students st ON st.id=ts.student_id JOIN classes c ON c.id=st.class_id
+          WHERE t.school_id=$1 AND t.status IN ('published','closed') AND ts.status='已完成' AND NOT ${validTaskCompletionPredicate('ts', 't')}
+          ORDER BY COALESCE(ts.completed_at,ts.created_at) DESC LIMIT 100`, [schoolId]);
+        items.push(...result.rows);
+      }
+      if (type === 'all' || type === 'syncConflicts') {
+        const result = await query(`SELECT batch.id,'syncConflicts' AS type,batch.resolution_status AS status,batch.client_batch_id AS "clientBatchId",batch.completed_at AS "createdAt",device.name AS "deviceName",device.device_code AS "deviceCode",station.station_code AS "stationCode",batch.response_json->>'message' AS message
+          FROM field_sync_batches batch JOIN test_devices device ON device.id=batch.device_id LEFT JOIN test_stations station ON station.id=device.station_id
+          WHERE device.school_id=$1 AND batch.status='failed' AND batch.resolution_status='open' ORDER BY batch.completed_at DESC LIMIT 100`, [schoolId]);
         items.push(...result.rows);
       }
       if (type === 'all' || type === 'activities') {
@@ -2692,6 +2567,7 @@ async function handle(req, res) {
       const row = resource?.rows[0];
       const schoolId = row?.school_id || row?.schoolId || null;
       if (!row || (schoolId && !schoolAllowed(user, schoolId))) return fail(res, 404, 'OPERATION_NOT_FOUND', '运营事项不存在或无权访问');
+      if (type === 'reviews' && row.session_id) return fail(res, 409, 'FIELD_SESSION_REVIEW_REQUIRED', '场地成绩必须在现场会话中结合证据复核');
       const anonymizationRequest = type === 'privacy' && ['delete', 'anonymize'].includes(row.request_type);
       if (anonymizationRequest && input.status === 'completed' && !hasRole(user, 'admin')) return fail(res, 403, 'PRIVACY_DELETE_ADMIN_REQUIRED', '删除申请必须由平台管理员最终确认');
       const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ type, id, status: input.status, note: input.note || '' }));
@@ -2834,7 +2710,12 @@ async function handle(req, res) {
         : null;
       const measuredAt = row.measuredAt instanceof Date ? row.measuredAt : new Date(row.measuredAt);
       const ageAtMeasurement = storedAge ?? ageMonthsFromBirthDate(student.birth_date, measuredAt);
-      const bodyReport = scoreBodyAssessment({ heightCm: row.heightCm, weightKg: row.weightKg, ageMonths: ageAtMeasurement, gender: student.gender, snapshots: row.snapshots || [] });
+      const bodyReport = publicationSafeBodyReport(scoreBodyAssessment({ heightCm: row.heightCm, weightKg: row.weightKg, ageMonths: ageAtMeasurement, gender: student.gender, snapshots: row.snapshots || [] }));
+      const screening = await query(`SELECT s.id AS "sessionId",s.status,s.version,d.id AS "decisionId",d.route,d.outcome_level AS "outcomeLevel",d.reason_codes AS "reasonCodes",d.model_confidence::float8 AS "modelConfidence",d.model_uncertainty::float8 AS "modelUncertainty",d.quality_score AS "qualityScore",d.review_required AS "reviewRequired",d.policy_version AS "decisionPolicyVersion",d.decided_at AS "decidedAt",
+        r.status AS "reviewStatus",r.decision AS "reviewDecision",r.comment AS "reviewComment",COALESCE(r.requested_recapture_tasks,'[]'::jsonb) AS "requestedRecaptureTasks",r.version AS "reviewVersion",r.reviewed_at AS "reviewedAt"
+        FROM body_screening_sessions s JOIN body_screening_decisions d ON d.session_id=s.id
+        LEFT JOIN LATERAL (SELECT br.status,br.decision,br.comment,br.requested_recapture_tasks,br.version,br.reviewed_at FROM body_screening_reviews br WHERE br.session_id=s.id ORDER BY br.created_at DESC LIMIT 1) r ON true
+        WHERE s.body_assessment_id=$1`, [row.id]);
       return ok(res, {
         ...row,
         heightCm: Number(row.heightCm),
@@ -2843,8 +2724,63 @@ async function handle(req, res) {
         overallLevel: bodyReport.overallLevel,
         algorithmVersion: POSTURE_ALGORITHM_VERSION,
         snapshots: row.snapshots || [],
-        ...bodyReport
+        ...bodyReport,
+        screeningDecision: screening.rows[0] || null
       });
+    }
+    if (req.method === 'GET' && parts[0] === 'v1' && parts[1] === 'body-screening' && parts[2] === 'reviews') {
+      const schoolId = String(url.searchParams.get('schoolId') || '');
+      if (!schoolId || !schoolStaffAllowed(user, schoolId) || !await userHasCapability(user, 'REVIEW_RESULT', schoolId)) return fail(res, 403, 'NO_PERMISSION', '没有该学校身体筛查复核权限');
+      const classIds = teacherOnly(user) ? teacherClassIds(user, schoolId) : [];
+      const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || 30)));
+      const result = await query(`SELECT r.id AS "reviewId",r.session_id AS "sessionId",r.status,r.version,r.created_at AS "createdAt",s.student_id AS "studentId",st.class_id AS "classId",concat(left(st.name,1),'同学') AS "studentDisplayName",d.route,d.outcome_level AS "outcomeLevel",d.reason_codes AS "reasonCodes",d.quality_score AS "qualityScore",d.model_confidence::float8 AS "modelConfidence",d.model_uncertainty::float8 AS "modelUncertainty",d.decided_at AS "decidedAt",s.protocol_version AS "protocolVersion",s.model_version AS "modelVersion",s.threshold_version AS "thresholdVersion",ba.measured_at AS "measuredAt",
+        COALESCE((SELECT jsonb_agg(jsonb_build_object('captureTask',a.capture_task,'attemptCount',a.attempt_count,'sampleCount',a.sample_count,'confidence',a.confidence::float8,'qualityScore',a.quality_score,'qualityEvents',a.quality_events_json,'repeatabilityDifference',a.repeatability_difference::float8,'capturedAt',a.captured_at,'metrics',a.metrics_json) ORDER BY a.capture_task) FROM body_screening_attempts a WHERE a.session_id=s.id),'[]'::jsonb) AS attempts
+        FROM body_screening_reviews r JOIN body_screening_sessions s ON s.id=r.session_id JOIN students st ON st.id=s.student_id JOIN body_screening_decisions d ON d.session_id=s.id LEFT JOIN body_assessments ba ON ba.id=s.body_assessment_id
+        WHERE st.school_id=$1 AND r.status IN ('pending','in_review') AND ($2::text[] IS NULL OR st.class_id=ANY($2::text[])) ORDER BY r.created_at ASC LIMIT $3`, [schoolId, teacherOnly(user) ? classIds : null, limit]);
+      const reviews = result.rows.map((row) => ({
+        ...row,
+        attempts: (Array.isArray(row.attempts) ? row.attempts : []).map(({ metrics, ...attempt }) => ({
+          ...attempt,
+          evidenceMetrics: bodyScreeningEvidenceMetrics(metrics, attempt.captureTask)
+        }))
+      }));
+      return ok(res, reviews);
+    }
+    if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'body-screening' && parts[2] === 'reviews' && parts[4] === 'decision') {
+      const input = await body(req);
+      const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash(input));
+      if (idempotency === false) return;
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const found = await client.query(`SELECT r.*,s.student_id,s.guardian_user_id,st.school_id,st.class_id FROM body_screening_reviews r JOIN body_screening_sessions s ON s.id=r.session_id JOIN students st ON st.id=s.student_id WHERE r.id=$1 FOR UPDATE OF r`, [parts[3]]);
+        const review = found.rows[0];
+        if (!review || !schoolStaffAllowed(user, review.school_id) || !await userHasCapability(user, 'REVIEW_RESULT', review.school_id, review.class_id)) throw Object.assign(new Error('复核记录不存在或无权访问'), { status: 404, code: 'REVIEW_NOT_FOUND' });
+        const expectedVersion = Number(input.expectedVersion);
+        if (!Number.isInteger(expectedVersion) || expectedVersion !== review.version) throw Object.assign(new Error('复核记录已被其他人员更新，请刷新后重试'), { status: 409, code: 'VERSION_CONFLICT', data: { currentVersion: review.version } });
+        const decision = String(input.decision || '');
+        if (!['archive','continue_observation','refer_for_professional_assessment','recapture'].includes(decision)) throw Object.assign(new Error('复核决定不合法'), { status: 400, code: 'REVIEW_DECISION_INVALID' });
+        const reviewComment = String(input.comment || '').trim().slice(0, 2000);
+        if (!reviewComment) throw Object.assign(new Error('请填写复核依据和后续处理说明'), { status: 400, code: 'REVIEW_COMMENT_REQUIRED' });
+        const recaptureTasks = Array.isArray(input.requestedRecaptureTasks) ? [...new Set(input.requestedRecaptureTasks.map(String))] : [];
+        if (decision === 'recapture' && (!recaptureTasks.length || recaptureTasks.some((task) => !['standingBack','forwardBend','seatedPosture','gaitVideo'].includes(task)))) throw Object.assign(new Error('请求重拍时必须指定有效动作'), { status: 400, code: 'RECAPTURE_TASKS_REQUIRED' });
+        const nextStatus = decision === 'recapture' ? 'recapture_requested' : 'completed';
+        const updated = await client.query(`UPDATE body_screening_reviews SET reviewer_user_id=$1,status=$2,decision=$3,comment=$4,requested_recapture_tasks=$5,version=version+1,reviewed_at=CASE WHEN $2='completed' THEN now() ELSE NULL END,updated_at=now() WHERE id=$6 RETURNING id AS "reviewId",session_id AS "sessionId",status,decision,comment,requested_recapture_tasks AS "requestedRecaptureTasks",version,reviewed_at AS "reviewedAt"`, [user.id, nextStatus, decision, reviewComment, recaptureTasks, review.id]);
+        await client.query(`UPDATE body_screening_sessions SET status=$1,version=version+1,updated_at=now() WHERE id=$2`, [decision === 'recapture' ? 'recapture_required' : 'review_completed', review.session_id]);
+        const parentMessage = decision === 'recapture'
+          ? { title: '身体观察需要重新采集', content: '学校专业人员已完成复核，请按页面提示重新采集指定动作。', action: '重新采集' }
+          : decision === 'refer_for_professional_assessment'
+            ? { title: '身体观察复核已完成', content: '学校专业人员建议进一步进行线下专业评估，请查看处理说明并联系学校。', action: '查看复核结果' }
+            : { title: '身体观察复核已完成', content: '学校专业人员已完成本次家庭身体观察复核，请查看最新处理结果。', action: '查看复核结果' };
+        await client.query(`INSERT INTO messages(receiver_user_id,title,content,category,message_type,business_id,business_route,child_id,action_label)
+          VALUES($1,$2,$3,'健康提醒','bodyScreeningReview',$4,'bodyAssessment',$5,$6)`, [review.guardian_user_id, parentMessage.title, parentMessage.content, `${review.id}:v${updated.rows[0].version}`, review.student_id, parentMessage.action]);
+        await client.query('COMMIT');
+        await audit(user, req, 'body_screening.review.decision', 'body_screening_review', review.id, { status: review.status, version: review.version }, updated.rows[0], review.school_id);
+        return okIdempotently(res, user, idempotency, updated.rows[0]);
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally { client.release(); }
     }
     await handlePrivacyRoutes({
       req, res, user, url, parts, query, hasRole, guardianStudentForUser,
@@ -2870,7 +2806,7 @@ async function handle(req, res) {
     if (req._idempotencyKeyHash) {
       await query(`UPDATE idempotency_keys SET status='failed',response_json=$1,response_status=$2,locked_at=NULL,expires_at=now()+interval '10 minutes' WHERE key_hash=$3`, [JSON.stringify({ status, body: { code, message, data: null } }), status, req._idempotencyKeyHash]).catch((releaseError) => logger.warn('idempotency.release_failed', { requestId: requestId(req), error: releaseError.message }));
     }
-    return fail(res, status, code, message);
+    return fail(res, status, code, message, error.data || null);
   }
 }
 

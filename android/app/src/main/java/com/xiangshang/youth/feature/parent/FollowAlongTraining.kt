@@ -64,6 +64,7 @@ import com.xiangshang.youth.app.Blue
 import com.xiangshang.youth.app.Canvas
 import com.xiangshang.youth.app.Green
 import com.xiangshang.youth.app.Navy
+import com.xiangshang.youth.core.model.AlgorithmReleaseGate
 import com.xiangshang.youth.core.service.FollowAlongSessionRecord
 import com.xiangshang.youth.core.util.BusinessClock
 import java.util.Locale
@@ -199,8 +200,7 @@ fun FollowAlongTrainingDialog(
         val totalTarget = day.exercises.sumOf { it.target }
         val totalDone = day.exercises.sumOf { exerciseProgress[it.id] ?: 0 }
         val ratio = if (totalTarget > 0) (totalDone.toFloat() / totalTarget).coerceIn(0f, 1f) else 1f
-        val quality = exerciseQualityScores.values.takeIf { it.isNotEmpty() }?.average()?.roundToInt()?.coerceIn(0, 100) ?: 0
-        onSessionSaved(FollowAlongSessionRecord(childId = studentId, dayId = day.id, completedAt = BusinessClock.format("yyyy-MM-dd'T'HH:mm:ssXXX"), durationSeconds = if (startedAtMillis > 0L) ((System.currentTimeMillis() - startedAtMillis) / 1000L).toInt().coerceAtLeast(0) else 0, completionRatio = ratio, qualityScore = quality, cameraVerified = cameraUsedDuringSession && visualUnits.isNotEmpty(), visualUnits = visualUnits, manualUnits = manualUnits, modelVersion = ChildFollowAlongTuning.algorithmVersion))
+        onSessionSaved(FollowAlongSessionRecord(childId = studentId, dayId = day.id, completedAt = BusinessClock.format("yyyy-MM-dd'T'HH:mm:ssXXX"), durationSeconds = if (startedAtMillis > 0L) ((System.currentTimeMillis() - startedAtMillis) / 1000L).toInt().coerceAtLeast(0) else 0, completionRatio = ratio, qualityScore = 0, cameraVerified = false, visualUnits = visualUnits, manualUnits = manualUnits, modelVersion = ChildFollowAlongTuning.algorithmVersion, mode = "parentConfirmedAssistedTraining"))
     }
 
     LaunchedEffect(day.id, speakerEnabled) {
@@ -293,10 +293,13 @@ fun FollowAlongTrainingDialog(
                                     Text("给 $studentName 的今日训练", color = Navy, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                                     Text("第 ${day.id} 天 · ${day.title}", color = Blue, fontWeight = FontWeight.SemiBold)
                                 }
-                                Text("姿态友好", color = Green, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text("家长陪同", color = Blue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
                             Text(if (day.exercises.isEmpty()) "今天以恢复和身体感受记录为主，不需要强行训练。" else "先看示范，再打开摄像头跟着做。动作质量优先，出现不适请立即停止。", color = Color.Gray, fontSize = 12.sp)
                         }
+                    }
+                    Surface(color = Color(0xFFFFF4E8), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
+                        Text(AlgorithmReleaseGate.pendingFollowAlongNotice, color = Navy, fontSize = 12.sp, modifier = Modifier.padding(12.dp))
                     }
                     if (day.exercises.isEmpty()) {
                         RecoveryCard(onComplete = { completed = true; saveSession(); onComplete(); onDismiss() })
@@ -343,7 +346,12 @@ fun FollowAlongTrainingDialog(
                                             modifier = Modifier.padding(10.dp).size(width = 118.dp, height = 166.dp).clip(RoundedCornerShape(12.dp))
                                         ) {
                                             AndroidView(
-                                                factory = { cameraContext -> PreviewView(cameraContext).also { cameraPreview = it } },
+                                                factory = { cameraContext ->
+                                                    PreviewView(cameraContext).also {
+                                                        it.scaleType = PreviewView.ScaleType.FIT_CENTER
+                                                        cameraPreview = it
+                                                    }
+                                                },
                                                 modifier = Modifier.fillMaxSize()
                                             )
                                             Box(
@@ -361,7 +369,7 @@ fun FollowAlongTrainingDialog(
                                                 Row(Modifier.padding(horizontal = 7.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                                                     Icon(if (poseFeedback.visible) Icons.Filled.CenterFocusStrong else Icons.Filled.Person, null, tint = Color.White, modifier = Modifier.size(11.dp))
                                                     Spacer(Modifier.width(3.dp))
-                                                    Text(if (poseFeedback.visible) "全身入框" else "取景准备", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                    Text(if (poseFeedback.visible) "全身远景" else "取景准备", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                                 }
                                             }
                                         }
@@ -372,7 +380,7 @@ fun FollowAlongTrainingDialog(
                                         Surface(color = if (poseFeedback.visible) (if (poseFeedback.active) Green else Color(0xFFFFA726)) else Color.Gray, shape = RoundedCornerShape(50)) { Spacer(Modifier.size(8.dp)) }
                                         Spacer(Modifier.width(7.dp))
                                         Text(poseFeedback.message, color = Navy, fontSize = 12.sp, modifier = Modifier.weight(1f), maxLines = 2)
-                                        Text("动作完成 ${poseFeedback.repCount} 次 · 连击 ${poseFeedback.comboCount} · ${poseFeedback.qualityScore}分", color = Blue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        Text("辅助计数 ${poseFeedback.repCount} 次 · 连击 ${poseFeedback.comboCount}", color = Blue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                     }
                                     FollowAlongGuideCard(poseFeedback = poseFeedback, exercise = day.exercises.getOrNull(selectedExercise), templateBeat = templateBeat)
                                 }
@@ -441,7 +449,7 @@ fun FollowAlongTrainingDialog(
                                             if (speakerEnabled) coach.say("${exercise.title} 已完成，做得很好。")
                                         }) { Text("本组完成") }
                                     }
-                                    Text("手动记录仅用于补录，不计入视觉准确率。打开摄像头后会单独显示视觉确认数据。", color = Color.Gray, fontSize = 12.sp)
+                                    Text("家长记录用于确认实际完成量；摄像头仅显示待验证的辅助计数，不作为准确率或标准动作证明。", color = Color.Gray, fontSize = 12.sp)
                                 }
                             }
                         }
@@ -455,12 +463,11 @@ fun FollowAlongTrainingDialog(
                         Surface(color = Green.copy(alpha = .10f), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().padding(14.dp).scale(completionScale)) {
                             Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Filled.Verified, null, tint = Green, modifier = Modifier.size(24.dp))
+                                    Icon(Icons.Filled.SupervisedUserCircle, null, tint = Green, modifier = Modifier.size(24.dp))
                                     Spacer(Modifier.width(8.dp))
-                                    Text("本次跟做已完成", color = Navy, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                                    Text("$sessionQualityScore 分", color = Blue, fontWeight = FontWeight.Bold)
+                                    Text("本次训练已由家长确认", color = Navy, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                                 }
-                                    Text("已记录 $total 个动作单位（视觉确认 ${visualUnits.values.sum()}，手动补录 $manualUnits）。完成度参考取景稳定度和动作幅度，仅用于训练反馈，不构成医疗判断。", color = Color.Gray, fontSize = 12.sp)
+                                    Text("已记录 $total 个动作单位（辅助识别 ${visualUnits.values.sum()}，家长补录 $manualUnits）。辅助识别尚未通过人工标注验证，不作为标准动作评分。", color = Color.Gray, fontSize = 12.sp)
                                 Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text("返回 28 天计划") }
                             }
                         }
@@ -471,7 +478,7 @@ fun FollowAlongTrainingDialog(
                                     completed = true
                                     saveSession()
                                     onComplete()
-                                    if (speakerEnabled) coach.say("今日跟做完成，做得很好。")
+                                    if (speakerEnabled) coach.say("本次训练已按家长确认保存。")
                                 } else {
                                     showPartialCompletionAlert = true
                                 }
@@ -493,7 +500,7 @@ fun FollowAlongTrainingDialog(
                     completed = true
                     saveSession()
                     onComplete()
-                    if (speakerEnabled) coach.say("今日跟做完成，做得很好。")
+                    if (speakerEnabled) coach.say("本次训练已按家长确认保存。")
                 }) { Text("结束并保存") }
             },
             dismissButton = { TextButton(onClick = { showPartialCompletionAlert = false }) { Text("继续训练") } },
@@ -531,7 +538,7 @@ private fun FollowAlongGuideCard(
         modifier = Modifier
             .fillMaxWidth()
             .semantics {
-                contentDescription = "动作引导。${poseFeedback.message}。请竖屏、保持全身入框并静止两秒完成准备。"
+                contentDescription = "动作引导。${poseFeedback.message}。请竖屏、保持全身远景并静止两秒完成准备。"
             }
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

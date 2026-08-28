@@ -177,6 +177,36 @@ import Foundation
         }
     }
 
+    /// Refreshes the server-owned screening/review status while preserving the
+    /// locally captured structured measurements. Raw camera media is never
+    /// requested by this endpoint.
+    func refreshLatestBodyAssessment(for student: Student) async {
+        guard repository.supportsRemoteAcknowledgement,
+              let record = localFeatures.bodyAssessments[student.id] else { return }
+        let key = "body-assessment-refresh-\(student.id)"
+        workflowStates[key] = .submitting
+        do {
+            guard let report = try await repository.loadLatestBodyAssessment(studentID: student.id, record: record) else {
+                workflowStates[key] = .failed("学校服务尚未返回身体观察结果。")
+                return
+            }
+            guard selectedChild?.id == student.id else { return }
+            mutateLocal { values in
+                guard var latest = values.bodyAssessments[student.id] else { return }
+                latest.postureReport = report
+                values.bodyAssessments[student.id] = latest
+                if var history = values.bodyAssessmentHistory[student.id], !history.isEmpty {
+                    history[history.count - 1].postureReport = report
+                    values.bodyAssessmentHistory[student.id] = history
+                }
+            }
+            workflowStates[key] = .succeeded("复核状态已更新")
+        } catch {
+            workflowStates[key] = .failed(error.localizedDescription)
+            if case ApiError.unauthorized = error { handleDashboardError(error) }
+        }
+    }
+
     func toggleBodyPlanDay(_ day: Date, for student: Student) {
         let key = Self.dayFormatter.string(from: day)
         mutateLocal { values in guard var record = values.bodyAssessments[student.id] else { return }; if record.completedPlanDays.contains(key) { record.completedPlanDays.remove(key) } else { record.completedPlanDays.insert(key) }; values.bodyAssessments[student.id] = record }
@@ -185,7 +215,8 @@ import Foundation
     func saveFollowAlongSession(_ record: FollowAlongSessionRecord) {
         mutateLocal { values in
             values.followAlongSessions = Array((values.followAlongSessions + [record]).suffix(90)); values.followAlongSyncStates[record.id.uuidString] = repository.supportsRemoteAcknowledgement ? .pendingSync : .submitted
-            guard record.cameraVerified else { return }
+            let parentConfirmed = record.mode == "parentConfirmedAssistedTraining" && record.completionRatio >= 1
+            guard record.cameraVerified || parentConfirmed else { return }
             let key = "follow-along-\(record.childID)"; values.courseProgress[key] = min(max(values.courseProgress[key] ?? 0, record.completionRatio), 1)
             let day = Self.dayFormatter.string(from: record.completedAt); values.checkInDates.insert(day)
             if var assessment = values.bodyAssessments[record.childID] { assessment.completedPlanDays.insert(day); values.bodyAssessments[record.childID] = assessment }

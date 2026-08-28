@@ -41,6 +41,11 @@ object MessageBusinessRoutePolicy {
 
     fun hasRequiredBusinessId(item: MessageItem): Boolean = !item.businessId.isNullOrBlank()
 
+    fun bodyAssessmentChildId(item: MessageItem, role: UserRole, boundChildIds: Set<String>): String? {
+        if (normalizeRoute(item.businessRoute) != "bodyassessment" || role != UserRole.Parent) return null
+        return item.childId?.takeIf { it.isNotBlank() && it in boundChildIds }
+    }
+
     fun taskTarget(item: MessageItem, role: UserRole, taskExists: Boolean, roleAuthorized: Boolean): MessageTaskTarget? {
         val route = normalizeRoute(item.businessRoute)
         if (route != "task" && route != "retest") return null

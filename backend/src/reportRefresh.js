@@ -4,6 +4,7 @@ import { resolveAssessmentStandard } from './assessmentStandards.js';
 import { MODEL_CALIBRATION_VERSION } from './modelCalibration.js';
 import { MODEL_REGISTRY_VERSION } from './modelRegistry.js';
 import { MOVEMENT_ALGORITHM_VERSION, evaluateMovementScores, normalizeTotalScore } from './scoring.js';
+import { dateOnlyText } from './dateOnly.js';
 
 const reportStudentRow = (row) => ({
   id: row.id,
@@ -15,7 +16,7 @@ const reportStudentRow = (row) => ({
   isPovertyArea: row.is_poverty_area,
   taskStatus: row.task_status || '未签到',
   totalScore: row.total_score == null ? null : normalizeTotalScore(row.total_score),
-  birthDate: row.birth_date
+  birthDate: dateOnlyText(row.birth_date)
 });
 
 const assessmentStandardContext = (student, task) => ({
@@ -98,8 +99,8 @@ export async function refreshReportForStudent({ student, taskId = null, operator
   const reportJson = {
     id: `${student.id}-${task.id}`,
     student: reportStudentRow(student),
-    assessmentDate: task.test_date,
-    date: task.test_date,
+    assessmentDate: dateOnlyText(task.test_date),
+    date: dateOnlyText(task.test_date),
     scores: evaluated.scores,
     scoreCompletionRatio: evaluated.scoreCompletionRatio,
     meanConfidence: evaluated.meanConfidence,

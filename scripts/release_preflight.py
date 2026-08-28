@@ -120,10 +120,14 @@ def main() -> int:
 
     model_corpus = ROOT / "qa/model_labeled_corpus.schema.json"
     model_approval_schema = ROOT / "qa/model_validation_approval.schema.json"
+    repeatability_schema = ROOT / "qa/capture_repeatability.schema.json"
     model_verifier = ROOT / "scripts/verify_model_validation_approval.py"
+    capture_profile_verifier = ROOT / "backend/scripts/verify-mobile-capture-calibration-registry.mjs"
     add(checks, "model-schema", model_corpus.is_file(), "人工标注集 schema 存在")
     add(checks, "model-approval-schema", model_approval_schema.is_file(), "模型人工审批 schema 存在")
+    add(checks, "model-repeatability-schema", repeatability_schema.is_file(), "同人10次重复性验证 schema 存在")
     add(checks, "model-approval-verifier", model_verifier.is_file(), "模型人工审批验证脚本存在")
+    add(checks, "capture-calibration-profile-verifier", capture_profile_verifier.is_file(), "物理标定配置验证脚本存在")
     if strict:
         verification = subprocess.run([sys.executable, str(model_verifier)], cwd=ROOT, text=True, capture_output=True, check=False)
         detail = (verification.stdout.strip() or verification.stderr.strip() or "模型人工验证失败").replace("\n", " ")
@@ -132,6 +136,20 @@ def main() -> int:
         add(checks, "model-human-validation", verification.returncode == 0, detail, blocking=True)
     else:
         add(checks, "model-human-validation", True, "本地模式仅验证门禁脚本；模型保持 pending-human-validation", blocking=False)
+
+    capture_registry_path = env("MOBILE_CAPTURE_CALIBRATION_REGISTRY_PATH")
+    if strict:
+        if capture_registry_path and Path(capture_registry_path).is_file() and capture_profile_verifier.is_file():
+            calibration = subprocess.run(
+                ["node", str(capture_profile_verifier), "--input", capture_registry_path],
+                cwd=ROOT / "backend", text=True, capture_output=True, check=False,
+            )
+            detail = (calibration.stdout.strip() or calibration.stderr.strip() or "物理标定配置验证失败").replace("\n", " ")
+            add(checks, "capture-calibration-profile", calibration.returncode == 0, detail)
+        else:
+            add(checks, "capture-calibration-profile", False, "正式姿态发布需要 MOBILE_CAPTURE_CALIBRATION_REGISTRY_PATH 指向已批准的设备标定配置")
+    else:
+        add(checks, "capture-calibration-profile", True, "本地模式允许引导质量采集；物理标定配置尚未作为发布依据", blocking=False)
 
     git_remote = subprocess.run(["git", "config", "--get", "remote.origin.url"], cwd=ROOT, text=True, capture_output=True, check=False).stdout.strip()
     add(checks, "git-remote", bool(git_remote) or not strict, "正式发布需要受保护的 Git 远程仓库", blocking=strict)

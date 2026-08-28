@@ -5,6 +5,10 @@ import com.xiangshang.youth.core.model.TaskStatus
 import com.xiangshang.youth.core.model.BodyAssessmentRecord
 import com.xiangshang.youth.core.model.BodyCaptureTask
 import com.xiangshang.youth.core.model.BodyAssessmentDraft
+import com.xiangshang.youth.core.model.PostureAssessmentReport
+import com.xiangshang.youth.core.model.PostureMetricSnapshot
+import com.xiangshang.youth.core.model.CaptureCalibrationEvidence
+import com.xiangshang.youth.core.model.CaptureCalibrationMode
 import org.json.JSONArray
 import org.json.JSONObject
 import com.xiangshang.youth.core.util.BusinessClock
@@ -247,7 +251,23 @@ class LocalFeatureStore(context: Context) {
         .putString("health_observation_sync_states", JSONObject(value.healthObservationSyncStates.mapValues { it.value.name }).toString())
         .putString("body_assessments", JSONObject().apply { value.bodyAssessments.forEach { (id, r) -> put(id, bodyRecordJson(r)) } }.toString())
         .putString("body_assessment_history", JSONObject().apply { value.bodyAssessmentHistory.forEach { (id, records) -> put(id, JSONArray().apply { records.forEach { r -> put(bodyRecordJson(r)) } }) } }.toString())
-        .putString("body_assessment_drafts", JSONObject().apply { value.bodyAssessmentDrafts.forEach { (id, draft) -> put(id, JSONObject().put("stage", draft.stage).put("guardianReady", draft.guardianReady).put("consentAcknowledged", draft.consentAcknowledged).put("environmentReady", draft.environmentReady).put("height", draft.heightCm).put("weight", draft.weightKg).put("captures", JSONArray(draft.captures.map { it.name })).put("asymmetric", draft.asymmetric).put("gait", draft.gaitConcern).put("visualHint", draft.visualObservationHint).put("captureHints", JSONObject(draft.captureObservationHints)).put("fatherHeight", draft.fatherHeightCm).put("motherHeight", draft.motherHeightCm)) } }.toString())
+        .putString("body_assessment_drafts", JSONObject().apply {
+            value.bodyAssessmentDrafts.forEach { (id, draft) ->
+                put(id, JSONObject()
+                    .put("stage", draft.stage).put("guardianReady", draft.guardianReady).put("consentAcknowledged", draft.consentAcknowledged).put("environmentReady", draft.environmentReady)
+                    .put("height", draft.heightCm).put("weight", draft.weightKg).put("captures", JSONArray(draft.captures.map { it.name }))
+                    .put("asymmetric", draft.asymmetric).put("gait", draft.gaitConcern).put("visualHint", draft.visualObservationHint).put("captureHints", JSONObject(draft.captureObservationHints))
+                    .put("fatherHeight", draft.fatherHeightCm).put("motherHeight", draft.motherHeightCm)
+                    .put("postureSnapshots", JSONArray().apply { draft.postureSnapshots.values.forEach { put(postureSnapshotJson(it)) } })
+                    .put("standingShoulder", draft.standingShoulderDifferenceCm).put("standingPelvis", draft.standingPelvisDifferenceCm).put("standingHeadTilt", draft.standingHeadTiltDegrees)
+                    .put("adamsObservedResult", draft.adamsObservedResult).put("adamsProminenceSide", draft.adamsProminenceSide)
+                    .put("gaitObservedAbnormal", draft.gaitObservedAbnormal).put("gaitObservationNote", draft.gaitObservationNote)
+                    .put("seatedMidline", draft.seatedMidlineDifferenceCm).put("seatedShoulder", draft.seatedShoulderDifferenceCm).put("seatedThoracicKyphosisObserved", draft.seatedThoracicKyphosisObserved)
+                    .put("thoracicAtr", draft.thoracicAtrDegrees).put("lumbarAtr", draft.lumbarAtrDegrees).put("thoracicAtrSide", draft.thoracicAtrSide).put("lumbarAtrSide", draft.lumbarAtrSide)
+                    .put("atrRetestEnabled", draft.atrRetestEnabled).put("thoracicAtrRepeat", draft.thoracicAtrRepeatDegrees).put("lumbarAtrRepeat", draft.lumbarAtrRepeatDegrees).put("seatedForwardBendAtr", draft.seatedForwardBendAtrDegrees)
+                    .put("occiputWallDistanceFirst", draft.occiputWallDistanceFirstCm).put("occiputWallDistanceSecond", draft.occiputWallDistanceSecondCm).put("occiputWallDistance", draft.occiputWallDistanceCm))
+            }
+        }.toString())
         .putString("body_assessment_sync_states", JSONObject(value.bodyAssessmentSyncStates.mapValues { it.value.name }).toString())
         .putString("health_consents", JSONObject().apply { value.healthConsents.forEach { (id, consent) -> put(id, JSONObject().put("consentId", consent.consentId).put("guardianUserId", consent.guardianUserId).put("childId", consent.childId).put("privacyPolicyVersion", consent.privacyPolicyVersion).put("cameraConsentVersion", consent.cameraConsentVersion).put("algorithmNoticeVersion", consent.algorithmNoticeVersion).put("agreedAt", consent.agreedAt).put("revokedAt", consent.revokedAt).put("deviceInfo", consent.deviceInfo).put("dataRetentionNoticeAccepted", consent.dataRetentionNoticeAccepted)) } }.toString())
         .putString("course_progress", JSONObject(value.courseProgress).toString())
@@ -308,11 +328,118 @@ class LocalFeatureStore(context: Context) {
     }.getOrDefault(emptyList())
     private fun decodeFamilyHealthRecords(raw: String?): Map<String, FamilyHealthRecord> = runCatching { val root = JSONObject(raw ?: "{}"); root.keys().asSequence().associateWith { id -> val record = root.getJSONObject(id); val answers = record.optJSONArray("structuredAnswers") ?: JSONArray(); FamilyHealthRecord(record.optString("childId"), record.optString("category"), record.optString("completedAt"), record.optJSONObject("entries")?.let { entries -> entries.keys().asSequence().associateWith { key -> entries.optString(key) } }.orEmpty(), record.optString("formVersion").takeIf { it.isNotBlank() && it != "null" }, record.optString("submittedAt").takeIf { it.isNotBlank() && it != "null" }, record.optInt("version", -1).takeIf { it >= 0 }, record.optString("frequency").takeIf { it.isNotBlank() && it != "null" }, record.optString("severity").takeIf { it.isNotBlank() && it != "null" }, List(answers.length()) { index -> val answer = answers.getJSONObject(index); val selected = answer.optJSONArray("selectedOptionIds") ?: JSONArray(); HealthObservationAnswer(answer.optString("questionId"), answer.optString("questionType", "text"), List(selected.length()) { selected.optString(it) }.filter { it.isNotBlank() }, answer.optString("note").takeIf { it.isNotBlank() && it != "null" }, answer.optBoolean("required", true)) }) } }.getOrDefault(emptyMap())
     private fun decodeHealthConsents(raw: String?): Map<String, HealthConsentRecord> = runCatching { val root = JSONObject(raw ?: "{}"); root.keys().asSequence().associateWith { id -> val value = root.getJSONObject(id); HealthConsentRecord(value.optString("consentId", id), value.optString("guardianUserId"), value.optString("childId", id), value.optString("privacyPolicyVersion", "v1"), value.optString("cameraConsentVersion", "v1"), value.optString("algorithmNoticeVersion", "posture-screening-v1"), value.optString("agreedAt"), value.optString("revokedAt").takeIf { it.isNotBlank() && it != "null" }, value.optString("deviceInfo"), value.optBoolean("dataRetentionNoticeAccepted", true)) } }.getOrDefault(emptyMap())
-    private fun bodyRecordJson(r: BodyAssessmentRecord) = JSONObject().put("height", r.heightCm).put("weight", r.weightKg).put("measured", r.measuredAt).put("captures", JSONArray(r.captures.map { it.name })).put("asymmetric", r.asymmetric).put("gait", r.gaitConcern).put("followup", r.nextFollowUp).put("plan", JSONArray(r.planDays)).put("visualHint", r.visualObservationHint).put("captureHints", JSONObject(r.captureObservationHints)).put("fatherHeight", r.fatherHeightCm).put("motherHeight", r.motherHeightCm).put("ageMonthsAtMeasurement", r.ageMonthsAtMeasurement)
-    private fun decodeBodyRecord(o: JSONObject): BodyAssessmentRecord { val c = o.optJSONArray("captures") ?: JSONArray(); val p = o.optJSONArray("plan") ?: JSONArray(); val hints = o.optJSONObject("captureHints")?.let { value -> value.keys().asSequence().associateWith { key -> value.optString(key) }.filterValues { it.isNotBlank() && it != "null" } }.orEmpty(); val age = o.optInt("ageMonthsAtMeasurement", -1).takeIf { it >= 0 }; return BodyAssessmentRecord(o.optDouble("height"), o.optDouble("weight"), o.optString("measured"), (0 until c.length()).mapNotNull { runCatching { BodyCaptureTask.valueOf(c.getString(it)) }.getOrNull() }.toSet(), o.optBoolean("asymmetric"), o.optBoolean("gait"), o.optString("followup"), (0 until p.length()).map { p.getString(it) }.toSet(), o.optString("visualHint").takeIf { it.isNotBlank() && it != "null" }, o.optionalDouble("fatherHeight"), o.optionalDouble("motherHeight"), hints, ageMonthsAtMeasurement = age) }
+    private fun captureCalibrationJson(value: CaptureCalibrationEvidence?) = value?.let {
+        JSONObject()
+            .put("mode", it.mode.wireValue)
+            .put("boardDetected", it.boardDetected)
+            .put("boardId", it.boardId)
+            .put("intrinsicsId", it.intrinsicsId)
+            .put("lensId", it.lensId)
+            .put("resolution", it.resolution)
+            .put("reprojectionErrorPx", it.reprojectionErrorPx)
+            .put("profileId", it.profileId)
+    }
+
+    private fun decodeCaptureCalibration(value: JSONObject): CaptureCalibrationEvidence? {
+        val source = value.optJSONObject("captureCalibration") ?: return null
+        val mode = when (source.optString("mode")) {
+            "marker-pnp" -> CaptureCalibrationMode.MarkerPnp
+            "guided" -> CaptureCalibrationMode.Guided
+            else -> return null
+        }
+        return CaptureCalibrationEvidence(
+            mode = mode,
+            boardDetected = source.optBoolean("boardDetected"),
+            boardId = source.optString("boardId").takeIf { it.isNotBlank() && it != "null" },
+            intrinsicsId = source.optString("intrinsicsId").takeIf { it.isNotBlank() && it != "null" },
+            lensId = source.optString("lensId").takeIf { it.isNotBlank() && it != "null" },
+            resolution = source.optString("resolution").takeIf { it.isNotBlank() && it != "null" },
+            reprojectionErrorPx = source.optionalDouble("reprojectionErrorPx"),
+            profileId = source.optString("profileId").takeIf { it.isNotBlank() && it != "null" }
+        )
+    }
+
+    private fun postureSnapshotJson(value: PostureMetricSnapshot) = JSONObject()
+        .put("id", value.id).put("task", value.task.name).put("sampleCount", value.sampleCount).put("confidence", value.confidence)
+        .put("shoulderHeightDifferenceCm", value.shoulderHeightDifferenceCm).put("pelvicHeightDifferenceCm", value.pelvicHeightDifferenceCm).put("headTiltDegrees", value.headTiltDegrees)
+        .put("spinalMidlineDeviationCm", value.spinalMidlineDeviationCm).put("thoracicRoundingDegrees", value.thoracicRoundingDegrees).put("forwardHeadAngleDegrees", value.forwardHeadAngleDegrees)
+        .put("cameraProxyAtrDegrees", value.cameraProxyAtrDegrees).put("cameraProxyRibProminenceCm", value.cameraProxyRibProminenceCm).put("adamsObservedResult", value.adamsObservedResult).put("adamsProminenceSide", value.adamsProminenceSide).put("instrumentAtrDegrees", value.instrumentAtrDegrees)
+        .put("shoulderProtractionProxyDegrees", value.shoulderProtractionProxyDegrees).put("pelvicTiltProxyDegrees", value.pelvicTiltProxyDegrees)
+        .put("kneeAlignmentProxyRatio", value.kneeAlignmentProxyRatio).put("lowerLimbAxisAsymmetryDegrees", value.lowerLimbAxisAsymmetryDegrees)
+        .put("leftKneeValgusProxyDegrees", value.leftKneeValgusProxyDegrees).put("rightKneeValgusProxyDegrees", value.rightKneeValgusProxyDegrees)
+        .put("kneeTrackingAsymmetryRatio", value.kneeTrackingAsymmetryRatio).put("squatDepthRatio", value.squatDepthRatio).put("movementRepetitionCount", value.movementRepetitionCount)
+        .put("footArchVisibilityScore", value.footArchVisibilityScore).put("leftArchProxyIndex", value.leftArchProxyIndex).put("rightArchProxyIndex", value.rightArchProxyIndex).put("heelAlignmentProxyDegrees", value.heelAlignmentProxyDegrees)
+        .put("thoracicAtrDegrees", value.thoracicAtrDegrees).put("lumbarAtrDegrees", value.lumbarAtrDegrees).put("thoracicAtrSide", value.thoracicAtrSide).put("lumbarAtrSide", value.lumbarAtrSide)
+        .put("thoracicAtrFirstDegrees", value.thoracicAtrFirstDegrees).put("thoracicAtrSecondDegrees", value.thoracicAtrSecondDegrees)
+        .put("lumbarAtrFirstDegrees", value.lumbarAtrFirstDegrees).put("lumbarAtrSecondDegrees", value.lumbarAtrSecondDegrees).put("seatedForwardBendAtrDegrees", value.seatedForwardBendAtrDegrees)
+        .put("occiputWallDistanceCm", value.occiputWallDistanceCm).put("gaitShoulderSwingDifferenceCm", value.gaitShoulderSwingDifferenceCm)
+        .put("gaitPelvicSwingDifferenceCm", value.gaitPelvicSwingDifferenceCm).put("gaitTrunkSwayCm", value.gaitTrunkSwayCm).put("gaitObservedAbnormal", value.gaitObservedAbnormal).put("gaitObservationNote", value.gaitObservationNote).put("seatedThoracicKyphosisObserved", value.seatedThoracicKyphosisObserved)
+        .put("captureProtocolVersion", value.captureProtocolVersion).put("cameraFacing", value.cameraFacing)
+        .put("measurementMode", value.measurementMode).put("deviceCapabilityTier", value.deviceCapabilityTier).put("depthAvailable", value.depthAvailable).put("segmentPhaseCount", value.segmentPhaseCount)
+        .put("qualityChecks", value.qualityChecks?.let(::JSONArray)).put("captureCalibration", captureCalibrationJson(value.captureCalibration)).put("captureAttemptCount", value.captureAttemptCount).put("repeatabilityStatus", value.repeatabilityStatus).put("repeatabilityMaximumDifference", value.repeatabilityMaximumDifference)
+
+    private fun decodePostureSnapshot(value: JSONObject): PostureMetricSnapshot? {
+        val task = runCatching { BodyCaptureTask.valueOf(value.optString("task")) }.getOrNull() ?: return null
+        return PostureMetricSnapshot(
+            id = value.optString("id").ifBlank { task.name }, task = task, sampleCount = value.optInt("sampleCount"), confidence = value.optDouble("confidence"),
+            shoulderHeightDifferenceCm = value.optionalDouble("shoulderHeightDifferenceCm"), pelvicHeightDifferenceCm = value.optionalDouble("pelvicHeightDifferenceCm"), headTiltDegrees = value.optionalDouble("headTiltDegrees"),
+            spinalMidlineDeviationCm = value.optionalDouble("spinalMidlineDeviationCm"), thoracicRoundingDegrees = value.optionalDouble("thoracicRoundingDegrees"), forwardHeadAngleDegrees = value.optionalDouble("forwardHeadAngleDegrees"),
+            cameraProxyAtrDegrees = value.optionalDouble("cameraProxyAtrDegrees"), cameraProxyRibProminenceCm = value.optionalDouble("cameraProxyRibProminenceCm"), adamsObservedResult = value.optString("adamsObservedResult").takeIf { it in setOf("negative", "equivocal", "positive") }, adamsProminenceSide = value.optString("adamsProminenceSide").takeIf { it == "左" || it == "右" }, instrumentAtrDegrees = value.optionalDouble("instrumentAtrDegrees"),
+            shoulderProtractionProxyDegrees = value.optionalDouble("shoulderProtractionProxyDegrees"), pelvicTiltProxyDegrees = value.optionalDouble("pelvicTiltProxyDegrees"), kneeAlignmentProxyRatio = value.optionalDouble("kneeAlignmentProxyRatio"), lowerLimbAxisAsymmetryDegrees = value.optionalDouble("lowerLimbAxisAsymmetryDegrees"), leftKneeValgusProxyDegrees = value.optionalDouble("leftKneeValgusProxyDegrees"), rightKneeValgusProxyDegrees = value.optionalDouble("rightKneeValgusProxyDegrees"), kneeTrackingAsymmetryRatio = value.optionalDouble("kneeTrackingAsymmetryRatio"), squatDepthRatio = value.optionalDouble("squatDepthRatio"), movementRepetitionCount = value.optionalDouble("movementRepetitionCount"), footArchVisibilityScore = value.optionalDouble("footArchVisibilityScore"), leftArchProxyIndex = value.optionalDouble("leftArchProxyIndex"), rightArchProxyIndex = value.optionalDouble("rightArchProxyIndex"), heelAlignmentProxyDegrees = value.optionalDouble("heelAlignmentProxyDegrees"),
+            thoracicAtrDegrees = value.optionalDouble("thoracicAtrDegrees"), lumbarAtrDegrees = value.optionalDouble("lumbarAtrDegrees"), thoracicAtrSide = value.optString("thoracicAtrSide").takeIf { it == "左" || it == "右" }, lumbarAtrSide = value.optString("lumbarAtrSide").takeIf { it == "左" || it == "右" },
+            thoracicAtrFirstDegrees = value.optionalDouble("thoracicAtrFirstDegrees"), thoracicAtrSecondDegrees = value.optionalDouble("thoracicAtrSecondDegrees"), lumbarAtrFirstDegrees = value.optionalDouble("lumbarAtrFirstDegrees"), lumbarAtrSecondDegrees = value.optionalDouble("lumbarAtrSecondDegrees"), seatedForwardBendAtrDegrees = value.optionalDouble("seatedForwardBendAtrDegrees"),
+            occiputWallDistanceCm = value.optionalDouble("occiputWallDistanceCm"), gaitShoulderSwingDifferenceCm = value.optionalDouble("gaitShoulderSwingDifferenceCm"), gaitPelvicSwingDifferenceCm = value.optionalDouble("gaitPelvicSwingDifferenceCm"), gaitTrunkSwayCm = value.optionalDouble("gaitTrunkSwayCm"), gaitObservedAbnormal = value.optionalBoolean("gaitObservedAbnormal"), gaitObservationNote = value.optString("gaitObservationNote").takeIf { it.isNotBlank() && it != "null" }, seatedThoracicKyphosisObserved = value.optionalBoolean("seatedThoracicKyphosisObserved"), captureProtocolVersion = value.optString("captureProtocolVersion").takeIf { it.isNotBlank() && it != "null" }, cameraFacing = value.optString("cameraFacing").takeIf { it.isNotBlank() && it != "null" }, measurementMode = value.optString("measurementMode").takeIf { it.isNotBlank() && it != "null" }, deviceCapabilityTier = value.optString("deviceCapabilityTier").takeIf { it.isNotBlank() && it != "null" }, depthAvailable = value.optionalBoolean("depthAvailable"), segmentPhaseCount = value.optInt("segmentPhaseCount", -1).takeIf { it > 0 }, qualityChecks = value.optJSONArray("qualityChecks")?.let { checks -> List(checks.length()) { checks.optString(it) }.filter { it.isNotBlank() } }, captureCalibration = decodeCaptureCalibration(value), captureAttemptCount = value.optInt("captureAttemptCount", -1).takeIf { it > 0 }, repeatabilityStatus = value.optString("repeatabilityStatus").takeIf { it.isNotBlank() && it != "null" }, repeatabilityMaximumDifference = value.optionalDouble("repeatabilityMaximumDifference")
+        )
+    }
+
+    private fun bodyRecordJson(r: BodyAssessmentRecord) = JSONObject().put("height", r.heightCm).put("weight", r.weightKg).put("measured", r.measuredAt).put("captures", JSONArray(r.captures.map { it.name })).put("asymmetric", r.asymmetric).put("gait", r.gaitConcern).put("followup", r.nextFollowUp).put("plan", JSONArray(r.planDays)).put("visualHint", r.visualObservationHint).put("captureHints", JSONObject(r.captureObservationHints)).put("fatherHeight", r.fatherHeightCm).put("motherHeight", r.motherHeightCm).put("ageMonthsAtMeasurement", r.ageMonthsAtMeasurement).put("postureSnapshots", JSONArray().apply { r.postureReport?.snapshots?.values?.forEach { put(postureSnapshotJson(it)) } })
+    private fun decodeBodyRecord(o: JSONObject): BodyAssessmentRecord {
+        val c = o.optJSONArray("captures") ?: JSONArray(); val p = o.optJSONArray("plan") ?: JSONArray()
+        val hints = o.optJSONObject("captureHints")?.let { value -> value.keys().asSequence().associateWith { key -> value.optString(key) }.filterValues { it.isNotBlank() && it != "null" } }.orEmpty()
+        val age = o.optInt("ageMonthsAtMeasurement", -1).takeIf { it >= 0 }
+        val measured = o.optString("measured")
+        val snapshotArray = o.optJSONArray("postureSnapshots") ?: JSONArray()
+        val snapshots = (0 until snapshotArray.length()).mapNotNull { decodePostureSnapshot(snapshotArray.optJSONObject(it) ?: return@mapNotNull null) }.associateBy { it.task }
+        return BodyAssessmentRecord(o.optDouble("height"), o.optDouble("weight"), measured, (0 until c.length()).mapNotNull { runCatching { BodyCaptureTask.valueOf(c.getString(it)) }.getOrNull() }.toSet(), o.optBoolean("asymmetric"), o.optBoolean("gait"), o.optString("followup"), (0 until p.length()).map { p.getString(it) }.toSet(), o.optString("visualHint").takeIf { it.isNotBlank() && it != "null" }, o.optionalDouble("fatherHeight"), o.optionalDouble("motherHeight"), hints, postureReport = snapshots.takeIf { it.isNotEmpty() }?.let { PostureAssessmentReport.make(it, measured, age) }, ageMonthsAtMeasurement = age)
+    }
     private fun decodeBodyAssessments(raw: String?): Map<String, BodyAssessmentRecord> = runCatching { val root = JSONObject(raw ?: "{}"); root.keys().asSequence().associateWith { id -> decodeBodyRecord(root.getJSONObject(id)) } }.getOrDefault(emptyMap())
     private fun decodeBodyAssessmentHistory(raw: String?): Map<String, List<BodyAssessmentRecord>> = runCatching { val root = JSONObject(raw ?: "{}"); root.keys().asSequence().associateWith { id -> val array = root.getJSONArray(id); List(array.length()) { decodeBodyRecord(array.getJSONObject(it)) } } }.getOrDefault(emptyMap())
     companion object {
+        private fun optionalDouble(value: JSONObject, name: String): Double? = if (value.has(name) && !value.isNull(name)) value.optDouble(name) else null
+        private fun optionalBoolean(value: JSONObject, name: String): Boolean? = if (value.has(name) && !value.isNull(name)) value.optBoolean(name) else null
+        private fun decodeDraftCaptureCalibration(value: JSONObject): CaptureCalibrationEvidence? {
+            val source = value.optJSONObject("captureCalibration") ?: return null
+            val mode = when (source.optString("mode")) {
+                "marker-pnp" -> CaptureCalibrationMode.MarkerPnp
+                "guided" -> CaptureCalibrationMode.Guided
+                else -> return null
+            }
+            return CaptureCalibrationEvidence(
+                mode = mode,
+                boardDetected = source.optBoolean("boardDetected"),
+                boardId = source.optString("boardId").takeIf { it.isNotBlank() && it != "null" },
+                intrinsicsId = source.optString("intrinsicsId").takeIf { it.isNotBlank() && it != "null" },
+                lensId = source.optString("lensId").takeIf { it.isNotBlank() && it != "null" },
+                resolution = source.optString("resolution").takeIf { it.isNotBlank() && it != "null" },
+                reprojectionErrorPx = optionalDouble(source, "reprojectionErrorPx"),
+                profileId = source.optString("profileId").takeIf { it.isNotBlank() && it != "null" }
+            )
+        }
+        private fun decodeDraftPostureSnapshot(value: JSONObject): PostureMetricSnapshot? {
+            fun optionalDouble(name: String): Double? = if (value.has(name) && !value.isNull(name)) value.optDouble(name) else null
+            fun optionalBoolean(name: String): Boolean? = if (value.has(name) && !value.isNull(name)) value.optBoolean(name) else null
+            val task = runCatching { BodyCaptureTask.valueOf(value.optString("task")) }.getOrNull() ?: return null
+            return PostureMetricSnapshot(
+                id = value.optString("id").ifBlank { task.name }, task = task, sampleCount = value.optInt("sampleCount"), confidence = value.optDouble("confidence"),
+                shoulderHeightDifferenceCm = optionalDouble("shoulderHeightDifferenceCm"), pelvicHeightDifferenceCm = optionalDouble("pelvicHeightDifferenceCm"), headTiltDegrees = optionalDouble("headTiltDegrees"),
+                spinalMidlineDeviationCm = optionalDouble("spinalMidlineDeviationCm"), thoracicRoundingDegrees = optionalDouble("thoracicRoundingDegrees"), forwardHeadAngleDegrees = optionalDouble("forwardHeadAngleDegrees"),
+                cameraProxyAtrDegrees = optionalDouble("cameraProxyAtrDegrees"), cameraProxyRibProminenceCm = optionalDouble("cameraProxyRibProminenceCm"), adamsObservedResult = value.optString("adamsObservedResult").takeIf { it in setOf("negative", "equivocal", "positive") }, adamsProminenceSide = value.optString("adamsProminenceSide").takeIf { it == "左" || it == "右" }, instrumentAtrDegrees = optionalDouble("instrumentAtrDegrees"),
+                shoulderProtractionProxyDegrees = optionalDouble("shoulderProtractionProxyDegrees"), pelvicTiltProxyDegrees = optionalDouble("pelvicTiltProxyDegrees"), kneeAlignmentProxyRatio = optionalDouble("kneeAlignmentProxyRatio"), lowerLimbAxisAsymmetryDegrees = optionalDouble("lowerLimbAxisAsymmetryDegrees"), leftKneeValgusProxyDegrees = optionalDouble("leftKneeValgusProxyDegrees"), rightKneeValgusProxyDegrees = optionalDouble("rightKneeValgusProxyDegrees"), kneeTrackingAsymmetryRatio = optionalDouble("kneeTrackingAsymmetryRatio"), squatDepthRatio = optionalDouble("squatDepthRatio"), movementRepetitionCount = optionalDouble("movementRepetitionCount"), footArchVisibilityScore = optionalDouble("footArchVisibilityScore"), leftArchProxyIndex = optionalDouble("leftArchProxyIndex"), rightArchProxyIndex = optionalDouble("rightArchProxyIndex"), heelAlignmentProxyDegrees = optionalDouble("heelAlignmentProxyDegrees"),
+                thoracicAtrDegrees = optionalDouble("thoracicAtrDegrees"), lumbarAtrDegrees = optionalDouble("lumbarAtrDegrees"), thoracicAtrSide = value.optString("thoracicAtrSide").takeIf { it == "左" || it == "右" }, lumbarAtrSide = value.optString("lumbarAtrSide").takeIf { it == "左" || it == "右" },
+                thoracicAtrFirstDegrees = optionalDouble("thoracicAtrFirstDegrees"), thoracicAtrSecondDegrees = optionalDouble("thoracicAtrSecondDegrees"), lumbarAtrFirstDegrees = optionalDouble("lumbarAtrFirstDegrees"), lumbarAtrSecondDegrees = optionalDouble("lumbarAtrSecondDegrees"), seatedForwardBendAtrDegrees = optionalDouble("seatedForwardBendAtrDegrees"),
+                occiputWallDistanceCm = optionalDouble("occiputWallDistanceCm"), gaitShoulderSwingDifferenceCm = optionalDouble("gaitShoulderSwingDifferenceCm"), gaitPelvicSwingDifferenceCm = optionalDouble("gaitPelvicSwingDifferenceCm"), gaitTrunkSwayCm = optionalDouble("gaitTrunkSwayCm"), gaitObservedAbnormal = optionalBoolean("gaitObservedAbnormal"), gaitObservationNote = value.optString("gaitObservationNote").takeIf { it.isNotBlank() && it != "null" }, seatedThoracicKyphosisObserved = optionalBoolean("seatedThoracicKyphosisObserved"), captureProtocolVersion = value.optString("captureProtocolVersion").takeIf { it.isNotBlank() && it != "null" }, cameraFacing = value.optString("cameraFacing").takeIf { it.isNotBlank() && it != "null" }, measurementMode = value.optString("measurementMode").takeIf { it.isNotBlank() && it != "null" }, deviceCapabilityTier = value.optString("deviceCapabilityTier").takeIf { it.isNotBlank() && it != "null" }, depthAvailable = optionalBoolean("depthAvailable"), segmentPhaseCount = value.optInt("segmentPhaseCount", -1).takeIf { it > 0 }, qualityChecks = value.optJSONArray("qualityChecks")?.let { checks -> List(checks.length()) { checks.optString(it) }.filter { it.isNotBlank() } }, captureCalibration = decodeDraftCaptureCalibration(value), captureAttemptCount = value.optInt("captureAttemptCount", -1).takeIf { it > 0 }, repeatabilityStatus = value.optString("repeatabilityStatus").takeIf { it.isNotBlank() && it != "null" }, repeatabilityMaximumDifference = optionalDouble("repeatabilityMaximumDifference")
+            )
+        }
         /** Internal for regression tests: incomplete legacy drafts must never invent measurements. */
         internal fun legacyBodyAssessmentDraft(stage: Int, heightCm: Double?, weightKg: Double?, captures: Set<BodyCaptureTask> = emptySet(), asymmetric: Boolean = false, gaitConcern: Boolean = false, visualHint: String? = null, fatherHeightCm: Double? = null, motherHeightCm: Double? = null, captureHints: Map<String, String> = emptyMap()): BodyAssessmentDraft = BodyAssessmentDraft(stage = stage, heightCm = heightCm ?: 0.0, weightKg = weightKg ?: 0.0, captures = captures, asymmetric = asymmetric, gaitConcern = gaitConcern, visualObservationHint = visualHint, fatherHeightCm = fatherHeightCm, motherHeightCm = motherHeightCm, captureObservationHints = captureHints)
         internal fun decodeBodyAssessmentDrafts(raw: String?): Map<String, BodyAssessmentDraft> = runCatching {
@@ -325,13 +452,31 @@ class LocalFeatureStore(context: Context) {
                     val captures = o.optJSONArray("captures") ?: JSONArray()
                     val fatherHeight = o.takeIf { it.has("fatherHeight") && !it.isNull("fatherHeight") }?.optDouble("fatherHeight")
                     val motherHeight = o.takeIf { it.has("motherHeight") && !it.isNull("motherHeight") }?.optDouble("motherHeight")
+                    val thoracicAtr = o.takeIf { it.has("thoracicAtr") && !it.isNull("thoracicAtr") }?.optDouble("thoracicAtr")
+                    val lumbarAtr = o.takeIf { it.has("lumbarAtr") && !it.isNull("lumbarAtr") }?.optDouble("lumbarAtr")
+                    val thoracicAtrRepeat = o.takeIf { it.has("thoracicAtrRepeat") && !it.isNull("thoracicAtrRepeat") }?.optDouble("thoracicAtrRepeat")
+                    val lumbarAtrRepeat = o.takeIf { it.has("lumbarAtrRepeat") && !it.isNull("lumbarAtrRepeat") }?.optDouble("lumbarAtrRepeat")
+                    val seatedForwardBendAtr = o.takeIf { it.has("seatedForwardBendAtr") && !it.isNull("seatedForwardBendAtr") }?.optDouble("seatedForwardBendAtr")
+                    val occiputWallDistance = o.takeIf { it.has("occiputWallDistance") && !it.isNull("occiputWallDistance") }?.optDouble("occiputWallDistance")
+                    val occiputWallDistanceFirst = o.takeIf { it.has("occiputWallDistanceFirst") && !it.isNull("occiputWallDistanceFirst") }?.optDouble("occiputWallDistanceFirst") ?: occiputWallDistance
+                    val occiputWallDistanceSecond = o.takeIf { it.has("occiputWallDistanceSecond") && !it.isNull("occiputWallDistanceSecond") }?.optDouble("occiputWallDistanceSecond") ?: occiputWallDistance
                     val captureHints = o.optJSONObject("captureHints")?.let { hints -> hints.keys().asSequence().associateWith { key -> hints.optString(key) }.filterValues { it.isNotBlank() && it != "null" } }.orEmpty()
-                    put(id, legacyBodyAssessmentDraft(o.optInt("stage"), if (o.has("height")) o.optDouble("height") else null, if (o.has("weight")) o.optDouble("weight") else null, (0 until captures.length()).mapNotNull { runCatching { BodyCaptureTask.valueOf(captures.getString(it)) }.getOrNull() }.toSet(), o.optBoolean("asymmetric"), o.optBoolean("gait"), o.optString("visualHint").takeIf { it.isNotBlank() && it != "null" }, fatherHeight, motherHeight, captureHints).copy(guardianReady = o.optBoolean("guardianReady"), consentAcknowledged = o.optBoolean("consentAcknowledged"), environmentReady = o.optBoolean("environmentReady")))
+                    val draftSnapshotArray = o.optJSONArray("postureSnapshots") ?: JSONArray()
+                    val draftSnapshots = (0 until draftSnapshotArray.length()).mapNotNull { decodeDraftPostureSnapshot(draftSnapshotArray.optJSONObject(it) ?: return@mapNotNull null) }.associateBy { it.task }
+                    put(id, legacyBodyAssessmentDraft(o.optInt("stage"), if (o.has("height")) o.optDouble("height") else null, if (o.has("weight")) o.optDouble("weight") else null, (0 until captures.length()).mapNotNull { runCatching { BodyCaptureTask.valueOf(captures.getString(it)) }.getOrNull() }.toSet(), o.optBoolean("asymmetric"), o.optBoolean("gait"), o.optString("visualHint").takeIf { it.isNotBlank() && it != "null" }, fatherHeight, motherHeight, captureHints).copy(
+                        guardianReady = o.optBoolean("guardianReady"), consentAcknowledged = o.optBoolean("consentAcknowledged"), environmentReady = o.optBoolean("environmentReady"), postureSnapshots = draftSnapshots,
+                        standingShoulderDifferenceCm = optionalDouble(o, "standingShoulder"), standingPelvisDifferenceCm = optionalDouble(o, "standingPelvis"), standingHeadTiltDegrees = optionalDouble(o, "standingHeadTilt"),
+                        adamsObservedResult = o.optString("adamsObservedResult").takeIf { it in setOf("negative", "equivocal", "positive") }, adamsProminenceSide = o.optString("adamsProminenceSide").takeIf { it == "左" || it == "右" },
+                        gaitObservedAbnormal = optionalBoolean(o, "gaitObservedAbnormal"), gaitObservationNote = o.optString("gaitObservationNote").takeIf { it.isNotBlank() && it != "null" },
+                        seatedMidlineDifferenceCm = optionalDouble(o, "seatedMidline"), seatedShoulderDifferenceCm = optionalDouble(o, "seatedShoulder"), seatedThoracicKyphosisObserved = optionalBoolean(o, "seatedThoracicKyphosisObserved"),
+                        thoracicAtrDegrees = thoracicAtr, lumbarAtrDegrees = lumbarAtr, thoracicAtrSide = o.optString("thoracicAtrSide").takeIf { it == "左" || it == "右" }, lumbarAtrSide = o.optString("lumbarAtrSide").takeIf { it == "左" || it == "右" }, atrRetestEnabled = o.optBoolean("atrRetestEnabled"), thoracicAtrRepeatDegrees = thoracicAtrRepeat, lumbarAtrRepeatDegrees = lumbarAtrRepeat, seatedForwardBendAtrDegrees = seatedForwardBendAtr, occiputWallDistanceFirstCm = occiputWallDistanceFirst, occiputWallDistanceSecondCm = occiputWallDistanceSecond, occiputWallDistanceCm = occiputWallDistance
+                    ))
                 }
             }
         }.getOrDefault(emptyMap())
     }
     private fun JSONObject.optionalDouble(name: String): Double? = if (has(name) && !isNull(name)) optDouble(name) else null
+    private fun JSONObject.optionalBoolean(name: String): Boolean? = if (has(name) && !isNull(name)) optBoolean(name) else null
     private fun decodeStringMap(raw: String?): Map<String, String> = runCatching { JSONObject(raw ?: "{}").keys().asSequence().associateWith { JSONObject(raw ?: "{}").optString(it) } }.getOrDefault(emptyMap())
     private fun decodeMessages(raw: String?): List<SupportMessage> = runCatching {
         val array = JSONArray(raw ?: "[]")

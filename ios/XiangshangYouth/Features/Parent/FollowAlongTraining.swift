@@ -54,6 +54,10 @@ struct FollowAlongTrainingView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     header
+                    Label(AlgorithmReleaseGate.pendingFollowAlongNotice, systemImage: "exclamationmark.shield.fill")
+                        .font(.caption).foregroundStyle(ReferenceColor.navy)
+                        .padding(12)
+                        .background(Color.orange.opacity(0.09), in: RoundedRectangle(cornerRadius: 14))
                     if day.exercises.isEmpty {
                         recoveryCard
                     } else {
@@ -122,8 +126,8 @@ struct FollowAlongTrainingView: View {
                     Text("第 \(day.id) 天 · \(day.title)").font(.subheadline.weight(.semibold)).foregroundStyle(ReferenceColor.blue)
                 }
                 Spacer()
-                Label("姿态友好", systemImage: "checkmark.shield.fill")
-                    .font(.caption.weight(.semibold)).foregroundStyle(ReferenceColor.green)
+                Label("家长陪同", systemImage: "person.2.fill")
+                    .font(.caption.weight(.semibold)).foregroundStyle(ReferenceColor.blue)
             }
             Text(day.exercises.isEmpty ? "今天以恢复和身体感受记录为主，不需要强行训练。" : "先看示范，再打开摄像头跟着做。动作质量优先，出现不适请立即停止。")
                 .font(.caption).foregroundStyle(.secondary)
@@ -160,7 +164,7 @@ struct FollowAlongTrainingView: View {
                                     VStack {
                                         HStack(spacing: 4) {
                                             Image(systemName: poseFeedback.visible ? "viewfinder.circle.fill" : "person.crop.rectangle")
-                                            Text(poseFeedback.visible ? "全身入框" : "取景准备")
+                                            Text(poseFeedback.visible ? "全身远景" : "取景准备")
                                         }
                                         .font(.system(size: 12, weight: .semibold))
                                         .foregroundStyle(.white)
@@ -233,7 +237,7 @@ struct FollowAlongTrainingView: View {
                         .frame(width: 8, height: 8)
                     Text(poseFeedback.message).font(.caption).foregroundStyle(ReferenceColor.navy).lineLimit(2)
                     Spacer()
-                Text("动作完成 \(visualRepCount) 次 · 连击 \(poseFeedback.comboCount) · \(poseFeedback.qualityScore)分").font(.caption.weight(.bold)).foregroundStyle(ReferenceColor.blue)
+                Text("辅助计数 \(visualRepCount) 次 · 连击 \(poseFeedback.comboCount)").font(.caption.weight(.bold)).foregroundStyle(ReferenceColor.blue)
                 }
                 .padding(.horizontal, 4)
                 cameraGuideCard
@@ -303,7 +307,7 @@ struct FollowAlongTrainingView: View {
                     }
                     .buttonStyle(.bordered).tint(ReferenceColor.green)
                 }
-                Text("手动记录仅用于补录，不计入视觉准确率。打开摄像头后会单独显示视觉确认数据。")
+                Text("家长记录用于确认实际完成量；摄像头仅显示待验证的辅助计数，不作为准确率或标准动作证明。")
                     .font(.caption).foregroundStyle(.secondary)
             }
             .padding(13)
@@ -366,7 +370,7 @@ struct FollowAlongTrainingView: View {
         .padding(12)
         .background(ReferenceColor.blue.opacity(0.07), in: RoundedRectangle(cornerRadius: 14))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("动作引导。\(poseFeedback.message)。请竖屏、保持全身入框并静止两秒完成准备。")
+        .accessibilityLabel("动作引导。\(poseFeedback.message)。请竖屏、保持全身远景并静止两秒完成准备。")
     }
 
     private var phaseStrip: some View {
@@ -419,13 +423,12 @@ struct FollowAlongTrainingView: View {
     private var completionSummary: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Image(systemName: "checkmark.seal.fill").font(.title2).foregroundStyle(ReferenceColor.green)
-                Text("本次跟做已完成").font(.headline).foregroundStyle(ReferenceColor.navy)
+                Image(systemName: "person.crop.circle.badge.checkmark").font(.title2).foregroundStyle(ReferenceColor.green)
+                Text("本次训练已由家长确认").font(.headline).foregroundStyle(ReferenceColor.navy)
                 Spacer()
-                Text("\(sessionQualityScore) 分").font(.headline.bold()).foregroundStyle(ReferenceColor.blue)
             }
             let total = day.exercises.reduce(0) { $0 + exerciseProgress[$1.id, default: 0] }
-                Text("已记录 \(total) 个动作单位（视觉确认 \(visualUnitCount)，手动补录 \(manualUnits)）。完成度参考取景稳定度和动作幅度，仅用于训练反馈，不构成医疗判断。")
+                Text("已记录 \(total) 个动作单位（辅助识别 \(visualUnitCount)，家长补录 \(manualUnits)）。辅助识别尚未通过人工标注验证，不作为标准动作评分。")
                 .font(.caption).foregroundStyle(.secondary)
             Button("返回 28 天计划") { dismiss() }
                 .frame(maxWidth: .infinity)
@@ -548,7 +551,7 @@ struct FollowAlongTrainingView: View {
         completed = true
         saveSession()
         onComplete()
-        speak("今日跟做完成，做得很好。")
+        speak("本次训练已按家长确认保存。")
     }
 
     private func saveSession() {
@@ -561,9 +564,9 @@ struct FollowAlongTrainingView: View {
         let record = FollowAlongSessionRecord(
             id: UUID(), childID: studentID, dayID: day.id, completedAt: .now,
             durationSeconds: duration, completionRatio: ratio,
-            qualityScore: sessionQualityScore, cameraVerified: cameraUsedDuringSession && !visualUnits.isEmpty,
+            qualityScore: 0, cameraVerified: false,
             visualUnits: visualUnits, manualUnits: manualUnits,
-            modelVersion: ChildFollowAlongTuning.algorithmVersion, mode: "guidedTraining"
+            modelVersion: ChildFollowAlongTuning.algorithmVersion, mode: "parentConfirmedAssistedTraining"
         )
         appState.saveFollowAlongSession(record)
     }
@@ -626,7 +629,9 @@ private struct FollowAlongCameraPreview: UIViewRepresentable {
 
         func attach(to view: UIView, isFront: Bool, category: String, ageMonths: Int?) {
             let layer = AVCaptureVideoPreviewLayer(session: session)
-            layer.videoGravity = .resizeAspectFill
+            // Do not crop the camera feed into a close-up inside the coach
+            // window. The complete frame makes foot and hand placement visible.
+            layer.videoGravity = .resizeAspect
             layer.frame = view.bounds
             view.layer.addSublayer(layer)
             previewLayer = layer
@@ -649,6 +654,10 @@ private struct FollowAlongCameraPreview: UIViewRepresentable {
                     return
                 }
                 do {
+                    if let _ = try? device.lockForConfiguration() {
+                        device.videoZoomFactor = min(max(1, device.minAvailableVideoZoomFactor), device.maxAvailableVideoZoomFactor)
+                        device.unlockForConfiguration()
+                    }
                     let input = try AVCaptureDeviceInput(device: device)
                     if self.session.canAddInput(input) { self.session.addInput(input) }
                     if self.session.outputs.isEmpty {

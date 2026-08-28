@@ -1,6 +1,6 @@
 package com.xiangshang.youth.core.model
 
-/** Product screening thresholds for the on-device posture proxy. */
+/** Engineering candidates for offline validation; not published health cut-offs. */
 object PostureScreeningRules {
     const val rulesSourceVersion = "UY-IMCA-SCOLIOSIS-FRAMEWORK-V1-2026-07-20"
     const val minimumSamples = 10
@@ -14,11 +14,11 @@ object PostureScreeningRules {
     /** 骨盆高度差 >0.5 cm 关注，>1.0 cm 建议复测。 */
     const val pelvisAttentionCentimeters = 0.5
     const val pelvisReferralCentimeters = 1.0
-    /** 坐姿躯干中线偏移 >1.3 cm 在儿童样本中开始异常。 */
+    /** 待验证工程候选值，不代表已由儿童标注样本证实。 */
     const val seatedMidlineAttentionCentimeters = 1.3
     /** 2D 估算下的胸椎前凸/圆背警戒线。 */
     const val seatedRoundingAttentionDegrees = 24.0
-    /** 前伸角度映射自 CVA 研究的非专业阈值近似值。 */
+    /** 待验证的二维视觉代理值，不作为专业CVA或健康结论。 */
     const val forwardHeadAttentionDegrees = 12.0
     const val forwardHeadReferralDegrees = 16.0
     const val gaitAttentionCentimeters = 1.0

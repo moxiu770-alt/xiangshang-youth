@@ -84,4 +84,11 @@ class MessageBusinessRoutePolicyTest {
         assertNull(MessageBusinessRoutePolicy.taskTarget(item, UserRole.Parent, taskExists = true, roleAuthorized = false))
         assertNull(MessageBusinessRoutePolicy.taskTarget(item, UserRole.Principal, taskExists = true, roleAuthorized = true))
     }
+
+    @Test fun bodyAssessmentReviewRoutesOnlyToAnAuthorizedFamilyChild() {
+        val item = MessageItem("m-body", "复核完成", "", "刚刚", "健康提醒", false, businessRoute = "bodyAssessment", businessId = "review-1:v2", childId = "s02")
+        assertEquals("s02", MessageBusinessRoutePolicy.bodyAssessmentChildId(item, UserRole.Parent, setOf("s01", "s02")))
+        assertNull(MessageBusinessRoutePolicy.bodyAssessmentChildId(item, UserRole.Parent, setOf("s01")))
+        assertNull(MessageBusinessRoutePolicy.bodyAssessmentChildId(item, UserRole.Teacher, setOf("s02")))
+    }
 }

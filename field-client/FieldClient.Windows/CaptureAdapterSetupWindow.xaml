@@ -1,0 +1,32 @@
+<Window x:Class="Xiangshang.FieldClient.Windows.CaptureAdapterSetupWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="采集设备设置" Width="680" Height="610" MinWidth="620" MinHeight="560"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResizeWithGrip"
+        Background="#F3F6FA" FontFamily="Microsoft YaHei UI">
+  <Window.Resources>
+    <SolidColorBrush x:Key="Ink" Color="#10233F"/><SolidColorBrush x:Key="Muted" Color="#6F7F94"/><SolidColorBrush x:Key="Blue" Color="#1769E0"/><SolidColorBrush x:Key="Line" Color="#DFE7F0"/>
+    <Style TargetType="TextBox"><Setter Property="Height" Value="42"/><Setter Property="Padding" Value="12,0"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="BorderBrush" Value="{StaticResource Line}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="Background" Value="#F9FBFD"/><Setter Property="FontSize" Value="12"/></Style>
+    <Style TargetType="ComboBox"><Setter Property="Height" Value="42"/><Setter Property="Padding" Value="10,0"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="BorderBrush" Value="{StaticResource Line}"/><Setter Property="Background" Value="#F9FBFD"/><Setter Property="FontSize" Value="12"/></Style>
+    <Style x:Key="PrimaryButton" TargetType="Button"><Setter Property="Height" Value="44"/><Setter Property="Padding" Value="20,0"/><Setter Property="Foreground" Value="White"/><Setter Property="Background" Value="{StaticResource Blue}"/><Setter Property="BorderBrush" Value="{StaticResource Blue}"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Cursor" Value="Hand"/></Style>
+    <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}"><Setter Property="Foreground" Value="{StaticResource Blue}"/><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#C9DCF7"/></Style>
+  </Window.Resources>
+  <Grid Margin="24">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="16"/><RowDefinition Height="*"/><RowDefinition Height="16"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <Border Background="#0F294C" CornerRadius="16" Padding="22"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="54"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Width="46" Height="46" CornerRadius="13" Background="#2677E8"><TextBlock Text="采" Foreground="White" FontSize="19" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center"><TextBlock Text="接入认证采集设备" Foreground="White" FontSize="19" FontWeight="Bold"/><TextBlock Text="选择厂商提供的适配器 DLL，客户端会自动识别并测试，不再需要配置环境变量。" Foreground="#AFC2D9" FontSize="10" Margin="0,5,0,0"/></StackPanel></Grid></Border>
+    <Border Grid.Row="2" Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="16" Padding="22">
+      <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
+        <TextBlock Text="1  选择厂商适配器 DLL" Foreground="{StaticResource Ink}" FontSize="12" FontWeight="Bold"/>
+        <Grid Margin="0,8,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="104"/></Grid.ColumnDefinitions><TextBox x:Name="AssemblyPathTextBox" ToolTip="选择实现 ICaptureAdapter 与设备自检接口的 DLL"/><Button Grid.Column="2" Content="浏览文件" Click="BrowseButton_Click" Style="{StaticResource SecondaryButton}"/></Grid>
+        <TextBlock Text="请使用硬件厂商或项目交付方提供、与当前客户端版本匹配的认证适配器。不要选择来源不明的 DLL。" TextWrapping="Wrap" Foreground="{StaticResource Muted}" FontSize="10" LineHeight="17" Margin="0,6,0,0"/>
+
+        <TextBlock Text="2  选择识别到的适配器" Foreground="{StaticResource Ink}" FontSize="12" FontWeight="Bold" Margin="0,18,0,0"/>
+        <Grid Margin="0,8,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="104"/></Grid.ColumnDefinitions><ComboBox x:Name="AdapterTypeComboBox"/><Button Grid.Column="2" Content="重新识别" Click="DiscoverButton_Click" Style="{StaticResource SecondaryButton}"/></Grid>
+
+        <Border x:Name="StatusPanel" Background="#EAF3FF" BorderBrush="#C9DCF7" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,18,0,0"><TextBlock x:Name="StatusText" Text="选择 DLL 后将自动列出可用适配器。" TextWrapping="Wrap" Foreground="#285F9F" FontSize="10" LineHeight="17"/></Border>
+        <Border Background="#FFF8E7" BorderBrush="#F1D99E" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,12,0,0"><TextBlock Text="说明：保存成功只代表适配器能够安全加载。返回主界面后，客户端还会把相机数量、GPU、标定误差和存储空间上报中央服务；全部检查通过后才会出现“开始采集”。" TextWrapping="Wrap" Foreground="#725513" FontSize="10" LineHeight="17"/></Border>
+      </StackPanel></ScrollViewer>
+    </Border>
+    <Grid Grid.Row="4"><Button x:Name="RemoveButton" Content="移除当前配置" Width="122" HorizontalAlignment="Left" Click="RemoveButton_Click" Style="{StaticResource SecondaryButton}"/><StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><Button Content="取消" Width="88" Margin="0,0,8,0" Click="CancelButton_Click" Style="{StaticResource SecondaryButton}"/><Button x:Name="SaveButton" Content="测试并保存" Width="126" Click="SaveButton_Click" Style="{StaticResource PrimaryButton}"/></StackPanel></Grid>
+  </Grid>
+</Window>

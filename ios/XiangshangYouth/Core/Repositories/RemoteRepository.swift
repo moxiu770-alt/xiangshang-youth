@@ -71,6 +71,15 @@ final class RemoteRepository: YouthRepository {
         }
         let key = stableWriteKey("body-assessment", studentID, String(record.measuredAt.timeIntervalSince1970), record.postureReport?.algorithm ?? BodyAssessmentRecord.ruleVersion)
         let response = try await client.request(path: "v1/students/\(studentID)/body-assessments", method: "POST", body: BodyAssessmentRequest(heightCm: record.heightCentimeters, weightKg: record.weightKilograms, overallLevel: record.postureReport?.overallLevel.rawValue ?? "pending", algorithmVersion: record.postureReport?.algorithm ?? BodyAssessmentRecord.ruleVersion, consentVersion: consentVersion, data: record, snapshots: snapshots), type: RemoteBodyAssessmentResult.self, idempotencyKey: key)
+        return try canonicalBodyAssessmentReport(response, record: record)
+    }
+
+    func loadLatestBodyAssessment(studentID: String, record: BodyAssessmentRecord) async throws -> PostureAssessmentReport? {
+        let response = try await client.request(path: "v1/students/\(studentID)/body-assessments/latest", type: RemoteBodyAssessmentResult.self)
+        return try canonicalBodyAssessmentReport(response, record: record)
+    }
+
+    private func canonicalBodyAssessmentReport(_ response: RemoteBodyAssessmentResult, record: BodyAssessmentRecord) throws -> PostureAssessmentReport? {
         guard response.bmiAlgorithmVersion == BodyAssessmentRecord.bmiAlgorithmVersion else {
             throw RemoteModelContractError.unsupportedBMI(response.bmiAlgorithmVersion ?? "missing")
         }
@@ -84,7 +93,18 @@ final class RemoteRepository: YouthRepository {
         guard summary.algorithm == PostureAssessmentReport.algorithmVersion else { throw RemoteModelContractError.unsupportedAlgorithm(summary.algorithm) }
         guard summary.calibrationVersion == PostureAssessmentReport.calibrationVersion else { throw RemoteModelContractError.unsupportedCalibration(summary.calibrationVersion ?? "missing") }
         guard summary.rulesSourceVersion == PostureScreeningRules.rulesSourceVersion else { throw RemoteModelContractError.unsupportedRules(summary.rulesSourceVersion ?? "missing") }
-        return PostureAssessmentReport(generatedAt: .now, algorithm: summary.algorithm, snapshots: record.postureReport?.snapshots ?? [:], overallLevel: summary.overallLevel, reasons: summary.reasons, disclaimer: summary.disclaimer, riskScore: summary.riskScore, qualityScore: summary.qualityScore, calibrationVersion: summary.calibrationVersion ?? PostureAssessmentReport.calibrationVersion, rulesSourceVersion: summary.rulesSourceVersion ?? PostureScreeningRules.rulesSourceVersion)
+        let validationStatus = AlgorithmValidationStatus(rawValue: summary.validationStatus ?? "") ?? .pendingHumanValidation
+        return PostureAssessmentReport(generatedAt: .now, algorithm: summary.algorithm, snapshots: record.postureReport?.snapshots ?? [:], overallLevel: summary.overallLevel, reasons: summary.reasons, disclaimer: summary.disclaimer, riskScore: summary.riskScore, qualityScore: summary.qualityScore, calibrationVersion: summary.calibrationVersion ?? PostureAssessmentReport.calibrationVersion, rulesSourceVersion: summary.rulesSourceVersion ?? PostureScreeningRules.rulesSourceVersion, validationStatus: validationStatus, screeningDecision: response.screeningDecision?.local)
+    }
+
+    func loadBodyScreeningReviews(schoolID: String, limit: Int = 30) async throws -> [BodyScreeningReviewItem] {
+        let encodedSchool = schoolID.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? schoolID
+        return try await client.request(path: "v1/body-screening/reviews?schoolId=\(encodedSchool)&limit=\(min(max(limit, 1), 100))", type: [BodyScreeningReviewItem].self)
+    }
+
+    func decideBodyScreeningReview(reviewID: String, decision: BodyScreeningReviewDecision, expectedVersion: Int, comment: String?, requestedRecaptureTasks: [BodyAssessmentRecord.CaptureTask]) async throws -> BodyScreeningReviewAck {
+        let body = BodyScreeningReviewDecisionRequest(decision: decision.rawValue, expectedVersion: expectedVersion, comment: comment, requestedRecaptureTasks: requestedRecaptureTasks.map(\.rawValue))
+        return try await client.request(path: "v1/body-screening/reviews/\(reviewID)/decision", method: "POST", body: body, type: BodyScreeningReviewAck.self, idempotencyKey: stableWriteKey("body-screening-review", reviewID, String(expectedVersion), decision.rawValue))
     }
 
     func loadHealthObservations(studentID: String) async throws -> [FamilyHealthRecord] {
@@ -246,11 +266,44 @@ private struct BodyAssessmentRequest: Encodable {
     let snapshots: [BodySnapshotRequest]
 }
 
+private struct BodyScreeningReviewDecisionRequest: Encodable {
+    let decision: String
+    let expectedVersion: Int
+    let comment: String?
+    let requestedRecaptureTasks: [String]
+}
+
 private struct RemoteBodyAssessmentResult: Decodable {
     let postureReport: RemotePostureSummary?
     let bmiAlgorithmVersion: String?
     let heightAlgorithmVersion: String?
     let modelRegistryVersion: String?
+    let screeningDecision: RemoteBodyScreeningDecision?
+}
+
+private struct RemoteBodyScreeningDecision: Decodable {
+    let sessionId: String?
+    let decisionId: String?
+    let route: String
+    let outcomeLevel: String?
+    let reasonCodes: [String]
+    let qualityScore: Int?
+    let reviewRequired: Bool
+    let decisionPolicyVersion: String
+    let version: Int?
+    let decidedAt: Date?
+    let reviewStatus: String?
+    let reviewDecision: BodyScreeningReviewDecision?
+    let reviewComment: String?
+    let requestedRecaptureTasks: [String]?
+    let reviewVersion: Int?
+    let reviewedAt: Date?
+
+    var local: BodyScreeningDecision? {
+        guard let route = BodyScreeningRoute(rawValue: route) else { return nil }
+        let outcome = outcomeLevel.flatMap(BodyScreeningOutcomeLevel.init(rawValue:))
+        return BodyScreeningDecision(sessionId: sessionId, decisionId: decisionId, route: route, outcomeLevel: outcome, reasonCodes: reasonCodes, qualityScore: qualityScore, reviewRequired: reviewRequired, decisionPolicyVersion: decisionPolicyVersion, version: version, decidedAt: decidedAt, reviewStatus: reviewStatus, reviewDecision: reviewDecision, reviewComment: reviewComment, requestedRecaptureTasks: requestedRecaptureTasks ?? [], reviewVersion: reviewVersion, reviewedAt: reviewedAt)
+    }
 }
 
 private struct RemotePostureSummary: Decodable {
@@ -262,6 +315,7 @@ private struct RemotePostureSummary: Decodable {
     let qualityScore: Int
     let calibrationVersion: String?
     let rulesSourceVersion: String?
+    let validationStatus: String?
 }
 
 /// Produces a retry-stable key for a logical write without storing request

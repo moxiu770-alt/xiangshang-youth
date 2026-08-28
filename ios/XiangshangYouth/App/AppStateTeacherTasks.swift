@@ -117,4 +117,39 @@ struct TeacherOverviewContext: Equatable {
         let note = reviewNote?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         mutateLocal { values in let key = taskKey(taskID: taskID, studentID: student.id); values.taskScopedStatuses[key] = status; if !note.isEmpty { values.taskScopedReviewNotes[key] = note } }
     }
+
+    func loadBodyScreeningReviews() async {
+        guard teacherHasCapability("REVIEW_RESULT"), let schoolID = profile?.schoolID, !bodyScreeningReviewsLoading else {
+            if !teacherHasCapability("REVIEW_RESULT") { bodyScreeningReviewsError = "当前账号没有身体观察复核权限。" }
+            return
+        }
+        bodyScreeningReviewsLoading = true
+        bodyScreeningReviewsError = nil
+        defer { bodyScreeningReviewsLoading = false }
+        do { bodyScreeningReviews = try await repository.loadBodyScreeningReviews(schoolID: schoolID, limit: 50) }
+        catch {
+            if case ApiError.unauthorized = error { handleDashboardError(error) }
+            else { bodyScreeningReviewsError = error.localizedDescription }
+        }
+    }
+
+    func submitBodyScreeningReview(_ item: BodyScreeningReviewItem, decision: BodyScreeningReviewDecision, comment: String?, recaptureTasks: Set<BodyAssessmentRecord.CaptureTask>) async -> Bool {
+        let key = "body-screening-review:\(item.reviewId)"
+        guard teacherHasCapability("REVIEW_RESULT"), !workflowState(for: key).isSubmitting else { return false }
+        let trimmed = comment?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !(trimmed ?? "").isEmpty else { workflowStates[key] = .failed("请填写复核依据和后续处理说明。"); return false }
+        guard decision != .recapture || !recaptureTasks.isEmpty else { workflowStates[key] = .failed("要求重采时至少选择一个动作。"); return false }
+        workflowStates[key] = .submitting
+        do {
+            let ack = try await repository.decideBodyScreeningReview(reviewID: item.reviewId, decision: decision, expectedVersion: item.version, comment: trimmed, requestedRecaptureTasks: Array(recaptureTasks))
+            if ack.status == "completed" { bodyScreeningReviews.removeAll { $0.reviewId == item.reviewId } }
+            else { await loadBodyScreeningReviews() }
+            workflowStates[key] = .succeeded(decision == .recapture ? "重采任务已发送" : "复核结论已保存")
+            return true
+        } catch {
+            workflowStates[key] = .failed(error.localizedDescription)
+            if error.localizedDescription.localizedCaseInsensitiveContains("version") || error.localizedDescription.contains("更新") { await loadBodyScreeningReviews() }
+            return false
+        }
+    }
 }

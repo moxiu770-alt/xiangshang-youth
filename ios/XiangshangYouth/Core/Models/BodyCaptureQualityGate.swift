@@ -4,29 +4,52 @@ import Foundation
 /// They only decide whether a guided recording is usable; they never infer a
 /// medical condition from a child's body pose.
 enum BodyCaptureQualityGate {
+    enum BodyScaleState: Equatable {
+        case invalid
+        case tooFar
+        case ready
+        case tooClose
+    }
+
     /// The Android posture-capture JSON is the single calibration source for
     /// both native clients. Built-in values remain a safe fallback only when
     /// the bundled asset is unavailable or fails validation.
-    static let canonicalAssetVersion = "android-v1-search-calibrated-2026-09-15"
-    static let staticHoldSeconds = 1.5
-    static let staticMinimumFrames = 12
+    static let canonicalAssetVersion = "android-v3-adams-repeatability-2026-08-27"
+    static let staticHoldSeconds = 2.5
+    static let staticMinimumFrames = 20
     static let staticMaximumDisplacement = 0.025
-    static let gaitMinimumSeconds = 2.5
+    static let gaitMinimumSeconds = 6.3
     static let gaitMinimumDisplacement = 0.035
     /// Minimum vertical body coverage in the camera frame. Pose confidence can
     /// be high even when a person is too small for a useful family observation.
     static let fullBodyMinimumFrameCoverage = 0.42
     static let seatedMinimumFrameCoverage = 0.16
+    /// Keep the child in a measurement-friendly long shot. A close crop makes
+    /// small camera movements look like large posture changes and increases
+    /// lens-perspective error around shoulders and hips.
+    static let fullBodyMaximumFrameCoverage = 0.70
+    static let seatedMaximumFrameCoverage = 0.36
+    /// Foot capture is a lower-leg close-up, not a full-body pose. The span
+    /// from knee to ankle should occupy enough of the portrait frame to make
+    /// heel-line quality observable without forcing the child's head into the
+    /// shot. These are framing gates only; they are not foot-arch thresholds.
+    static let footMinimumFrameCoverage = 0.28
+    static let footMaximumFrameCoverage = 0.72
+    static let followAlongMaximumBodySpan = 0.78
+    static let followAlongMaximumTorsoSpan = 0.34
     /// Every required joint must first clear the reliable-joint bar.  A
     /// second mean-confidence bar prevents a frame with fuzzy ankles/hips
     /// from being treated as a trustworthy guided capture.
     /// This remains a *capture quality* check, never a health conclusion.
     static let minimumIndividualLandmarkConfidence = 0.50
     static let minimumMeanLandmarkConfidence = 0.55
-    /// A visual-completion threshold only. The side/rear angle is intentional:
-    /// a rear-only 2D camera cannot reliably tell a true forward bend from a
-    /// natural standing pose. It is not a flexibility score.
-    static let forwardBendMinimumTorsoTilt = 0.35
+    /// A rear-view visual-completion threshold only. It verifies that the
+    /// guided Adams action was performed and is not an ATR or medical score.
+    static let forwardBendMinimumTorsoTilt = 0.28
+    /// The manual requires the knees to be fully extended. The camera gate
+    /// uses a small landmark tolerance so normal detector jitter does not turn
+    /// a straight leg into a false rejection.
+    static let adamsMinimumKneeExtensionDegrees = 165.0
 
     struct PostureCaptureProfile {
         let tag: String
@@ -145,67 +168,50 @@ enum BodyCaptureQualityGate {
         if let canonical = canonicalProfile(ageMonths: ageMonths) { return canonical }
         switch ageMonths ?? 108 {
         case ...96:
-            return PostureCaptureProfile(tag: "6-8岁", staticHoldSeconds: 1.8, staticMinimumFrames: 12, staticMaximumDisplacement: 0.032, staticDisplacementJitter: 0.0088, gaitMinimumSeconds: 2.55, gaitMinimumDisplacement: 0.0365, stabilityWindowFrames: 11, gaitMovementWindowFrames: 7, minimumRawSamplesForCompletion: 6, fullBodyMinimumFrameCoverage: 0.38, seatedMinimumFrameCoverage: 0.145, minimumIndividualLandmarkConfidence: 0.47, minimumMeanLandmarkConfidence: 0.515, forwardBendMinimumTorsoTilt: 0.34)
+            return PostureCaptureProfile(tag: "6-8岁", staticHoldSeconds: 2.6, staticMinimumFrames: 20, staticMaximumDisplacement: 0.032, staticDisplacementJitter: 0.0088, gaitMinimumSeconds: 6.5, gaitMinimumDisplacement: 0.0365, stabilityWindowFrames: 15, gaitMovementWindowFrames: 7, minimumRawSamplesForCompletion: 18, fullBodyMinimumFrameCoverage: 0.38, seatedMinimumFrameCoverage: 0.145, minimumIndividualLandmarkConfidence: 0.47, minimumMeanLandmarkConfidence: 0.515, forwardBendMinimumTorsoTilt: 0.27)
         case 97...132:
-            return PostureCaptureProfile(tag: "9-11岁", staticHoldSeconds: 1.7, staticMinimumFrames: 13, staticMaximumDisplacement: 0.031, staticDisplacementJitter: 0.0078, gaitMinimumSeconds: 2.5, gaitMinimumDisplacement: 0.0355, stabilityWindowFrames: 10, gaitMovementWindowFrames: 7, minimumRawSamplesForCompletion: 6, fullBodyMinimumFrameCoverage: 0.40, seatedMinimumFrameCoverage: 0.155, minimumIndividualLandmarkConfidence: 0.50, minimumMeanLandmarkConfidence: 0.54, forwardBendMinimumTorsoTilt: 0.35)
+            return PostureCaptureProfile(tag: "9-11岁", staticHoldSeconds: 2.5, staticMinimumFrames: 20, staticMaximumDisplacement: 0.031, staticDisplacementJitter: 0.0078, gaitMinimumSeconds: 6.3, gaitMinimumDisplacement: 0.0355, stabilityWindowFrames: 15, gaitMovementWindowFrames: 7, minimumRawSamplesForCompletion: 18, fullBodyMinimumFrameCoverage: 0.40, seatedMinimumFrameCoverage: 0.155, minimumIndividualLandmarkConfidence: 0.50, minimumMeanLandmarkConfidence: 0.54, forwardBendMinimumTorsoTilt: 0.28)
         case 133...180:
-            return PostureCaptureProfile(tag: "12-15岁", staticHoldSeconds: 1.65, staticMinimumFrames: 14, staticMaximumDisplacement: 0.03, staticDisplacementJitter: 0.0072, gaitMinimumSeconds: 2.45, gaitMinimumDisplacement: 0.0368, stabilityWindowFrames: 10, gaitMovementWindowFrames: 6, minimumRawSamplesForCompletion: 6, fullBodyMinimumFrameCoverage: 0.42, seatedMinimumFrameCoverage: 0.16, minimumIndividualLandmarkConfidence: 0.52, minimumMeanLandmarkConfidence: 0.56, forwardBendMinimumTorsoTilt: 0.35)
+            return PostureCaptureProfile(tag: "12-15岁", staticHoldSeconds: 2.4, staticMinimumFrames: 20, staticMaximumDisplacement: 0.03, staticDisplacementJitter: 0.0072, gaitMinimumSeconds: 6.1, gaitMinimumDisplacement: 0.0368, stabilityWindowFrames: 14, gaitMovementWindowFrames: 6, minimumRawSamplesForCompletion: 18, fullBodyMinimumFrameCoverage: 0.42, seatedMinimumFrameCoverage: 0.16, minimumIndividualLandmarkConfidence: 0.52, minimumMeanLandmarkConfidence: 0.56, forwardBendMinimumTorsoTilt: 0.28)
         default:
-            return PostureCaptureProfile(tag: "16-18岁", staticHoldSeconds: 1.6, staticMinimumFrames: 14, staticMaximumDisplacement: 0.029, staticDisplacementJitter: 0.0068, gaitMinimumSeconds: 2.4, gaitMinimumDisplacement: 0.038, stabilityWindowFrames: 10, gaitMovementWindowFrames: 6, minimumRawSamplesForCompletion: 6, fullBodyMinimumFrameCoverage: 0.43, seatedMinimumFrameCoverage: 0.16, minimumIndividualLandmarkConfidence: 0.53, minimumMeanLandmarkConfidence: 0.57, forwardBendMinimumTorsoTilt: 0.35)
+            return PostureCaptureProfile(tag: "16-18岁", staticHoldSeconds: 2.4, staticMinimumFrames: 20, staticMaximumDisplacement: 0.029, staticDisplacementJitter: 0.0068, gaitMinimumSeconds: 6.0, gaitMinimumDisplacement: 0.038, stabilityWindowFrames: 14, gaitMovementWindowFrames: 6, minimumRawSamplesForCompletion: 18, fullBodyMinimumFrameCoverage: 0.43, seatedMinimumFrameCoverage: 0.16, minimumIndividualLandmarkConfidence: 0.53, minimumMeanLandmarkConfidence: 0.57, forwardBendMinimumTorsoTilt: 0.28)
         }
     }
 
-    static func isStaticCaptureReady(elapsed: TimeInterval, stableFrames: Int, displacement: Double) -> Bool {
-        elapsed.isFinite && displacement.isFinite && elapsed >= staticHoldSeconds && stableFrames >= staticMinimumFrames && displacement >= 0 && displacement < staticMaximumDisplacement
-    }
-
-    static func isStaticCaptureReady(elapsed: TimeInterval, stableFrames: Int, displacement: Double, ageMonths: Int?) -> Bool {
-        let p = profile(ageMonths: ageMonths)
-        return elapsed.isFinite && displacement.isFinite && elapsed >= p.staticHoldSeconds && stableFrames >= p.staticMinimumFrames && displacement >= 0 && displacement < p.staticMaximumDisplacement
-    }
-
-    static func isStaticCaptureReady(elapsed: TimeInterval, stableFrames: Int, displacement: Double, jitter: Double, ageMonths: Int?) -> Bool {
-        let p = profile(ageMonths: ageMonths)
-        return elapsed.isFinite && displacement.isFinite && jitter.isFinite && elapsed >= p.staticHoldSeconds && stableFrames >= p.staticMinimumFrames && displacement >= 0 && jitter >= 0 && displacement < p.staticMaximumDisplacement && jitter <= p.staticDisplacementJitter
-    }
-
-    static func isGaitCaptureReady(elapsed: TimeInterval, displacement: Double) -> Bool {
-        elapsed.isFinite && displacement.isFinite && elapsed >= gaitMinimumSeconds && displacement >= gaitMinimumDisplacement
-    }
-
-    static func isGaitCaptureReady(elapsed: TimeInterval, displacement: Double, ageMonths: Int?) -> Bool {
-        let p = profile(ageMonths: ageMonths)
-        return elapsed.isFinite && displacement.isFinite && elapsed >= p.gaitMinimumSeconds && displacement >= p.gaitMinimumDisplacement
-    }
-
-    static func isGaitCaptureReady(elapsed: TimeInterval, displacement: Double, movedFrames: Int, rawSamples: Int, ageMonths: Int?) -> Bool {
-        let p = profile(ageMonths: ageMonths)
-        // Require the complete movement window, matching Android. The half
-        // window is only suitable for early guidance text; accepting it as a
-        // terminal gate makes the same clip pass on iOS but fail on Android.
-        return elapsed.isFinite && displacement.isFinite && elapsed >= p.gaitMinimumSeconds && displacement >= p.gaitMinimumDisplacement && movedFrames >= p.gaitMovementWindowFrames && rawSamples >= p.minimumRawSamplesForCompletion
-    }
-
-    static func isForwardBendCaptureReady(elapsed: TimeInterval, stableFrames: Int, displacement: Double, torsoTilt: Double) -> Bool {
-        isStaticCaptureReady(elapsed: elapsed, stableFrames: stableFrames, displacement: displacement)
-            && torsoTilt.isFinite && torsoTilt >= 0 && torsoTilt <= 10 && torsoTilt >= forwardBendMinimumTorsoTilt
-    }
-
-    static func isForwardBendCaptureReady(elapsed: TimeInterval, stableFrames: Int, displacement: Double, torsoTilt: Double, ageMonths: Int?) -> Bool {
-        isStaticCaptureReady(elapsed: elapsed, stableFrames: stableFrames, displacement: displacement, ageMonths: ageMonths) && torsoTilt.isFinite && torsoTilt >= 0 && torsoTilt <= 10 && torsoTilt >= profile(ageMonths: ageMonths).forwardBendMinimumTorsoTilt
-    }
-
-    static func isForwardBendCaptureReady(elapsed: TimeInterval, stableFrames: Int, displacement: Double, jitter: Double, torsoTilt: Double, ageMonths: Int?) -> Bool {
-        isStaticCaptureReady(elapsed: elapsed, stableFrames: stableFrames, displacement: displacement, jitter: jitter, ageMonths: ageMonths) && torsoTilt.isFinite && torsoTilt >= 0 && torsoTilt <= 10 && torsoTilt >= profile(ageMonths: ageMonths).forwardBendMinimumTorsoTilt
-    }
-
     static func hasUsableBodyScale(verticalCoverage: Double, seated: Bool) -> Bool {
-        verticalCoverage.isFinite && (0...1).contains(verticalCoverage) && verticalCoverage >= (seated ? seatedMinimumFrameCoverage : fullBodyMinimumFrameCoverage)
+        bodyScaleState(verticalCoverage: verticalCoverage, seated: seated) == .ready
     }
 
     static func hasUsableBodyScale(verticalCoverage: Double, seated: Bool, ageMonths: Int?) -> Bool {
+        bodyScaleState(verticalCoverage: verticalCoverage, seated: seated, ageMonths: ageMonths) == .ready
+    }
+
+    static func bodyScaleState(verticalCoverage: Double, seated: Bool) -> BodyScaleState {
+        bodyScaleState(verticalCoverage: verticalCoverage, seated: seated, ageMonths: nil)
+    }
+
+    static func bodyScaleState(verticalCoverage: Double, seated: Bool, ageMonths: Int?) -> BodyScaleState {
+        guard verticalCoverage.isFinite, (0...1).contains(verticalCoverage) else { return .invalid }
         let p = profile(ageMonths: ageMonths)
-        return verticalCoverage.isFinite && (0...1).contains(verticalCoverage) && verticalCoverage >= (seated ? p.seatedMinimumFrameCoverage : p.fullBodyMinimumFrameCoverage)
+        let minimum = seated ? p.seatedMinimumFrameCoverage : p.fullBodyMinimumFrameCoverage
+        let maximum = seated ? seatedMaximumFrameCoverage : fullBodyMaximumFrameCoverage
+        if verticalCoverage < minimum { return .tooFar }
+        if verticalCoverage > maximum { return .tooClose }
+        return .ready
+    }
+
+    static func footScaleState(lowerLegCoverage: Double) -> BodyScaleState {
+        guard lowerLegCoverage.isFinite, (0...1).contains(lowerLegCoverage) else { return .invalid }
+        if lowerLegCoverage < footMinimumFrameCoverage { return .tooFar }
+        if lowerLegCoverage > footMaximumFrameCoverage { return .tooClose }
+        return .ready
+    }
+
+    static func hasComfortableFollowAlongFraming(bodySpan: Double?, torsoSpan: Double?) -> Bool {
+        let validBody = bodySpan.map { $0.isFinite && (0...1.5).contains($0) } ?? true
+        let validTorso = torsoSpan.map { $0.isFinite && (0...1.5).contains($0) } ?? true
+        guard validBody, validTorso else { return false }
+        return (bodySpan ?? 0) <= followAlongMaximumBodySpan && (torsoSpan ?? 0) <= followAlongMaximumTorsoSpan
     }
 
     /// Seated capture must have a clearly vertical upper-body geometry. Vision
@@ -231,6 +237,21 @@ enum BodyCaptureQualityGate {
         return confidences.allSatisfy { $0.isFinite && (0...1).contains($0) && $0 >= p.minimumIndividualLandmarkConfidence } && confidences.reduce(0, +) / Float(confidences.count) >= p.minimumMeanLandmarkConfidence
     }
 
+    /// Feet are together in the Adams position, so one ankle can visually
+    /// overlap the other. Core torso joints remain strict while at least one
+    /// ankle must be clearly visible to verify body scale.
+    static func hasReliableForwardBendLandmarks(core: [Float], ankles: [Float], ageMonths: Int?) -> Bool {
+        let p = profile(ageMonths: ageMonths)
+        guard !core.isEmpty, core.allSatisfy({ $0.isFinite && (0...1).contains($0) && $0 >= max(0.35, p.minimumIndividualLandmarkConfidence - 0.08) }) else { return false }
+        let coreMean = core.reduce(0, +) / Float(core.count)
+        return coreMean >= max(0.42, p.minimumMeanLandmarkConfidence - 0.05)
+            && ankles.contains { $0.isFinite && (0...1).contains($0) && $0 >= p.minimumIndividualLandmarkConfidence }
+    }
+
+    /// Rear-view Adams completion score. As the trunk approaches horizontal,
+    /// its projected vertical length becomes shorter relative to shoulder
+    /// width. This only verifies completion and never estimates ATR, rib
+    /// prominence or scoliosis risk.
     static func staticProgress(elapsed: TimeInterval) -> Double { min(0.96, max(0, elapsed / staticHoldSeconds)) }
     static func staticProgress(elapsed: TimeInterval, ageMonths: Int?) -> Double { min(0.96, max(0, elapsed / profile(ageMonths: ageMonths).staticHoldSeconds)) }
     static func gaitProgress(elapsed: TimeInterval, hasMoved: Bool) -> Double { hasMoved ? min(0.96, 0.2 + elapsed / gaitMinimumSeconds * 0.8) : 0.12 }

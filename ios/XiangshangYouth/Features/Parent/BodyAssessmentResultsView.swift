@@ -4,16 +4,18 @@ extension BodyAssessmentView {
     func result(_ student: Student) -> some View {
         let activeRecord = record ?? provisionalRecord
         let level = activeRecord.attention(ageMonths: student.bodyAssessmentAgeMonths, gender: student.gender)
+        let bmiLevel = activeRecord.bmiAttention(ageMonths: student.bodyAssessmentAgeMonths, gender: student.gender)
+        let postureClassificationPending = activeRecord.postureReport?.canPublishClassification == false
         return VStack(alignment: .leading, spacing: AppTheme.cardSpacing) {
             AssessmentHeroCard(
                 icon: icon(for: level),
                 eyebrow: "\(dateText(activeRecord.measuredAt)) · 家庭观察",
                 title: "\(student.name) 的身体测评结果",
-                detail: resultSummary(for: level)
+                detail: postureClassificationPending ? "身体数据和姿态观察已保存；手机姿态结论需待人工标注验证通过后才会开放。" : resultSummary(for: level)
             ) {
                 HStack(spacing: 8) {
                     AssessmentFactChip(icon: "scalemass.fill", title: String(format: "BMI %.1f", activeRecord.bmi))
-                    AssessmentFactChip(icon: "checkmark.circle.fill", title: "完成 \(activeRecord.completedCaptures.count) 项")
+                    AssessmentFactChip(icon: "checkmark.circle.fill", title: "8 段采集记录")
                 }
             }
             bodySyncStatus(for: student)
@@ -23,7 +25,7 @@ extension BodyAssessmentView {
                     HStack(spacing: 10) {
                         resultMetric(title: "身高", value: String(format: "%.1f", activeRecord.heightCentimeters), unit: "cm", color: ReferenceColor.blue)
                         resultMetric(title: "体重", value: String(format: "%.1f", activeRecord.weightKilograms), unit: "kg", color: ReferenceColor.green)
-                        resultMetric(title: "BMI", value: String(format: "%.1f", activeRecord.bmi), unit: activeRecord.bmiScreeningLabel(ageMonths: student.bodyAssessmentAgeMonths, gender: student.gender), color: color(for: level))
+                        resultMetric(title: "BMI", value: String(format: "%.1f", activeRecord.bmi), unit: activeRecord.bmiScreeningLabel(ageMonths: student.bodyAssessmentAgeMonths, gender: student.gender), color: color(for: bmiLevel))
                     }
                     if let geneticHeight = activeRecord.geneticHeightReference(gender: student.gender) {
                         Divider()
@@ -67,10 +69,74 @@ extension BodyAssessmentView {
     private func postureReportCard(_ report: PostureAssessmentReport) -> some View {
         VStack(alignment: .leading, spacing: 11) {
             HStack {
-                Label("人体姿态测评报告", systemImage: "figure.stand.line.dotted.figure.stand")
+                Label("人体姿态观察记录", systemImage: "figure.stand.line.dotted.figure.stand")
                     .font(.headline).foregroundStyle(ReferenceColor.navy)
                 Spacer()
-                attentionBadge(report.overallLevel)
+                Text(report.validationStatus.userFacingLabel)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(report.canPublishClassification ? ReferenceColor.green : .orange)
+                    .padding(.horizontal, 9).padding(.vertical, 5)
+                    .background((report.canPublishClassification ? ReferenceColor.green : Color.orange).opacity(0.10), in: Capsule())
+            }
+            if !report.canPublishClassification {
+                Label(AlgorithmReleaseGate.pendingPostureNotice, systemImage: "exclamationmark.shield.fill")
+                    .font(.caption).foregroundStyle(ReferenceColor.navy)
+                    .padding(10)
+                    .background(Color.orange.opacity(0.09), in: RoundedRectangle(cornerRadius: 10))
+            }
+            if let decision = report.screeningDecision {
+                VStack(alignment: .leading, spacing: 7) {
+                    Label(decision.route.label, systemImage: screeningDecisionIcon(decision.route))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(screeningDecisionColor(decision.route))
+                    if let outcomeLevel = decision.outcomeLevel {
+                        Text("筛查建议：\(outcomeLevel.label)")
+                            .font(.system(size: AppTheme.bodySize, weight: .semibold))
+                            .foregroundStyle(ReferenceColor.navy)
+                    }
+                    Text(decision.route.detail)
+                        .font(.system(size: AppTheme.bodySize))
+                        .foregroundStyle(ReferenceColor.navy)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("分流规则：\(decision.decisionPolicyVersion)")
+                        .font(.system(size: AppTheme.captionSize))
+                        .foregroundStyle(.secondary)
+                    if let reviewDecision = decision.reviewDecision {
+                        Divider()
+                        Label(reviewDecision.title, systemImage: "person.crop.circle.badge.checkmark")
+                            .font(.system(size: AppTheme.bodySize, weight: .semibold))
+                            .foregroundStyle(ReferenceColor.navy)
+                        if let comment = decision.reviewComment, !comment.isEmpty {
+                            Text(comment)
+                                .font(.system(size: AppTheme.bodySize))
+                                .foregroundStyle(ReferenceColor.navy)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        if reviewDecision == .recapture, let tasks = decision.requestedRecaptureTasks, !tasks.isEmpty {
+                            Text("需要重采：\(tasks.map(captureTaskTitle).joined(separator: "、"))")
+                                .font(.system(size: AppTheme.captionSize))
+                                .foregroundStyle(.secondary)
+                        }
+                    } else if decision.route == .professionalReview {
+                        Text("当前状态：等待学校专业人员复核")
+                            .font(.system(size: AppTheme.bodySize, weight: .medium))
+                            .foregroundStyle(.orange)
+                    }
+                    if decision.route == .recaptureRequired || decision.reviewDecision == .recapture {
+                        Button {
+                            step = .capture
+                        } label: {
+                            Label("按提示重新采集", systemImage: "arrow.clockwise.camera.fill")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(ReferenceColor.blue)
+                    }
+                }
+                .padding(12)
+                .background(screeningDecisionColor(decision.route).opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("身体筛查状态：\(decision.route.label)。\(decision.route.detail)")
             }
             Text("本次观察 · \(report.snapshots.values.map(\.sampleCount).reduce(0, +)) 条记录")
                 .font(.caption).foregroundStyle(.secondary)
@@ -85,12 +151,19 @@ extension BodyAssessmentView {
                         }
                         Text(postureMetricSummary(snapshot))
                             .font(.caption).foregroundStyle(.secondary)
+                        if let protocolVersion = snapshot.captureProtocolVersion {
+                            Label(captureTraceSummary(snapshot, protocolVersion: protocolVersion), systemImage: "viewfinder.circle")
+                                .font(.system(size: AppTheme.captionSize, weight: .medium))
+                                .foregroundStyle(ReferenceColor.blue)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityLabel("采集质量：\(captureTraceSummary(snapshot, protocolVersion: protocolVersion))")
+                        }
                     }
                     .padding(9)
                     .background(ReferenceColor.canvas, in: RoundedRectangle(cornerRadius: 10))
                 }
             }
-            ForEach(report.reasons, id: \.self) { reason in
+            ForEach(report.reasons.filter { $0 != AlgorithmReleaseGate.pendingPostureNotice }, id: \.self) { reason in
                 HStack(alignment: .top, spacing: 7) {
                     Image(systemName: "waveform.path.ecg").foregroundStyle(ReferenceColor.blue)
                     Text(reason).font(.caption).foregroundStyle(ReferenceColor.navy)
@@ -99,7 +172,7 @@ extension BodyAssessmentView {
             Text(report.disclaimer)
                 .font(.caption).foregroundStyle(.secondary)
                 .padding(10).background(ReferenceColor.blue.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
-            if report.overallLevel == .pending {
+            if !report.isComplete {
                 Button {
                     step = .capture
                 } label: {
@@ -114,14 +187,67 @@ extension BodyAssessmentView {
         .background(.white, in: RoundedRectangle(cornerRadius: 16))
     }
 
+    private func screeningDecisionIcon(_ route: BodyScreeningRoute) -> String {
+        switch route {
+        case .autoArchive: "checkmark.seal.fill"
+        case .recaptureRequired: "arrow.clockwise.camera.fill"
+        case .professionalReview: "person.crop.circle.badge.clock.fill"
+        }
+    }
+
+    private func screeningDecisionColor(_ route: BodyScreeningRoute) -> Color {
+        switch route {
+        case .autoArchive: ReferenceColor.green
+        case .recaptureRequired: bodyCoral
+        case .professionalReview: .orange
+        }
+    }
+
+    private func captureTaskTitle(_ code: String) -> String {
+        BodyAssessmentRecord.CaptureTask(rawValue: code)?.title ?? code
+    }
+
     private func postureMetricSummary(_ snapshot: PostureMetricSnapshot) -> String {
         var values: [String] = []
-        if let value = snapshot.shoulderHeightDifferenceCm { values.append(String(format: "双肩差 %.1f cm", value)) }
-        if let value = snapshot.pelvicHeightDifferenceCm { values.append(String(format: "骨盆差 %.1f cm", value)) }
-        if let value = snapshot.spinalMidlineDeviationCm { values.append(String(format: "中线偏移 %.1f cm", value)) }
+        if snapshot.task == .footArch {
+            values.append("当前仅记录足部画面质量与足跟投影；足弓分类待专用足部模型完成人工标注验证")
+        }
+        if let value = snapshot.shoulderHeightDifferenceCm { values.append(String(format: "肩线投影参考值 %.1f", value)) }
+        if let value = snapshot.pelvicHeightDifferenceCm { values.append(String(format: "骨盆线投影参考值 %.1f", value)) }
+        if let value = snapshot.headTiltDegrees { values.append(String(format: "头部侧倾 %.1f°", value)) }
+        if let value = snapshot.spinalMidlineDeviationCm { values.append(String(format: "躯干中线投影参考值 %.1f", value)) }
+        if let value = snapshot.kneeAlignmentProxyRatio { values.append(String(format: "站立膝部轨迹参考值 %.2f", value)) }
+        if let value = snapshot.lowerLimbAxisAsymmetryDegrees { values.append(String(format: "下肢左右差参考值 %.1f°", value)) }
+        if let value = snapshot.movementRepetitionCount { values.append(String(format: "完整下蹲回位 %.0f 次", value)) }
+        if let value = snapshot.kneeTrackingAsymmetryRatio { values.append(String(format: "动态膝轨迹左右差 %.2f", value)) }
+        if let value = snapshot.squatDepthRatio { values.append(String(format: "动作幅度参考值 %.2f", value)) }
+        if let value = snapshot.footArchVisibilityScore { values.append(String(format: "足部画面可见度 %.0f%%", value * 100)) }
+        if let value = snapshot.heelAlignmentProxyDegrees { values.append(String(format: "足跟线投影参考值 %.1f°", value)) }
+        if let adams = snapshot.adamsResult { values.append("Adams \(adams.label)") }
+        if let side = snapshot.adamsProminenceSide { values.append("隆起侧 \(side)") }
         if let value = snapshot.cameraProxyAtrDegrees { values.append(String(format: "旋转代理 %.1f°", value)) }
-        if let value = snapshot.gaitTrunkSwayCm { values.append(String(format: "步态摆动 %.1f cm", value)) }
-        return values.isEmpty ? "指标尚未完整，请重新拍摄" : values.joined(separator: " · ")
+        if let value = snapshot.thoracicAtrDegrees { values.append(String(format: "胸段 ATR %.1f°%@", value, snapshot.thoracicAtrSide.map { " · \($0)侧" } ?? "")) }
+        if let value = snapshot.lumbarAtrDegrees { values.append(String(format: "腰段 ATR %.1f°%@", value, snapshot.lumbarAtrSide.map { " · \($0)侧" } ?? "")) }
+        if let first = snapshot.thoracicAtrFirstDegrees, let second = snapshot.thoracicAtrSecondDegrees { values.append(String(format: "胸段复测原始值 %.1f° / %.1f°", first, second)) }
+        if let first = snapshot.lumbarAtrFirstDegrees, let second = snapshot.lumbarAtrSecondDegrees { values.append(String(format: "腰段复测原始值 %.1f° / %.1f°", first, second)) }
+        if let value = snapshot.seatedForwardBendAtrDegrees { values.append(String(format: "坐位前屈 ATR %.1f°", value)) }
+        if let value = snapshot.occiputWallDistanceCm { values.append(String(format: "枕墙距 %.1f cm", value)) }
+        if let value = snapshot.gaitTrunkSwayCm { values.append(String(format: "步态摆动投影参考值 %.1f", value)) }
+        if let value = snapshot.gaitObservedAbnormal { values.append(value ? "步态人工观察异常" : "步态人工观察未见异常") }
+        if let value = snapshot.seatedThoracicKyphosisObserved { values.append(value ? "坐姿圆肩驼背" : "坐姿未见明显圆肩驼背") }
+        return values.isEmpty ? "该段尚未形成有效结构化记录，请重新拍摄" : values.joined(separator: " · ")
+    }
+
+    private func captureTraceSummary(_ snapshot: PostureMetricSnapshot, protocolVersion: String) -> String {
+        let camera = snapshot.cameraFacing == "rear-1x" ? "后置 1×" : "引导镜头"
+        let checks = snapshot.qualityChecks?.count ?? 0
+        if snapshot.repeatabilityStatus == "passed" {
+            return "\(camera) · 两次独立采集一致性已通过并融合 · \(checks) 项质量门 · \(protocolVersion)"
+        }
+        if snapshot.repeatabilityStatus == "awaiting-second-take" {
+            return "\(camera) · 第 1 次已保存，尚需独立第 2 次采集 · \(protocolVersion)"
+        }
+        return "\(camera) · \(checks) 项质量门已通过 · \(protocolVersion)"
     }
 
     @ViewBuilder private func bodySyncStatus(for student: Student) -> some View {

@@ -46,7 +46,7 @@ const cleanMetrics = {
   gaitTrunkSwayCm: 0.2
 };
 const snapshotsFor = (kind) => {
-  const tasks = ['standingBack', 'forwardBend', 'seatedPosture', 'gaitVideo'];
+  const tasks = ['standingFront', 'standingBack', 'standingSide', 'forwardBend', 'dynamicKneeControl', 'gaitVideo', 'seatedPosture', 'footArch'];
   const snapshots = tasks.map((captureTask) => ({ captureTask, sampleCount: 18, confidence: 0.82, metrics: { ...cleanMetrics } }));
   if (kind === 'shoulder') snapshots[0].metrics.shoulderHeightDifferenceCm = 2.0;
   if (kind === 'atr') snapshots[1].metrics.instrumentAtrDegrees = 7.0;

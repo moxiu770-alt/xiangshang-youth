@@ -156,7 +156,28 @@ data class BodyAssessmentDraft(
     val fatherHeightCm: Double? = null,
     val motherHeightCm: Double? = null,
     val captureObservationHints: Map<String, String> = emptyMap(),
-    val postureSnapshots: Map<BodyCaptureTask, PostureMetricSnapshot> = emptyMap()
+    val postureSnapshots: Map<BodyCaptureTask, PostureMetricSnapshot> = emptyMap(),
+    val standingShoulderDifferenceCm: Double? = null,
+    val standingPelvisDifferenceCm: Double? = null,
+    val standingHeadTiltDegrees: Double? = null,
+    val adamsObservedResult: String? = null,
+    val adamsProminenceSide: String? = null,
+    val gaitObservedAbnormal: Boolean? = null,
+    val gaitObservationNote: String? = null,
+    val seatedMidlineDifferenceCm: Double? = null,
+    val seatedShoulderDifferenceCm: Double? = null,
+    val seatedThoracicKyphosisObserved: Boolean? = null,
+    val thoracicAtrDegrees: Double? = null,
+    val lumbarAtrDegrees: Double? = null,
+    val thoracicAtrSide: String? = null,
+    val lumbarAtrSide: String? = null,
+    val atrRetestEnabled: Boolean = false,
+    val thoracicAtrRepeatDegrees: Double? = null,
+    val lumbarAtrRepeatDegrees: Double? = null,
+    val seatedForwardBendAtrDegrees: Double? = null,
+    val occiputWallDistanceFirstCm: Double? = null,
+    val occiputWallDistanceSecondCm: Double? = null,
+    val occiputWallDistanceCm: Double? = null
 )
 private data class BmiRow(val month: Int, val overweight: Double, val obesity: Double)
 private object BmiReference {

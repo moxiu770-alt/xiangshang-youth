@@ -11,7 +11,7 @@ export async function reconcileFieldLiveness(executor, offlineAfterSeconds) {
   const stationIds = [...new Set(devices.rows.map((device) => device.stationId).filter(Boolean))];
   if (!stationIds.length) return { devices: devices.rows, stations: [] };
   const stations = await executor.query(`UPDATE test_stations station
-    SET status='offline',updated_at=now()
+    SET status='offline',status_reason='边缘主机心跳超时，系统自动标记离线',status_changed_at=now(),status_changed_by=NULL,updated_at=now()
     WHERE station.id = ANY($1::text[]) AND station.status='online'
       AND NOT EXISTS (SELECT 1 FROM test_devices device
         WHERE device.station_id=station.id AND device.status='online' AND device.device_type='edge_host'

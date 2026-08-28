@@ -87,6 +87,8 @@
               <span data-icon="dashboard"></span>数据总览</button
             ><button class="nav-item" data-section="tasks">
               <span data-icon="clipboard"></span>测评任务</button
+            ><button class="nav-item" data-section="field">
+              <span data-icon="flag"></span>现场运行</button
             ><button class="nav-item" data-section="students">
               <span data-icon="users"></span>学生档案</button
             ><button class="nav-item" data-section="reports">
@@ -225,7 +227,7 @@
               <div class="panel-head">
                 <div>
                   <h3>各年级测评完成率</h3>
-                  <p>按当前学校最新任务状态汇总</p>
+                  <p>按当前业务任务的学生状态汇总</p>
                 </div>
                 <button class="panel-action" data-section="analysis">
                   查看分析 <span data-icon="chevron"></span>
@@ -269,7 +271,7 @@
                         <th>任务名称</th>
                         <th>测评范围</th>
                         <th>进度</th>
-                        <th>状态</th>
+                        <th>现场进度</th>
                         <th>日期</th>
                       </tr>
                     </thead>
@@ -447,7 +449,9 @@
     </div>
     <div id="toast" class="toast hidden"></div>
     <script src="/admin.js" defer></script>
+    <script src="/field-operations-policy.js" defer></script>
     <script src="/admin-enhancements.js" defer></script>
     <script src="/content-operations.js" defer></script>
+    <script src="/admin-workspaces.js" defer></script>
   </body>
 </html>

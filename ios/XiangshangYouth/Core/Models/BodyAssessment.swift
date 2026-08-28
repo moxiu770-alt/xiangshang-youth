@@ -59,25 +59,23 @@ struct BodyAssessmentRecord: Codable, Equatable {
     }
 
     enum CaptureTask: String, Codable, CaseIterable, Identifiable {
-        case standingBack, forwardBend, seatedPosture, gaitVideo
+        case standingFront, standingBack, standingSide, forwardBend
+        case dynamicKneeControl, gaitVideo, seatedPosture, footArch
 
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .standingBack: "自然站姿"
-            case .forwardBend: "前屈观察"
-            case .seatedPosture: "坐姿观察"
-            case .gaitVideo: "步态视频"
+            case .standingFront: "正面自然站立观察"
+            case .standingBack: "静态站姿对称观察"
+            case .standingSide: "左右侧位姿态观察"
+            case .forwardBend: "亚当斯前屈试验"
+            case .dynamicKneeControl: "动态下肢力线观察"
+            case .seatedPosture: "无靠背坐姿脊柱直立测试"
+            case .gaitVideo: "动态步态姿态观察"
+            case .footArch: "足弓与足跟对齐观察"
             }
         }
-        var instruction: String {
-            switch self {
-            case .standingBack: "背对镜头自然站立，双脚与肩同宽。"
-            case .forwardBend: "建议从侧后方拍摄；家长陪同下缓慢前屈，感到不适立即停止。"
-            case .seatedPosture: "坐在无靠背椅上，双手自然放在膝盖。"
-            case .gaitVideo: "沿直线自然行走 3–5 秒，镜头从后方拍摄。"
-            }
-        }
+        var instruction: String { SpineScreeningStandard.instruction(for: self) }
     }
 
     struct Observation: Codable, Equatable, Identifiable {
@@ -241,12 +239,19 @@ struct BodyAssessmentRecord: Codable, Equatable {
 
     func observations(ageMonths: Int?, gender: String) -> [Observation] {
         let posture = postureReport?.overallLevel ?? postureAttention()
+        let postureDetail: String = {
+            guard let postureReport else { return "尚未形成完整姿态观察。" }
+            return postureReport.canPublishClassification
+                ? "本次观察已整理为结果：\(postureReport.overallLevel.label)。"
+                : "姿态观察记录已保存；算法仍在人工标注验证中，暂不生成风险等级。"
+        }()
+        let captureQualityLevel: AttentionLevel = postureReport.map { $0.isComplete ? .green : .pending } ?? .pending
         return [
             Observation(id: "bmi", title: "BMI 年龄别筛查", detail: String(format: "BMI %.1f · %@ · %@", bmi, bmiScreeningLabel(ageMonths: ageMonths, gender: gender), ruleVersion), level: bmiAttention(ageMonths: ageMonths, gender: gender)),
-            Observation(id: "shoulder", title: "姿态观察", detail: postureReport.map { "本次观察已整理为结果：\($0.overallLevel.label)。" } ?? "尚未形成完整姿态观察。", level: posture),
+            Observation(id: "shoulder", title: "姿态观察", detail: postureDetail, level: posture),
             Observation(id: "gait", title: "家长安全信息", detail: parentMarkedGaitConcern ? "家长补充：近期有行走困难或活动受限，请关注安全并咨询专业人员。" : "未补充行走困难或活动受限。", level: .green),
-            Observation(id: "visual", title: "画面质量", detail: visualObservationSummary ?? "画面已完成质量检查。", level: postureReport?.overallLevel ?? (visualObservationSummary == nil ? .green : .yellow)),
-            Observation(id: "capture", title: "记录完整度", detail: postureReport.map { _ in "本次记录已保存，可查看家庭观察结果。" } ?? "已完成 \(completedCaptures.count) / \(CaptureTask.allCases.count) 个拍摄任务，仍需完成稳定度确认。", level: postureReport == nil ? .yellow : posture)
+            Observation(id: "visual", title: "画面质量", detail: visualObservationSummary ?? "画面已完成质量检查。", level: captureQualityLevel),
+            Observation(id: "capture", title: "记录完整度", detail: postureReport.map { _ in "本次记录已保存，可查看采集值和质量说明。" } ?? "已完成 \(completedCaptures.count) / \(CaptureTask.allCases.count) 个拍摄任务，仍需完成稳定度确认。", level: postureReport == nil ? .yellow : captureQualityLevel)
         ]
     }
 
@@ -255,68 +260,6 @@ struct BodyAssessmentRecord: Codable, Equatable {
             .compactMap { task in captureObservationHints[task].map { "\(task.title)：\($0)" } }
             .joined(separator: "\n")
         return structured.isEmpty ? visualObservationHint : structured
-    }
-}
-
-/// Persisted only while a family assessment is in progress.  It contains no
-/// media asset and lets a parent safely leave the app before confirming a
-/// result.
-struct BodyAssessmentDraft: Codable, Equatable {
-    var step: Int = 0
-    var guardianReady = false
-    var consentAcknowledged = false
-    var environmentReady = false
-    var heightCentimeters: Double = 0
-    var weightKilograms: Double = 0
-    var completedCaptures: Set<BodyAssessmentRecord.CaptureTask> = []
-    var parentMarkedAsymmetric = false
-    var parentMarkedGaitConcern = false
-    var visualObservationHint: String? = nil
-    var captureObservationHints: [BodyAssessmentRecord.CaptureTask: String] = [:]
-    var fatherHeightCentimeters: Double? = nil
-    var motherHeightCentimeters: Double? = nil
-    var postureSnapshots: [BodyAssessmentRecord.CaptureTask: PostureMetricSnapshot] = [:]
-
-    private enum CodingKeys: String, CodingKey {
-        case step, guardianReady, consentAcknowledged, environmentReady
-        case heightCentimeters, weightKilograms, completedCaptures
-        case parentMarkedAsymmetric, parentMarkedGaitConcern, visualObservationHint
-        case captureObservationHints, fatherHeightCentimeters, motherHeightCentimeters, postureSnapshots
-    }
-
-    init(step: Int = 0, guardianReady: Bool = false, consentAcknowledged: Bool = false, environmentReady: Bool = false, heightCentimeters: Double = 0, weightKilograms: Double = 0, completedCaptures: Set<BodyAssessmentRecord.CaptureTask> = [], parentMarkedAsymmetric: Bool = false, parentMarkedGaitConcern: Bool = false, visualObservationHint: String? = nil, captureObservationHints: [BodyAssessmentRecord.CaptureTask: String] = [:], fatherHeightCentimeters: Double? = nil, motherHeightCentimeters: Double? = nil, postureSnapshots: [BodyAssessmentRecord.CaptureTask: PostureMetricSnapshot] = [:]) {
-        self.step = step
-        self.guardianReady = guardianReady
-        self.consentAcknowledged = consentAcknowledged
-        self.environmentReady = environmentReady
-        self.heightCentimeters = heightCentimeters
-        self.weightKilograms = weightKilograms
-        self.completedCaptures = completedCaptures
-        self.parentMarkedAsymmetric = parentMarkedAsymmetric
-        self.parentMarkedGaitConcern = parentMarkedGaitConcern
-        self.visualObservationHint = visualObservationHint
-        self.captureObservationHints = captureObservationHints
-        self.fatherHeightCentimeters = fatherHeightCentimeters
-        self.motherHeightCentimeters = motherHeightCentimeters
-        self.postureSnapshots = postureSnapshots
-    }
-
-    init(from decoder: Decoder) throws {
-        let values = try decoder.container(keyedBy: CodingKeys.self)
-        step = try values.decodeIfPresent(Int.self, forKey: .step) ?? 0
-        guardianReady = try values.decodeIfPresent(Bool.self, forKey: .guardianReady) ?? false
-        consentAcknowledged = try values.decodeIfPresent(Bool.self, forKey: .consentAcknowledged) ?? false
-        environmentReady = try values.decodeIfPresent(Bool.self, forKey: .environmentReady) ?? false
-        heightCentimeters = try values.decodeIfPresent(Double.self, forKey: .heightCentimeters) ?? 0
-        weightKilograms = try values.decodeIfPresent(Double.self, forKey: .weightKilograms) ?? 0
-        completedCaptures = try values.decodeIfPresent(Set<BodyAssessmentRecord.CaptureTask>.self, forKey: .completedCaptures) ?? []
-        parentMarkedAsymmetric = try values.decodeIfPresent(Bool.self, forKey: .parentMarkedAsymmetric) ?? false
-        parentMarkedGaitConcern = try values.decodeIfPresent(Bool.self, forKey: .parentMarkedGaitConcern) ?? false
-        visualObservationHint = try values.decodeIfPresent(String.self, forKey: .visualObservationHint)
-        captureObservationHints = try values.decodeIfPresent([BodyAssessmentRecord.CaptureTask: String].self, forKey: .captureObservationHints) ?? [:]
-        fatherHeightCentimeters = try values.decodeIfPresent(Double.self, forKey: .fatherHeightCentimeters)
-        motherHeightCentimeters = try values.decodeIfPresent(Double.self, forKey: .motherHeightCentimeters)
-        postureSnapshots = try values.decodeIfPresent([BodyAssessmentRecord.CaptureTask: PostureMetricSnapshot].self, forKey: .postureSnapshots) ?? [:]
     }
 }
 

@@ -6,7 +6,8 @@ export const taskStatusTransitions = Object.freeze({
   '已完成': ['待复核', '待补测'],
   '待复核': ['已完成', '待补测'],
   '待补测': ['已签到', '缺席'],
-  '缺席': ['已签到']
+  '缺席': ['已签到'],
+  '未完成': []
 });
 
 export const taskStatusAllowed = (from, to) => from === to || Boolean(taskStatusTransitions[from]?.includes(to));

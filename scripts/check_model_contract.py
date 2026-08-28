@@ -20,6 +20,12 @@ IOS_BODY = "\n".join(
         ROOT / "ios/XiangshangYouth/Core/Models/BodyPostureAssessment.swift",
         ROOT / "ios/XiangshangYouth/Core/Models/BodyCaptureQualityGate.swift",
         ROOT / "ios/XiangshangYouth/Core/Models/PostureMetricCalculator.swift",
+        ROOT / "ios/XiangshangYouth/Core/Models/PostureAssessmentReport.swift",
+        ROOT / "ios/XiangshangYouth/Core/Models/BodyAssessmentDraft.swift",
+        ROOT / "ios/XiangshangYouth/Core/Models/PostureCaptureRepeatability.swift",
+        ROOT / "ios/XiangshangYouth/Core/Models/BodyScreeningModels.swift",
+        ROOT / "ios/XiangshangYouth/Core/Models/PostureRepeatabilityCalculator.swift",
+        ROOT / "ios/XiangshangYouth/Core/Models/BodyCaptureActionQuality.swift",
     )
 )
 ANDROID_BODY = "\n".join(
@@ -31,6 +37,12 @@ ANDROID_BODY = "\n".join(
         ROOT / "android/app/src/main/java/com/xiangshang/youth/core/model/PostureAssessmentReport.kt",
         ROOT / "android/app/src/main/java/com/xiangshang/youth/core/model/PostureMetricCalculator.kt",
         ROOT / "android/app/src/main/java/com/xiangshang/youth/core/model/BodyCaptureQualityGate.kt",
+        ROOT / "android/app/src/main/java/com/xiangshang/youth/core/model/BodyAttentionModels.kt",
+        ROOT / "android/app/src/main/java/com/xiangshang/youth/core/model/BodyCaptureTask.kt",
+        ROOT / "android/app/src/main/java/com/xiangshang/youth/core/model/BodyCaptureCompletionGate.kt",
+        ROOT / "android/app/src/main/java/com/xiangshang/youth/core/model/PostureRepeatabilityCalculator.kt",
+        ROOT / "android/app/src/main/java/com/xiangshang/youth/core/model/BodyScreeningModels.kt",
+        ROOT / "android/app/src/main/java/com/xiangshang/youth/core/model/PostureEvidenceValidation.kt",
     )
 )
 ANDROID_GROWTH = (ROOT / "android/app/src/main/java/com/xiangshang/youth/core/model/GrowthInsight.kt").read_text()
@@ -70,6 +82,8 @@ MODEL_EVALUATOR = (ROOT / "scripts/evaluate_model_corpus.mjs").read_text()
 MODEL_FUZZ = (ROOT / "scripts/fuzz_model_boundaries.mjs").read_text()
 MODEL_FITTER = (ROOT / "scripts/fit_movement_calibration.mjs").read_text()
 MODEL_FITTER_TEST = (ROOT / "scripts/test_model_calibration.mjs").read_text()
+MODEL_APPROVAL_SCHEMA_SOURCE = (ROOT / "qa/model_validation_approval.schema.json").read_text()
+MODEL_APPROVAL_VERIFIER = (ROOT / "scripts/verify_model_validation_approval.py").read_text()
 MODEL_FITTER_SCHEMA = json.loads((ROOT / "qa/model_calibration_corpus.schema.json").read_text())
 MODEL_CORPUS = json.loads((ROOT / "qa/model_golden_corpus.json").read_text())
 MODEL_SCHEMA = json.loads((ROOT / "qa/model_labeled_corpus.schema.json").read_text())
@@ -129,7 +143,7 @@ def extract_posture_profiles(source: str, platform: str):
         return [((int(min_months), int(max_months)), parse_numeric_named_arguments(body)) for min_months, max_months, body in blocks]
     if platform == "ios":
         start = source.index("static func profile(ageMonths: Int?) -> ScoringProfile")
-        section = source[start:source.index("/// Report-level rules")]
+        section = source[start:source.index("/// Candidate posture rules")]
         blocks = re.findall(r"return ScoringProfile\(([^\)]*)\)", section, flags=re.DOTALL)
         bands = [(72, 96), (97, 132), (133, 180), (181, 216)]
         return list(zip(bands, (parse_numeric_named_arguments(block) for block in blocks)))
@@ -202,11 +216,12 @@ def main() -> int:
         (r'const val calibrationVersion = "UY-CAL-BASELINE-1\.0"', ANDROID_BODY, "Android posture calibration version"),
         (r"POSTURE_ALGORITHM_VERSION.*from './postureScoring\.js'", BACKEND_SERVER, "backend posture algorithm wiring"),
         (r"scoreBodyAssessment.*from './bodyScoring\.js'", BACKEND_SERVER, "backend body scorer wiring"),
-        (r"finiteScalar, scoreBodyAssessment.*from './bodyScoring\.js'", BACKEND_SERVER, "backend body API scalar gate wiring"),
+        (r"finiteScalar, publicationSafeBodyReport, scoreBodyAssessment.*from './bodyScoring\.js'", BACKEND_SERVER, "backend body API scalar and publication gate wiring"),
+        (r"publicationSafeBodyReport\(scoreBodyAssessment", BACKEND_SERVER, "backend unvalidated posture publication guard"),
         (r"export const POSTURE_ALGORITHM_VERSION = 'UY-IMCA-CV-1\.3'", BACKEND_POSTURE, "backend canonical posture scorer version"),
         (r"POSTURE_RULES_SOURCE_VERSION = 'UY-IMCA-SCOLIOSIS-FRAMEWORK-V1-2026-07-20'", BACKEND_POSTURE, "backend posture framework source version"),
         (r"rulesSourceVersion: 'UY-IMCA-SCOLIOSIS-FRAMEWORK-V1-2026-07-20'", BACKEND_REGISTRY, "posture registry framework source version"),
-        (r"sourceVersion: 'android-v1-search-calibrated-2026-09-15'", BACKEND_REGISTRY, "posture capture source asset version"),
+        (r"sourceVersion: 'android-v3-adams-repeatability-2026-08-27'", BACKEND_REGISTRY, "posture capture source asset version"),
         (r"export const BMI_RULE_VERSION = 'WS/T 586—2018 年龄别 BMI 参考 v1\.1'", BACKEND_BODY, "backend canonical BMI rule version"),
         (r"export function combineBodyLevel", BACKEND_BODY, "backend BMI/posture level merge"),
         (r"validLevels = new Set", BACKEND_BODY, "backend unknown body level fail-closed gate"),
@@ -232,10 +247,17 @@ def main() -> int:
         (r"bmiAgeBucketMonths: bmiAgeBucket", BACKEND_BODY, "backend BMI half-year audit bucket"),
         (r"ageMonths: Number\.isInteger\(ageMonths\) \? ageMonths : null", BACKEND_BODY, "body measurement age snapshot"),
         (r"heightAlgorithmVersion: HEIGHT_ALGORITHM_VERSION", BACKEND_BODY, "backend height output version"),
-        (r"MODEL_REGISTRY_VERSION = 'UY-MODELS-1\.0'", BACKEND_REGISTRY, "model registry version"),
+        (r"MODEL_REGISTRY_VERSION = 'UY-MODELS-1\.1'", BACKEND_REGISTRY, "model registry version"),
         (r"followAlong: Object\.freeze", BACKEND_REGISTRY, "follow-along registry entry"),
         (r"sourceVersion: 'android-child-precision-2026-09-16-child-motion-research-v4\.1'", BACKEND_REGISTRY, "follow-along source asset version"),
         (r"growth: Object\.freeze", BACKEND_REGISTRY, "growth registry entry"),
+        (r"POSTURE_VALIDATION_DOMAINS", BACKEND_REGISTRY, "eight-domain posture validation registry"),
+        (r"postureClassificationIsPublished", BACKEND_REGISTRY, "posture publication requires all domain approvals"),
+        (r"postureClassificationIsPublished\(\)", BACKEND_POSTURE, "posture report uses the all-domain publication gate"),
+        (r'"postureDomainValidation"', MODEL_APPROVAL_SCHEMA_SOURCE, "posture domain approval schema"),
+        (r'"foot_arch"', MODEL_APPROVAL_SCHEMA_SOURCE, "foot domain approval requirement"),
+        (r'MODEL_POSTURE_DOMAIN_REPORT_DIR', MODEL_APPROVAL_VERIFIER, "private posture-domain evidence directory"),
+        (r'POSTURE_DOMAINS', MODEL_APPROVAL_VERIFIER, "eight-domain approval verifier"),
         (r"short-lived parser per call", IOS_GROWTH, "iOS growth date parser concurrency safety"),
         (r"export function heightDevelopment", BACKEND_BODY, "backend height development scorer"),
         (r"export const GROWTH_ALGORITHM_VERSION = 'UY-GROWTH-RULE-1\.1'", BACKEND_GROWTH, "backend canonical growth scorer version"),
@@ -259,7 +281,7 @@ def main() -> int:
         (r"headTiltYellow", IOS_BODY, "iOS head-tilt screening rule"),
         (r"let rulesSourceVersion: String", IOS_BODY, "iOS posture report source version"),
         (r"loadCanonicalProfilesIfAvailable", IOS_BODY, "iOS posture capture canonical asset loader"),
-        (r"canonicalAssetVersion = \"android-v1-search-calibrated-2026-09-15\"", IOS_BODY, "iOS posture capture asset version gate"),
+        (r"canonicalAssetVersion = \"android-v3-adams-repeatability-2026-08-27\"", IOS_BODY, "iOS posture capture asset version gate"),
         (r"canonicalProfileIsValid", IOS_BODY, "iOS posture capture complete asset bounds gate"),
         (r"validMetrics", ANDROID_BODY, "Android posture metric range gate"),
         (r"rulesSourceVersion = \"UY-IMCA-SCOLIOSIS-FRAMEWORK-V1-2026-07-20\"", ANDROID_BODY, "Android posture framework source version"),
@@ -351,8 +373,8 @@ def main() -> int:
         (r"ScoreReviewStatus\.PendingReview", ANDROID_SCORE_ADAPTER, "Android unknown review status fallback"),
         (r"duplicateConflictThreshold", IOS_SCORE, "iOS movement duplicate conflict gate"),
         (r"duplicateConflictThreshold", ANDROID_SCORE, "Android movement duplicate conflict gate"),
-        (r'static let modelRegistryVersion = "UY-MODELS-1\.0"', IOS_SCORE, "iOS model registry version"),
-        (r'const val modelRegistryVersion = "UY-MODELS-1\.0"', ANDROID_SCORE, "Android model registry version"),
+        (r'static let modelRegistryVersion = "UY-MODELS-1\.1"', IOS_SCORE, "iOS model registry version"),
+        (r'const val modelRegistryVersion = "UY-MODELS-1\.1"', ANDROID_SCORE, "Android model registry version"),
         (r'static let calibrationVersion = "UY-CAL-BASELINE-1\.0"', IOS_SCORE, "iOS movement calibration version"),
         (r'const val calibrationVersion = "UY-CAL-BASELINE-1\.0"', ANDROID_SCORE, "Android movement calibration version"),
         (r'modelRegistryVersion: MODEL_REGISTRY_VERSION', BACKEND_SCORE, "backend movement registry output"),
@@ -383,7 +405,7 @@ def main() -> int:
         (r"dynamicGateFloor", IOS_FOLLOW, "iOS follow-along age dynamic gate floor"),
         (r"minRange\.coerceAtMost\(rangeCeiling\)", ANDROID_FOLLOW, "Android follow-along safe dynamic range bounds"),
         (r"static func range\(_ values: \[Double\]\)", IOS_BODY, "iOS gait motion range helper"),
-        (r"fun range\(values: List<Double>\)", ANDROID_BODY, "Android gait motion range helper"),
+        (r"fun (?:PostureMetricCalculator\.)?range\(values: List<Double>\)", ANDROID_BODY, "Android gait motion range helper"),
         (r"TASK_EVIDENCE_KEYS", BACKEND_POSTURE, "backend task-specific posture evidence gate"),
         (r"var isComplete: Bool", IOS_BODY, "iOS persisted posture completeness gate"),
         (r"movedFrames >= p\.gaitMovementWindowFrames", IOS_BODY, "iOS gait complete movement window"),
@@ -393,7 +415,7 @@ def main() -> int:
         (r"private var stateReady = true", ANDROID_FOLLOW, "Android follow-along hysteresis state"),
         (r"returnSlopeMinRatio", ANDROID_FOLLOW, "Android follow-along return slope gate"),
         (r"movementSamples >= profile\.gaitMovementWindowFrames", ANDROID_BODY, "Android gait complete movement window"),
-        (r"Shared model assets", IOS_PROJECT, "iOS shared follow-along asset build phase"),
+        (r"Shared app assets", IOS_PROJECT, "iOS shared model asset build phase"),
         (r"body_pose_capture_profiles\.json", IOS_PROJECT, "iOS shared posture capture asset build phase"),
         (r'const val algorithmVersion = "UY-FOLLOW-CV-1\.0"', ANDROID_FOLLOW, "Android follow-along algorithm version"),
         (r'static let algorithmVersion = "UY-GROWTH-RULE-1\.1"', (ROOT / "ios/XiangshangYouth/Core/Models/GrowthInsight.swift").read_text(), "iOS growth algorithm version"),

@@ -1,6 +1,6 @@
 param(
   [string]$OutputPath = "./artifacts/field-client-win-x64",
-  [switch]$SelfContained
+  [bool]$SelfContained = $true
 )
 
 $ErrorActionPreference = "Stop"
@@ -12,11 +12,13 @@ $publishArgs = @(
   "--configuration", "Release",
   "--runtime", "win-x64",
   "--output", $OutputPath,
+  "--self-contained", $SelfContained.ToString().ToLowerInvariant(),
   "-p:PublishSingleFile=true",
-  "-p:IncludeNativeLibrariesForSelfExtract=true"
+  "-p:IncludeNativeLibrariesForSelfExtract=true",
+  "-p:DebugType=None",
+  "-p:DebugSymbols=false"
 )
-if ($SelfContained) { $publishArgs += "--self-contained"; $publishArgs += "true" }
-else { $publishArgs += "--self-contained"; $publishArgs += "false" }
 
 & dotnet @publishArgs
+Copy-Item (Join-Path $PSScriptRoot "README-WINDOWS.txt") (Join-Path $OutputPath "开始使用.txt") -Force
 Write-Host "Windows field client published to $OutputPath"

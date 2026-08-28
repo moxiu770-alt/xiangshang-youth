@@ -46,6 +46,7 @@ fun openMessageBusinessRoute(
     openCourseTarget: (childId: String, courseId: String?, lessonId: String?, title: String) -> Unit = { _, _, _, _ -> },
     openActivityTarget: (activityId: String) -> Unit = {},
     openExpertAppointmentTarget: (appointmentId: String) -> Unit = {},
+    selectChildTarget: (childId: String) -> Unit = {},
     openClassNoticeTarget: (MessageItem) -> Unit = {}
 ): Boolean {
     if (MessageBusinessRoutePolicy.isExpired(item.expiresAt)) return false
@@ -88,6 +89,14 @@ fun openMessageBusinessRoute(
         "activity" -> item.businessId?.takeIf { role == UserRole.Parent }?.let { openActivityTarget(it); nav.navigate(Destinations.Activities); true } ?: false
         "expertappointment" -> item.businessId?.takeIf { role == UserRole.Parent }?.let { openExpertAppointmentTarget(it); nav.navigate(Destinations.Experts); true } ?: false
         "childbinding" -> if (role == UserRole.Parent) { nav.navigate(Destinations.ChildrenBinding); true } else false
+        "bodyassessment" -> {
+            val childId = MessageBusinessRoutePolicy.bodyAssessmentChildId(item, role, state.local.boundChildIds) ?: return false
+            run {
+                if (state.selectedChild?.id != childId) selectChildTarget(childId)
+                nav.navigate(Destinations.BodyAssessment)
+                true
+            }
+        }
         "classnotice" -> item.businessId?.takeIf { it.isNotBlank() }?.let { openClassNoticeTarget(item); true } ?: false
         else -> false
     }
@@ -102,6 +111,7 @@ fun NotificationsScreen(
     openCourseTarget: (String, String?, String?, String) -> Unit = { _, _, _, _ -> },
     openActivityTarget: (String) -> Unit = {},
     openExpertAppointmentTarget: (String) -> Unit = {},
+    selectChildTarget: (String) -> Unit = {},
     loadClassNoticeDetail: (String, (com.xiangshang.youth.core.service.NotificationCampaignDetail?) -> Unit) -> Unit = { _, done -> done(null) },
     acknowledgeClassNotice: (String, (Boolean) -> Unit) -> Unit = { _, done -> done(false) }
 ) = AppScaffold("消息通知", onBack = { nav.popBackStack() }) {
@@ -112,7 +122,7 @@ fun NotificationsScreen(
     Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) { Text("全部通知", color = Navy, fontWeight = FontWeight.Bold, fontSize = 16.sp); Spacer(Modifier.weight(1f)); if (state.unreadMessageCount > 0) TextButton(onClick = markAllMessagesRead, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp), modifier = Modifier.semantics { contentDescription = "将全部通知标记为已读" }) { Text("全部已读", fontSize = 12.sp) }; Text("未读 ${state.unreadMessageCount}", color = Blue, fontSize = 12.sp) }
     state.data.messages.forEachIndexed { index, item ->
         var detail by remember { mutableStateOf(false) }
-        Surface(Modifier.fillMaxWidth().padding(vertical = 4.dp).semantics { role = Role.Button; contentDescription = "查看通知：${item.title}" }.clickable { markMessageRead(item.id); if (!openMessageBusinessRoute(item, state, nav, UserRole.Parent, openCourseTarget, openActivityTarget, openExpertAppointmentTarget, openClassNoticeTarget = { detail = true })) detail = true }, color = Color.White, shape = RoundedCornerShape(11.dp), shadowElevation = 1.dp) {
+        Surface(Modifier.fillMaxWidth().padding(vertical = 4.dp).semantics { role = Role.Button; contentDescription = "查看通知：${item.title}" }.clickable { markMessageRead(item.id); if (!openMessageBusinessRoute(item, state, nav, UserRole.Parent, openCourseTarget, openActivityTarget, openExpertAppointmentTarget, selectChildTarget, openClassNoticeTarget = { detail = true })) detail = true }, color = Color.White, shape = RoundedCornerShape(11.dp), shadowElevation = 1.dp) {
             Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(if (item.category == "报告") Icons.Filled.Description else Icons.Filled.Notifications, null, tint = if (index == 0) Blue else Color(0xFFFF9D25), modifier = Modifier.size(25.dp))
                 Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)) { Row(verticalAlignment = Alignment.CenterVertically) { Text(item.title, color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp); if (!item.isRead && item.id !in state.local.readMessageIds) Spacer(Modifier.width(5.dp)); if (!item.isRead && item.id !in state.local.readMessageIds) Box(Modifier.size(5.dp).background(Color.Red, CircleShape)) }; Text(item.content, color = Color.Gray, fontSize = 12.sp, maxLines = 2); Text("${item.category} · ${item.time}", color = Color.Gray, fontSize = 12.sp) }; Icon(Icons.Filled.ChevronRight, null, tint = Color.Gray, modifier = Modifier.size(15.dp))
@@ -137,7 +147,8 @@ fun ParentMessagesScreen(
     markAllMessagesRead: () -> Unit,
     openCourseTarget: (String, String?, String?, String) -> Unit = { _, _, _, _ -> },
     openActivityTarget: (String) -> Unit = {},
-    openExpertAppointmentTarget: (String) -> Unit = {}
+    openExpertAppointmentTarget: (String) -> Unit = {},
+    selectChildTarget: (String) -> Unit = {}
 ) {
     var selectedTitle by remember { mutableStateOf<String?>(null) }
     var selectedContent by remember { mutableStateOf("") }
@@ -185,7 +196,7 @@ fun ParentMessagesScreen(
                 Surface(
                     Modifier.fillMaxWidth().padding(vertical = 4.dp).semantics { role = Role.Button; contentDescription = "查看消息：${item.title}" }.clickable {
                         markMessageRead(item.id)
-                        if (!openMessageBusinessRoute(item, state, nav, UserRole.Parent, openCourseTarget, openActivityTarget, openExpertAppointmentTarget, openClassNoticeTarget = {
+                        if (!openMessageBusinessRoute(item, state, nav, UserRole.Parent, openCourseTarget, openActivityTarget, openExpertAppointmentTarget, selectChildTarget, openClassNoticeTarget = {
                                 selectedTitle = item.title
                                 selectedContent = item.content
                                 selectedTime = item.time
@@ -228,7 +239,7 @@ fun ParentMessagesScreen(
 private fun messageRouteFallback(item: MessageItem): String {
     return when (MessageBusinessRoutePolicy.normalizeRoute(item.businessRoute)) {
         "course", "lesson" -> "该课程通知缺少孩子、课程或课节编号，暂时不能打开指定课程。"
-        "report", "task", "retest" -> "当前账号无法打开这条通知关联的孩子、任务或报告。"
+        "report", "task", "retest", "bodyassessment" -> "当前账号无法打开这条通知关联的孩子、任务、报告或身体观察记录。"
         "activity", "expertappointment" -> "该通知缺少可打开的业务编号，暂时只能查看通知内容。"
         "classnotice" -> "该班级通知缺少通知编号，暂时只能查看文字内容。"
         else -> item.content

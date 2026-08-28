@@ -1,3 +1,5 @@
+import { dateOnlyText } from './dateOnly.js';
+
 const defaultRuleConfig = Object.freeze({
   itemCount: 7,
   scoreRange: { min: 0, max: 5 },
@@ -5,9 +7,7 @@ const defaultRuleConfig = Object.freeze({
 });
 
 const asDate = (value) => {
-  if (value instanceof Date && Number.isFinite(value.valueOf())) return value.toISOString().slice(0, 10);
-  const date = String(value || '').slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : new Date().toISOString().slice(0, 10);
+  return dateOnlyText(value) || dateOnlyText(new Date());
 };
 
 export const assessmentStandardSnapshot = (row, context) => ({
@@ -17,7 +17,7 @@ export const assessmentStandardSnapshot = (row, context) => ({
   gradeId: row?.gradeId || context.gradeId || null,
   region: row?.region || context.region || '',
   povertyArea: row?.povertyArea ?? Boolean(context.povertyArea),
-  effectiveDate: row?.effectiveDate || asDate(context.testDate),
+  effectiveDate: dateOnlyText(row?.effectiveDate) || asDate(context.testDate),
   ruleConfig: row?.ruleConfig || defaultRuleConfig,
   reportConfig: row?.reportConfig || {},
   courseConfig: row?.courseConfig || {},
@@ -25,7 +25,7 @@ export const assessmentStandardSnapshot = (row, context) => ({
 });
 
 export async function resolveAssessmentStandard(executor, context) {
-  const result = await executor.query(`SELECT id,school_id AS "schoolId",grade_id AS "gradeId",region,poverty_area AS "povertyArea",standard_version AS "standardVersion",rule_config AS "ruleConfig",report_config AS "reportConfig",course_config AS "courseConfig",effective_date AS "effectiveDate"
+  const result = await executor.query(`SELECT id,school_id AS "schoolId",grade_id AS "gradeId",region,poverty_area AS "povertyArea",standard_version AS "standardVersion",rule_config AS "ruleConfig",report_config AS "reportConfig",course_config AS "courseConfig",effective_date::text AS "effectiveDate"
     FROM assessment_standards
     WHERE status='active' AND effective_date<=$1
       AND (school_id IS NULL OR school_id=$2)

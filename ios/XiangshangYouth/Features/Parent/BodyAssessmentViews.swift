@@ -5,44 +5,133 @@ import SwiftUI
 /// App and does not retain photos or videos at this stage.
 struct BodyAssessmentView: View {
     enum Step: Int, CaseIterable { case overview, consent, profile, bmi, environment, capture, confirm, result, plan }
-    private let assessmentSteps = ["使用说明", "监护人授权", "孩子身体信息", "身高体重和BMI", "拍摄环境检查", "摄像头测评", "质量确认", "结果报告", "训练计划"]
+    let assessmentSteps = ["使用说明", "监护人授权", "孩子身体信息", "身高体重和BMI", "拍摄环境检查", "摄像头测评", "质量确认", "结果报告", "训练计划"]
 
     @EnvironmentObject var state: AppState
     @EnvironmentObject var router: AppRouter
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
     @State var step: Step = .overview
     // Values deliberately start empty (zero) rather than with a child's
     // fabricated measurement. The ruler becomes active only after a parent
     // enters a real value.
-    @State private var height = 0.0
-    @State private var weight = 0.0
-    @State private var fatherHeight = 0.0
-    @State private var motherHeight = 0.0
-    @State private var completedCaptures = Set<BodyAssessmentRecord.CaptureTask>()
-    @State private var asymmetric = false
-    @State private var gaitConcern = false
-    @State private var activeCameraTask: BodyAssessmentRecord.CaptureTask?
-    @State private var captureFeedback: [BodyAssessmentRecord.CaptureTask: String] = [:]
-    @State private var visualHints: [BodyAssessmentRecord.CaptureTask: String] = [:]
-    @State private var postureSnapshots: [BodyAssessmentRecord.CaptureTask: PostureMetricSnapshot] = [:]
-    @State private var adultReady = false
-    @State private var spaceReady = false
-    @State private var consentAcknowledged = false
-    @State private var didLoad = false
+    @State var height = 0.0
+    @State var weight = 0.0
+    @State var fatherHeight = 0.0
+    @State var motherHeight = 0.0
+    @State var completedCaptures = Set<BodyAssessmentRecord.CaptureTask>()
+    @State var asymmetric = false
+    @State var gaitConcern = false
+    @State var activeCameraTask: BodyAssessmentRecord.CaptureTask?
+    @State var captureFeedback: [BodyAssessmentRecord.CaptureTask: String] = [:]
+    @State var visualHints: [BodyAssessmentRecord.CaptureTask: String] = [:]
+    @State var postureSnapshots: [BodyAssessmentRecord.CaptureTask: PostureMetricSnapshot] = [:]
+    @State var standingShoulderText = ""
+    @State var standingPelvisText = ""
+    @State var standingHeadTiltText = ""
+    @State var adamsObservedResult = "unrecorded"
+    @State var adamsProminenceSide = "无"
+    @State var gaitObservedResult = "unrecorded"
+    @State var gaitObservationNote = ""
+    @State var seatedMidlineText = ""
+    @State var seatedShoulderText = ""
+    @State var seatedKyphosisResult = "unrecorded"
+    @State var thoracicAtrText = ""
+    @State var lumbarAtrText = ""
+    @State var thoracicAtrSide = "无"
+    @State var lumbarAtrSide = "无"
+    @State var atrRetestEnabled = false
+    @State var thoracicAtrRepeatText = ""
+    @State var lumbarAtrRepeatText = ""
+    @State var seatedForwardBendAtrText = ""
+    @State var occiputWallDistanceText = ""
+    @State var occiputWallDistanceRepeatText = ""
+    @State var adultReady = false
+    @State var spaceReady = false
+    @State var consentAcknowledged = false
+    @State var didLoad = false
     @State var showFollowAlong = false
     @State var followAlongDayIndex = 0
     @State var followAlongDate = Date()
-    @State private var parentsExpanded = false
+    @State var parentsExpanded = false
     @State var showsAllPlanDays = false
     /// Viewing a saved family observation is read-only navigation context. Its
     /// back action must leave the feature, not expose the old confirmation
     /// form where a finished record could be accidentally re-submitted.
-    @State private var viewingSavedRecord = false
+    @State var viewingSavedRecord = false
 
-    private var student: Student? { state.selectedChild }
-    private var visualSummary: String? {
+    var student: Student? { state.selectedChild }
+    var visualSummary: String? {
         let summary = visualHints.keys.sorted { $0.rawValue < $1.rawValue }.compactMap { visualHints[$0] }.joined(separator: "\n")
         return summary.isEmpty ? nil : summary
+    }
+    var thoracicAtrFirst: Double? { standardizedMeasurement(thoracicAtrText, range: 0...30) }
+    var lumbarAtrFirst: Double? { standardizedMeasurement(lumbarAtrText, range: 0...30) }
+    var thoracicAtrRepeat: Double? { standardizedMeasurement(thoracicAtrRepeatText, range: 0...30) }
+    var lumbarAtrRepeat: Double? { standardizedMeasurement(lumbarAtrRepeatText, range: 0...30) }
+    var seatedForwardBendAtr: Double? { standardizedMeasurement(seatedForwardBendAtrText, range: 0...30) }
+    var thoracicAtr: Double? { averagedATR(first: thoracicAtrFirst, repeatValue: thoracicAtrRepeat) }
+    var lumbarAtr: Double? { averagedATR(first: lumbarAtrFirst, repeatValue: lumbarAtrRepeat) }
+    var occiputWallDistanceFirst: Double? { standardizedMeasurement(occiputWallDistanceText, range: 0...15) }
+    var occiputWallDistanceSecond: Double? { standardizedMeasurement(occiputWallDistanceRepeatText, range: 0...15) }
+    var occiputWallDistance: Double? {
+        SpineScreeningStandard.maximumOcciputWallDistance(first: occiputWallDistanceFirst, second: occiputWallDistanceSecond)
+    }
+    var atrRecorded: Bool {
+        guard let thoracicAtr, let lumbarAtr else { return false }
+        return (thoracicAtr == 0 || thoracicAtrSide != "无") && (lumbarAtr == 0 || lumbarAtrSide != "无")
+    }
+    var otwdRecorded: Bool { occiputWallDistance != nil }
+    var standingShoulder: Double? { standardizedMeasurement(standingShoulderText, range: 0...10) }
+    var standingPelvis: Double? { standardizedMeasurement(standingPelvisText, range: 0...10) }
+    var standingHeadTilt: Double? { standardizedMeasurement(standingHeadTiltText, range: 0...30) }
+    var seatedMidline: Double? { standardizedMeasurement(seatedMidlineText, range: 0...10) }
+    var seatedShoulder: Double? { standardizedMeasurement(seatedShoulderText, range: 0...10) }
+    var standingMeasured: Bool { standingShoulder != nil && standingPelvis != nil && standingHeadTilt != nil }
+    var adamsObserved: Bool { adamsObservedResult != "unrecorded" && (adamsObservedResult == "negative" || adamsProminenceSide != "无") }
+    var gaitObserved: Bool { gaitObservedResult != "unrecorded" }
+    var seatedMeasured: Bool { seatedMidline != nil && seatedShoulder != nil && seatedKyphosisResult != "unrecorded" }
+    var completedStandardItems: Int {
+        SpineScreeningStandard.homeCameraItems.reduce(into: 0) { count, item in
+            if case .camera(let task) = item.method, completedCaptures.contains(task) { count += 1 }
+        }
+    }
+    var standardSnapshots: [BodyAssessmentRecord.CaptureTask: PostureMetricSnapshot] {
+        var value = postureSnapshots
+        if var standing = value[.standingBack], let standingShoulder, let standingPelvis, let standingHeadTilt {
+            standing.shoulderHeightDifferenceCm = standingShoulder
+            standing.pelvicHeightDifferenceCm = standingPelvis
+            standing.headTiltDegrees = standingHeadTilt
+            value[.standingBack] = standing
+        }
+        if var forward = value[.forwardBend], let thoracicAtr, let lumbarAtr {
+            forward.thoracicAtrDegrees = thoracicAtr
+            forward.lumbarAtrDegrees = lumbarAtr
+            forward.instrumentAtrDegrees = max(thoracicAtr, lumbarAtr)
+            forward.thoracicAtrSide = thoracicAtr == 0 ? nil : thoracicAtrSide
+            forward.lumbarAtrSide = lumbarAtr == 0 ? nil : lumbarAtrSide
+            forward.thoracicAtrFirstDegrees = thoracicAtrFirst
+            forward.thoracicAtrSecondDegrees = atrRetestEnabled ? thoracicAtrRepeat : nil
+            forward.lumbarAtrFirstDegrees = lumbarAtrFirst
+            forward.lumbarAtrSecondDegrees = atrRetestEnabled ? lumbarAtrRepeat : nil
+            forward.seatedForwardBendAtrDegrees = seatedForwardBendAtr
+            forward.adamsObservedResult = adamsObservedResult == "unrecorded" ? nil : adamsObservedResult
+            forward.adamsProminenceSide = adamsObservedResult == "negative" ? nil : (adamsProminenceSide == "无" ? nil : adamsProminenceSide)
+            value[.forwardBend] = forward
+        }
+        if var gait = value[.gaitVideo], gaitObserved {
+            gait.gaitObservedAbnormal = gaitObservedResult == "abnormal"
+            let note = gaitObservationNote.trimmingCharacters(in: .whitespacesAndNewlines)
+            gait.gaitObservationNote = note.isEmpty ? nil : note
+            value[.gaitVideo] = gait
+        }
+        if var seated = value[.seatedPosture], let occiputWallDistance {
+            seated.occiputWallDistanceCm = occiputWallDistance
+            seated.spinalMidlineDeviationCm = seatedMidline
+            seated.shoulderHeightDifferenceCm = seatedShoulder
+            seated.seatedThoracicKyphosisObserved = seatedKyphosisResult == "abnormal"
+            value[.seatedPosture] = seated
+        }
+        return value
     }
     var provisionalRecord: BodyAssessmentRecord {
         BodyAssessmentRecord(
@@ -60,20 +149,20 @@ struct BodyAssessmentView: View {
             savedAt: .now,
             nextFollowUpDate: followUpDate,
             completedPlanDays: state.bodyAssessment(for: student ?? fallbackStudent)?.completedPlanDays ?? [],
-            postureReport: postureSnapshots.isEmpty ? nil : PostureAssessmentReport.make(snapshots: postureSnapshots, ageMonths: student?.bodyAssessmentAgeMonths),
+            postureReport: standardSnapshots.isEmpty ? nil : PostureAssessmentReport.make(snapshots: standardSnapshots, ageMonths: student?.bodyAssessmentAgeMonths),
             ageMonthsAtMeasurement: student?.bodyAssessmentAgeMonths
         )
     }
-    private var fallbackStudent: Student { Student(id: "body-assessment-preview", name: "孩子", gender: "男", grade: "三年级", className: "三年级1班", region: "", isPovertyArea: false, taskStatus: .completed, totalScore: nil) }
-    private var hasValidCoreMeasurements: Bool {
+    var fallbackStudent: Student { Student(id: "body-assessment-preview", name: "孩子", gender: "男", grade: "三年级", className: "三年级1班", region: "", isPovertyArea: false, taskStatus: .completed, totalScore: nil) }
+    var hasValidCoreMeasurements: Bool {
         (90.0...190.0).contains(height) && (15.0...90.0).contains(weight)
     }
-    private var followUpDate: Date {
+    var followUpDate: Date {
         let level = provisionalBMILevel
         let days = level == .red ? 7 : level == .yellow || asymmetric || gaitConcern ? 30 : 90
         return BusinessClock.addingDays(days)
     }
-    private var provisionalBMILevel: BodyAssessmentRecord.AttentionLevel {
+    var provisionalBMILevel: BodyAssessmentRecord.AttentionLevel {
         return BodyAssessmentRecord(heightCentimeters: height, weightKilograms: weight, measuredAt: .now, ruleVersion: BodyAssessmentRecord.ruleVersion, completedCaptures: [], parentMarkedAsymmetric: false, parentMarkedGaitConcern: false, savedAt: .now, nextFollowUpDate: .now, completedPlanDays: []).bmiAttention(ageMonths: student?.bodyAssessmentAgeMonths, gender: student?.gender ?? "男")
     }
     var record: BodyAssessmentRecord? { student.flatMap(state.bodyAssessment(for:)) }
@@ -81,47 +170,41 @@ struct BodyAssessmentView: View {
     var body: some View {
         Group {
             if let student {
-                AppScaffold(title: stepTitle, onBack: goBack, scrollResetID: step.rawValue) {
-                    VStack(spacing: AppTheme.sectionSpacing) {
-                        progress
-                        switch step {
-                        case .overview: overview(student)
-                        case .consent: consentStep
-                        case .profile: profileStep(student)
-                        case .bmi: bmiEntry(student)
-                        case .environment: environmentStep
-                        case .capture: captureGuide
-                        case .confirm: observationConfirm
-                        case .result: result(student)
-                        case .plan: plan(student)
-                        }
-                    }
-                    .padding(.top, AppTheme.cardSpacing)
-                }
-                .task { load(record: state.bodyAssessment(for: student), draft: state.bodyAssessmentDraft(for: student)) }
-                .onChange(of: height) { _, _ in persistDraft() }
-                .onChange(of: weight) { _, _ in persistDraft() }
-                .onChange(of: fatherHeight) { _, _ in persistDraft() }
-                .onChange(of: motherHeight) { _, _ in persistDraft() }
-                .onChange(of: adultReady) { _, _ in persistDraft() }
-                .onChange(of: consentAcknowledged) { _, _ in persistDraft() }
-                .onChange(of: spaceReady) { _, _ in persistDraft() }
-                .onChange(of: completedCaptures) { _, _ in persistDraft() }
-                .onChange(of: asymmetric) { _, _ in persistDraft() }
-                .onChange(of: gaitConcern) { _, _ in persistDraft() }
-                .onChange(of: visualHints) { _, _ in persistDraft() }
-                .onChange(of: postureSnapshots) { _, _ in persistDraft() }
+                persistedAssessmentContent(student)
             } else {
                 ParentBindingPrompt()
             }
         }
         .sheet(item: $activeCameraTask) { task in
             LiveVisionCaptureSheet(task: task, measuredHeightCm: height, ageMonths: student?.bodyAssessmentAgeMonths) { review in
-                captureFeedback[task] = review.message
                 if let hint = review.observationHint { visualHints[task] = hint }
                 else { visualHints.removeValue(forKey: task) }
-                if let snapshot = review.postureSnapshot { postureSnapshots[task] = snapshot }
-                if review.accepted { completedCaptures.insert(task) }
+                if var snapshot = review.postureSnapshot, review.accepted {
+                    if let first = postureSnapshots[task], first.repeatabilityStatus == "awaiting-second-take" {
+                        let repeatability = PostureCaptureRepeatability.verify(first: first, second: snapshot)
+                        if repeatability.passed {
+                            postureSnapshots[task] = PostureCaptureRepeatability.merged(first: first, second: snapshot, result: repeatability)
+                            completedCaptures.insert(task)
+                            captureFeedback[task] = "两次独立采集一致性通过，已完成该项记录。"
+                        } else {
+                            snapshot.captureAttemptCount = 1
+                            snapshot.repeatabilityStatus = "awaiting-second-take"
+                            snapshot.repeatabilityMaximumDifference = repeatability.maximumDifference.isFinite ? repeatability.maximumDifference : nil
+                            postureSnapshots[task] = snapshot
+                            completedCaptures.remove(task)
+                            captureFeedback[task] = "两次记录差异较大，请离开人型框后重新入镜，再完成第 2 次采集。"
+                        }
+                    } else {
+                        snapshot.captureAttemptCount = 1
+                        snapshot.repeatabilityStatus = "awaiting-second-take"
+                        snapshot.repeatabilityMaximumDifference = nil
+                        postureSnapshots[task] = snapshot
+                        completedCaptures.remove(task)
+                        captureFeedback[task] = "第 1 次采集已保存。请离开人型框后重新入镜，完成第 2 次独立采集。"
+                    }
+                } else {
+                    captureFeedback[task] = review.message
+                }
                 activeCameraTask = nil
             } cancelled: {
                 captureFeedback[task] = "已取消记录，可随时重新开始。"
@@ -143,375 +226,253 @@ struct BodyAssessmentView: View {
         }
     }
 
-    private var stepTitle: String {
+    func assessmentContent(_ student: Student) -> some View {
+        AppScaffold(title: stepTitle, onBack: goBack, scrollResetID: step.rawValue) {
+            VStack(spacing: AppTheme.sectionSpacing) {
+                progress
+                assessmentStepContent(student)
+            }
+            .padding(.top, AppTheme.cardSpacing)
+        }
+    }
+
+    @ViewBuilder
+    func assessmentStepContent(_ student: Student) -> some View {
+        switch step {
+        case .overview: overview(student)
+        case .consent: consentStep
+        case .profile: profileStep(student)
+        case .bmi: bmiEntry(student)
+        case .environment: environmentStep
+        case .capture: captureGuide
+        case .confirm: observationConfirm
+        case .result: result(student)
+        case .plan: plan(student)
+        }
+    }
+
+    func persistedAssessmentContent(_ student: Student) -> some View {
+        assessmentContent(student)
+            .onChange(of: draftPersistenceKey) { _, _ in persistDraft() }
+            .task {
+                load(record: state.bodyAssessment(for: student), draft: state.bodyAssessmentDraft(for: student))
+                guard state.bodyAssessmentDraft(for: student) == nil, state.bodyAssessment(for: student) != nil else { return }
+                await state.refreshLatestBodyAssessment(for: student)
+                load(record: state.bodyAssessment(for: student), draft: nil)
+            }
+    }
+
+    /// One compact observation key replaces a deep chain of generic
+    /// `onChange` modifiers. It keeps every draft field durable while making
+    /// this already substantial assessment screen practical to type-check.
+    var draftPersistenceKey: [String] {
+        let measurements = [height, weight, fatherHeight, motherHeight].map { String($0) }
+        let workflow = [
+            String(adultReady), String(consentAcknowledged), String(spaceReady),
+            String(asymmetric), String(gaitConcern), String(atrRetestEnabled),
+            String(describing: completedCaptures), String(describing: visualHints),
+            String(describing: postureSnapshots)
+        ]
+        let supervised = [
+            standingShoulderText, standingPelvisText, standingHeadTiltText,
+            adamsObservedResult, adamsProminenceSide,
+            gaitObservedResult, gaitObservationNote,
+            seatedMidlineText, seatedShoulderText, seatedKyphosisResult,
+            thoracicAtrText, lumbarAtrText, thoracicAtrSide, lumbarAtrSide,
+            thoracicAtrRepeatText, lumbarAtrRepeatText, seatedForwardBendAtrText,
+            occiputWallDistanceText, occiputWallDistanceRepeatText
+        ]
+        return measurements + workflow + supervised
+    }
+
+    var stepTitle: String {
         assessmentSteps[displayStepIndex]
     }
 
-    private var displayStepIndex: Int {
+    var displayStepIndex: Int {
         step.rawValue
     }
 
-    private var progress: some View {
+    var progress: some View {
         AssessmentProgressHeader(titles: assessmentSteps, currentIndex: displayStepIndex)
     }
 
-    private func overview(_ student: Student) -> some View {
-        VStack(spacing: AppTheme.cardSpacing) {
+    var captureGuide: some View {
+        VStack(alignment: .leading, spacing: AppTheme.cardSpacing) {
             AssessmentHeroCard(
-                icon: "figure.walk.motion",
-                eyebrow: "为 \(student.name) 准备",
-                title: "约 5 分钟完成身体测评",
-                detail: "记录身高、体重与四项姿态动作，形成家庭健康观察和训练建议。"
+                icon: "checklist.checked",
+                eyebrow: "UY-IMCA V1 · 2026-07-20",
+                title: "完成 8 段家庭相机观察",
+                detail: "依次完成正面、背面、双侧、Adams 前屈、下肢力线、3 米步态、坐姿和足弓；每段需两次稳定采集。"
             ) {
                 HStack(spacing: 8) {
-                    AssessmentFactChip(icon: "clock.fill", title: "约 5 分钟")
-                    AssessmentFactChip(icon: "camera.fill", title: "端内识别")
-                    AssessmentFactChip(icon: "lock.shield.fill", title: "不存原片")
+                    AssessmentFactChip(icon: "checkmark.circle.fill", title: "已完成 \(completedStandardItems) / \(SpineScreeningStandard.homeCameraItems.count)")
+                    AssessmentFactChip(icon: "speaker.wave.2.fill", title: "语音指导")
                 }
             }
-
-            if let record {
-                ReferenceCard {
-                    VStack(alignment: .leading, spacing: 12) {
-                        ReferenceSectionTitle(title: "最近一次记录", trailing: dateText(record.measuredAt))
-                        HStack(alignment: .center) {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(String(format: "%.1f", record.bmi))
-                                    .font(.system(size: 30, weight: .bold))
-                                    .foregroundStyle(ReferenceColor.blue)
-                                Text("BMI")
-                                    .font(.system(size: AppTheme.captionSize, weight: .semibold))
-                                    .foregroundStyle(AppTheme.muted)
-                            }
-                            Spacer()
-                            VStack(alignment: .trailing, spacing: 7) {
-                                attentionBadge(record.attention(ageMonths: student.bodyAssessmentAgeMonths, gender: student.gender))
-                                Text("已完成 \(record.completedCaptures.count) / \(BodyAssessmentRecord.CaptureTask.allCases.count) 项采集")
-                                    .font(.system(size: AppTheme.captionSize))
-                                    .foregroundStyle(AppTheme.muted)
-                            }
-                        }
-                        Text("测评于 \(dateText(record.measuredAt)) · 已完成 \(record.completedCaptures.count) 项拍摄任务")
-                            .font(.system(size: AppTheme.captionSize)).foregroundStyle(AppTheme.muted)
-                        Button { viewingSavedRecord = true; move(to: .result) } label: {
-                            Label("查看结果与计划", systemImage: "chevron.right")
-                                .font(.system(size: AppTheme.secondarySize, weight: .semibold))
-                                .frame(maxWidth: .infinity, minHeight: AppTheme.minimumTapSize)
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(ReferenceColor.blue)
-                    }
-                }
-            }
-
-            ReferenceCard {
-                VStack(alignment: .leading, spacing: 14) {
-                    ReferenceSectionTitle(title: "测评流程", trailing: "共 9 步")
-                    AssessmentPhaseRow(number: 1, title: "准备资料", detail: "阅读说明、完成监护授权并确认孩子信息", icon: "checklist")
-                    Divider()
-                    AssessmentPhaseRow(number: 2, title: "填写与采集", detail: "录入身高体重，检查环境并完成四项动作", icon: "camera.viewfinder")
-                    Divider()
-                    AssessmentPhaseRow(number: 3, title: "查看建议", detail: "确认质量，查看结果并开始训练计划", icon: "chart.bar.doc.horizontal")
+            AssessmentInfoBanner(
+                icon: "camera.metering.center.weighted",
+                title: "统一主机位",
+                detail: SpineScreeningStandard.mainCameraPlacement + "；步态需准备 3 米直线通道。"
+            )
+            ForEach(SpineScreeningStandard.homeCameraItems) { item in
+                switch item.method {
+                case .camera(let task):
+                    standardCameraItem(item, task: task)
+                case .instrumentATR:
+                    EmptyView()
                 }
             }
             AssessmentInfoBanner(
                 icon: "cross.case.fill",
-                title: "家庭运动健康观察",
-                detail: "结果用于运动建议，不替代医疗诊断。如孩子有疼痛、麻木或活动受限，请先咨询专业人员。",
+                title: "专业增强项不在家庭端采集",
+                detail: "ATR、枕墙距和软尺厘米值需要受训人员及专用器械。家庭相机不会生成 ATR、Cobb 角或医疗诊断。",
                 tint: ReferenceColor.green
             )
-            AssessmentPrimaryAction(title: record == nil ? "开始身体测评" : "开始新的测评", icon: "arrow.right") {
-                viewingSavedRecord = false
-                move(to: .consent)
-            }
-        }
-    }
-
-    private var consentStep: some View {
-        VStack(alignment: .leading, spacing: AppTheme.cardSpacing) {
-            AssessmentHeroCard(
-                icon: "lock.shield.fill",
-                eyebrow: "隐私与安全",
-                title: "由监护人陪同完成",
-                detail: "相机画面只在手机内实时处理，不保存照片、视频或原始帧。"
-            ) {
-                AssessmentFactChip(icon: "checkmark.shield.fill", title: "仅保存结构化测量结果")
-            }
-
-            ReferenceCard {
-                VStack(alignment: .leading, spacing: 14) {
-                    ReferenceSectionTitle(title: "需要你的确认", trailing: adultReady && consentAcknowledged ? "已完成" : "2 项")
-                    readinessToggle(
-                        title: "监护关系确认",
-                        detail: "我是孩子的监护人，并将在测评过程中全程陪同。",
-                        icon: "person.badge.shield.checkmark",
-                        isOn: $adultReady
-                    )
-                    Divider()
-                    readinessToggle(
-                        title: "摄像头与算法说明",
-                        detail: "我已了解数据用途、保留范围和撤回授权方式。",
-                        icon: "camera.metering.center.weighted",
-                        isOn: $consentAcknowledged
-                    )
-                }
-            }
-
-            AssessmentInfoBanner(
-                icon: "heart.text.square.fill",
-                title: "用途说明",
-                detail: "身体测评仅用于家庭运动健康筛查和训练建议，不构成疾病诊断。",
-                tint: ReferenceColor.green
-            )
-            AssessmentPrimaryAction(
-                title: adultReady && consentAcknowledged ? "继续确认孩子资料" : "请完成两项确认",
-                icon: "arrow.right",
-                enabled: adultReady && consentAcknowledged
-            ) { move(to: .profile) }
-        }
-    }
-
-    private func profileStep(_ student: Student) -> some View {
-        VStack(alignment: .leading, spacing: AppTheme.cardSpacing) {
-            AssessmentInfoBanner(
-                icon: "person.text.rectangle.fill",
-                title: "确认测评对象",
-                detail: "BMI 年龄参考会使用孩子档案中的出生日期、性别和本次测量日期。"
-            )
-            ReferenceCard {
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack(spacing: 13) {
-                        Text(String(student.name.prefix(1)))
-                            .font(.system(size: 22, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 52, height: 52)
-                            .background(LinearGradient(colors: [ReferenceColor.blue, Color(hex: "39B7B0")], startPoint: .topLeading, endPoint: .bottomTrailing), in: Circle())
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(student.name)
-                                .font(.system(size: AppTheme.sectionTitleSize, weight: .bold))
-                                .foregroundStyle(ReferenceColor.navy)
-                            Text("\(student.grade) · \(student.className)")
-                                .font(.system(size: AppTheme.secondarySize))
-                                .foregroundStyle(AppTheme.muted)
-                        }
-                        Spacer()
-                        Image(systemName: "checkmark.seal.fill")
-                            .foregroundStyle(ReferenceColor.green)
-                            .accessibilityLabel("孩子档案已载入")
-                    }
-                    Divider()
-                    profileDataRow(icon: "person.fill", title: "性别", value: student.gender)
-                    profileDataRow(icon: "birthday.cake.fill", title: "年龄参考", value: student.bodyAssessmentAgeLabel)
-                    profileDataRow(icon: "building.2.fill", title: "学校档案", value: "\(student.grade) \(student.className)")
-                    Text("如资料有误，请先在家庭账户中联系学校更正。年龄别 BMI 只使用孩子资料中的出生日期和本次测量日期计算。")
-                        .font(.system(size: AppTheme.captionSize)).foregroundStyle(AppTheme.muted)
-                        .padding(.top, 2)
-                }
-            }
-            AssessmentPrimaryAction(title: "确认无误，填写身高体重", icon: "arrow.right") { move(to: .bmi) }
-        }
-    }
-
-    private var environmentStep: some View {
-        VStack(alignment: .leading, spacing: AppTheme.cardSpacing) {
-            environmentPreview
-            ReferenceCard {
-                VStack(alignment: .leading, spacing: 14) {
-                    ReferenceSectionTitle(title: "开始前检查", trailing: spaceReady ? "环境已确认" : "3 项")
-                    checklist("镜头距离约 2–3 米，手机竖直并保持稳定", icon: "iphone.gen3")
-                    Divider()
-                    checklist("画面中只出现一名孩子，头部到双脚完整入镜", icon: "person.crop.rectangle")
-                    Divider()
-                    checklist("光线均匀、地面平整，周围没有易碰撞物品", icon: "sun.max.fill")
-                }
-            }
-            readinessToggle(
-                title: "环境已经准备好",
-                detail: "我已确认以上条件，孩子可以安全完成动作。",
-                icon: "checkmark.shield.fill",
-                isOn: $spaceReady
-            )
-            AssessmentInfoBanner(
-                icon: "camera.aperture",
-                title: "相机还会自动检查",
-                detail: "打开相机后将继续识别光线、距离、遮挡、多人入镜和身体离开画面。"
-            )
-            AssessmentPrimaryAction(
-                title: spaceReady ? "进入动作采集" : "请先确认拍摄环境",
-                icon: "camera.fill",
-                enabled: spaceReady
-            ) { move(to: .capture) }
-        }
-    }
-
-    private func bmiEntry(_ student: Student) -> some View {
-        VStack(alignment: .leading, spacing: AppTheme.cardSpacing) {
-            AssessmentHeroCard(
-                icon: "scalemass.fill",
-                eyebrow: "本次实际测量",
-                title: "填写身高和体重",
-                detail: "请使用身高仪和体重秤的实际读数，相机不会估算身高或体重。"
-            ) {
-                HStack(spacing: 8) {
-                    AssessmentFactChip(icon: "function", title: "自动计算 BMI")
-                    AssessmentFactChip(icon: "calendar", title: student.bodyAssessmentAgeLabel)
-                }
-            }
-            ruler(title: "身高", value: $height, range: 90...190, unit: "cm", step: 0.5)
-            ruler(title: "体重", value: $weight, range: 15...90, unit: "kg", step: 0.1)
-
-            ReferenceCard {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(alignment: .center) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("当前 BMI")
-                                .font(.system(size: AppTheme.captionSize, weight: .semibold))
-                                .foregroundStyle(AppTheme.muted)
-                            Text(height > 0 && weight > 0 ? String(format: "%.1f", provisionalRecord.bmi) : "--")
-                                .font(.system(size: 38, weight: .bold, design: .rounded))
-                                .foregroundStyle(ReferenceColor.blue)
-                        }
-                        Spacer()
-                        VStack(alignment: .trailing, spacing: 6) {
-                            attentionBadge(provisionalBMILevel, label: provisionalRecord.bmiScreeningLabel(ageMonths: student.bodyAssessmentAgeMonths, gender: student.gender))
-                            Text("儿童年龄别 BMI 参考")
-                                .font(.system(size: AppTheme.captionSize))
-                                .foregroundStyle(AppTheme.muted)
-                        }
-                    }
-                    Divider()
-                    Text("BMI = 体重(kg) ÷ 身高²(m²)。结果会结合出生日期、性别和测量日期给出年龄别参考。")
-                        .font(.system(size: AppTheme.captionSize))
-                        .foregroundStyle(AppTheme.muted)
-                    if let heightAssessment = provisionalRecord.heightDevelopmentAssessment(ageMonths: student.bodyAssessmentAgeMonths, gender: student.gender) {
-                        Text("当前身高发育：\(heightAssessment.level.label) · \(heightAssessment.ageYears)岁参考中位 \(String(format: "%.1f", heightAssessment.median)) cm · 儿童身高参考标准")
-                            .font(.system(size: AppTheme.captionSize)).foregroundStyle(ReferenceColor.navy)
-                    }
-                }
-            }
-
-            DisclosureGroup(isExpanded: $parentsExpanded) {
-                VStack(alignment: .leading, spacing: AppTheme.cardSpacing) {
-                    Text("仅用于计算遗传靶身高参考区间，不代表成年身高预测。")
-                        .font(.system(size: AppTheme.captionSize))
-                        .foregroundStyle(AppTheme.muted)
-                    ruler(title: "父亲身高", value: $fatherHeight, range: 120...230, unit: "cm", step: 0.5)
-                    ruler(title: "母亲身高", value: $motherHeight, range: 120...230, unit: "cm", step: 0.5)
-                    if let geneticHeight = provisionalRecord.geneticHeightReference(gender: student.gender) {
-                        let range = provisionalRecord.geneticHeightRange(gender: student.gender)
-                        let rangeText = range.map { String(format: "%.1f–%.1f cm", $0.lowerBound, $0.upperBound) } ?? "待完整填写"
-                        AssessmentInfoBanner(
-                            icon: "ruler.fill",
-                            title: String(format: "遗传靶身高中位 %.1f cm", geneticHeight),
-                            detail: "参考区间 \(rangeText) · 仅作家庭健康管理参考",
-                            tint: ReferenceColor.green
-                        )
-                    }
-                }
-                .padding(.top, AppTheme.cardSpacing)
-            } label: {
-                Label("补充父母身高（选填）", systemImage: "person.2.fill")
-                    .font(.system(size: AppTheme.bodySize, weight: .semibold))
-                    .foregroundStyle(ReferenceColor.navy)
-            }
-            .padding(AppTheme.cardPadding)
-            .background(.white, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous).stroke(AppTheme.divider.opacity(0.8), lineWidth: 0.75))
-
-            AssessmentPrimaryAction(
-                title: hasValidCoreMeasurements ? "继续检查拍摄环境" : "请填写有效身高和体重",
-                icon: "arrow.right",
-                enabled: hasValidCoreMeasurements
-            ) { move(to: .environment) }
-        }
-    }
-
-    private var captureGuide: some View {
-        VStack(alignment: .leading, spacing: AppTheme.cardSpacing) {
-            AssessmentHeroCard(
-                icon: "camera.viewfinder",
-                eyebrow: "端内视觉识别",
-                title: "完成 4 项动作采集",
-                detail: "每项约 10–20 秒。按语音提示调整站位，达到质量要求后自动完成。"
-            ) {
-                HStack(spacing: 8) {
-                    AssessmentFactChip(icon: "checkmark.circle.fill", title: "已完成 \(completedCaptures.count) / \(BodyAssessmentRecord.CaptureTask.allCases.count)")
-                    AssessmentFactChip(icon: "speaker.wave.2.fill", title: "语音指导")
-                }
-            }
-            ForEach(Array(BodyAssessmentRecord.CaptureTask.allCases.enumerated()), id: \.element.id) { index, task in
-                Button { activeCameraTask = task } label: {
-                    HStack(spacing: 13) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill((completedCaptures.contains(task) ? ReferenceColor.green : ReferenceColor.blue).opacity(0.10))
-                            if completedCaptures.contains(task) {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 19, weight: .bold))
-                            } else {
-                                Text("\(index + 1)")
-                                    .font(.system(size: 19, weight: .bold, design: .rounded))
-                            }
-                        }
-                        .foregroundStyle(completedCaptures.contains(task) ? ReferenceColor.green : ReferenceColor.blue)
-                        .frame(width: 48, height: 48)
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(spacing: 6) {
-                                Text(task.title)
-                                    .font(.system(size: AppTheme.bodySize, weight: .semibold))
-                                    .foregroundStyle(ReferenceColor.navy)
-                                if completedCaptures.contains(task) {
-                                    Text("已完成")
-                                        .font(.system(size: AppTheme.captionSize, weight: .semibold))
-                                        .foregroundStyle(ReferenceColor.green)
-                                }
-                            }
-                            Text(task.instruction)
-                                .font(.system(size: AppTheme.captionSize))
-                                .foregroundStyle(AppTheme.muted)
-                                .multilineTextAlignment(.leading)
-                                .lineLimit(2)
-                            if let feedback = captureFeedback[task] {
-                                Text(feedback)
-                                    .font(.system(size: AppTheme.captionSize, weight: .medium))
-                                    .foregroundStyle(completedCaptures.contains(task) ? ReferenceColor.green : AppTheme.warning)
-                                    .lineLimit(2)
-                            }
-                        }
-                        Spacer()
-                        Image(systemName: completedCaptures.contains(task) ? "arrow.clockwise.camera" : "camera.fill")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(completedCaptures.contains(task) ? ReferenceColor.green : ReferenceColor.blue)
-                    }
-                    .padding(14)
-                    .background(.white, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous).stroke(completedCaptures.contains(task) ? ReferenceColor.green.opacity(0.28) : AppTheme.divider.opacity(0.8), lineWidth: 0.85))
-                }.buttonStyle(.plain).accessibilityLabel("\(task.title)，\(completedCaptures.contains(task) ? "已完成" : "打开相机")")
-            }
             AssessmentInfoBanner(
                 icon: "eye.trianglebadge.exclamationmark",
                 title: "质量不足会提示重拍",
                 detail: "系统会检查清晰度、全身入镜、多人、遮挡、距离和中途离开，不会用低质量画面生成结果。"
             )
-            let allCaptured = completedCaptures.count == BodyAssessmentRecord.CaptureTask.allCases.count
+            let allCaptured = completedStandardItems == SpineScreeningStandard.homeCameraItems.count
             AssessmentPrimaryAction(
-                title: allCaptured ? "继续质量确认" : "还需完成 \(BodyAssessmentRecord.CaptureTask.allCases.count - completedCaptures.count) 项",
+                title: allCaptured ? "继续质量确认" : "还需完成 \(SpineScreeningStandard.homeCameraItems.count - completedStandardItems) 项",
                 icon: "arrow.right",
                 enabled: allCaptured
             ) { move(to: .confirm) }
         }
     }
 
-    private var observationConfirm: some View {
+    func standardCameraItem(_ item: SpineScreeningStandard.Item, task: BodyAssessmentRecord.CaptureTask) -> some View {
+        let captured = completedCaptures.contains(task)
+        let awaitingSecondTake = postureSnapshots[task]?.repeatabilityStatus == "awaiting-second-take"
+        return Button { activeCameraTask = task } label: {
+            HStack(alignment: .top, spacing: 13) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill((captured ? ReferenceColor.green : ReferenceColor.blue).opacity(0.10))
+                    if captured { Image(systemName: "checkmark").font(.system(size: 19, weight: .bold)) }
+                    else { Text("\(item.number)").font(.system(size: 19, weight: .bold, design: .rounded)) }
+                }
+                .foregroundStyle(captured ? ReferenceColor.green : ReferenceColor.blue)
+                .frame(width: 48, height: 48)
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(spacing: 6) {
+                        Text(item.title).font(.system(size: AppTheme.bodySize, weight: .semibold)).foregroundStyle(ReferenceColor.navy)
+                        if captured { Text("两次采集已通过").font(.system(size: AppTheme.captionSize, weight: .semibold)).foregroundStyle(ReferenceColor.green) }
+                        else if awaitingSecondTake { Text("还需第 2 次").font(.system(size: AppTheme.captionSize, weight: .semibold)).foregroundStyle(AppTheme.warning) }
+                    }
+                    Text(item.purpose).font(.system(size: AppTheme.captionSize, weight: .semibold)).foregroundStyle(ReferenceColor.blue)
+                    Text(item.instruction).font(.system(size: AppTheme.captionSize)).foregroundStyle(AppTheme.muted).fixedSize(horizontal: false, vertical: true)
+                    if task == .forwardBend {
+                        Text(SpineScreeningStandard.forwardBendAuxiliaryPlacement)
+                            .font(.system(size: AppTheme.captionSize, weight: .medium)).foregroundStyle(AppTheme.warning)
+                    }
+                    if let feedback = captureFeedback[task] {
+                        Text(feedback).font(.system(size: AppTheme.captionSize, weight: .medium)).foregroundStyle(captured ? ReferenceColor.green : AppTheme.warning).lineLimit(2)
+                    }
+                }
+                Spacer(minLength: 0)
+                Image(systemName: captured ? "arrow.clockwise.camera" : (task == .gaitVideo ? "video.fill" : "camera.fill"))
+                    .font(.system(size: 17, weight: .semibold)).foregroundStyle(captured ? ReferenceColor.green : (awaitingSecondTake ? AppTheme.warning : ReferenceColor.blue))
+            }
+            .padding(14)
+            .background(.white, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous).stroke(captured ? ReferenceColor.green.opacity(0.28) : AppTheme.divider.opacity(0.8), lineWidth: 0.85))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("第 \(item.number) 项，\(item.title)，\(captured ? "两次采集已通过，可重新采集" : (awaitingSecondTake ? "第 1 次已完成，还需第 2 次" : "打开相机"))")
+        .accessibilityIdentifier("body-capture-\(task.rawValue)")
+    }
+
+    func atrMeasurementCard(_ item: SpineScreeningStandard.Item) -> some View {
+        ReferenceCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 12) {
+                    Text("\(item.number)").font(.system(size: 19, weight: .bold, design: .rounded)).foregroundStyle(atrRecorded ? ReferenceColor.green : ReferenceColor.blue)
+                        .frame(width: 48, height: 48).background((atrRecorded ? ReferenceColor.green : ReferenceColor.blue).opacity(0.10), in: RoundedRectangle(cornerRadius: 14))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(item.title).font(.system(size: AppTheme.bodySize, weight: .semibold)).foregroundStyle(ReferenceColor.navy)
+                        Text(item.purpose).font(.system(size: AppTheme.captionSize, weight: .semibold)).foregroundStyle(ReferenceColor.blue)
+                        Text(item.instruction).font(.system(size: AppTheme.captionSize)).foregroundStyle(AppTheme.muted).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                standardInstrumentRow(title: "胸段 T4-T8", value: $thoracicAtrText, side: $thoracicAtrSide)
+                standardInstrumentRow(title: "腰段 T12-L3", value: $lumbarAtrText, side: $lumbarAtrSide)
+                Toggle("两次读数波动较大，启用复测并取算术平均值", isOn: $atrRetestEnabled)
+                    .font(.system(size: AppTheme.captionSize, weight: .semibold))
+                if atrRetestEnabled {
+                    standardInstrumentRow(title: "胸段复测", value: $thoracicAtrRepeatText, side: $thoracicAtrSide)
+                    standardInstrumentRow(title: "腰段复测", value: $lumbarAtrRepeatText, side: $lumbarAtrSide)
+                    Text("原始读数与复测读数均保留，最终胸段/腰段分别取两次算术平均值。")
+                        .font(.system(size: AppTheme.captionSize)).foregroundStyle(AppTheme.muted)
+                }
+                Label(atrRecorded ? "ATR 读数完整，最大值 \(String(format: "%.1f", max(thoracicAtr ?? 0, lumbarAtr ?? 0)))°" : "请录入两段最大读数；非 0° 时必须选择左/右偏向", systemImage: atrRecorded ? "checkmark.circle.fill" : "exclamationmark.circle")
+                    .font(.system(size: AppTheme.captionSize, weight: .semibold)).foregroundStyle(atrRecorded ? ReferenceColor.green : AppTheme.warning)
+                if let maximum = [thoracicAtr, lumbarAtr].compactMap({ $0 }).max(), maximum >= SpineScreeningStandard.atrAttentionDegrees {
+                    Divider()
+                    Text("坐位前屈 ATR 复核（手册建议）").font(.system(size: AppTheme.secondarySize, weight: .semibold)).foregroundStyle(ReferenceColor.navy)
+                    Text("让孩子坐于凳上再次前屈，录入最大 ATR。较站位下降 ≥3° 记录为“功能性偏斜可能”；变化不足 3° 进入结构异常复核提示。")
+                        .font(.system(size: AppTheme.captionSize)).foregroundStyle(AppTheme.muted).fixedSize(horizontal: false, vertical: true)
+                    HStack {
+                        TextField("0.0", text: $seatedForwardBendAtrText).keyboardType(.decimalPad).textFieldStyle(.roundedBorder)
+                            .accessibilityLabel("坐位前屈 ATR 角度")
+                        Text("°").foregroundStyle(AppTheme.muted)
+                    }
+                }
+            }
+        }
+    }
+
+    func standardInstrumentRow(title: String, value: Binding<String>, side: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(title).font(.system(size: AppTheme.secondarySize, weight: .semibold)).foregroundStyle(ReferenceColor.navy)
+            HStack(spacing: 10) {
+                TextField("0.0", text: value)
+                    .keyboardType(.decimalPad)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(minWidth: 90)
+                    .accessibilityLabel("\(title) ATR 角度")
+                Text("°").foregroundStyle(AppTheme.muted)
+                Picker("旋转偏向", selection: side) {
+                    Text("无").tag("无"); Text("左").tag("左"); Text("右").tag("右")
+                }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 170)
+            }
+        }
+    }
+
+    var occiputWallDistanceCard: some View {
+        ReferenceCard {
+            VStack(alignment: .leading, spacing: 9) {
+                Text("项目 5 辅助定量 · 枕墙距 OTWD")
+                    .font(.system(size: AppTheme.secondarySize, weight: .semibold)).foregroundStyle(ReferenceColor.navy)
+                Text("坐姿观察后，脱鞋背靠平整墙面，双脚并拢，臀部及肩胛骨贴墙，双眼平视、下颌微收。水平测量后脑勺最突出点到墙面的距离，两次取最大值。")
+                    .font(.system(size: AppTheme.captionSize)).foregroundStyle(AppTheme.muted).fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 10) {
+                    TextField("第一次", text: $occiputWallDistanceText).keyboardType(.decimalPad).textFieldStyle(.roundedBorder)
+                        .accessibilityLabel("第一次枕墙距，厘米")
+                    TextField("第二次", text: $occiputWallDistanceRepeatText).keyboardType(.decimalPad).textFieldStyle(.roundedBorder)
+                        .accessibilityLabel("第二次枕墙距，厘米")
+                    Text("cm").foregroundStyle(AppTheme.muted)
+                }
+                Label(otwdRecorded ? "已自动取最大值 \(String(format: "%.1f", occiputWallDistance ?? 0)) cm" : "请分别录入两次读数，精确至 0.1 cm", systemImage: otwdRecorded ? "checkmark.circle.fill" : "ruler")
+                    .font(.system(size: AppTheme.captionSize, weight: .semibold)).foregroundStyle(otwdRecorded ? ReferenceColor.green : AppTheme.warning)
+            }
+        }
+    }
+
+    var observationConfirm: some View {
         VStack(alignment: .leading, spacing: AppTheme.cardSpacing) {
             AssessmentHeroCard(
                 icon: "checkmark.shield.fill",
                 eyebrow: "采集完成",
                 title: "确认质量与安全信息",
-                detail: "四项动作均已达到基础取景要求。提交前请补充孩子近期的身体感受。"
+                detail: "八段相机采集已完成。提交前请核对双次采集质量和孩子近期身体感受。"
             ) {
                 HStack(spacing: 8) {
-                    AssessmentFactChip(icon: "camera.fill", title: "4 项已采集")
+                    AssessmentFactChip(icon: "checklist.checked", title: "8 段已记录")
                     AssessmentFactChip(icon: "person.fill.checkmark", title: "单人完整入镜")
                 }
             }
@@ -545,7 +506,7 @@ struct BodyAssessmentView: View {
         }
     }
 
-    private func load(record: BodyAssessmentRecord?, draft: BodyAssessmentDraft?) {
+    func load(record: BodyAssessmentRecord?, draft: BodyAssessmentDraft?) {
         guard !didLoad else { return }; didLoad = true
         if let draft {
             let restoredStep: Int
@@ -570,6 +531,27 @@ struct BodyAssessmentView: View {
             asymmetric = draft.parentMarkedAsymmetric; gaitConcern = draft.parentMarkedGaitConcern
             visualHints = draft.captureObservationHints
             postureSnapshots = draft.postureSnapshots
+            standingShoulderText = draft.standingShoulderDifferenceCentimeters.map { String(format: "%.1f", $0) } ?? ""
+            standingPelvisText = draft.standingPelvisDifferenceCentimeters.map { String(format: "%.1f", $0) } ?? ""
+            standingHeadTiltText = draft.standingHeadTiltDegrees.map { String(format: "%.1f", $0) } ?? ""
+            adamsObservedResult = draft.adamsObservedResult ?? "unrecorded"
+            adamsProminenceSide = draft.adamsProminenceSide ?? "无"
+            gaitObservedResult = draft.gaitObservedAbnormal.map { $0 ? "abnormal" : "normal" } ?? "unrecorded"
+            gaitObservationNote = draft.gaitObservationNote ?? ""
+            seatedMidlineText = draft.seatedMidlineDifferenceCentimeters.map { String(format: "%.1f", $0) } ?? ""
+            seatedShoulderText = draft.seatedShoulderDifferenceCentimeters.map { String(format: "%.1f", $0) } ?? ""
+            seatedKyphosisResult = draft.seatedThoracicKyphosisObserved.map { $0 ? "abnormal" : "normal" } ?? "unrecorded"
+            thoracicAtrText = draft.thoracicAtrDegrees.map { String(format: "%.1f", $0) } ?? ""
+            lumbarAtrText = draft.lumbarAtrDegrees.map { String(format: "%.1f", $0) } ?? ""
+            thoracicAtrSide = draft.thoracicAtrSide ?? "无"
+            lumbarAtrSide = draft.lumbarAtrSide ?? "无"
+            atrRetestEnabled = draft.atrRetestEnabled
+            thoracicAtrRepeatText = draft.thoracicAtrRepeatDegrees.map { String(format: "%.1f", $0) } ?? ""
+            lumbarAtrRepeatText = draft.lumbarAtrRepeatDegrees.map { String(format: "%.1f", $0) } ?? ""
+            seatedForwardBendAtrText = draft.seatedForwardBendAtrDegrees.map { String(format: "%.1f", $0) } ?? ""
+            occiputWallDistanceText = draft.occiputWallDistanceCentimeters.map { String(format: "%.1f", $0) } ?? ""
+            occiputWallDistanceText = draft.occiputWallDistanceFirstCentimeters.map { String(format: "%.1f", $0) } ?? occiputWallDistanceText
+            occiputWallDistanceRepeatText = draft.occiputWallDistanceSecondCentimeters.map { String(format: "%.1f", $0) } ?? draft.occiputWallDistanceCentimeters.map { String(format: "%.1f", $0) } ?? ""
             if visualHints.isEmpty, let hint = draft.visualObservationHint, let task = draft.completedCaptures.first { visualHints[task] = hint }
             let currentConsent = student.flatMap { state.localFeatures.healthConsents[$0.id] }
             let consentIsCurrent = currentConsent?.revokedAt == nil
@@ -596,13 +578,49 @@ struct BodyAssessmentView: View {
         asymmetric = record.parentMarkedAsymmetric; gaitConcern = record.parentMarkedGaitConcern
         visualHints = record.captureObservationHints
         postureSnapshots = record.postureReport?.snapshots ?? [:]
+        let standing = record.postureReport?.snapshots[.standingBack]
+        standingShoulderText = standing?.shoulderHeightDifferenceCm.map { String(format: "%.1f", $0) } ?? ""
+        standingPelvisText = standing?.pelvicHeightDifferenceCm.map { String(format: "%.1f", $0) } ?? ""
+        standingHeadTiltText = standing?.headTiltDegrees.map { String(format: "%.1f", $0) } ?? ""
+        let forward = record.postureReport?.snapshots[.forwardBend]
+        adamsObservedResult = forward?.adamsObservedResult ?? "unrecorded"
+        adamsProminenceSide = forward?.adamsProminenceSide ?? "无"
+        thoracicAtrText = (forward?.thoracicAtrFirstDegrees ?? forward?.thoracicAtrDegrees).map { String(format: "%.1f", $0) } ?? ""
+        lumbarAtrText = (forward?.lumbarAtrFirstDegrees ?? forward?.lumbarAtrDegrees).map { String(format: "%.1f", $0) } ?? ""
+        thoracicAtrSide = forward?.thoracicAtrSide ?? "无"
+        lumbarAtrSide = forward?.lumbarAtrSide ?? "无"
+        atrRetestEnabled = forward?.thoracicAtrSecondDegrees != nil || forward?.lumbarAtrSecondDegrees != nil
+        thoracicAtrRepeatText = forward?.thoracicAtrSecondDegrees.map { String(format: "%.1f", $0) } ?? ""
+        lumbarAtrRepeatText = forward?.lumbarAtrSecondDegrees.map { String(format: "%.1f", $0) } ?? ""
+        seatedForwardBendAtrText = forward?.seatedForwardBendAtrDegrees.map { String(format: "%.1f", $0) } ?? ""
+        let gaitSnapshot = record.postureReport?.snapshots[.gaitVideo]
+        gaitObservedResult = gaitSnapshot?.gaitObservedAbnormal.map { $0 ? "abnormal" : "normal" } ?? "unrecorded"
+        gaitObservationNote = gaitSnapshot?.gaitObservationNote ?? ""
+        let seatedSnapshot = record.postureReport?.snapshots[.seatedPosture]
+        seatedMidlineText = seatedSnapshot?.spinalMidlineDeviationCm.map { String(format: "%.1f", $0) } ?? ""
+        seatedShoulderText = seatedSnapshot?.shoulderHeightDifferenceCm.map { String(format: "%.1f", $0) } ?? ""
+        seatedKyphosisResult = seatedSnapshot?.seatedThoracicKyphosisObserved.map { $0 ? "abnormal" : "normal" } ?? "unrecorded"
+        occiputWallDistanceText = seatedSnapshot?.occiputWallDistanceCm.map { String(format: "%.1f", $0) } ?? ""
+        occiputWallDistanceRepeatText = occiputWallDistanceText
         if visualHints.isEmpty, let hint = record.visualObservationHint, let task = record.completedCaptures.first { visualHints[task] = hint }
     }
-    private func persistDraft() {
+    func persistDraft() {
         guard let student, step.rawValue <= Step.confirm.rawValue else { return }
-        state.saveBodyAssessmentDraft(BodyAssessmentDraft(step: step.rawValue, guardianReady: adultReady, consentAcknowledged: consentAcknowledged, environmentReady: spaceReady, heightCentimeters: height, weightKilograms: weight, completedCaptures: completedCaptures, parentMarkedAsymmetric: asymmetric, parentMarkedGaitConcern: gaitConcern, visualObservationHint: visualSummary, captureObservationHints: visualHints, fatherHeightCentimeters: fatherHeight, motherHeightCentimeters: motherHeight, postureSnapshots: postureSnapshots), for: student)
+        state.saveBodyAssessmentDraft(BodyAssessmentDraft(step: step.rawValue, guardianReady: adultReady, consentAcknowledged: consentAcknowledged, environmentReady: spaceReady, heightCentimeters: height, weightKilograms: weight, completedCaptures: completedCaptures, parentMarkedAsymmetric: asymmetric, parentMarkedGaitConcern: gaitConcern, visualObservationHint: visualSummary, captureObservationHints: visualHints, fatherHeightCentimeters: fatherHeight, motherHeightCentimeters: motherHeight, postureSnapshots: postureSnapshots, standingShoulderDifferenceCentimeters: standingShoulder, standingPelvisDifferenceCentimeters: standingPelvis, standingHeadTiltDegrees: standingHeadTilt, adamsObservedResult: adamsObservedResult == "unrecorded" ? nil : adamsObservedResult, adamsProminenceSide: adamsProminenceSide == "无" ? nil : adamsProminenceSide, gaitObservedAbnormal: gaitObserved ? gaitObservedResult == "abnormal" : nil, gaitObservationNote: gaitObservationNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : gaitObservationNote.trimmingCharacters(in: .whitespacesAndNewlines), seatedMidlineDifferenceCentimeters: seatedMidline, seatedShoulderDifferenceCentimeters: seatedShoulder, seatedThoracicKyphosisObserved: seatedMeasured ? seatedKyphosisResult == "abnormal" : nil, thoracicAtrDegrees: thoracicAtrFirst, lumbarAtrDegrees: lumbarAtrFirst, thoracicAtrSide: thoracicAtrSide == "无" ? nil : thoracicAtrSide, lumbarAtrSide: lumbarAtrSide == "无" ? nil : lumbarAtrSide, atrRetestEnabled: atrRetestEnabled, thoracicAtrRepeatDegrees: thoracicAtrRepeat, lumbarAtrRepeatDegrees: lumbarAtrRepeat, seatedForwardBendAtrDegrees: seatedForwardBendAtr, occiputWallDistanceFirstCentimeters: occiputWallDistanceFirst, occiputWallDistanceSecondCentimeters: occiputWallDistanceSecond, occiputWallDistanceCentimeters: occiputWallDistance), for: student)
     }
-    private func goBack() {
+    func standardizedMeasurement(_ raw: String, range: ClosedRange<Double>) -> Double? {
+        let normalized = raw.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: ",", with: ".")
+        guard !normalized.isEmpty, let value = Double(normalized), value.isFinite, range.contains(value) else { return nil }
+        return (value * 10).rounded() / 10
+    }
+
+    func averagedATR(first: Double?, repeatValue: Double?) -> Double? {
+        guard let first else { return nil }
+        guard atrRetestEnabled else { return first }
+        guard let repeatValue else { return nil }
+        return ((first + repeatValue) / 2 * 10).rounded() / 10
+    }
+    func goBack() {
         if viewingSavedRecord, step == .result {
             router.pop()
             return
@@ -617,7 +635,7 @@ struct BodyAssessmentView: View {
         if next == .profile, let student { state.recordHealthConsent(studentID: student.id) }
         if reduceMotion { var transaction = Transaction(); transaction.animation = nil; withTransaction(transaction) { step = next } } else { withAnimation(.easeInOut(duration: 0.22)) { step = next } }; persistDraft()
     }
-    private func ruler(title: String, value: Binding<Double>, range: ClosedRange<Double>, unit: String, step: Double) -> some View {
+    func ruler(title: String, value: Binding<Double>, range: ClosedRange<Double>, unit: String, step: Double) -> some View {
         let textValue = Binding<String>(
             get: { value.wrappedValue > 0 ? String(format: "%.1f", value.wrappedValue) : "" },
             set: { raw in
@@ -655,7 +673,7 @@ struct BodyAssessmentView: View {
         .background(.white, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous).stroke(AppTheme.divider.opacity(0.8), lineWidth: 0.75))
     }
-    private func profileDataRow(icon: String, title: String, value: String) -> some View {
+    func profileDataRow(icon: String, title: String, value: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
                 .foregroundStyle(ReferenceColor.blue)
@@ -671,7 +689,7 @@ struct BodyAssessmentView: View {
         }
         .accessibilityElement(children: .combine)
     }
-    private var environmentPreview: some View {
+    var environmentPreview: some View {
         ZStack {
             LinearGradient(colors: [Color(hex: "172B4D"), Color(hex: "245A87")], startPoint: .topLeading, endPoint: .bottomTrailing)
             RoundedRectangle(cornerRadius: 22, style: .continuous)
@@ -683,7 +701,7 @@ struct BodyAssessmentView: View {
                     .font(.system(size: 58, weight: .light))
                 Text("头部到双脚完整入镜")
                     .font(.system(size: AppTheme.bodySize, weight: .semibold))
-                Text("手机与孩子保持约 2–3 米")
+                Text("正后方约 2.5 米 · 镜头与胸椎同高")
                     .font(.system(size: AppTheme.captionSize))
                     .foregroundStyle(.white.opacity(0.76))
             }
@@ -692,9 +710,9 @@ struct BodyAssessmentView: View {
         .frame(height: 210)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("拍摄取景示意，孩子头部到双脚完整入镜，手机距离约二到三米")
+        .accessibilityLabel("标准主机位示意，正后方约二点五米，镜头与胸椎同高，孩子全身完整入镜")
     }
-    private func checklist(_ text: String, icon: String) -> some View {
+    func checklist(_ text: String, icon: String) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 16, weight: .semibold))
@@ -708,7 +726,7 @@ struct BodyAssessmentView: View {
         }
         .accessibilityElement(children: .combine)
     }
-    private func readinessToggle(title: String, detail: String, icon: String, isOn: Binding<Bool>) -> some View {
+    func readinessToggle(title: String, detail: String, icon: String, isOn: Binding<Bool>) -> some View {
         HStack(alignment: .center, spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 18, weight: .semibold))
@@ -733,7 +751,7 @@ struct BodyAssessmentView: View {
         .padding(12)
         .background(AppTheme.surface, in: RoundedRectangle(cornerRadius: AppTheme.controlRadius, style: .continuous))
     }
-    private func confirmationToggle(title: String, detail: String, value: Binding<Bool>) -> some View {
+    func confirmationToggle(title: String, detail: String, value: Binding<Bool>) -> some View {
         Toggle(isOn: value) {
             VStack(alignment: .leading, spacing: 5) {
                 Text(title).font(.system(size: AppTheme.bodySize, weight: .semibold)).foregroundStyle(ReferenceColor.navy)

@@ -9,6 +9,56 @@ private final class IncompleteRemoteRepository: YouthRepository {
 
 @MainActor
 final class LocalFeatureStateTests: XCTestCase {
+    func testMarkerPnPEvidenceRequiresApprovedProfileAndUsesSharedWireKeys() throws {
+        let evidence = CaptureCalibrationEvidence(
+            mode: .markerPnP, boardDetected: true, boardID: "uy-charuco-v1",
+            intrinsicsID: "iphone-rear1x-v1", lensID: "rear-1x", resolution: "1920x1080",
+            reprojectionErrorPx: 1.2, profileID: "ios-iphone-rear1x-v1"
+        )
+        XCTAssertTrue(evidence.hasMarkerPnPEvidence)
+        let payload = try JSONSerialization.jsonObject(with: JSONEncoder().encode(evidence)) as? [String: Any]
+        XCTAssertEqual(payload?["boardId"] as? String, "uy-charuco-v1")
+        XCTAssertEqual(payload?["intrinsicsId"] as? String, "iphone-rear1x-v1")
+        XCTAssertEqual(payload?["profileId"] as? String, "ios-iphone-rear1x-v1")
+        XCTAssertNil(payload?["boardID"])
+        XCTAssertFalse(CaptureCalibrationEvidence(mode: .markerPnP, boardDetected: true, boardID: "b", intrinsicsID: "i", lensID: "rear-1x", resolution: "1920x1080", reprojectionErrorPx: 1).hasMarkerPnPEvidence)
+    }
+
+    func testPostureCaptureRequiresTwoConsistentIndependentTakes() {
+        func snapshot(_ id: String, shoulder: Double, headTilt: Double) -> PostureMetricSnapshot {
+            PostureMetricSnapshot(
+                id: id,
+                task: .forwardBend,
+                sampleCount: 24,
+                confidence: 0.86,
+                shoulderHeightDifferenceCm: shoulder,
+                pelvicHeightDifferenceCm: 0.2,
+                headTiltDegrees: headTilt,
+                spinalMidlineDeviationCm: 0.3,
+                thoracicRoundingDegrees: 12,
+                forwardHeadAngleDegrees: 6,
+                cameraProxyAtrDegrees: nil,
+                cameraProxyRibProminenceCm: nil,
+                gaitShoulderSwingDifferenceCm: nil,
+                gaitPelvicSwingDifferenceCm: nil,
+                gaitTrunkSwayCm: nil
+            )
+        }
+        let first = snapshot("first", shoulder: 0.30, headTilt: 1)
+        let second = snapshot("second", shoulder: 0.85, headTilt: 3.5)
+        let stable = PostureCaptureRepeatability.verify(first: first, second: second)
+        XCTAssertTrue(stable.passed)
+        XCTAssertGreaterThanOrEqual(stable.comparedMetricCount, 3)
+        let merged = PostureCaptureRepeatability.merged(first: first, second: second, result: stable)
+        XCTAssertEqual(merged.shoulderHeightDifferenceCm ?? -1, 0.575, accuracy: 0.0001)
+        XCTAssertEqual(merged.sampleCount, 48)
+        XCTAssertEqual(merged.repeatabilityStatus, "passed")
+
+        let unstable = PostureCaptureRepeatability.verify(first: snapshot("first", shoulder: 0.30, headTilt: 1), second: snapshot("third", shoulder: 1.25, headTilt: 4.5))
+        XCTAssertFalse(unstable.passed)
+        XCTAssertGreaterThan(unstable.maximumDifference, 0.8)
+    }
+
     private func authorizeTeacherFixture(_ state: AppState) {
         state.profile = UserProfile(
             id: "teacher-test", name: "测试教师", phone: "13800138000", role: .teacher,
@@ -250,7 +300,7 @@ final class LocalFeatureStateTests: XCTestCase {
         }
         XCTAssertEqual(PostureAssessmentReport.algorithmVersion, "UY-IMCA-CV-1.3")
         XCTAssertEqual(PostureAssessmentReport.calibrationVersion, "UY-CAL-BASELINE-1.0")
-        XCTAssertEqual(AssessmentScoreRules.modelRegistryVersion, "UY-MODELS-1.0")
+        XCTAssertEqual(AssessmentScoreRules.modelRegistryVersion, "UY-MODELS-1.1")
         XCTAssertEqual(AssessmentScoreRules.algorithmVersion, "UY-IMCA-SCORE-1.3")
         XCTAssertEqual(BodyAssessmentRecord.bmiAlgorithmVersion, "UY-IMCA-BMI-1.2")
         XCTAssertEqual(BodyAssessmentRecord.heightAlgorithmVersion, "UY-IMCA-HEIGHT-1.0")
@@ -259,6 +309,10 @@ final class LocalFeatureStateTests: XCTestCase {
         let report = PostureAssessmentReport.make(snapshots: [:], generatedAt: .now)
         XCTAssertEqual(report.calibrationVersion, PostureAssessmentReport.calibrationVersion)
         XCTAssertEqual(report.rulesSourceVersion, PostureScreeningRules.rulesSourceVersion)
+        XCTAssertEqual(report.validationStatus, .pendingHumanValidation)
+        XCTAssertFalse(report.canPublishClassification)
+        XCTAssertEqual(report.overallLevel, .pending)
+        XCTAssertEqual(report.riskScore, 0)
     }
 
     func testMovementAggregateUsesCanonicalHalfUpRounding() {
@@ -308,6 +362,18 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertNil(PostureMetricCalculator.range([.nan, .infinity]))
     }
 
+    func testPostureSamplingRejectsOutliersAndEvaluatesTenRunRepeatability() throws {
+        XCTAssertEqual(try XCTUnwrap(PostureMetricCalculator.robustMedian([10, 10.1, 9.9, 10, 60])), 10, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(PostureMetricCalculator.robustRange([0.10, 0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 5.0])), 0.07, accuracy: 0.001)
+        XCTAssertTrue(PostureMetricCalculator.isStableSeries(Array(repeating: 0.20, count: 18), minimumSamples: 18, maximumMedianAbsoluteDeviation: 0.55))
+        XCTAssertFalse(PostureMetricCalculator.isStableSeries(Array(repeating: 0.20, count: 17), minimumSamples: 18, maximumMedianAbsoluteDeviation: 0.55))
+
+        let stableRuns = [1.00, 1.04, 0.98, 1.02, 1.01, 0.99, 1.05, 0.97, 1.03, 1.00]
+        XCTAssertTrue(PostureMetricCalculator.repeatability(stableRuns, maximumRange: 0.20, maximumStandardDeviation: 0.08).passed)
+        XCTAssertFalse(PostureMetricCalculator.repeatability(Array(stableRuns.prefix(9)), maximumRange: 0.20, maximumStandardDeviation: 0.08).passed)
+        XCTAssertFalse(PostureMetricCalculator.repeatability([1, 1, 1, 1, 1, 1, 1, 1, 1, 1.8], maximumRange: 0.20, maximumStandardDeviation: 0.08).passed)
+    }
+
     func testFollowAlongAgeProfilesAndRequiredJointsAreMonotonic() {
         let child = ChildFollowAlongTuning.profile(ageMonths: 84)
         let junior = ChildFollowAlongTuning.profile(ageMonths: 120)
@@ -344,6 +410,8 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertGreaterThan(child.staticMaximumDisplacement, teen.staticMaximumDisplacement)
         XCTAssertLessThan(child.minimumIndividualLandmarkConfidence, teen.minimumIndividualLandmarkConfidence)
         XCTAssertGreaterThan(child.gaitMinimumSeconds, teen.gaitMinimumSeconds)
+        XCTAssertGreaterThanOrEqual(child.minimumRawSamplesForCompletion, 18)
+        XCTAssertGreaterThanOrEqual(teen.staticHoldSeconds, 2.4)
     }
 
     func testPostureCaptureGateRejectsJitterAndIncompleteGait() {
@@ -395,7 +463,37 @@ final class LocalFeatureStateTests: XCTestCase {
         let defaults = UserDefaults(suiteName: suite)!
         defaults.removePersistentDomain(forName: suite)
         let store = LocalFeatureStore(defaults: defaults)
-        let draft = BodyAssessmentDraft(step: 2, heightCentimeters: 133.5, weightKilograms: 31.2, completedCaptures: [.standingBack, .seatedPosture], parentMarkedAsymmetric: false, parentMarkedGaitConcern: false, visualObservationHint: "请由家长确认画面对齐提示。", captureObservationHints: [.standingBack: "站姿提示", .seatedPosture: "坐姿提示"])
+        let draft = BodyAssessmentDraft(
+            step: 5,
+            heightCentimeters: 133.5,
+            weightKilograms: 31.2,
+            completedCaptures: [.standingBack, .seatedPosture],
+            parentMarkedAsymmetric: false,
+            parentMarkedGaitConcern: false,
+            visualObservationHint: "请由家长确认画面对齐提示。",
+            captureObservationHints: [.standingBack: "站姿提示", .seatedPosture: "坐姿提示"],
+            standingShoulderDifferenceCentimeters: 0.4,
+            standingPelvisDifferenceCentimeters: 0.3,
+            standingHeadTiltDegrees: 2.5,
+            adamsObservedResult: "equivocal",
+            adamsProminenceSide: "右",
+            gaitObservedAbnormal: true,
+            gaitObservationNote: "右侧骨盆摆动不对称",
+            seatedMidlineDifferenceCentimeters: 0.6,
+            seatedShoulderDifferenceCentimeters: 0.4,
+            seatedThoracicKyphosisObserved: false,
+            thoracicAtrDegrees: 5.2,
+            lumbarAtrDegrees: 3.4,
+            thoracicAtrSide: "右",
+            lumbarAtrSide: "左",
+            atrRetestEnabled: true,
+            thoracicAtrRepeatDegrees: 5.4,
+            lumbarAtrRepeatDegrees: 3.2,
+            seatedForwardBendAtrDegrees: 2.0,
+            occiputWallDistanceFirstCentimeters: 1.4,
+            occiputWallDistanceSecondCentimeters: 1.6,
+            occiputWallDistanceCentimeters: 1.6
+        )
 
         store.update { $0.bodyAssessmentDrafts["s01"] = draft }
 
@@ -403,6 +501,14 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertEqual(restored, draft)
         XCTAssertEqual(restored?.captureObservationHints[.standingBack], "站姿提示")
         XCTAssertEqual(restored?.captureObservationHints[.seatedPosture], "坐姿提示")
+        XCTAssertEqual(restored?.adamsObservedResult, "equivocal")
+        XCTAssertEqual(restored?.adamsProminenceSide, "右")
+        XCTAssertEqual(restored?.thoracicAtrRepeatDegrees, 5.4)
+        XCTAssertEqual(restored?.occiputWallDistanceCentimeters, 1.6)
+        XCTAssertEqual(restored?.gaitObservationNote, "右侧骨盆摆动不对称")
+        XCTAssertTrue(SpineScreeningStandard.isApplicable(ageMonths: 72))
+        XCTAssertTrue(SpineScreeningStandard.isApplicable(ageMonths: 155))
+        XCTAssertFalse(SpineScreeningStandard.isApplicable(ageMonths: 156))
     }
 
     func testBMIAndGeneticHeightUseFamilyFormula() throws {
@@ -553,24 +659,104 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertEqual(BodyMeasurementInput.normalized(1, range: 1...2, step: 0), 1, accuracy: 0.001)
     }
 
+    func testCaptureCalibrationRequiresLevelPhoneAndAllBodyAnchors() {
+        let level = CaptureCalibrationRules.deviceAlignment(gravityX: 0, gravityY: -1, gravityZ: 0)
+        XCTAssertTrue(level.isAvailable)
+        XCTAssertTrue(level.isLevel)
+        XCTAssertFalse(CaptureCalibrationRules.deviceAlignment(gravityX: 0.18, gravityY: -0.98, gravityZ: 0).isLevel)
+        XCTAssertFalse(CaptureCalibrationRules.deviceAlignment(gravityX: 0, gravityY: -0.97, gravityZ: 0.24).isLevel)
+        XCTAssertFalse(CaptureCalibrationRules.deviceAlignment(gravityX: .nan, gravityY: -1, gravityZ: 0).isAvailable)
+
+        let ready = CaptureBodyAlignment(
+            bodyDetected: true,
+            distanceState: .ready,
+            centered: true,
+            headReady: true,
+            shouldersReady: true,
+            hipsReady: true,
+            kneesReady: true,
+            feetReady: true
+        )
+        XCTAssertTrue(ready.isReady)
+        XCTAssertFalse(CaptureBodyAlignment(
+            bodyDetected: true,
+            distanceState: .ready,
+            centered: true,
+            headReady: true,
+            shouldersReady: true,
+            hipsReady: true,
+            kneesReady: true,
+            feetReady: false
+        ).isReady)
+        XCTAssertFalse(CaptureBodyAlignment(
+            bodyDetected: true,
+            distanceState: .tooClose,
+            centered: true,
+            headReady: true,
+            shouldersReady: true,
+            hipsReady: true,
+            kneesReady: true,
+            feetReady: true
+        ).isReady)
+        XCTAssertEqual(SpineScreeningStandard.items.map(\.number), [1, 2, 3, 4, 5])
+        XCTAssertEqual(SpineScreeningStandard.homeCameraItems.count, 8)
+        XCTAssertEqual(SpineScreeningStandard.homeCameraItems.compactMap { item -> BodyAssessmentRecord.CaptureTask? in
+            if case .camera(let task) = item.method { return task }
+            return nil
+        }, [.standingFront, .standingBack, .standingSide, .forwardBend, .dynamicKneeControl, .gaitVideo, .seatedPosture, .footArch])
+        XCTAssertEqual(SpineScreeningStandard.items[1].title, "亚当斯前屈试验")
+        XCTAssertTrue(SpineScreeningStandard.items[1].instruction.contains("膝关节完全伸直"))
+        XCTAssertTrue(SpineScreeningStandard.items[1].instruction.contains("不屈膝、不弓步"))
+        XCTAssertTrue(BodyCaptureQualityGate.hasAdamsLowerBodyPosition(kneeAngles: [172, 169], ankleGap: 0.045, shoulderWidth: 0.20, requiresBothFeet: true))
+        XCTAssertFalse(BodyCaptureQualityGate.hasAdamsLowerBodyPosition(kneeAngles: [142, 171], ankleGap: 0.045, shoulderWidth: 0.20, requiresBothFeet: true))
+        XCTAssertFalse(BodyCaptureQualityGate.hasAdamsLowerBodyPosition(kneeAngles: [172, 171], ankleGap: 0.18, shoulderWidth: 0.20, requiresBothFeet: true))
+        XCTAssertFalse(BodyCaptureQualityGate.hasAdamsLowerBodyPosition(kneeAngles: [172, 171], ankleGap: 0.09, shoulderWidth: 0.20, requiresBothFeet: true))
+        XCTAssertEqual(SpineScreeningStandard.atrBand(degrees: 4.9), .green)
+        XCTAssertEqual(SpineScreeningStandard.atrBand(degrees: 5.0), .yellow)
+        XCTAssertEqual(SpineScreeningStandard.atrBand(degrees: 6.9), .yellow)
+        XCTAssertEqual(SpineScreeningStandard.atrBand(degrees: 7.0), .red)
+        XCTAssertEqual(SpineScreeningStandard.maximumOcciputWallDistance(first: 1.4, second: 1.8), 1.8)
+        XCTAssertNil(SpineScreeningStandard.maximumOcciputWallDistance(first: 1.4, second: nil))
+    }
+
+    func testFootCloseUpUsesLowerLegScaleInsteadOfFullBodyScale() {
+        XCTAssertEqual(BodyCaptureQualityGate.footScaleState(lowerLegCoverage: 0.18), .tooFar)
+        XCTAssertEqual(BodyCaptureQualityGate.footScaleState(lowerLegCoverage: 0.45), .ready)
+        XCTAssertEqual(BodyCaptureQualityGate.footScaleState(lowerLegCoverage: 0.82), .tooClose)
+        XCTAssertEqual(BodyCaptureQualityGate.footScaleState(lowerLegCoverage: .nan), .invalid)
+    }
+
     func testVisualCaptureQualityGateRequiresStablePoseAndRealGaitMovement() {
-        XCTAssertTrue(BodyCaptureQualityGate.isStaticCaptureReady(elapsed: 1.5, stableFrames: 12, displacement: 0.01))
-        XCTAssertFalse(BodyCaptureQualityGate.isStaticCaptureReady(elapsed: 1.5, stableFrames: 12, displacement: 0.03))
-        XCTAssertFalse(BodyCaptureQualityGate.isStaticCaptureReady(elapsed: 1.4, stableFrames: 20, displacement: 0.01))
-        XCTAssertTrue(BodyCaptureQualityGate.isGaitCaptureReady(elapsed: 2.5, displacement: 0.04))
-        XCTAssertFalse(BodyCaptureQualityGate.isGaitCaptureReady(elapsed: 2.5, displacement: 0.02))
-        XCTAssertFalse(BodyCaptureQualityGate.isForwardBendCaptureReady(elapsed: 1.5, stableFrames: 12, displacement: 0.01, torsoTilt: 0.10))
-        XCTAssertTrue(BodyCaptureQualityGate.isForwardBendCaptureReady(elapsed: 1.5, stableFrames: 12, displacement: 0.01, torsoTilt: 0.45))
-        XCTAssertFalse(BodyCaptureQualityGate.isForwardBendCaptureReady(elapsed: 1.5, stableFrames: 12, displacement: 0.01, torsoTilt: .infinity, ageMonths: 120))
+        XCTAssertTrue(BodyCaptureQualityGate.isStaticCaptureReady(elapsed: 2.5, stableFrames: 20, displacement: 0.01))
+        XCTAssertFalse(BodyCaptureQualityGate.isStaticCaptureReady(elapsed: 2.5, stableFrames: 20, displacement: 0.03))
+        XCTAssertFalse(BodyCaptureQualityGate.isStaticCaptureReady(elapsed: 2.4, stableFrames: 20, displacement: 0.01))
+        XCTAssertTrue(BodyCaptureQualityGate.isGaitCaptureReady(elapsed: 6.4, displacement: 0.04))
+        XCTAssertFalse(BodyCaptureQualityGate.isGaitCaptureReady(elapsed: 6.4, displacement: 0.02))
+        XCTAssertFalse(BodyCaptureQualityGate.isForwardBendCaptureReady(elapsed: 2.5, stableFrames: 20, displacement: 0.01, torsoTilt: 0.10))
+        XCTAssertTrue(BodyCaptureQualityGate.isForwardBendCaptureReady(elapsed: 2.5, stableFrames: 20, displacement: 0.01, torsoTilt: 0.45))
+        XCTAssertFalse(BodyCaptureQualityGate.isForwardBendCaptureReady(elapsed: 2.5, stableFrames: 20, displacement: 0.01, torsoTilt: .infinity, ageMonths: 120))
         XCTAssertFalse(BodyCaptureQualityGate.hasUsableBodyScale(verticalCoverage: 0.30, seated: false))
         XCTAssertTrue(BodyCaptureQualityGate.hasUsableBodyScale(verticalCoverage: 0.50, seated: false))
+        XCTAssertFalse(BodyCaptureQualityGate.hasUsableBodyScale(verticalCoverage: 0.82, seated: false))
+        XCTAssertEqual(BodyCaptureQualityGate.bodyScaleState(verticalCoverage: 0.30, seated: false), .tooFar)
+        XCTAssertEqual(BodyCaptureQualityGate.bodyScaleState(verticalCoverage: 0.50, seated: false), .ready)
+        XCTAssertEqual(BodyCaptureQualityGate.bodyScaleState(verticalCoverage: 0.82, seated: false), .tooClose)
         XCTAssertFalse(BodyCaptureQualityGate.hasUsableBodyScale(verticalCoverage: 0.12, seated: true))
+        XCTAssertFalse(BodyCaptureQualityGate.hasUsableBodyScale(verticalCoverage: 0.48, seated: true))
+        XCTAssertTrue(BodyCaptureQualityGate.hasComfortableFollowAlongFraming(bodySpan: 0.70, torsoSpan: 0.30))
+        XCTAssertFalse(BodyCaptureQualityGate.hasComfortableFollowAlongFraming(bodySpan: 0.82, torsoSpan: 0.30))
+        XCTAssertFalse(BodyCaptureQualityGate.hasComfortableFollowAlongFraming(bodySpan: 0.70, torsoSpan: 0.40))
         XCTAssertTrue(BodyCaptureQualityGate.hasUsableSeatedGeometry(shoulderCenterY: 0.85, hipCenterY: 0.65, verticalCoverage: 0.20))
         XCTAssertFalse(BodyCaptureQualityGate.hasUsableSeatedGeometry(shoulderCenterY: 0.65, hipCenterY: 0.85, verticalCoverage: 0.20))
         XCTAssertTrue(BodyCaptureQualityGate.hasReliableLandmarks([0.72, 0.62, 0.58, 0.60]))
         XCTAssertFalse(BodyCaptureQualityGate.hasReliableLandmarks([0.96, 0.96, 0.33, 0.34]))
         XCTAssertFalse(BodyCaptureQualityGate.hasReliableLandmarks([0.9, 0.9, 0.2, 0.9]))
         XCTAssertFalse(BodyCaptureQualityGate.hasReliableLandmarks([0.9, .infinity, 0.9, 0.9]))
+        XCTAssertTrue(BodyCaptureQualityGate.hasReliableForwardBendLandmarks(core: [0.82, 0.76, 0.74, 0.78, 0.73], ankles: [0.72, 0.10], ageMonths: 120))
+        XCTAssertFalse(BodyCaptureQualityGate.hasReliableForwardBendLandmarks(core: [0.82, 0.76, 0.74, 0.78, 0.73], ankles: [0.12, 0.10], ageMonths: 120))
+        XCTAssertEqual(BodyCaptureQualityGate.adamsForwardBendCompletionScore(leftShoulderX: 0.40, leftShoulderY: 0.52, rightShoulderX: 0.60, rightShoulderY: 0.52, hipCenterY: 0.50) ?? 0, 0.90, accuracy: 0.001)
+        XCTAssertEqual(BodyCaptureQualityGate.adamsForwardBendCompletionScore(leftShoulderX: 0.40, leftShoulderY: 0.70, rightShoulderX: 0.60, rightShoulderY: 0.70, hipCenterY: 0.50) ?? -1, 0, accuracy: 0.001)
+        XCTAssertNil(BodyCaptureQualityGate.adamsForwardBendCompletionScore(leftShoulderX: .infinity, leftShoulderY: 0.52, rightShoulderX: 0.60, rightShoulderY: 0.52, hipCenterY: 0.50))
         XCTAssertFalse(BodyCaptureQualityGate.hasUsableBodyScale(verticalCoverage: .infinity, seated: false))
         XCTAssertEqual(BodyCaptureQualityGate.staticProgress(elapsed: 10), 0.96, accuracy: 0.001)
     }
@@ -580,7 +766,13 @@ final class LocalFeatureStateTests: XCTestCase {
             PostureMetricSnapshot(id: task.rawValue, task: task, sampleCount: sampleCount, confidence: 0.82, shoulderHeightDifferenceCm: shoulder, pelvicHeightDifferenceCm: 0.2, headTiltDegrees: 1, spinalMidlineDeviationCm: 0.2, thoracicRoundingDegrees: 10, forwardHeadAngleDegrees: 5, cameraProxyAtrDegrees: atr, cameraProxyRibProminenceCm: rib, gaitShoulderSwingDifferenceCm: gait, gaitPelvicSwingDifferenceCm: nil, gaitTrunkSwayCm: nil)
         }
         let greenSnapshots = Dictionary(uniqueKeysWithValues: BodyAssessmentRecord.CaptureTask.allCases.map { ($0, snapshot($0)) })
-        let greenReport = PostureAssessmentReport.make(snapshots: greenSnapshots, generatedAt: .now)
+        let greenReport = PostureAssessmentReport.makeValidatedFixture(snapshots: greenSnapshots, generatedAt: .now)
+        XCTAssertEqual(PostureAssessmentReport.makeValidatedFixture(snapshots: greenSnapshots, generatedAt: .now, ageMonths: 156).overallLevel, .pending)
+        let productReport = PostureAssessmentReport.make(snapshots: greenSnapshots, generatedAt: .now)
+        XCTAssertTrue(productReport.isComplete)
+        XCTAssertEqual(productReport.overallLevel, .pending)
+        XCTAssertEqual(productReport.riskScore, 0)
+        XCTAssertFalse(productReport.canPublishClassification)
         let green = BodyAssessmentRecord(heightCentimeters: 150, weightKilograms: 30, measuredAt: .now, ruleVersion: BodyAssessmentRecord.ruleVersion, completedCaptures: Set(BodyAssessmentRecord.CaptureTask.allCases), parentMarkedAsymmetric: true, parentMarkedGaitConcern: true, savedAt: .now, nextFollowUpDate: .now, completedPlanDays: [], postureReport: greenReport)
         XCTAssertEqual(greenReport.overallLevel, .green)
         XCTAssertEqual(green.attention(ageMonths: 108, gender: "男"), .green)
@@ -588,28 +780,38 @@ final class LocalFeatureStateTests: XCTestCase {
 
         var redSnapshots = greenSnapshots
         redSnapshots[.standingBack] = snapshot(.standingBack, shoulder: 2.0)
-        XCTAssertEqual(PostureAssessmentReport.make(snapshots: redSnapshots, generatedAt: .now).overallLevel, .yellow)
+        XCTAssertEqual(PostureAssessmentReport.makeValidatedFixture(snapshots: redSnapshots, generatedAt: .now).overallLevel, .yellow)
         var multiSignalSnapshots = redSnapshots
         multiSignalSnapshots[.forwardBend] = snapshot(.forwardBend, atr: nil, rib: 1.3)
         multiSignalSnapshots[.gaitVideo] = snapshot(.gaitVideo, atr: nil, rib: nil, gait: 1.4)
-        XCTAssertEqual(PostureAssessmentReport.make(snapshots: multiSignalSnapshots, generatedAt: .now).overallLevel, .red)
+        XCTAssertEqual(PostureAssessmentReport.makeValidatedFixture(snapshots: multiSignalSnapshots, generatedAt: .now).overallLevel, .red)
         var proxyOnlySnapshots = greenSnapshots
         proxyOnlySnapshots[.forwardBend] = snapshot(.forwardBend, atr: 30)
-        XCTAssertEqual(PostureAssessmentReport.make(snapshots: proxyOnlySnapshots, generatedAt: .now).overallLevel, .green)
+        XCTAssertEqual(PostureAssessmentReport.makeValidatedFixture(snapshots: proxyOnlySnapshots, generatedAt: .now).overallLevel, .green)
         var instrumentATR = greenSnapshots
         instrumentATR[.forwardBend] = snapshot(.forwardBend, atr: nil, rib: nil)
         instrumentATR[.forwardBend] = PostureMetricSnapshot(id: "instrument", task: .forwardBend, sampleCount: 18, confidence: 0.82, shoulderHeightDifferenceCm: 0.2, pelvicHeightDifferenceCm: 0.2, headTiltDegrees: 1, spinalMidlineDeviationCm: 0.2, thoracicRoundingDegrees: 10, forwardHeadAngleDegrees: 5, cameraProxyAtrDegrees: nil, cameraProxyRibProminenceCm: nil, instrumentAtrDegrees: 7, occiputWallDistanceCm: nil, gaitShoulderSwingDifferenceCm: nil, gaitPelvicSwingDifferenceCm: nil, gaitTrunkSwayCm: nil)
-        XCTAssertEqual(PostureAssessmentReport.make(snapshots: instrumentATR, generatedAt: .now).overallLevel, .red)
+        XCTAssertEqual(PostureAssessmentReport.makeValidatedFixture(snapshots: instrumentATR, generatedAt: .now).overallLevel, .red)
+        var functionalReview = greenSnapshots
+        var functionalForward = snapshot(.forwardBend, atr: nil, rib: nil)
+        functionalForward.thoracicAtrDegrees = 5.5
+        functionalForward.seatedForwardBendAtrDegrees = 1.5
+        functionalReview[.forwardBend] = functionalForward
+        XCTAssertEqual(PostureAssessmentReport.makeValidatedFixture(snapshots: functionalReview, generatedAt: .now).overallLevel, .yellow)
+        var fixedReview = functionalReview
+        functionalForward.seatedForwardBendAtrDegrees = 5.0
+        fixedReview[.forwardBend] = functionalForward
+        XCTAssertEqual(PostureAssessmentReport.makeValidatedFixture(snapshots: fixedReview, generatedAt: .now).overallLevel, .red)
         var malformed = greenSnapshots
         malformed[.standingBack] = snapshot(.standingBack, shoulder: .nan)
-        let malformedReport = PostureAssessmentReport.make(snapshots: malformed, generatedAt: .now)
+        let malformedReport = PostureAssessmentReport.makeValidatedFixture(snapshots: malformed, generatedAt: .now)
         XCTAssertEqual(malformedReport.overallLevel, .pending)
         XCTAssertTrue(malformedReport.reasons.contains { $0.contains("异常测量值") })
         XCTAssertFalse(malformedReport.reasons.joined(separator: " ").localizedCaseInsensitiveContains("nan"))
-        XCTAssertEqual(PostureAssessmentReport.make(snapshots: greenSnapshots.filter { $0.key != .seatedPosture }, generatedAt: .now).overallLevel, .pending)
+        XCTAssertEqual(PostureAssessmentReport.makeValidatedFixture(snapshots: greenSnapshots.filter { $0.key != .seatedPosture }, generatedAt: .now).overallLevel, .pending)
         var lowQuality = greenSnapshots
         lowQuality[.seatedPosture] = snapshot(.seatedPosture, sampleCount: 3)
-        XCTAssertEqual(PostureAssessmentReport.make(snapshots: lowQuality, generatedAt: .now).overallLevel, .pending)
+        XCTAssertEqual(PostureAssessmentReport.makeValidatedFixture(snapshots: lowQuality, generatedAt: .now).overallLevel, .pending)
     }
 
     func testPostureReportUsesHeadTiltAndBothCalibratedAtrSegments() throws {
@@ -617,35 +819,39 @@ final class LocalFeatureStateTests: XCTestCase {
             PostureMetricSnapshot(id: task.rawValue, task: task, sampleCount: 18, confidence: 0.82, shoulderHeightDifferenceCm: 0.2, pelvicHeightDifferenceCm: 0.2, headTiltDegrees: headTilt ?? (task == .standingBack ? 6.5 : 1), spinalMidlineDeviationCm: 0.2, thoracicRoundingDegrees: 10, forwardHeadAngleDegrees: 5, cameraProxyAtrDegrees: 2, cameraProxyRibProminenceCm: 0.2, gaitShoulderSwingDifferenceCm: nil, gaitPelvicSwingDifferenceCm: nil, gaitTrunkSwayCm: nil)
         }
         let base = Dictionary(uniqueKeysWithValues: BodyAssessmentRecord.CaptureTask.allCases.map { ($0, snapshot($0)) })
-        XCTAssertEqual(PostureAssessmentReport.make(snapshots: base, generatedAt: .now).overallLevel, .yellow)
+        XCTAssertEqual(PostureAssessmentReport.makeValidatedFixture(snapshots: base, generatedAt: .now).overallLevel, .yellow)
 
         var thoracic = base
         thoracic[.standingBack] = snapshot(.standingBack, headTilt: 1)
         thoracic[.forwardBend] = PostureMetricSnapshot(id: "forward", task: .forwardBend, sampleCount: 18, confidence: 0.82, shoulderHeightDifferenceCm: 0.2, pelvicHeightDifferenceCm: 0.2, headTiltDegrees: 1, spinalMidlineDeviationCm: 0.2, thoracicRoundingDegrees: 10, forwardHeadAngleDegrees: 5, cameraProxyAtrDegrees: nil, cameraProxyRibProminenceCm: nil, thoracicAtrDegrees: 7, gaitShoulderSwingDifferenceCm: nil, gaitPelvicSwingDifferenceCm: nil, gaitTrunkSwayCm: nil)
-        XCTAssertEqual(PostureAssessmentReport.make(snapshots: thoracic, generatedAt: .now).overallLevel, .red)
+        XCTAssertEqual(PostureAssessmentReport.makeValidatedFixture(snapshots: thoracic, generatedAt: .now).overallLevel, .red)
 
         var lumbar = thoracic
         lumbar[.forwardBend] = thoracic[.forwardBend].map { value in
             PostureMetricSnapshot(id: value.id, task: value.task, sampleCount: value.sampleCount, confidence: value.confidence, shoulderHeightDifferenceCm: value.shoulderHeightDifferenceCm, pelvicHeightDifferenceCm: value.pelvicHeightDifferenceCm, headTiltDegrees: value.headTiltDegrees, spinalMidlineDeviationCm: value.spinalMidlineDeviationCm, thoracicRoundingDegrees: value.thoracicRoundingDegrees, forwardHeadAngleDegrees: value.forwardHeadAngleDegrees, cameraProxyAtrDegrees: value.cameraProxyAtrDegrees, cameraProxyRibProminenceCm: value.cameraProxyRibProminenceCm, lumbarAtrDegrees: 5, gaitShoulderSwingDifferenceCm: value.gaitShoulderSwingDifferenceCm, gaitPelvicSwingDifferenceCm: value.gaitPelvicSwingDifferenceCm, gaitTrunkSwayCm: value.gaitTrunkSwayCm)
         }
-        XCTAssertEqual(PostureAssessmentReport.make(snapshots: lumbar, generatedAt: .now).overallLevel, .yellow)
+        XCTAssertEqual(PostureAssessmentReport.makeValidatedFixture(snapshots: lumbar, generatedAt: .now).overallLevel, .yellow)
     }
 
     func testPostureReportRequiresTaskSpecificEvidence() {
-        func sparse(_ task: BodyAssessmentRecord.CaptureTask, shoulder: Double? = nil, trunk: Double? = nil, gait: Double? = nil) -> PostureMetricSnapshot {
-            PostureMetricSnapshot(id: task.rawValue, task: task, sampleCount: 18, confidence: 0.82, shoulderHeightDifferenceCm: shoulder, pelvicHeightDifferenceCm: nil, headTiltDegrees: nil, spinalMidlineDeviationCm: trunk, thoracicRoundingDegrees: nil, forwardHeadAngleDegrees: nil, cameraProxyAtrDegrees: nil, cameraProxyRibProminenceCm: nil, gaitShoulderSwingDifferenceCm: gait, gaitPelvicSwingDifferenceCm: nil, gaitTrunkSwayCm: nil)
+        func sparse(_ task: BodyAssessmentRecord.CaptureTask, shoulder: Double? = nil, trunk: Double? = nil, gait: Double? = nil, forwardHead: Double? = nil, repetitions: Double? = nil, footVisibility: Double? = nil) -> PostureMetricSnapshot {
+            PostureMetricSnapshot(id: task.rawValue, task: task, sampleCount: 18, confidence: 0.82, shoulderHeightDifferenceCm: shoulder, pelvicHeightDifferenceCm: nil, headTiltDegrees: nil, spinalMidlineDeviationCm: trunk, thoracicRoundingDegrees: nil, forwardHeadAngleDegrees: forwardHead, cameraProxyAtrDegrees: nil, cameraProxyRibProminenceCm: nil, movementRepetitionCount: repetitions, footArchVisibilityScore: footVisibility, gaitShoulderSwingDifferenceCm: gait, gaitPelvicSwingDifferenceCm: nil, gaitTrunkSwayCm: nil)
         }
         let mismatched = Dictionary(uniqueKeysWithValues: BodyAssessmentRecord.CaptureTask.allCases.map { ($0, sparse($0, shoulder: 0.2)) })
-        let mismatchedReport = PostureAssessmentReport.make(snapshots: mismatched)
+        let mismatchedReport = PostureAssessmentReport.makeValidatedFixture(snapshots: mismatched)
         XCTAssertEqual(mismatchedReport.overallLevel, .pending)
         XCTAssertFalse(mismatchedReport.isComplete)
         let taskSpecific: [BodyAssessmentRecord.CaptureTask: PostureMetricSnapshot] = [
+            .standingFront: sparse(.standingFront, shoulder: 0.2),
             .standingBack: sparse(.standingBack, shoulder: 0.2),
+            .standingSide: sparse(.standingSide, forwardHead: 2),
             .forwardBend: sparse(.forwardBend, trunk: 0.2),
+            .dynamicKneeControl: sparse(.dynamicKneeControl, repetitions: 3),
             .seatedPosture: sparse(.seatedPosture, trunk: 0.2),
-            .gaitVideo: sparse(.gaitVideo, gait: 0.2)
+            .gaitVideo: sparse(.gaitVideo, gait: 0.2),
+            .footArch: sparse(.footArch, footVisibility: 0.8)
         ]
-        let completeReport = PostureAssessmentReport.make(snapshots: taskSpecific)
+        let completeReport = PostureAssessmentReport.makeValidatedFixture(snapshots: taskSpecific)
         XCTAssertEqual(completeReport.overallLevel, .green)
         XCTAssertTrue(completeReport.isComplete)
     }
@@ -1473,6 +1679,22 @@ final class LocalFeatureStateTests: XCTestCase {
         XCTAssertNil(state.data)
         XCTAssertNotNil(state.error)
         XCTAssertNil(LocalFeatureStore(defaults: defaults).state.sessionProfile)
+    }
+
+    func testBodyScreeningDecisionDecodesLegacyPayloadWithoutReviewFields() throws {
+        let json = #"{"route":"professional_review","reasonCodes":["MODEL_PENDING_HUMAN_VALIDATION"],"qualityScore":82,"reviewRequired":true,"decisionPolicyVersion":"UY-BODY-TRIAGE-1.0"}"#.data(using: .utf8)!
+        let decision = try JSONDecoder().decode(BodyScreeningDecision.self, from: json)
+        XCTAssertEqual(decision.route, .professionalReview)
+        XCTAssertNil(decision.reviewDecision)
+        XCTAssertNil(decision.requestedRecaptureTasks)
+    }
+
+    func testBodyScreeningDecisionDecodesProfessionalRecaptureOutcome() throws {
+        let json = #"{"sessionId":"session-1","decisionId":"decision-1","route":"professional_review","reasonCodes":["REPEATABILITY_FAILED"],"qualityScore":61,"reviewRequired":true,"decisionPolicyVersion":"UY-BODY-TRIAGE-1.0","reviewStatus":"recapture_requested","reviewDecision":"recapture","reviewComment":"请重新完成前屈和步态观察","requestedRecaptureTasks":["forwardBend","gaitVideo"],"reviewVersion":2}"#.data(using: .utf8)!
+        let decision = try JSONDecoder().decode(BodyScreeningDecision.self, from: json)
+        XCTAssertEqual(decision.reviewDecision, .recapture)
+        XCTAssertEqual(decision.requestedRecaptureTasks, ["forwardBend", "gaitVideo"])
+        XCTAssertEqual(decision.reviewVersion, 2)
     }
 }
 

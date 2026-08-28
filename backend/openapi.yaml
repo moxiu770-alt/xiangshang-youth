@@ -52,6 +52,53 @@ paths:
         '400': { $ref: '#/components/responses/Conflict' }
         '200': { description: Prometheus text exposition }
         '401': { $ref: '#/components/responses/AuthError' }
+  /v1/public/field-client-release:
+    get:
+      summary: 查询 Windows 场地端发布包
+      description: 返回当前自包含 Windows x64 客户端的版本、大小、SHA-256 和下载地址；安装包不包含学校或设备密钥。
+      operationId: getPublicFieldClientRelease
+      tags: [Field]
+      security: []
+      responses:
+        '200':
+          description: 发布包状态；available=false 表示服务器尚未生成发布包
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [available, platform, runtime, sizeBytes, unsigned, executable]
+                        properties:
+                          available: { type: boolean }
+                          version: { type: [string, 'null'] }
+                          platform: { type: string }
+                          runtime: { type: string }
+                          sizeBytes: { type: integer, minimum: 0 }
+                          sha256: { type: [string, 'null'], pattern: '^[a-f0-9]{64}$' }
+                          generatedAt: { type: [string, 'null'], format: date-time }
+                          unsigned: { type: boolean }
+                          downloadUrl: { type: [string, 'null'] }
+                          executable: { type: string }
+        '400': { $ref: '#/components/responses/Conflict' }
+  /downloads/xiangshang-field-client-windows-x64.zip:
+    get:
+      summary: 下载 Windows 场地端自包含压缩包
+      operationId: downloadFieldClientWindowsX64
+      tags: [Field]
+      security: []
+      responses:
+        '200':
+          description: Windows x64 ZIP 安装包
+          headers:
+            X-Checksum-Sha256: { schema: { type: string, pattern: '^[a-f0-9]{64}$' } }
+          content:
+            application/zip:
+              schema: { type: string, format: binary }
+        '404': { $ref: '#/components/responses/NotFound' }
   /v1/auth/login:
     post:
       summary: "POST /v1/auth/login"
@@ -529,7 +576,7 @@ paths:
         '400': { $ref: '#/components/responses/Conflict' }
   /v1/admin/operations/summary:
     get:
-      summary: "GET /v1/admin/operations/summary"
+      summary: 汇总现场任务、候测学生、设备在线与开测门禁，以及完成异常、场地会话、补测、同步冲突、待发布报告与业务运营待办
       operationId: getV1AdminOperationsSummary
       tags: [Admin]
       security: [{ bearerAuth: [] }]
@@ -608,7 +655,7 @@ paths:
         '400': { $ref: '#/components/responses/Conflict' }
   /v1/admin/tasks/batch-status:
     post:
-      summary: "POST /v1/admin/tasks/batch-status"
+      summary: 批量推进学生任务状态；确认已完成前必须具备任务全部成绩且无待复核项目
       operationId: postV1AdminTasksBatchStatus
       tags: [Admin]
       security: [{ bearerAuth: [] }]
@@ -637,7 +684,7 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
   /v1/tasks/{taskId}/students:
     get:
-      summary: "GET /v1/tasks/{taskId}/students"
+      summary: 查询任务学生及成绩完成度、待复核数和可完成状态
       operationId: getV1TasksTaskIdStudents
       tags: [School]
       security: [{ bearerAuth: [] }]
@@ -653,7 +700,7 @@ paths:
         '400': { $ref: '#/components/responses/Conflict' }
   /v1/tasks/{taskId}/students/{studentId}/status:
     patch:
-      summary: "PATCH /v1/tasks/{taskId}/students/{studentId}/status"
+      summary: 推进单个学生任务状态；确认已完成前必须具备任务全部成绩且无待复核项目
       operationId: patchV1TasksTaskIdStudentsStudentIdStatus
       tags: [School]
       security: [{ bearerAuth: [] }]
@@ -1168,11 +1215,12 @@ paths:
       responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' } }
   /v1/admin/tasks:
     post:
-      summary: "POST /v1/admin/tasks"
+      summary: 创建并发布测评任务；项目必须是标准七项中的 1–7 项且不可重复
       operationId: postV1AdminTasks
       tags: [Admin]
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [schoolId, title, testDate, items], properties: { schoolId: { type: string }, title: { type: string }, testDate: { type: string, format: date }, location: { type: string }, gradeId: { type: [string, 'null'] }, classId: { type: [string, 'null'] }, items: { type: array, minItems: 1, maxItems: 7, uniqueItems: true, items: { type: string, enum: [连续双脚障碍跳, 侧向滑步, 倒退平衡, 接球-上手掷准, 手运球绕杆, 脚运球变向, 定点踢准] } } } } } } }
       responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' } }
   /v1/admin/school-periods:
     get:
@@ -1285,7 +1333,23 @@ paths:
       parameters:
         - { in: path, name: taskId, required: true, schema: { type: string } }
         - { $ref: '#/components/parameters/IdempotencyKey' }
-      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [draft, published, closed] }
+                reason: { type: string, maxLength: 500, description: 关闭任务时必填，写入队列、学生状态和审计记录 }
+                unfinishedAction: { type: string, enum: [close_incomplete, create_followup], description: 关闭任务时必填 }
+                followUpDate: { type: string, format: date, description: create_followup 时必填 }
+                followUpTitle: { type: string, maxLength: 160 }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/Conflict' }
+        '409': { description: 仍有活动会话、待复核记录、完成异常，或任务状态已变化 }
   /v1/admin/tasks/{taskId}/sync-students:
     post:
       summary: "POST /v1/admin/tasks/{taskId}/sync-students"
@@ -1308,13 +1372,13 @@ paths:
       responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' } }
   /v1/admin/operations/items:
     get:
-      summary: "GET /v1/admin/operations/items"
+      summary: 查询统一待办明细，并返回对应任务、会话、队列或同步冲突定位信息
       operationId: getV1AdminOperationsItems
       tags: [Admin]
       security: [{ bearerAuth: [] }]
       parameters:
         - { in: query, name: schoolId, schema: { type: string } }
-        - { in: query, name: type, schema: { type: string } }
+        - { in: query, name: type, schema: { type: string, enum: [all, completionAnomalies, fieldSessions, retests, syncConflicts, reviews, reports, activities, appointments, courseUploads, support, privacy] } }
       responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
   /v1/admin/operations/{type}/{itemId}/status:
     patch:
@@ -1460,7 +1524,7 @@ paths:
         - { in: path, name: studentId, required: true, schema: { type: string } }
       responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
     post:
-      summary: "POST /v1/tasks/{taskId}/students/{studentId}/scores"
+      summary: 录入当前任务范围内的成绩；markCompleted 仍受完整成绩与复核门禁约束
       operationId: postV1TasksTaskIdStudentsStudentIdScores
       tags: [School]
       security: [{ bearerAuth: [] }]
@@ -1468,7 +1532,7 @@ paths:
         - { in: path, name: taskId, required: true, schema: { type: string } }
         - { in: path, name: studentId, required: true, schema: { type: string } }
         - { $ref: '#/components/parameters/IdempotencyKey' }
-      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' } }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' }, '409': { $ref: '#/components/responses/Conflict' } }
   /v1/scores/{scoreId}/review:
     post:
       summary: "POST /v1/scores/{scoreId}/review"
@@ -1863,12 +1927,12 @@ paths:
                 completedAt: { type: string, format: date-time }
                 durationSeconds: { type: integer, minimum: 0, maximum: 86400 }
                 completionRatio: { type: number, minimum: 0, maximum: 1 }
-                qualityScore: { type: integer, minimum: 0, maximum: 100 }
-                cameraVerified: { type: boolean }
+                qualityScore: { type: integer, minimum: 0, maximum: 100, description: "模型处于 pending-human-validation 时必须为 0。" }
+                cameraVerified: { type: boolean, description: "仅 frozen model 取得 human-validated 审批后可为 true；当前版本必须为 false。" }
                 visualUnits: { type: object, additionalProperties: { type: integer, minimum: 0 } }
                 manualUnits: { type: integer, minimum: 0, maximum: 100000 }
                 modelVersion: { type: string, minLength: 1, maxLength: 120 }
-                mode: { type: string, maxLength: 60 }
+                mode: { type: string, maxLength: 60, description: "当前家庭确认完成使用 parentConfirmedAssistedTraining。" }
       responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
   /v1/students/{studentId}/health-observations:
     get:
@@ -2047,12 +2111,80 @@ paths:
   /v1/students/{studentId}/body-assessments:
     post:
       summary: "POST /v1/students/{studentId}/body-assessments"
+      description: "仅已绑定学生的监护人可提交。不得上传原始照片、视频或原始骨架帧；姿态采集只提交结构化指标与质量追溯。带 UY-CAPTURE-GUIDED 协议的记录必须来自后置 1×镜头并通过质量门。Marker-PnP 还必须匹配服务端已批准的手机/镜头/分辨率内参配置，不能由客户端自行声明。"
       operationId: postV1StudentsStudentIdBodyAssessments
       tags: [School]
       security: [{ bearerAuth: [] }]
       parameters:
         - { in: path, name: studentId, required: true, schema: { type: string } }
         - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [heightCm, weightKg, consentVersion, snapshots]
+              properties:
+                heightCm: { type: number, minimum: 90, maximum: 190 }
+                weightKg: { type: number, minimum: 15, maximum: 90 }
+                consentVersion: { type: string, minLength: 1, maxLength: 120 }
+                algorithmVersion: { type: string, maxLength: 120 }
+                snapshots:
+                  type: array
+                  minItems: 8
+                  maxItems: 8
+                  items:
+                    type: object
+                    required: [captureTask, sampleCount, confidence, metrics]
+                    properties:
+                      captureTask: { type: string, enum: [standingFront, standingBack, standingSide, forwardBend, dynamicKneeControl, gaitVideo, seatedPosture, footArch] }
+                      sampleCount: { type: integer, minimum: 0, maximum: 10000 }
+                      confidence: { type: number, minimum: 0, maximum: 1 }
+                      metrics:
+                        type: object
+                        description: "仅限聚合姿态指标与 captureMetadata；严禁原始媒体、图片路径、视频地址或原始关键点帧。"
+                        properties:
+                          captureProtocolVersion: { type: string, pattern: '^UY-CAPTURE-(GUIDED|MARKER-PNP)-' }
+                          cameraFacing: { type: string, enum: [rear-1x, front-preview] }
+                          measurementMode: { type: string, enum: [rgb-pose-2d, depth-assisted-3d] }
+                          deviceCapabilityTier: { type: string, enum: [standard-2d, enhanced-depth] }
+                          depthAvailable: { type: boolean }
+                          segmentPhaseCount: { type: integer, minimum: 1, maximum: 4 }
+                          qualityChecks: { type: array, items: { type: string }, uniqueItems: true, description: "UY-CAPTURE-GUIDED-3.x 必须包含 two-take-repeatability；动态膝控制还必须包含 three-repetition-cycle；足弓步骤必须包含 foot-close-up 与 lower-limb-landmarks，不能用 full-body 代替。" }
+                          captureCalibration:
+                            type: object
+                            description: "当前移动端直接序列化的标定追溯字段；Marker-PnP 必须匹配服务端已批准 profileId。"
+                            properties:
+                              mode: { type: string, enum: [guided, marker-pnp] }
+                              boardDetected: { type: boolean }
+                              boardId: { type: string, maxLength: 120 }
+                              intrinsicsId: { type: string, maxLength: 120 }
+                              lensId: { type: string, maxLength: 120 }
+                              resolution: { type: string, pattern: '^[0-9]{3,5}x[0-9]{3,5}$' }
+                              reprojectionErrorPx: { type: number, minimum: 0, maximum: 10 }
+                              profileId: { type: string, maxLength: 120, description: "服务端批准的设备、镜头和分辨率标定配置编号" }
+                          captureMetadata:
+                            type: object
+                            properties:
+                              captureProtocolVersion: { type: string, pattern: '^UY-CAPTURE-(GUIDED|MARKER-PNP)-' }
+                              cameraFacing: { type: string, enum: [rear-1x, front-preview] }
+                              measurementMode: { type: string, enum: [rgb-pose-2d, depth-assisted-3d] }
+                              deviceCapabilityTier: { type: string, enum: [standard-2d, enhanced-depth] }
+                              depthAvailable: { type: boolean }
+                              segmentPhaseCount: { type: integer, minimum: 1, maximum: 4 }
+                              qualityChecks: { type: array, items: { type: string }, uniqueItems: true, description: "UY-CAPTURE-GUIDED-3.x 必须包含 two-take-repeatability；动态膝控制还必须包含 three-repetition-cycle；足弓步骤必须包含 foot-close-up 与 lower-limb-landmarks，不能用 full-body 代替。" }
+                              calibration:
+                                type: object
+                                properties:
+                                  mode: { type: string, enum: [guided, marker-pnp] }
+                                  boardDetected: { type: boolean }
+                                  boardId: { type: string, maxLength: 120 }
+                                  intrinsicsId: { type: string, maxLength: 120 }
+                                  lensId: { type: string, maxLength: 120 }
+                                  resolution: { type: string, pattern: '^[0-9]{3,5}x[0-9]{3,5}$' }
+                                  reprojectionErrorPx: { type: number, minimum: 0, maximum: 10 }
+                                  profileId: { type: string, maxLength: 120 }
       responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' } }
   /v1/students/{studentId}/body-assessments/latest:
     get:
@@ -2062,7 +2194,56 @@ paths:
       security: [{ bearerAuth: [] }]
       parameters:
         - { in: path, name: studentId, required: true, schema: { type: string } }
-      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' } }
+      responses:
+        '200':
+          description: 最新家庭身体测评、服务端分流和专业复核结果
+          content: { application/json: { schema: { $ref: '#/components/schemas/BodyAssessmentLatestEnvelope' } } }
+        '400': { $ref: '#/components/responses/Conflict' }
+  /v1/body-screening/reviews:
+    get:
+      summary: 获取当前学校待处理的家庭身体筛查专业复核队列
+      operationId: getBodyScreeningReviews
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: query, name: schoolId, required: true, schema: { type: string } }
+        - { in: query, name: limit, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 30 } }
+      responses:
+        '200':
+          description: 结构化专业复核队列；不包含原始照片或视频
+          content: { application/json: { schema: { $ref: '#/components/schemas/BodyScreeningReviewListEnvelope' } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/body-screening/reviews/{reviewId}/decision:
+    post:
+      summary: 提交家庭身体筛查专业复核决定
+      description: 需要 REVIEW_RESULT 能力和对应班级授权；所有写入使用乐观版本与幂等键。
+      operationId: decideBodyScreeningReview
+      tags: [School]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: reviewId, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision, expectedVersion, comment]
+              properties:
+                decision: { type: string, enum: [archive, continue_observation, refer_for_professional_assessment, recapture] }
+                expectedVersion: { type: integer, minimum: 1 }
+                comment: { type: string, maxLength: 2000 }
+                requestedRecaptureTasks:
+                  type: array
+                  uniqueItems: true
+                  items: { type: string, enum: [standingFront, standingBack, standingSide, forwardBend, dynamicKneeControl, gaitVideo, seatedPosture, footArch] }
+      responses:
+        '200':
+          description: 已持久化的复核决定和服务端新版本
+          content: { application/json: { schema: { $ref: '#/components/schemas/BodyScreeningReviewAckEnvelope' } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
   /v1/files/presign:
     post:
       summary: "POST /v1/files/presign"
@@ -2113,8 +2294,25 @@ paths:
       summary: 注册场地测试点
       tags: [Admin]
       security: [{ bearerAuth: [] }]
-      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [schoolId, stationCode, name], properties: { schoolId: { type: string }, stationCode: { type: string }, name: { type: string }, itemCode: { type: string }, queueCapacity: { type: integer } } } } } }
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [schoolId, stationCode, name], properties: { schoolId: { type: string }, stationCode: { type: string }, name: { type: string }, itemCode: { type: [string, 'null'], enum: [null, 连续双脚障碍跳, 侧向滑步, 倒退平衡, 接球-上手掷准, 手运球绕杆, 脚运球变向, 定点踢准], description: null 表示可完成任务全部项目的整套任务通道；单项值只承接同项目的单项任务 }, queueCapacity: { type: integer, minimum: 1, maximum: 500 } } } } } }
       responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/field-sync-conflicts:
+    get:
+      operationId: getAdminFieldSyncConflicts
+      summary: 分页查看场地端失败同步批次及其结构化失败上下文
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: query, name: schoolId, required: true, schema: { type: string } }, { in: query, name: view, schema: { type: string, enum: [open, resolved, all], default: open } }, { in: query, name: page, schema: { type: integer, minimum: 1 } }, { in: query, name: pageSize, schema: { type: integer, minimum: 1, maximum: 100 } }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /v1/admin/field-sync-conflicts/{batchId}/resolve:
+    post:
+      operationId: postAdminFieldSyncConflictResolve
+      summary: 管理员确认中央状态和现场事实已核对，并向对应设备下发冲突处理结果
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: batchId, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [note], properties: { note: { type: string, minLength: 1, maxLength: 500 } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
   /v1/admin/test-stations/{stationId}/calibrations:
     post:
       operationId: postAdminTestStationCalibration
@@ -2140,12 +2338,12 @@ paths:
   /v1/admin/test-stations/{stationId}:
     patch:
       operationId: patchAdminTestStation
-      summary: 修改场地测试点容量、状态与元数据
+      summary: 修改场地测试点编码、名称、能力、容量、状态与元数据
       tags: [Admin]
       security: [{ bearerAuth: [] }]
       parameters: [{ in: path, name: stationId, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' }]
-      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { name: { type: string, maxLength: 120 }, itemCode: { type: [string, 'null'], maxLength: 64 }, queueCapacity: { type: integer, minimum: 1, maximum: 500 }, status: { type: string, enum: [online, offline, maintenance, paused, disabled] }, metadata: { type: object, additionalProperties: true } } } } } }
-      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { stationCode: { type: string, minLength: 1, maxLength: 64 }, name: { type: string, minLength: 1, maxLength: 120 }, itemCode: { type: [string, 'null'], enum: [null, 连续双脚障碍跳, 侧向滑步, 倒退平衡, 接球-上手掷准, 手运球绕杆, 脚运球变向, 定点踢准], description: null 表示整套任务通道 }, queueCapacity: { type: integer, minimum: 1, maximum: 500 }, status: { type: string, enum: [offline, maintenance, paused, disabled], description: 状态变化时必须同时提供 reason；online 只能由边缘主机心跳产生 }, reason: { type: string, minLength: 1, maxLength: 500 }, metadata: { type: object, additionalProperties: true } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
   /v1/admin/test-devices:
     get:
       operationId: getAdminTestDevices
@@ -2161,6 +2359,15 @@ paths:
       security: [{ bearerAuth: [] }]
       requestBody: { required: true, content: { application/json: { schema: { type: object, required: [schoolId, deviceCode, name, deviceType], properties: { schoolId: { type: string }, stationId: { type: string }, deviceCode: { type: string }, name: { type: string }, deviceType: { type: string, enum: [edge_host, depth_camera, rgb_camera, display, speaker, reader, ups, network] }, serialNumber: { type: string }, softwareVersion: { type: string }, apiKeyExpiresAt: { type: string, format: date-time }, capabilities: { type: object } } } } } }
       responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/test-devices/{deviceId}:
+    patch:
+      operationId: patchAdminTestDevice
+      summary: 修改设备名称、编码、测试点归属、序列号或人工状态；在线状态只能由设备真实心跳产生
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: deviceId, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, minProperties: 1, properties: { name: { type: string, minLength: 1, maxLength: 120 }, deviceCode: { type: string, minLength: 1, maxLength: 64 }, stationId: { type: [string, 'null'], description: null 表示解除测试点绑定 }, serialNumber: { type: [string, 'null'], maxLength: 120 }, status: { type: string, enum: [offline, maintenance, disabled] }, reason: { type: string, maxLength: 500 } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
   /v1/admin/test-devices/{deviceId}/rotate-key:
     post:
       operationId: postAdminTestDeviceRotateKey
@@ -2173,15 +2380,23 @@ paths:
   /v1/admin/test-queues:
     get:
       operationId: getAdminTestQueues
-      summary: 查询任务的场地候测队列与测试点分配
+      summary: 查询任务的场地候测队列、测试点分配、状态时效及活动采集的最新设备事件
       tags: [Admin]
       security: [{ bearerAuth: [] }]
       parameters: [{ in: query, name: taskId, required: true, schema: { type: string } }, { in: query, name: stationId, required: false, schema: { type: string } }]
       responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /v1/admin/test-queues/{queueEntryId}/history:
+    get:
+      operationId: getAdminTestQueueHistory
+      summary: 查看单个学生的完整现场队列事件、处置原因和同任务采集尝试
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: queueEntryId, required: true, schema: { type: string } }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
   /v1/admin/test-queues/rebalance:
     post:
       operationId: postAdminTestQueuesRebalance
-      summary: 仅重新分配未开始的学生到已通过正式开测门禁的测试点
+      summary: 将未开始的学生均衡分配到测试点；无就绪设备时允许预分流，但正式采集仍受开测门禁限制
       tags: [Admin]
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
@@ -2190,20 +2405,38 @@ paths:
   /v1/admin/test-queues/{queueEntryId}/transition:
     post:
       operationId: postAdminTestQueueTransition
-      summary: 由后台受权人员调度单个候测队列条目
+      summary: 由后台授权人员调度单个候测队列条目；叫号必须就绪，签到必须先叫号并明确确认学生身份
       tags: [Admin]
       security: [{ bearerAuth: [] }]
       parameters: [{ in: path, name: queueEntryId, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' }]
-      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [status], properties: { status: { type: string, enum: [waiting, called, checked_in, testing, completed, retest, skipped, paused, cancelled] }, stationId: { type: [string, 'null'] }, expectedVersion: { type: integer, minimum: 0 }, reason: { type: string, maxLength: 500 } } } } } }
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [status, expectedVersion], properties: { status: { type: string, enum: [waiting, called, checked_in, retest, absent, skipped, paused, cancelled] }, stationId: { type: [string, 'null'] }, expectedVersion: { type: integer, minimum: 1 }, identityVerified: { type: boolean, description: status 为 checked_in 时必须为 true，表示已当面核对姓名、班级和学籍信息 }, reason: { type: string, minLength: 1, maxLength: 500, description: status 为 absent、skipped、cancelled 或 retest 时必填，作为审计处置原因 } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/test-queues/{queueEntryId}/assign:
+    post:
+      operationId: postAdminTestQueueAssign
+      summary: 将单个候测或待重测学生安全调整到另一个已就绪且有容量的测试点
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: queueEntryId, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [stationId, expectedVersion, reason], properties: { stationId: { type: string }, expectedVersion: { type: integer, minimum: 1 }, reason: { type: string, minLength: 1, maxLength: 500 } } } } } }
       responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
   /v1/admin/test-sessions:
     get:
       operationId: getAdminTestSessions
-      summary: 分页查询场地会话，支持任务、测试点和状态筛选
+      summary: 分页查询场地会话，支持任务、测试点、状态、待处理分组和服务端搜索，并返回各分组总量
       tags: [Admin]
       security: [{ bearerAuth: [] }]
-      parameters: [{ in: query, name: schoolId, required: true, schema: { type: string } }, { in: query, name: taskId, schema: { type: string } }, { in: query, name: stationId, schema: { type: string } }, { in: query, name: status, schema: { type: string } }, { in: query, name: page, schema: { type: integer, minimum: 1 } }, { in: query, name: pageSize, schema: { type: integer, minimum: 1, maximum: 100 } }]
+      parameters: [{ in: query, name: schoolId, required: true, schema: { type: string } }, { in: query, name: taskId, schema: { type: string } }, { in: query, name: stationId, schema: { type: string } }, { in: query, name: status, schema: { type: string } }, { in: query, name: view, description: 服务端会话分组筛选, schema: { type: string, enum: [attention, active, completed, all], default: all } }, { in: query, name: search, description: 按学生姓名、学籍号、任务、测试点或设备编码搜索, schema: { type: string, maxLength: 120 } }, { in: query, name: paged, description: 传 1 时返回 items、total、page、pageSize 与 counts, schema: { type: string, enum: ['1'] } }, { in: query, name: page, schema: { type: integer, minimum: 1 } }, { in: query, name: pageSize, schema: { type: integer, minimum: 1, maximum: 100 } }]
       responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /v1/admin/assessment-protocols:
+    get:
+      operationId: getAdminAssessmentProtocols
+      summary: 获取学校可用的版本化测试方案及固定项目顺序
+      description: 同时返回平台通用方案和学校专属方案；任务与会话保存方案快照，后续修改不会改写历史。
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: query, name: schoolId, required: true, schema: { type: string } }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '403': { $ref: '#/components/responses/Forbidden' } }
   /v1/admin/test-sessions/{sessionId}:
     get:
       operationId: getAdminTestSession
@@ -2212,6 +2445,42 @@ paths:
       security: [{ bearerAuth: [] }]
       parameters: [{ in: path, name: sessionId, required: true, schema: { type: string } }]
       responses: { '200': { $ref: '#/components/responses/Success' }, '404': { $ref: '#/components/responses/NotFound' } }
+  /v1/admin/test-sessions/{sessionId}/review:
+    post:
+      operationId: postAdminTestSessionReview
+      summary: 在证据上下文内确认场地成绩或原子安排补测，并同步会话、候测队列与任务学生状态
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: sessionId, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action: { type: string, enum: [approve, retest] }
+                reason: { type: string, maxLength: 1000, description: 安排补测或修改成绩时必填 }
+                scores:
+                  type: array
+                  maxItems: 7
+                  items:
+                    type: object
+                    required: [scoreId, score]
+                    properties:
+                      scoreId: { type: string }
+                      score: { type: number, minimum: 0, maximum: 5 }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/admin/test-sessions/{sessionId}/recover:
+    post:
+      operationId: postAdminTestSessionRecover
+      summary: 在设备离线或已明确停止后，将卡住的现场会话原子收口为已中止并安排补测；在线设备仍在接管时拒绝操作
+      tags: [Admin]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ in: path, name: sessionId, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [reason], properties: { reason: { type: string, minLength: 1, maxLength: 500 } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
   /v1/admin/field/stream:
     get:
       operationId: getAdminFieldStream
@@ -2225,19 +2494,19 @@ paths:
   /v1/admin/device-commands:
     post:
       operationId: postAdminDeviceCommand
-      summary: 向已注册的场地设备下发受审计的远程命令
+      summary: 向场地设备下发受审计的远程命令；暂停、停止和恢复会同步更新中央持久控制状态
       tags: [Admin]
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
       requestBody: { required: true, content: { application/json: { schema: { type: object, required: [deviceId, commandType], properties: { deviceId: { type: string }, commandType: { type: string, enum: [pause, resume, stop, call_next, recall, skip, retest, refresh_config] }, payload: { type: object, additionalProperties: true }, expiresAt: { type: string, format: date-time } } } } } }
-      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+      responses: { '201': { $ref: '#/components/responses/Created' }, '400': { $ref: '#/components/responses/Conflict' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
   /v1/field/bootstrap:
     get:
       operationId: getFieldBootstrap
-      summary: 下发场地端任务、队列、标定与待执行指令
+      summary: 下发版本化测试方案、固定项目顺序、可选任务目录、本站学生名单、分流摘要、标定与待执行指令
       tags: [Field]
       security: [{ fieldDeviceId: [], fieldDeviceTimestamp: [], fieldDeviceNonce: [], fieldDeviceBodyHash: [], fieldDeviceSignature: [] }]
-      parameters: [{ in: query, name: taskId, required: false, schema: { type: string } }]
+      parameters: [{ in: query, name: taskId, required: false, description: 场地端选择的已发布任务；省略时按日期自动选择, schema: { type: string } }]
       responses: { '200': { $ref: '#/components/responses/Success' }, '401': { $ref: '#/components/responses/AuthError' } }
   /v1/field/heartbeat:
     post:
@@ -2335,10 +2604,10 @@ paths:
   /v1/field/queue/transition:
     post:
       operationId: postFieldQueueTransition
-      summary: 由当前设备按版本号推进场地候测队列
+      summary: 由当前设备按版本号推进叫号与签到；签到必须先叫号并明确确认身份，测试中和已完成只能由正式会话接口生成
       tags: [Field]
       security: [{ fieldDeviceId: [], fieldDeviceTimestamp: [], fieldDeviceNonce: [], fieldDeviceBodyHash: [], fieldDeviceSignature: [] }]
-      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [queueEntryId, status], properties: { queueEntryId: { type: string }, status: { type: string, enum: [waiting, called, checked_in, testing, completed, retest, skipped, paused, cancelled] }, expectedVersion: { type: integer, minimum: 0 }, reason: { type: string, maxLength: 500 } } } } } }
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [queueEntryId, status, expectedVersion], properties: { queueEntryId: { type: string }, status: { type: string, enum: [waiting, called, checked_in, retest, absent, skipped, paused, cancelled] }, expectedVersion: { type: integer, minimum: 1 }, identityVerified: { type: boolean, description: status 为 checked_in 时必须为 true，表示现场操作员已完成身份核验 }, reason: { type: string, maxLength: 500 } } } } } }
       responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '401': { $ref: '#/components/responses/AuthError' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
   /v1/field/sessions:
     post:
@@ -2360,16 +2629,26 @@ paths:
   /v1/field/sessions/{sessionId}/complete:
     post:
       operationId: postFieldSessionComplete
-      summary: 提交场地最终成绩、证据关联和自动复核状态
+      summary: 提交场地最终成绩、证据关联和自动复核状态；成绩项目必须与任务项目完全一致
       tags: [Field]
       security: [{ fieldDeviceId: [], fieldDeviceTimestamp: [], fieldDeviceNonce: [], fieldDeviceBodyHash: [], fieldDeviceSignature: [] }]
       parameters: [{ in: path, name: sessionId, required: true, schema: { type: string } }]
       requestBody: { required: true, content: { application/json: { schema: { type: object, required: [scores], properties: { algorithmVersion: { type: string, maxLength: 120 }, endedAt: { type: string, format: date-time }, outcome: { type: string, enum: [completed, retest] }, scores: { type: array, minItems: 1, maxItems: 7, items: { type: object, required: [item, score, confidence], properties: { item: { type: string }, score: { type: number, minimum: 0, maximum: 5 }, confidence: { type: number, minimum: 0, maximum: 1 }, reviewStatus: { type: string, enum: [passed, pendingReview], description: 缺失或非 passed 时服务端将保守地进入待复核 }, note: { type: string, maxLength: 1000 }, evidence: { type: object, additionalProperties: true } } } }, evidence: { type: array, maxItems: 30, items: { type: object, required: [fileId, evidenceType], properties: { fileId: { type: string }, evidenceType: { type: string, enum: [video, image, skeleton, timeline, calibration, log, other] }, checksumSha256: { type: string, pattern: '^[A-Fa-f0-9]{64}$' }, metadata: { type: object, additionalProperties: true } } } }, summary: { type: object, additionalProperties: true } } } } } }
       responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/Conflict' }, '401': { $ref: '#/components/responses/AuthError' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+  /v1/field/sessions/{sessionId}/abort:
+    post:
+      operationId: postFieldSessionAbort
+      summary: 将无法恢复的中断采集会话关闭，并原子安排学生补测
+      tags: [Field]
+      security: [{ fieldDeviceId: [], fieldDeviceTimestamp: [], fieldDeviceNonce: [], fieldDeviceBodyHash: [], fieldDeviceSignature: [] }]
+      parameters: [{ in: path, name: sessionId, required: true, schema: { type: string } }]
+      requestBody: { required: false, content: { application/json: { schema: { type: object, properties: { endedAt: { type: string, format: date-time }, reason: { type: string, maxLength: 500 } } } } } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '401': { $ref: '#/components/responses/AuthError' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
   /v1/field/sync/batches:
     post:
       operationId: postFieldSyncBatches
-      summary: 幂等补传场地端队列、会话、动作和完成事件
+      summary: 幂等补传场地端队列、会话、动作、完成和中断恢复事件
+      description: 对已关闭或归档任务的迟到离线叫号、签到和开测事实，仅追加审计时间线并将会话归档为 aborted；不得重新开启任务、队列或学生状态。直接在线接口仍拒绝修改非已发布任务。
       tags: [Field]
       security: [{ fieldDeviceId: [], fieldDeviceTimestamp: [], fieldDeviceNonce: [], fieldDeviceBodyHash: [], fieldDeviceSignature: [] }]
       requestBody:
@@ -2392,7 +2671,14 @@ paths:
                       eventType: { type: string }
                       happenedAt: { type: string, format: date-time }
                       payload: { type: object }
-      responses: { '200': { $ref: '#/components/responses/Success' }, '409': { $ref: '#/components/responses/Conflict' } }
+      responses: { '200': { $ref: '#/components/responses/Success' }, '400': { $ref: '#/components/responses/FieldSyncFailure' }, '409': { $ref: '#/components/responses/FieldSyncFailure' } }
+  /v1/field/sync/conflict-resolutions:
+    get:
+      operationId: getFieldSyncConflictResolutions
+      summary: 获取后台已确认的同步冲突，供当前设备解除本地冲突标记并保留历史事实
+      tags: [Field]
+      security: [{ fieldDeviceId: [], fieldDeviceTimestamp: [], fieldDeviceNonce: [], fieldDeviceBodyHash: [], fieldDeviceSignature: [] }]
+      responses: { '200': { $ref: '#/components/responses/Success' }, '401': { $ref: '#/components/responses/AuthError' } }
   /v1/mobile/events:
     post:
       operationId: postMobileProductEvents
@@ -2447,6 +2733,27 @@ components:
       required: false
       schema: { type: string, maxLength: 128 }
   schemas:
+    FieldSyncFailureReceipt:
+      type: object
+      required: [clientBatchId, acceptedEventIds, failedEventId, unprocessedEventIds]
+      properties:
+        clientBatchId: { type: string, format: uuid }
+        acceptedEventIds: { type: array, items: { type: string, format: uuid } }
+        failedEventId: { type: [string, 'null'], format: uuid }
+        unprocessedEventIds: { type: array, items: { type: string, format: uuid } }
+        failedEvent:
+          type: object
+          description: 不保存原始媒体或完整成绩，只提供后台定位冲突所需的最小业务上下文
+          properties:
+            clientEventId: { type: string }
+            eventType: { type: string }
+            queueEntryId: { type: string }
+            status: { type: string }
+            expectedVersion: { type: [integer, 'null'] }
+            clientSessionId: { type: string }
+            taskId: { type: string }
+            studentId: { type: string }
+            sessionId: { type: string }
     ContentReleaseItem:
       type: object
       required: [contentType, contentId]
@@ -2577,6 +2884,143 @@ components:
         duration: { type: string }
         focus: { type: string }
         isPublicBenefit: { type: boolean }
+    BodyScreeningDecision:
+      type: object
+      required: [route, outcomeLevel, reasonCodes, reviewRequired, decisionPolicyVersion]
+      properties:
+        sessionId: { type: string }
+        decisionId: { type: string }
+        route: { type: string, enum: [auto_archive, recapture_required, professional_review] }
+        outcomeLevel: { type: string, enum: [capture_invalid, no_obvious_abnormality, training_observation, school_retest, professional_evaluation] }
+        reasonCodes: { type: array, items: { type: string } }
+        modelConfidence: { type: number, minimum: 0, maximum: 1 }
+        modelUncertainty: { type: number, minimum: 0, maximum: 1 }
+        qualityScore: { type: integer, minimum: 0, maximum: 100 }
+        reviewRequired: { type: boolean }
+        decisionPolicyVersion: { type: string }
+        version: { type: integer, minimum: 1 }
+        decidedAt: { type: string, format: date-time }
+        reviewStatus: { type: string, enum: [pending, in_review, completed, recapture_requested] }
+        reviewDecision: { type: string, enum: [archive, continue_observation, refer_for_professional_assessment, recapture] }
+        reviewComment: { type: string, maxLength: 2000 }
+        requestedRecaptureTasks:
+          type: array
+          uniqueItems: true
+          items: { type: string, enum: [standingFront, standingBack, standingSide, forwardBend, dynamicKneeControl, gaitVideo, seatedPosture, footArch] }
+        reviewVersion: { type: integer, minimum: 1 }
+        reviewedAt: { type: string, format: date-time }
+    PostureDomainValidation:
+      type: object
+      required: [spinal_alignment, shoulder_pelvis, head_upper_posture, trunk_rotation, dynamic_knee, gait, seated_posture, foot_arch]
+      properties:
+        spinal_alignment: { type: string, enum: [pending-human-validation, human-validated] }
+        shoulder_pelvis: { type: string, enum: [pending-human-validation, human-validated] }
+        head_upper_posture: { type: string, enum: [pending-human-validation, human-validated] }
+        trunk_rotation: { type: string, enum: [pending-human-validation, human-validated] }
+        dynamic_knee: { type: string, enum: [pending-human-validation, human-validated] }
+        gait: { type: string, enum: [pending-human-validation, human-validated] }
+        seated_posture: { type: string, enum: [pending-human-validation, human-validated] }
+        foot_arch: { type: string, enum: [pending-human-validation, human-validated] }
+      additionalProperties: false
+    BodyPostureReport:
+      type: object
+      required: [validationStatus, domainValidation, classificationPublished]
+      properties:
+        validationStatus: { type: string, enum: [pending-human-validation, human-validated] }
+        domainValidation: { $ref: '#/components/schemas/PostureDomainValidation' }
+        classificationPublished:
+          type: boolean
+          description: 仅当总姿态模型与八个问题域全部完成独立人工验证时为 true。
+      additionalProperties: true
+    BodyScreeningReviewAttempt:
+      type: object
+      required: [captureTask, attemptCount, sampleCount, confidence, qualityEvents]
+      properties:
+        captureTask: { type: string, enum: [standingFront, standingBack, standingSide, forwardBend, dynamicKneeControl, gaitVideo, seatedPosture, footArch] }
+        attemptCount: { type: integer, minimum: 1 }
+        sampleCount: { type: integer, minimum: 0 }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+        qualityScore: { type: integer, minimum: 0, maximum: 100 }
+        qualityEvents: { type: array, items: { type: string } }
+        repeatabilityDifference: { type: number, minimum: 0 }
+        capturedAt: { type: string, format: date-time }
+        evidenceMetrics:
+          type: array
+          description: 服务端白名单投影；绝不包含原始媒体、任意客户端 JSON 或未经授权的仪器声明。
+          items: { $ref: '#/components/schemas/BodyScreeningEvidenceMetric' }
+    BodyScreeningEvidenceMetric:
+      type: object
+      required: [code, label, source]
+      properties:
+        code: { type: string }
+        label: { type: string }
+        numericValue: { type: number }
+        textValue: { type: string }
+        unit: { type: string, description: 摄像头来源必须明确标注为投影值或摄像头估计，不能标成物理测量。 }
+        source: { type: string, enum: [camera_proxy, guardian_observation, instrument] }
+    BodyScreeningReviewItem:
+      type: object
+      required: [reviewId, sessionId, status, version, studentId, studentDisplayName, route, reasonCodes, attempts]
+      properties:
+        reviewId: { type: string }
+        sessionId: { type: string }
+        status: { type: string, enum: [pending, in_review, recapture_requested] }
+        version: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        studentId: { type: string }
+        classId: { type: string }
+        studentDisplayName: { type: string, description: 服务端脱敏展示名 }
+        route: { type: string, enum: [professional_review] }
+        reasonCodes: { type: array, items: { type: string } }
+        qualityScore: { type: integer, minimum: 0, maximum: 100 }
+        modelConfidence: { type: number, minimum: 0, maximum: 1 }
+        modelUncertainty: { type: number, minimum: 0, maximum: 1 }
+        decidedAt: { type: string, format: date-time }
+        protocolVersion: { type: string }
+        modelVersion: { type: string }
+        thresholdVersion: { type: string }
+        measuredAt: { type: string, format: date-time }
+        attempts: { type: array, items: { $ref: '#/components/schemas/BodyScreeningReviewAttempt' } }
+    BodyScreeningReviewAck:
+      type: object
+      required: [reviewId, sessionId, status, requestedRecaptureTasks, version]
+      properties:
+        reviewId: { type: string }
+        sessionId: { type: string }
+        status: { type: string, enum: [completed, recapture_requested] }
+        decision: { type: string, enum: [archive, continue_observation, refer_for_professional_assessment, recapture] }
+        comment: { type: string, maxLength: 2000 }
+        requestedRecaptureTasks:
+          type: array
+          items: { type: string, enum: [standingFront, standingBack, standingSide, forwardBend, dynamicKneeControl, gaitVideo, seatedPosture, footArch] }
+        version: { type: integer, minimum: 1 }
+        reviewedAt: { type: string, format: date-time }
+    BodyAssessmentLatestEnvelope:
+      type: object
+      required: [code, message, data]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        data:
+          type: object
+          additionalProperties: true
+          properties:
+            postureReport: { $ref: '#/components/schemas/BodyPostureReport' }
+            screeningDecision: { $ref: '#/components/schemas/BodyScreeningDecision' }
+    BodyScreeningReviewListEnvelope:
+      type: object
+      required: [code, message, data]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        data: { type: array, items: { $ref: '#/components/schemas/BodyScreeningReviewItem' } }
+    BodyScreeningReviewAckEnvelope:
+      type: object
+      required: [code, message, data]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        data: { $ref: '#/components/schemas/BodyScreeningReviewAck' }
     DiagnosisReportPayload:
       type: object
       required: [id, student, assessmentDate, scores, totalScore, ruleVersion, courseSuggestions]
@@ -2599,6 +3043,17 @@ components:
         message: { type: string }
         data: { $ref: '#/components/schemas/DiagnosisReportPayload' }
   responses:
+    FieldSyncFailure:
+      description: 同步批次部分失败；已确认事件、失败事件和未处理事件按原顺序返回，客户端可安全拆批续传
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [code, message, data]
+            properties:
+              code: { type: string }
+              message: { type: string }
+              data: { $ref: '#/components/schemas/FieldSyncFailureReceipt' }
     Success:
       description: Successful response
       content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } }

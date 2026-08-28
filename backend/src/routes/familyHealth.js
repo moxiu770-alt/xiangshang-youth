@@ -3,6 +3,8 @@
  * observations, session metrics and check-ins; it deliberately accepts no
  * camera frames, photos, or raw video.
  */
+import { MODEL_REGISTRY } from '../modelRegistry.js';
+
 export async function handleFamilyHealthRoutes(context) {
   const {
     req, res, user, url, parts,
@@ -45,6 +47,10 @@ if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'students' && par
   if (!Number.isInteger(manualUnits) || manualUnits < 0 || manualUnits > 100000) return fail(res, 400, 'TRAINING_SESSION_INVALID', '手动完成次数不合法');
   const modelVersion = requiredString(input.modelVersion, '模型版本', { max: 120 });
   const mode = requiredString(input.mode || 'guidedTraining', '训练模式', { max: 60 });
+  if (modelVersion !== MODEL_REGISTRY.followAlong.algorithmVersion) return fail(res, 409, 'MODEL_VERSION_UNSUPPORTED', '跟练模型版本与服务端当前版本不一致');
+  if (MODEL_REGISTRY.followAlong.status !== 'human-validated' && (Boolean(input.cameraVerified) || qualityScore > 0)) {
+    return fail(res, 409, 'MODEL_VALIDATION_PENDING', '动作识别尚未完成人工标注验证，不能提交摄像头验证或动作质量分');
+  }
   const visualUnits = fieldObject(input.visualUnits);
   if (JSON.stringify(visualUnits).length > 4000) return fail(res, 400, 'TRAINING_SESSION_INVALID', '动作统计过长');
   const idempotency = await beginIdempotentRequest(req, user, res, requestBodyHash({ ...input, childId: parts[2], sessionId }));

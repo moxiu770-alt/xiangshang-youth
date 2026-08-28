@@ -1,3 +1,15 @@
+const fieldSyncFailureSummary = (event) => {
+  const eventType = String(event?.eventType || '').slice(0, 64);
+  const payload = event?.payload && typeof event.payload === 'object' && !Array.isArray(event.payload) ? event.payload : {};
+  const summary = { clientEventId: String(event?.clientEventId || '').slice(0, 120), eventType };
+  if (eventType === 'queue.transition') return { ...summary, taskId: String(payload.taskId || '').slice(0, 120), queueEntryId: String(payload.queueEntryId || '').slice(0, 120), status: String(payload.status || '').slice(0, 32), expectedVersion: Number(payload.expectedVersion) || null, note: String(payload.note || payload.reason || '').slice(0, 200) };
+  if (eventType === 'session.open') return { ...summary, clientSessionId: String(payload.clientSessionId || '').slice(0, 120), taskId: String(payload.taskId || '').slice(0, 120), studentId: String(payload.studentId || '').slice(0, 120), algorithmVersion: String(payload.algorithmVersion || '').slice(0, 120) };
+  if (eventType === 'session.events') return { ...summary, sessionId: String(payload.sessionId || '').slice(0, 120), eventCount: Array.isArray(payload.events) ? payload.events.length : 0 };
+  if (eventType === 'session.complete') return { ...summary, sessionId: String(payload.sessionId || '').slice(0, 120), scoreCount: Array.isArray(payload.scores) ? payload.scores.length : 0, evidenceCount: Array.isArray(payload.evidence) ? payload.evidence.length : 0 };
+  if (eventType === 'session.abort') return { ...summary, sessionId: String(payload.sessionId || '').slice(0, 120), reason: String(payload.reason || '').slice(0, 200) };
+  return summary;
+};
+
 /** Device-authenticated field routes, isolated from user-session routes. */
 export async function handleFieldDeviceRoutes(context) {
   const {
@@ -5,7 +17,7 @@ export async function handleFieldDeviceRoutes(context) {
     publishFieldUpdate, ok, fieldBootstrap, queryValue, safeFileName,
     allowedContentTypes, maxUploadBytes, crypto, path, created, rawBody,
     fileSignatureMatches, storage, sha256, transitionFieldQueue,
-    openFieldSession, appendFieldSessionEvents, accepted, completeFieldSession,
+    openFieldSession, appendFieldSessionEvents, accepted, completeFieldSession, abortFieldSession,
     fieldInputString, requestBodyHash, recordMetric, logger, requestId, fieldIsoDate
   } = context;
   if (!url.pathname.startsWith('/v1/field/')) return false;
@@ -22,7 +34,12 @@ export async function handleFieldDeviceRoutes(context) {
     // A display, speaker or card reader heartbeat cannot make a testing
     // station eligible. Only its registered edge host controls the online
     // state used by the formal-score gate.
-    if (device.station_id && device.device_type === 'edge_host') await query(`UPDATE test_stations SET status=CASE WHEN status='disabled' THEN status ELSE 'online' END,last_seen_at=now(),updated_at=now() WHERE id=$1`, [device.station_id]);
+    if (device.station_id && device.device_type === 'edge_host') await query(`UPDATE test_stations SET
+      status=CASE WHEN status='offline' THEN 'online' ELSE status END,
+      status_reason=CASE WHEN status='offline' THEN NULL ELSE status_reason END,
+      status_changed_at=CASE WHEN status='offline' THEN now() ELSE status_changed_at END,
+      status_changed_by=CASE WHEN status='offline' THEN NULL ELSE status_changed_by END,
+      last_seen_at=now(),updated_at=now() WHERE id=$1`, [device.station_id]);
     void publishFieldUpdate(device.school_id, 'device.heartbeat', { deviceId: device.id, stationId: device.station_id || null, status: 'online', health });
     return ok(res, { ...updated.rows[0], serverTime: new Date().toISOString() });
   }
@@ -79,6 +96,18 @@ export async function handleFieldDeviceRoutes(context) {
     return accepted(res, await appendFieldSessionEvents(device, parts[3], input.events));
   }
   if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'field' && parts[2] === 'sessions' && parts[3] && parts[4] === 'complete') return ok(res, await completeFieldSession(device, parts[3], await body(req)));
+  if (req.method === 'POST' && parts[0] === 'v1' && parts[1] === 'field' && parts[2] === 'sessions' && parts[3] && parts[4] === 'abort') return ok(res, await abortFieldSession(device, parts[3], await body(req)));
+  if (req.method === 'GET' && url.pathname === '/v1/field/sync/conflict-resolutions') {
+    const resolutions = await query(`SELECT client_batch_id AS "clientBatchId",response_json->'acceptedEventIds' AS "acceptedEventIds",
+      response_json->>'failedEventId' AS "failedEventId",response_json->'unprocessedEventIds' AS "unprocessedEventIds",
+      resolution_note AS "resolutionNote",resolved_at AS "resolvedAt"
+      FROM field_sync_batches WHERE device_id=$1 AND status='failed' AND resolution_status='resolved'
+        AND resolved_at>now()-interval '180 days' ORDER BY resolved_at DESC LIMIT 200`, [device.id]);
+    return ok(res, resolutions.rows.map((row) => ({
+      ...row,
+      eventIds: [...(Array.isArray(row.acceptedEventIds) ? row.acceptedEventIds : []), row.failedEventId, ...(Array.isArray(row.unprocessedEventIds) ? row.unprocessedEventIds : [])].filter(Boolean)
+    })));
+  }
   if (req.method === 'POST' && url.pathname === '/v1/field/sync/batches') {
     const input = await body(req);
     const clientBatchId = fieldInputString(input.clientBatchId, '客户端批次 ID');
@@ -88,10 +117,15 @@ export async function handleFieldDeviceRoutes(context) {
     if (existing.rows[0]?.status === 'completed') return ok(res, { ...existing.rows[0].response, idempotent: true });
     if (existing.rows[0]?.status === 'processing' && Date.now() - new Date(existing.rows[0].receivedAt).getTime() < 5 * 60_000) return fail(res, 409, 'FIELD_BATCH_IN_PROGRESS', '同步批次正在处理中，请稍后重试');
     await query(`INSERT INTO field_sync_batches(device_id,client_batch_id,event_count,status) VALUES($1,$2,$3,'processing')
-      ON CONFLICT(device_id,client_batch_id) DO UPDATE SET event_count=EXCLUDED.event_count,status='processing',received_at=now(),response_json='{}'::jsonb`, [device.id, clientBatchId, events.length]);
+      ON CONFLICT(device_id,client_batch_id) DO UPDATE SET event_count=EXCLUDED.event_count,status='processing',received_at=now(),response_json='{}'::jsonb,
+        resolution_status='not_applicable',resolution_note=NULL,resolved_by=NULL,resolved_at=NULL`, [device.id, clientBatchId, events.length]);
     const outcomes = [];
+    let activeEventIndex = -1;
+    let activeEventId = null;
     try {
-      for (const event of events) {
+      for (const [eventIndex, event] of events.entries()) {
+        activeEventIndex = eventIndex;
+        activeEventId = typeof event?.clientEventId === 'string' ? event.clientEventId : null;
         const clientEventId = fieldInputString(event?.clientEventId, '客户端事件 ID');
         const eventType = fieldInputString(event?.eventType, '同步事件类型', 64);
         const payload = fieldObject(event?.payload);
@@ -107,23 +141,38 @@ export async function handleFieldDeviceRoutes(context) {
           continue;
         }
         let data;
-        if (eventType === 'queue.transition') data = await transitionFieldQueue(device, { ...payload, clientEventId, happenedAt: event.happenedAt }, { type: 'device', id: device.id });
-        else if (eventType === 'session.open') data = await openFieldSession(device, payload);
+        if (eventType === 'queue.transition') data = await transitionFieldQueue(device, {
+          ...payload, clientEventId, happenedAt: event.happenedAt,
+          syncReceipt: { deviceId: device.id, payloadHash }
+        }, { type: 'device', id: device.id });
+        else if (eventType === 'session.open') data = await openFieldSession(device, payload, { allowInactiveRecovery: true });
         else if (eventType === 'session.events') data = await appendFieldSessionEvents(device, fieldInputString(payload.sessionId, '会话 ID'), payload.events);
         else if (eventType === 'session.complete') data = await completeFieldSession(device, fieldInputString(payload.sessionId, '会话 ID'), payload);
+        else if (eventType === 'session.abort') data = await abortFieldSession(device, fieldInputString(payload.sessionId, '会话 ID'), payload);
         else throw Object.assign(new Error('同步事件类型不受支持'), { status: 400, code: 'FIELD_SYNC_EVENT_UNSUPPORTED' });
-        await query(`INSERT INTO field_sync_events(device_id,client_event_id,event_type,session_id,happened_at,payload_hash)
-          VALUES($1,$2,$3,$4,$5,$6)`, [device.id, clientEventId, eventType, data?.id || payload.sessionId || null, fieldIsoDate(event?.happenedAt), payloadHash]);
+        // Only session facts may reference test_sessions. Queue transitions
+        // return a queue-entry id, which must never be written into
+        // field_sync_events.session_id (it would violate tenant validation).
+        if (eventType !== 'queue.transition') {
+          const syncedSessionId = eventType.startsWith('session.') ? data?.id || null : null;
+          await query(`INSERT INTO field_sync_events(device_id,client_event_id,event_type,session_id,happened_at,payload_hash)
+            VALUES($1,$2,$3,$4,$5,$6)`, [device.id, clientEventId, eventType, syncedSessionId, fieldIsoDate(event?.happenedAt), payloadHash]);
+        }
         outcomes.push({ clientEventId, eventType, data });
       }
       const response = { clientBatchId, accepted: outcomes.length, outcomes };
-      await query(`UPDATE field_sync_batches SET status='completed',response_json=$1,completed_at=now() WHERE device_id=$2 AND client_batch_id=$3`, [response, device.id, clientBatchId]);
+      await query(`UPDATE field_sync_batches SET status='completed',response_json=$1,completed_at=now(),resolution_status='not_applicable',resolution_note=NULL,resolved_by=NULL,resolved_at=NULL WHERE device_id=$2 AND client_batch_id=$3`, [response, device.id, clientBatchId]);
       return ok(res, response);
     } catch (error) {
-      await query(`UPDATE field_sync_batches SET status='failed',response_json=$1,completed_at=now() WHERE device_id=$2 AND client_batch_id=$3`, [{ code: error.code || 'FIELD_SYNC_FAILED', message: error.message }, device.id, clientBatchId]);
+      const acceptedEventIds = outcomes.map((outcome) => outcome.clientEventId);
+      const unprocessedEventIds = events.slice(activeEventIndex + 1)
+        .map((event) => typeof event?.clientEventId === 'string' ? event.clientEventId : null)
+        .filter(Boolean);
+      const partialReceipt = { clientBatchId, acceptedEventIds, failedEventId: activeEventId, unprocessedEventIds, failedEvent: fieldSyncFailureSummary(events[activeEventIndex]) };
+      await query(`UPDATE field_sync_batches SET status='failed',response_json=$1,completed_at=now(),resolution_status='open',resolution_note=NULL,resolved_by=NULL,resolved_at=NULL WHERE device_id=$2 AND client_batch_id=$3`, [{ code: error.code || 'FIELD_SYNC_FAILED', message: error.message, ...partialReceipt }, device.id, clientBatchId]);
+      error.data = partialReceipt;
       throw error;
     }
   }
   return fail(res, 404, 'FIELD_ROUTE_NOT_FOUND', '场地端接口不存在');
 }
-

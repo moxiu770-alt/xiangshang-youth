@@ -35,10 +35,13 @@ node scripts/evaluate_model_corpus.mjs --corpus /path/to/human-labeled.json --re
 export MODEL_CORPUS_PATH=/secure/model-validation/human-labeled.json
 export MODEL_VALIDATION_REPORT_PATH=/secure/model-validation/report.json
 export MODEL_VALIDATION_APPROVAL_PATH=/secure/model-validation/approval.json
+export MODEL_REPEATABILITY_CORPUS_PATH=/secure/model-validation/repeatability.json
+export MODEL_REPEATABILITY_REPORT_PATH=/secure/model-validation/repeatability-report.json
+export MODEL_POSTURE_DOMAIN_REPORT_DIR=/secure/model-validation/posture-domains
 python3 scripts/verify_model_validation_approval.py
 ```
 
-验证器会重新以冻结模型运行独立评估，核对私有语料与报告的 SHA-256、模型注册表版本和六个模型族版本。审批记录必须使用 `qa/model_validation_approval.schema.json` 的 `human-validated` 状态，并至少由算法负责人及安全/专业复核人独立签核。`qa/model_validation_approval.example.json` 只是不可通过的占位模板；严禁将其或合成边界集作为发布证据。试点和生产预检会调用该验证器，缺少任一证据即阻断发布。
+验证器会重新以冻结模型运行独立评估，核对私有语料与报告的 SHA-256、模型注册表版本和六个模型族版本。姿态还必须为脊柱排列、肩骨盆、头颈上肢、躯干旋转、动态膝、步态、坐姿和足弓分别提供不少于 500 例的独立报告及摘要；任一问题域未达敏感度、特异度、阴性预测值、重复性和不可判定率门槛，总姿态模型不得标记为已验证。审批记录必须使用 `qa/model_validation_approval.schema.json` 的 `human-validated` 状态，并至少由算法负责人及安全/专业复核人独立签核。`qa/model_validation_approval.example.json` 只是不可通过的占位模板；严禁将其或合成边界集作为发布证据。试点和生产预检会调用该验证器，缺少任一证据即阻断发布。
 
 输出包含准确率、平衡准确率、宏平均 F1、逐类 precision/recall/F1 和混淆矩阵，并可对同一条 body 样本分别核对 BMI、身高、姿态和综合结论。只有 `human-labeled` 独立集才允许作为发布门禁；合成边界集只能发现回归，不能证明真实准确率。
 

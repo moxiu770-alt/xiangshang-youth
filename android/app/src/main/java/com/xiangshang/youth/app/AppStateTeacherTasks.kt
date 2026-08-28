@@ -140,6 +140,41 @@ fun AppViewModel.loadTeacherOverview(classId: String, task: TestTask) = viewMode
                 }
             }
     }
+
+fun AppViewModel.loadBodyScreeningReviews() = viewModelScope.launch {
+    val current = _state.value
+    val schoolId = current.profile?.schoolId
+    if (!current.teacherHasCapability("REVIEW_RESULT") || schoolId.isNullOrBlank() || current.bodyScreeningReviewsLoading) {
+        if (!current.teacherHasCapability("REVIEW_RESULT")) _state.value = current.copy(bodyScreeningReviewsError = "当前账号没有身体观察复核权限。")
+        return@launch
+    }
+    _state.value = current.copy(bodyScreeningReviewsLoading = true, bodyScreeningReviewsError = null)
+    runCatching { repository.loadBodyScreeningReviews(schoolId, 50) }
+        .onSuccess { _state.value = _state.value.copy(bodyScreeningReviews = it, bodyScreeningReviewsLoading = false) }
+        .onFailure { error ->
+            if (error is ApiError.Unauthorized) handleDashboardFailure(error)
+            else _state.value = _state.value.copy(bodyScreeningReviewsLoading = false, bodyScreeningReviewsError = error.localizedMessage ?: "身体观察复核队列加载失败")
+        }
+}
+
+fun AppViewModel.submitBodyScreeningReview(item: BodyScreeningReviewItem, decision: BodyScreeningReviewDecision, comment: String, recaptureTasks: Set<BodyCaptureTask>) = viewModelScope.launch {
+    val key = "body-screening-review:${item.reviewId}"
+    val trimmed = comment.trim()
+    if (!_state.value.teacherHasCapability("REVIEW_RESULT") || _state.value.workflowStates[key]?.isSubmitting == true) return@launch
+    if (trimmed.isEmpty()) { setWorkflow(key, WorkflowCommandState(WorkflowCommandStatus.Failed, "请填写复核依据和后续处理说明。")); return@launch }
+    if (decision == BodyScreeningReviewDecision.Recapture && recaptureTasks.isEmpty()) { setWorkflow(key, WorkflowCommandState(WorkflowCommandStatus.Failed, "要求重采时至少选择一个动作。")); return@launch }
+    setWorkflow(key, WorkflowCommandState(WorkflowCommandStatus.Submitting))
+    runCatching { repository.decideBodyScreeningReview(item.reviewId, decision, item.version, trimmed, recaptureTasks.toList()) }
+        .onSuccess { ack ->
+            _state.value = _state.value.copy(bodyScreeningReviews = if (ack.status == "completed") _state.value.bodyScreeningReviews.filterNot { it.reviewId == item.reviewId } else _state.value.bodyScreeningReviews)
+            setWorkflow(key, WorkflowCommandState(WorkflowCommandStatus.Succeeded, if (decision == BodyScreeningReviewDecision.Recapture) "重采任务已发送" else "复核结论已保存"))
+            if (ack.status != "completed") loadBodyScreeningReviews()
+        }
+        .onFailure { error ->
+            setWorkflow(key, WorkflowCommandState(WorkflowCommandStatus.Failed, error.localizedMessage ?: "提交失败，请重试"))
+            if (error is ApiError.Conflict) loadBodyScreeningReviews()
+        }
+}
     /** A mobile role is usable only when it is present in the signed-in
      * account claims. `UserRole.mobileRoles` is a product capability list,
      * never a substitute for a teacher authorization grant. */

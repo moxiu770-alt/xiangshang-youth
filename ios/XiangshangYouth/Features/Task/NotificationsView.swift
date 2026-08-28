@@ -95,7 +95,7 @@ struct NotificationsView: View {
         switch route {
         case "course", "lesson":
             return MessageItem(id: message.id, title: message.title, content: "该课程通知缺少孩子、课程或课节编号，暂时不能打开指定课程。", time: message.time, isRead: true, category: message.category)
-        case "report", "task", "retest":
+        case "report", "task", "retest", "bodyassessment":
             return MessageItem(id: message.id, title: message.title, content: "当前账号无权打开这条通知关联的数据，或关联对象已不存在。", time: message.time, isRead: true, category: message.category)
         case "activity", "expertappointment":
             return MessageItem(id: message.id, title: message.title, content: "该通知缺少可打开的业务编号，暂时只能查看通知内容。", time: message.time, isRead: true, category: message.category)
@@ -134,6 +134,12 @@ struct NotificationsView: View {
             state.openExpertAppointmentTarget(businessID); router.push(.expertList); return true
         case (.parent, "childbinding"):
             router.push(.children(returnAfterBinding: false)); return true
+        case (.parent, "bodyassessment"):
+            guard let id = message.childID, state.boundChildren.contains(where: { $0.id == id }) else { return false }
+            if state.selectedChild?.id != id, let child = state.boundChildren.first(where: { $0.id == id }) {
+                state.selectChild(child)
+            }
+            router.push(.bodyAssessment); return true
         case (.parent, "classnotice"), (.teacher, "classnotice"):
             guard message.businessID?.isEmpty == false else { return false }
             selectedMessage = message

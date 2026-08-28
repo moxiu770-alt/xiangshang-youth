@@ -1,16 +1,17 @@
 {
   "meta": {
     "platform": "android",
-    "scenario": "android-child-precision-v2.8-child-motion-research-calibrated",
-    "source": "基于公开姿态计次样本与 yakupzengin 动作定义（rep duration）以及体育跟跳项目双端实现对比复核后的儿童版调参。",
+    "scenario": "engineering-baseline-pending-human-validation",
+    "validationStatus": "pending-human-validation",
+    "source": "工程起始阈值：参考公开动作定义与现有双端实现整理，尚未在冻结的真实儿童人工标注集上完成独立验证。",
     "notes": [
-      "基于6-8岁儿童动作样本做二次阈值增强（跳绳/开合跳/高抬腿）以提升儿童场景误计数抑制。",
-      "6-8岁组加大学习门槛和回位持有，降低儿童抖动导致的误计。",
-      "6-11岁组适度放宽回位下降阈值，避免快速动作遗漏计数。",
+      "年龄段参数目前是待验证的工程候选值，不代表已通过儿童准确率验证。",
+      "6-8岁组暂用更长的稳定与回位门槛，需通过真实标注视频量化误计与漏计。",
+      "6-11岁组的回位下降阈值同样需要按设备、身高和动作类型分层验证。",
       "开合跳/跳绳/高抬腿参照公开动作定义与体育跟跳计数实现进行儿童安全化修正。",
       "保留 JSON 热更新能力与默认本地回退。"
     ],
-    "versionSource": "儿童动作样本（国家学生体质健康标准参考 + 体育跟跳项目双端复核样本 + 姿态库姿态分解）+ 本地儿童动作样本回放调参。",
+    "versionSource": "工程基线（未获人工标注验证审批；不得用于正式准确率声明）。",
     "version": "android-child-precision-2026-09-16-child-motion-research-v4.1"
   },
   "ageProfiles": [

@@ -602,12 +602,21 @@ struct ReviewListView: View {
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var router: AppRouter
     @State private var selectedStudent: Student?
+    @State private var selectedBodyReview: BodyScreeningReviewItem?
+    @State private var reviewMode = 0
     var body: some View {
         ScrollView {
             VStack(spacing: 10) {
                 ParentPageNavigation(title: "预警中心", showsBack: true)
                 ReferenceHeader(name: state.activeDisplayName, school: "\(state.profile?.schoolName ?? "学校") · \(state.managedTeacherClasses.map(\.name).joined(separator: "、").isEmpty ? "暂无班级" : state.managedTeacherClasses.map(\.name).joined(separator: "、"))", initial: String(state.activeDisplayName.prefix(1)), avatarAsset: "TeacherAvatar")
                 ReferenceSectionTitle(title: "预警中心", trailing: "待处理列表").padding(.horizontal, 12)
+                Picker("复核类型", selection: $reviewMode) {
+                    Text("学校体测").tag(0)
+                    Text("家庭身体观察").tag(1)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 12)
+                if reviewMode == 0 {
                 if let error = state.error, state.data == nil {
                     ErrorStateView(message: error) { Task { await state.refreshDashboard() } }
                 } else if state.loading || state.data == nil {
@@ -631,11 +640,135 @@ struct ReviewListView: View {
                     }
                     if students.isEmpty { EmptyStateView(title: "暂无待处理预警", detail: "待复核、待补测和缺席学生将在此显示。") }
                 }
+                } else {
+                    bodyScreeningReviewQueue
+                }
             }
         }
         .background(ReferenceColor.canvas)
         .sheet(item: $selectedStudent) { student in TaskStatusSheet(student: student, status: state.taskStatus(for: student), requiresReviewNote: true) }
+        .sheet(item: $selectedBodyReview) { item in BodyScreeningReviewSheet(item: item) }
+        .task(id: reviewMode) { if reviewMode == 1 { await state.loadBodyScreeningReviews() } }
     }
+
+    @ViewBuilder private var bodyScreeningReviewQueue: some View {
+        if !state.teacherHasCapability("REVIEW_RESULT") {
+            ErrorStateView(message: "当前账号没有身体观察复核权限。") { router.pop() }
+        } else if state.bodyScreeningReviewsLoading && state.bodyScreeningReviews.isEmpty {
+            LoadingStateView()
+        } else if let error = state.bodyScreeningReviewsError, state.bodyScreeningReviews.isEmpty {
+            ErrorStateView(message: error) { Task { await state.loadBodyScreeningReviews() } }
+        } else if state.bodyScreeningReviews.isEmpty {
+            EmptyStateView(title: "暂无身体观察待复核记录", detail: "算法不确定、质量边界或风险候选记录将在这里显示。")
+        } else {
+            Text("待处理 \(state.bodyScreeningReviews.count) 条 · 仅展示结构化证据，不包含原始照片或视频")
+                .font(.system(size: 13, weight: .semibold)).foregroundStyle(AppTheme.muted)
+                .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 14)
+            ForEach(state.bodyScreeningReviews) { item in
+                Button { selectedBodyReview = item } label: {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Text(item.studentDisplayName).font(.system(size: 16, weight: .bold)).foregroundStyle(ReferenceColor.navy)
+                            Spacer()
+                            Text("质量 \(item.qualityScore.map(String.init) ?? "--")")
+                                .font(.system(size: 13, weight: .semibold)).foregroundStyle(item.qualityScore.map { $0 >= 70 ? ReferenceColor.green : AppTheme.warning } ?? AppTheme.muted)
+                            Image(systemName: "chevron.right").foregroundStyle(AppTheme.muted)
+                        }
+                        Text("\(item.attempts.count) 项结构化证据 · \(item.reasonCodes.map(bodyReviewReason).joined(separator: "、"))")
+                            .font(.system(size: 13)).foregroundStyle(AppTheme.muted).fixedSize(horizontal: false, vertical: true)
+                        HStack {
+                            Text(item.protocolVersion ?? "协议版本待同步")
+                            Spacer()
+                            Text("v\(item.version)")
+                        }.font(.system(size: 12)).foregroundStyle(.secondary)
+                    }
+                    .padding(15).background(.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }.buttonStyle(.plain).padding(.horizontal, 12)
+                    .accessibilityLabel("\(item.studentDisplayName)身体观察待复核，质量分\(item.qualityScore.map(String.init) ?? "未知")")
+            }
+        }
+    }
+
+    private func bodyReviewReason(_ code: String) -> String {
+        switch code {
+        case "MODEL_PENDING_HUMAN_VALIDATION": "模型待人工验证"
+        case "RISK_CANDIDATE": "存在关注指标"
+        case "HIGH_UNCERTAINTY": "算法不确定性较高"
+        case "LOW_CONFIDENCE": "关键点置信度不足"
+        case "REPEATABILITY_FAILED": "两次采集一致性不足"
+        default: code.replacingOccurrences(of: "_", with: " ")
+        }
+    }
+}
+
+private struct BodyScreeningReviewSheet: View {
+    let item: BodyScreeningReviewItem
+    @EnvironmentObject private var state: AppState
+    @Environment(\.dismiss) private var dismiss
+    @State private var decision: BodyScreeningReviewDecision = .continueObservation
+    @State private var comment = ""
+    @State private var recaptureTasks: Set<BodyAssessmentRecord.CaptureTask> = []
+    private var workflowKey: String { "body-screening-review:\(item.reviewId)" }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("结构化采集证据") {
+                    LabeledContent("学生", value: item.studentDisplayName)
+                    LabeledContent("总质量分", value: item.qualityScore.map(String.init) ?? "未提供")
+                    ForEach(item.attempts) { attempt in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(taskTitle(attempt.captureTask)).font(.headline)
+                            Text("置信度 \(Int(attempt.confidence * 100))% · \(attempt.sampleCount) 个有效样本 · \(attempt.attemptCount) 次采集")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                            if let quality = attempt.qualityScore { ProgressView(value: Double(quality), total: 100).tint(quality >= 70 ? ReferenceColor.green : AppTheme.warning) }
+                            ForEach(attempt.evidenceMetrics ?? []) { metric in
+                                VStack(alignment: .leading, spacing: 2) {
+                                    HStack(alignment: .firstTextBaseline) {
+                                        Text(metric.label).foregroundStyle(ReferenceColor.navy)
+                                        Spacer(minLength: 12)
+                                        Text(metric.displayedValue).fontWeight(.semibold).multilineTextAlignment(.trailing)
+                                    }
+                                    Text(metric.sourceTitle).font(.caption).foregroundStyle(.secondary)
+                                }
+                                .font(.subheadline)
+                                .accessibilityElement(children: .combine)
+                                .accessibilityLabel("\(metric.label)，\(metric.displayedValue)，来源\(metric.sourceTitle)")
+                            }
+                            if (attempt.evidenceMetrics ?? []).isEmpty {
+                                Text("本动作暂无可展示的白名单指标，仅可依据采集质量决定是否重采。")
+                                    .font(.footnote).foregroundStyle(.secondary)
+                            }
+                        }.accessibilityElement(children: .combine)
+                    }
+                    Text("“相对投影值”和“摄像头估计”不是物理厘米、ATR 或 Cobb 角。不提供原始照片或视频；复核结论仅用于健康管理与后续行动，不构成医疗诊断。")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                Section("复核结论") {
+                    Picker("处理方式", selection: $decision) { ForEach(BodyScreeningReviewDecision.allCases) { Text($0.title).tag($0) } }
+                    TextEditor(text: $comment).frame(minHeight: 96).accessibilityLabel("复核依据和后续处理说明")
+                    if decision == .recapture {
+                        ForEach(BodyAssessmentRecord.CaptureTask.allCases, id: \.self) { task in
+                            Toggle(task.title, isOn: Binding(get: { recaptureTasks.contains(task) }, set: { selected in if selected { recaptureTasks.insert(task) } else { recaptureTasks.remove(task) } }))
+                        }
+                    }
+                    if case let .failed(message) = state.workflowState(for: workflowKey) { Text(message).foregroundStyle(.red).font(.footnote) }
+                }
+                Section {
+                    Button {
+                        Task { if await state.submitBodyScreeningReview(item, decision: decision, comment: comment, recaptureTasks: recaptureTasks) { dismiss() } }
+                    } label: {
+                        HStack { Spacer(); if state.workflowState(for: workflowKey).isSubmitting { ProgressView() } else { Text("确认提交").fontWeight(.semibold) }; Spacer() }
+                    }.disabled(state.workflowState(for: workflowKey).isSubmitting)
+                }
+            }
+            .navigationTitle("身体观察复核")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("关闭") { dismiss() } } }
+        }
+    }
+
+    private func taskTitle(_ value: String) -> String { BodyAssessmentRecord.CaptureTask(rawValue: value)?.title ?? value }
 }
 
 private struct TeacherStudentStatusRow: View {

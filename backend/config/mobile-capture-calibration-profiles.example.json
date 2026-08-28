@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "UY-MOBILE-CAPTURE-PROFILE-1.0",
+  "profiles": [
+    {
+      "profileId": "ios-iphone15-rear1x-1920x1080-v1",
+      "status": "active",
+      "boardId": "uy-charuco-floor-wall-v1",
+      "intrinsicsId": "iphone15-rear1x-1920x1080-v1",
+      "lensId": "rear-1x",
+      "resolution": "1920x1080",
+      "deviceModel": "iPhone15,4",
+      "boardFamily": "charuco",
+      "markerSizeMm": 17,
+      "boardWidthMm": 168,
+      "boardHeightMm": 240,
+      "intrinsicMatrix": [],
+      "distortionCoefficients": [],
+      "boardLayoutHash": "c466885664f171904a9f62614e25667aae288774617bd6d25652986f7170f4dc",
+      "approvedAt": "2026-08-28T00:00:00Z",
+      "expiresAt": "2027-08-28T00:00:00Z"
+    }
+  ]
+}

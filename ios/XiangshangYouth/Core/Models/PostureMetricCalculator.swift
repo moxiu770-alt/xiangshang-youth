@@ -42,11 +42,22 @@ enum PostureMetricCalculator {
         return sorted.count.isMultiple(of: 2) ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle]
     }
 
-    /// Motion amplitude around the camera baseline. A range avoids treating
-    /// a child who walks slightly off-centre as exaggerated trunk sway.
-    static func range(_ values: [Double]) -> Double? {
-        let finite = values.filter { $0.isFinite }
-        guard let minimum = finite.min(), let maximum = finite.max() else { return nil }
-        return max(0, maximum - minimum)
+    /// Median after rejecting isolated landmark jumps with a MAD fence. This
+    /// makes one low-confidence frame unable to move the reported value while
+    /// preserving genuine, consistently observed asymmetry.
+    static func robustMedian(_ values: [Double], madMultiplier: Double = 3.5) -> Double? {
+        let finite = values.filter(\.isFinite)
+        guard let center = median(finite) else { return nil }
+        let deviations = finite.map { abs($0 - center) }
+        guard let mad = median(deviations), mad > 0.000_001 else { return center }
+        let fence = mad * max(2.5, madMultiplier)
+        let retained = finite.filter { abs($0 - center) <= fence }
+        return median(retained) ?? center
+    }
+
+    static func medianAbsoluteDeviation(_ values: [Double]) -> Double? {
+        let finite = values.filter(\.isFinite)
+        guard finite.count >= 2, let center = median(finite) else { return nil }
+        return median(finite.map { abs($0 - center) })
     }
 }

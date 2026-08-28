@@ -1,22 +1,5 @@
 package com.xiangshang.youth.core.model
 
-import org.json.JSONArray
-import org.json.JSONObject
-
-enum class BodyAttentionLevel(val label: String) {
-    /** A data-completeness state, not a health-risk classification. */
-    Pending("待完成拍摄记录"),
-    Green("本次观察已完成"),
-    Yellow("建议关注"),
-    Red("建议进一步评估"),
-    Unavailable("待完善生日")
-}
-enum class AdamsScreeningResult(val label: String) {
-    Negative("阴性（未见明显不对称）"),
-    Equivocal("可疑阳性（建议复测）"),
-    Positive("阳性代理信号（建议专科复核）")
-}
-
 /** Aggregated normalized pose geometry. Raw camera frames are never stored. */
 data class PostureMetricSnapshot(
     val id: String,
@@ -31,17 +14,63 @@ data class PostureMetricSnapshot(
     val forwardHeadAngleDegrees: Double? = null,
     val cameraProxyAtrDegrees: Double? = null,
     val cameraProxyRibProminenceCm: Double? = null,
+    val shoulderProtractionProxyDegrees: Double? = null,
+    val pelvicTiltProxyDegrees: Double? = null,
+    val kneeAlignmentProxyRatio: Double? = null,
+    val lowerLimbAxisAsymmetryDegrees: Double? = null,
+    val leftKneeValgusProxyDegrees: Double? = null,
+    val rightKneeValgusProxyDegrees: Double? = null,
+    val kneeTrackingAsymmetryRatio: Double? = null,
+    val squatDepthRatio: Double? = null,
+    val movementRepetitionCount: Double? = null,
+    /** Quality-only until a dedicated paediatric foot model is validated. */
+    val footArchVisibilityScore: Double? = null,
+    val leftArchProxyIndex: Double? = null,
+    val rightArchProxyIndex: Double? = null,
+    val heelAlignmentProxyDegrees: Double? = null,
+    val adamsObservedResult: String? = null,
+    val adamsProminenceSide: String? = null,
     /** Optional validated ATR from a calibrated instrument/depth adapter. */
     val instrumentAtrDegrees: Double? = null,
     /** Optional calibrated chest/waist ATR readings. */
     val thoracicAtrDegrees: Double? = null,
     val lumbarAtrDegrees: Double? = null,
+    val thoracicAtrSide: String? = null,
+    val lumbarAtrSide: String? = null,
+    val thoracicAtrFirstDegrees: Double? = null,
+    val thoracicAtrSecondDegrees: Double? = null,
+    val lumbarAtrFirstDegrees: Double? = null,
+    val lumbarAtrSecondDegrees: Double? = null,
+    val seatedForwardBendAtrDegrees: Double? = null,
     /** Optional supervised occiput-to-wall distance measurement. */
     val occiputWallDistanceCm: Double? = null,
     val gaitShoulderSwingDifferenceCm: Double? = null,
     val gaitPelvicSwingDifferenceCm: Double? = null,
-    val gaitTrunkSwayCm: Double? = null
+    val gaitTrunkSwayCm: Double? = null,
+    val gaitObservedAbnormal: Boolean? = null,
+    val gaitObservationNote: String? = null,
+    val seatedThoracicKyphosisObserved: Boolean? = null,
+    /** Actual camera-gate provenance, not an assertion that a physical
+     * marker board has already been detected. */
+    val captureProtocolVersion: String? = null,
+    val cameraFacing: String? = null,
+    /** This describes evidence actually consumed, not hardware marketing. */
+    val measurementMode: String? = null,
+    val deviceCapabilityTier: String? = null,
+    val depthAvailable: Boolean? = null,
+    val segmentPhaseCount: Int? = null,
+    val qualityChecks: List<String>? = null,
+    val captureCalibration: CaptureCalibrationEvidence? = null,
+    /** 1 means a usable first take exists and an independent second take is still required. */
+    val captureAttemptCount: Int? = null,
+    val repeatabilityStatus: String? = null,
+    val repeatabilityMaximumDifference: Double? = null
 ) {
     val adamsResult: AdamsScreeningResult?
-        get() = cameraProxyRibProminenceCm?.takeIf { it.isFinite() && it >= 0.0 }?.let { when { it >= PostureScreeningRules.ribProminencePositiveCentimeters -> AdamsScreeningResult.Positive; it >= PostureScreeningRules.ribProminenceEquivocalCentimeters -> AdamsScreeningResult.Equivocal; else -> AdamsScreeningResult.Negative } }
+        get() = when (adamsObservedResult) {
+            "negative" -> AdamsScreeningResult.Negative
+            "equivocal" -> AdamsScreeningResult.Equivocal
+            "positive" -> AdamsScreeningResult.Positive
+            else -> cameraProxyRibProminenceCm?.takeIf { it.isFinite() && it >= 0.0 }?.let { when { it >= PostureScreeningRules.ribProminencePositiveCentimeters -> AdamsScreeningResult.Positive; it >= PostureScreeningRules.ribProminenceEquivocalCentimeters -> AdamsScreeningResult.Equivocal; else -> AdamsScreeningResult.Negative } }
+        }
 }

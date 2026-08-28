@@ -32,6 +32,7 @@
 
 /* Begin PBXFileReference section */
 		4815524C3021F73E00DFEF89 /* XiangshangYouth.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = XiangshangYouth.xcodeproj; sourceTree = "<group>"; };
+		4836804B3040761F00E4A48B /* XiangshangYouth.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = XiangshangYouth.xcodeproj; sourceTree = "<group>"; };
 		485C31A4303C561A00FCC7D1 /* XiangshangYouth.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = XiangshangYouth.xcodeproj; sourceTree = "<group>"; };
 		485C324B303CAA8A00FCC7D1 /* XiangshangYouth.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = XiangshangYouth.xcodeproj; sourceTree = "<group>"; };
 		485E1CB03020A9AC00AA1653 /* XiangshangYouth.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = XiangshangYouth.xcodeproj; sourceTree = "<group>"; };
@@ -94,6 +95,11 @@
 
 /* Begin PBXGroup section */
 		4815524E3021F73E00DFEF89 /* Products */ = {
+			isa = PBXGroup;
+			name = Products;
+			sourceTree = "<group>";
+		};
+		4836804D3040761F00E4A48B /* Products */ = {
 			isa = PBXGroup;
 			name = Products;
 			sourceTree = "<group>";
@@ -265,10 +271,6 @@
 			projectDirPath = "";
 			projectReferences = (
 				{
-					ProductGroup = 485E1CB23020A9AC00AA1653 /* Products */;
-					ProjectRef = 485E1CB03020A9AC00AA1653 /* XiangshangYouth.xcodeproj */;
-				},
-				{
 					ProductGroup = 4815524E3021F73E00DFEF89 /* Products */;
 					ProjectRef = 4815524C3021F73E00DFEF89 /* XiangshangYouth.xcodeproj */;
 				},
@@ -295,6 +297,14 @@
 				{
 					ProductGroup = 48F0CFCE303D49CE0028C0C8 /* Products */;
 					ProjectRef = 48F0CFCC303D49CE0028C0C8 /* XiangshangYouth.xcodeproj */;
+				},
+				{
+					ProductGroup = 485E1CB23020A9AC00AA1653 /* Products */;
+					ProjectRef = 485E1CB03020A9AC00AA1653 /* XiangshangYouth.xcodeproj */;
+				},
+				{
+					ProductGroup = 4836804D3040761F00E4A48B /* Products */;
+					ProjectRef = 4836804B3040761F00E4A48B /* XiangshangYouth.xcodeproj */;
 				},
 			);
 			projectRoot = "";

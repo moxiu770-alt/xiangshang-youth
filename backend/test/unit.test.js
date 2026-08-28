@@ -28,7 +28,9 @@ test('push installation tokens are encrypted, authenticated and provider-scoped'
   assert.notEqual(encrypted, token);
   assert.equal(decryptPushToken(encrypted, secret), token);
   assert.notEqual(pushTokenHash('apns', token), pushTokenHash('fcm', token));
-  assert.throws(() => decryptPushToken(`${encrypted.slice(0, -1)}x`, secret), /无法解密/);
+  const tampered = encrypted.split('.');
+  tampered[2] = `${tampered[2][0] === 'A' ? 'B' : 'A'}${tampered[2].slice(1)}`;
+  assert.throws(() => decryptPushToken(tampered.join('.'), secret), /无法解密/);
   assert.throws(() => encryptPushToken(token, 'short'), /加密密钥未配置/);
 });
 

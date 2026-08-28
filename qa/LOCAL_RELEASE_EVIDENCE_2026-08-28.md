@@ -22,9 +22,10 @@
 
 ## 未通过/外部阻塞
 
-- `npm run test:integration` 按安全设计失败：未提供独立 `TEST_DATABASE_URL`，未连接开发库或生产库替代。
+- 本机没有独立 PostgreSQL 服务，因此未在本机运行 `npm run test:integration`；GitHub Actions run `33170822638` 已在独立 PostgreSQL 16 服务与独立 schema 中完成 migration、隔离 fixture、96 项单元/契约测试和集成测试，Backend integration 作业通过，未连接开发或生产库替代。
 - 本机无 `dotnet`，本轮未重跑 Windows 场地端核心测试。
 - Android `adb devices -l` 列表为空，本轮没有 Android 真机/模拟器证据。
 - `api.risingteen.com` 当前被大陆云侧 `webblock` 拦截，HTTPS/TLS 不可用；源站 HTTP 只返回 Caddy 转 HTTPS。在备案/云侧接入修复前，RemoteRepository 现网全闭环无法验收。
 - 未提供真实儿童独立人工标注集、每人 10 次重复性数据和八份分域报告。模型状态保持 `pending-human-validation`，不做商业准确率声明。
-- 跨端候选改动在本轮通过差异空白、常见私钥/令牌格式和大文件检查后保存为本地 Git 基线；本轮不推送远程，也不以该基线代替外部发布门禁。
+- 远程准备提交 `b0b02d0` 已推送到 `codex/pilot-content-ops-architecture`。同一 CI run 的 Production container contract 已验证生产 Compose、Caddy 正式域名配置、公网 IP 短期证书配置和 pilot overlay；该配置验证不冒充腾讯云实机部署或公网 `/readyz` 已通过。
+- 推送 device installation 已完成服务端加密注册、撤销、失效回收与 OpenAPI；真实 APNs Key、Firebase 配置和通知网关凭据尚未注入，当前不得声称系统推送通过。
